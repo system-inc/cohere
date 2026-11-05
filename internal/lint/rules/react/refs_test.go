@@ -814,21 +814,21 @@ export function Component({label}: {label: string}) {
 	probe := rule.Rule{
 		Name:             "refs-cannot-have-ref-type-probe",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(root *ast.Node) {
 					var visit func(node *ast.Node) bool
 					visit = func(node *ast.Node) bool {
 						if refsCannotHaveRefType(node) {
 							declined[node.Kind]++
-							if refsNodeHasRefType(ctx, node) {
+							if refsNodeHasRefType(ruleContext, node) {
 								test.Errorf("declined %s at %d, which the checker types as a ref", node.Kind, node.Pos())
 							}
 						}
 						if node.Kind == ast.KindBinaryExpression || node.Kind == ast.KindConditionalExpression ||
 							node.Kind == ast.KindFunctionExpression {
-							text := ctx.SourceFile.Text()[node.Pos():node.End()]
-							asked[strings.TrimSpace(text)] = !refsCannotHaveRefType(node) && refsNodeHasRefType(ctx, node)
+							text := ruleContext.SourceFile.Text()[node.Pos():node.End()]
+							asked[strings.TrimSpace(text)] = !refsCannotHaveRefType(node) && refsNodeHasRefType(ruleContext, node)
 						}
 						return node.ForEachChild(visit)
 					}

@@ -203,7 +203,7 @@ func funcNameMatchingMessage(direction string, isProperty bool, functionName str
 // the same two lines rather than from a separate guard.
 var FuncNameMatching = rule.Rule{
 	Name: "func-name-matching",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		resolved := DefaultFuncNameMatchingOptions()
 		if given, isFuncNameMatchingOptions := rule.OptionsAs[FuncNameMatchingOptions](options); isFuncNameMatchingOptions {
 			resolved = given
@@ -214,7 +214,7 @@ var FuncNameMatching = rule.Rule{
 		}
 
 		checker := &funcNameMatchingChecker{
-			ctx:                        ctx,
+			ctx:                        ruleContext,
 			direction:                  direction,
 			considerPropertyDescriptor: resolved.ConsiderPropertyDescriptor,
 			includeModuleExports:       resolved.IncludeCommonJSModuleExports,

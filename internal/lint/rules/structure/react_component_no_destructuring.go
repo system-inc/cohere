@@ -94,8 +94,8 @@ var propertiesSourceNames = map[string]bool{
 // boundary. Requiring a rest there would be asking for a shape that does not fit.
 var ReactComponentNoDestructuring = rule.Rule{
 	Name: "structure/react-component-no-destructuring",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 
@@ -116,7 +116,7 @@ var ReactComponentNoDestructuring = rule.Rule{
 					continue
 				}
 				if message, ok := destructuringProblem(pattern, node); ok {
-					ctx.ReportNode(pattern, message)
+					ruleContext.ReportNode(pattern, message)
 				}
 			}
 		}
@@ -164,11 +164,11 @@ var ReactComponentNoDestructuring = rule.Rule{
 				// No rest at all is its own message here, because the repair is different: the
 				// whole statement goes, rather than a rest being added to it.
 				if restBindingName(pattern) == nil {
-					ctx.ReportNode(pattern, messageNoDestructuringFromPropsSource())
+					ruleContext.ReportNode(pattern, messageNoDestructuringFromPropsSource())
 					return
 				}
 				if message, ok := destructuringProblem(pattern, containing); ok {
-					ctx.ReportNode(pattern, message)
+					ruleContext.ReportNode(pattern, message)
 				}
 			},
 		}

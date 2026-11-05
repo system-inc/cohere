@@ -181,7 +181,7 @@ var RestrictTemplateExpressions = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[RestrictTemplateExpressionsOptions](options)
 		if !isSettings {
 			// A rule configured as a bare severity reaches here with nil options, and the zero
@@ -233,7 +233,7 @@ var RestrictTemplateExpressions = rule.Rule{
 
 			// The configured allowlist, checked against the type and its base types so a subclass
 			// of an allowed type is allowed too. That is upstream's `matchesTypeOrBaseType`.
-			if matchesAllowedTypeOrBaseType(ctx, candidate, settings,
+			if matchesAllowedTypeOrBaseType(ruleContext, candidate, settings,
 				map[*checker.Type]struct{}{}) {
 				return true
 			}
@@ -252,7 +252,7 @@ var RestrictTemplateExpressions = rule.Rule{
 				checker.TypeFlagsNumberLike|checker.TypeFlagsBigIntLike) {
 				return true
 			}
-			if allowRegExp && type_checking.GetTypeName(ctx.TypeChecker, candidate) == "RegExp" {
+			if allowRegExp && type_checking.GetTypeName(ruleContext.TypeChecker, candidate) == "RegExp" {
 				return true
 			}
 			if allowNever && type_checking.IsTypeFlagSet(candidate, checker.TypeFlagsNever) {
@@ -261,9 +261,9 @@ var RestrictTemplateExpressions = rule.Rule{
 
 			// The array tester recurses through the number index type, which is what separates
 			// `string[]` from `object[]` under the same flag.
-			if allowArray && (checker.Checker_isArrayType(ctx.TypeChecker, candidate) ||
+			if allowArray && (checker.Checker_isArrayType(ruleContext.TypeChecker, candidate) ||
 				checker.IsTupleType(candidate)) {
-				return isAllowedType(type_checking.GetNumberIndexType(ctx.TypeChecker, candidate))
+				return isAllowedType(type_checking.GetNumberIndexType(ruleContext.TypeChecker, candidate))
 			}
 
 			return false
@@ -271,7 +271,7 @@ var RestrictTemplateExpressions = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindTemplateExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -292,14 +292,14 @@ var RestrictTemplateExpressions = rule.Rule{
 						continue
 					}
 
-					expressionType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker,
+					expressionType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker,
 						expression)
 					if expressionType == nil || isAllowedType(expressionType) {
 						continue
 					}
 
-					ctx.ReportNode(expression, buildInvalidTypeMessage(
-						ctx.TypeChecker.TypeToString(expressionType)))
+					ruleContext.ReportNode(expression, buildInvalidTypeMessage(
+						ruleContext.TypeChecker.TypeToString(expressionType)))
 				}
 			},
 		}
@@ -317,7 +317,7 @@ var RestrictTemplateExpressions = rule.Rule{
 //
 // `seen` reproduces upstream's cycle guard rather than adding one. It is load-bearing on interfaces,
 // where a declaration-merged hierarchy can reach itself.
-func matchesAllowedTypeOrBaseType(ctx rule.Context, candidate *checker.Type,
+func matchesAllowedTypeOrBaseType(ruleContext rule.Context, candidate *checker.Type,
 	settings RestrictTemplateExpressionsOptions, seen map[*checker.Type]struct{}) bool {
 	if candidate == nil {
 		return false
@@ -328,12 +328,12 @@ func matchesAllowedTypeOrBaseType(ctx rule.Context, candidate *checker.Type,
 	seen[candidate] = struct{}{}
 
 	if type_checking.TypeMatchesSomeSpecifier(candidate, settings.Allow, settings.AllowInline,
-		ctx.Program) {
+		ruleContext.Program) {
 		return true
 	}
 
-	for _, baseType := range baseTypesOf(ctx, candidate) {
-		if matchesAllowedTypeOrBaseType(ctx, baseType, settings, seen) {
+	for _, baseType := range baseTypesOf(ruleContext, candidate) {
+		if matchesAllowedTypeOrBaseType(ruleContext, baseType, settings, seen) {
 			return true
 		}
 	}
@@ -345,7 +345,7 @@ func matchesAllowedTypeOrBaseType(ctx rule.Context, candidate *checker.Type,
 // Two hops that are easy to skip and both matter. A generic type arrives as a type REFERENCE whose
 // base types live on its target rather than on the reference, and `getBaseTypes` answers only for a
 // class or interface, so anything else returns nothing rather than being asked.
-func baseTypesOf(ctx rule.Context, candidate *checker.Type) []*checker.Type {
+func baseTypesOf(ruleContext rule.Context, candidate *checker.Type) []*checker.Type {
 	if !type_checking.IsObjectType(candidate) {
 		return nil
 	}
@@ -362,7 +362,7 @@ func baseTypesOf(ctx rule.Context, candidate *checker.Type) []*checker.Type {
 		return nil
 	}
 
-	return checker.Checker_getBaseTypes(ctx.TypeChecker, interfaceTarget)
+	return checker.Checker_getBaseTypes(ruleContext.TypeChecker, interfaceTarget)
 }
 
 func buildInvalidTypeMessage(typeName string) rule.Message {

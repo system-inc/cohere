@@ -94,7 +94,7 @@ func runRenameVerb(arguments []string) error {
 		return fmt.Errorf("building the type graph: %w", err)
 	}
 
-	ctx := context.Background()
+	backgroundContext := context.Background()
 
 	position, isPosition := rename.ParsePosition(target)
 	if isPosition {
@@ -110,7 +110,7 @@ func runRenameVerb(arguments []string) error {
 		// The bare-name form is sugar, and it refuses rather than guesses. A bare name is not a
 		// symbol: if three files each declare a local `err`, this has three valid answers and the
 		// cursor that would disambiguate in an editor does not exist on a command line.
-		candidates, symbols, resolveBareNameError := rename.ResolveBareName(ctx, graph, target)
+		candidates, symbols, resolveBareNameError := rename.ResolveBareName(backgroundContext, graph, target)
 		if resolveBareNameError != nil {
 			return resolveBareNameError
 		}
@@ -131,7 +131,7 @@ func runRenameVerb(arguments []string) error {
 		}
 	}
 
-	plan, err := rename.Build(ctx, graph, position, newName)
+	plan, err := rename.Build(backgroundContext, graph, position, newName)
 	if err != nil {
 		return err
 	}

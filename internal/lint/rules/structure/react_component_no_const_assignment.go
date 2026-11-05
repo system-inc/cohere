@@ -73,8 +73,8 @@ func messageNoConstAssignment(identifierName string, isExported bool) rule.Messa
 // that change does not touch. A reader who found it deleted would have no way to learn that.
 var ReactComponentNoConstAssignment = rule.Rule{
 	Name: "structure/react-component-no-const-assignment",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil || !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 
@@ -112,7 +112,7 @@ var ReactComponentNoConstAssignment = rule.Rule{
 					if initializer.Kind != ast.KindFunctionExpression && initializer.Kind != ast.KindArrowFunction {
 						continue
 					}
-					ctx.ReportNode(name, messageNoConstAssignment(name.Text(), isExported))
+					ruleContext.ReportNode(name, messageNoConstAssignment(name.Text(), isExported))
 				}
 			},
 		}

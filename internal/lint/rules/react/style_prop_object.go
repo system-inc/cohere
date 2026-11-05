@@ -176,7 +176,7 @@ var StylePropObject = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[StylePropObjectOptions](options)
 		allowed := make(map[string]bool, len(settings.Allow))
 		for _, name := range settings.Allow {
@@ -197,14 +197,14 @@ var StylePropObject = rule.Rule{
 		// The failure is silent in the costly direction, and no imported fixture caught it because
 		// upstream's corpus writes no shorthand.
 		checkIdentifier := func(node *ast.Node, shorthand *ast.Node) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 			var symbol *ast.Symbol
 			if shorthand != nil {
-				symbol = ctx.TypeChecker.GetShorthandAssignmentValueSymbol(shorthand)
+				symbol = ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(shorthand)
 			} else {
-				symbol = ctx.TypeChecker.GetSymbolAtLocation(node)
+				symbol = ruleContext.TypeChecker.GetSymbolAtLocation(node)
 			}
 			if symbol == nil || len(symbol.Declarations) == 0 {
 				return
@@ -217,7 +217,7 @@ var StylePropObject = rule.Rule{
 			}
 			initializer := stylePropObjectUnwrapParentheses(declaration.AsVariableDeclaration().Initializer)
 			if stylePropObjectIsNonNullLiteral(initializer) {
-				ctx.ReportNode(node, stylePropObjectMessage)
+				ruleContext.ReportNode(node, stylePropObjectMessage)
 			}
 		}
 
@@ -250,7 +250,7 @@ var StylePropObject = rule.Rule{
 				// A value that is not an expression container is a plain string attribute, which
 				// upstream reports directly. The finding is on the whole attribute in that branch.
 				if attribute.Initializer.Kind != ast.KindJsxExpression {
-					ctx.ReportNode(node, stylePropObjectMessage)
+					ruleContext.ReportNode(node, stylePropObjectMessage)
 					return
 				}
 
@@ -260,7 +260,7 @@ var StylePropObject = rule.Rule{
 				// branch because the container test already passed. Measured; no corpus case
 				// writes it. The nil here is that same undefined.
 				if stylePropObjectIsNonNullLiteral(expression) || expression == nil {
-					ctx.ReportNode(node, stylePropObjectMessage)
+					ruleContext.ReportNode(node, stylePropObjectMessage)
 					return
 				}
 				if expression.Kind == ast.KindIdentifier {
@@ -270,10 +270,10 @@ var StylePropObject = rule.Rule{
 			},
 
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				if !isPragmaCreateElementCall(ctx, node) {
+				if !isPragmaCreateElementCall(ruleContext, node) {
 					return
 				}
 				arguments := node.AsCallExpression().Arguments
@@ -336,7 +336,7 @@ var StylePropObject = rule.Rule{
 						// Upstream reports on the VALUE here, not on the property and not on the
 						// call, which is a different anchor from the JSX arm above. A span fixture
 						// pins both.
-						ctx.ReportNode(value, stylePropObjectMessage)
+						ruleContext.ReportNode(value, stylePropObjectMessage)
 					}
 					return
 				}

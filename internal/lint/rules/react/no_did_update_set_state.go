@@ -84,7 +84,7 @@ var NoDidUpdateSetState = rule.Rule{
 	// No namespace prefix. The config writes `react/no-did-update-set-state` and the parity guard
 	// strips the namespace on a `/` boundary.
 	Name: "react/no-did-update-set-state",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's permissive default.
 		settings, _ := rule.OptionsAs[NoMethodSetStateOptions](options)
 		reportInsideNestedFunctions := settings.DisallowInFunc
@@ -113,7 +113,7 @@ var NoDidUpdateSetState = rule.Rule{
 				// The callee, not the call. Upstream underlines thirteen characters for
 				// `this.setState({...})`, stopping before the parenthesis, on all eighteen of its
 				// snapshot diagnostics.
-				ctx.ReportNode(callee, messageNoSetStateInComponentDidUpdate)
+				ruleContext.ReportNode(callee, messageNoSetStateInComponentDidUpdate)
 			},
 		}
 	},

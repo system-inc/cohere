@@ -20,11 +20,11 @@ var indexedAccessWriteText = policy.MessageOf("adamic/no-indexed-access-write", 
 var NoIndexedAccessWrite = rule.Rule{
 	Name:             "adamic/no-indexed-access-write",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
-		walker := flow.WalkerFor(ctx)
+		walker := flow.WalkerFor(ruleContext)
 		var sourceRoot *checker.Type
 		judge := func(pair flow.Pair) (bool, bool) {
 			if !flow.IsTypeParameterIndexedAccess(pair.Target) {
@@ -33,19 +33,19 @@ var NoIndexedAccessWrite = rule.Rule{
 			if pair.Source.Flags()&checker.TypeFlagsNever != 0 {
 				return false, false
 			}
-			if projectsIndexedAccess(ctx.TypeChecker, sourceRoot, pair.Target, pair.Path) ||
-				returnsIndexedAccess(ctx.TypeChecker, sourceRoot, pair.Target, pair.Path) {
+			if projectsIndexedAccess(ruleContext.TypeChecker, sourceRoot, pair.Target, pair.Path) ||
+				returnsIndexedAccess(ruleContext.TypeChecker, sourceRoot, pair.Target, pair.Path) {
 				return false, false
 			}
 			same := pair.Source.Flags()&checker.TypeFlagsIndexedAccess != 0 &&
-				checker.Checker_isTypeIdenticalTo(ctx.TypeChecker, pair.Source, pair.Target)
+				checker.Checker_isTypeIdenticalTo(ruleContext.TypeChecker, pair.Source, pair.Target)
 			return !same, false
 		}
 		return walker.Listeners(func(site flow.Site) {
 			// Spreads can copy a concrete property into T[K]; contextual methods can
 			// return one or accept one through a bivariant parameter. Their Node probes
 			// are spread.ts, method-return.ts and method-argument.ts (#xzpba0r).
-			if readsIndexedAccess(ctx.TypeChecker, site.Node, site.Target) {
+			if readsIndexedAccess(ruleContext.TypeChecker, site.Node, site.Target) {
 				return
 			}
 			sourceRoot = site.Source
@@ -53,16 +53,16 @@ var NoIndexedAccessWrite = rule.Rule{
 			if !wrong {
 				return
 			}
-			constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, found.Target)
+			constraint := checker.Checker_getBaseConstraintOfType(ruleContext.TypeChecker, found.Target)
 			constraintText := "unknown"
 			if constraint != nil {
-				constraintText = type_checking.StableTypeText(ctx.TypeChecker, constraint)
+				constraintText = type_checking.StableTypeText(ruleContext.TypeChecker, constraint)
 			}
-			ctx.ReportNode(site.Node, rule.Message{
+			ruleContext.ReportNode(site.Node, rule.Message{
 				Id: "indexedAccessWrite",
 				Description: indexedAccessWriteText.Render(map[string]string{
-					"slot":       type_checking.StableTypeText(ctx.TypeChecker, found.Target),
-					"source":     type_checking.StableTypeText(ctx.TypeChecker, found.Source),
+					"slot":       type_checking.StableTypeText(ruleContext.TypeChecker, found.Target),
+					"source":     type_checking.StableTypeText(ruleContext.TypeChecker, found.Source),
 					"constraint": constraintText,
 				}),
 			})

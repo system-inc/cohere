@@ -113,19 +113,19 @@ func methodCallScopeStates(test *testing.T, source string) (before, after, calls
 	probe := rule.Rule{
 		Name:             "method-call-scope-states",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						return
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
-						InferReactive(function, ctx.TypeChecker)
+						InferReactive(function, ruleContext.TypeChecker)
 						DropManualMemoization(function)
 						ranges := InferMutableRanges(function)
 						disjoint := FindDisjointMutableValuesWithRanges(function, ranges)

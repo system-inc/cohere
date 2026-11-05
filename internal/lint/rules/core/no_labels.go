@@ -107,7 +107,7 @@ type NoLabelsOptions struct {
 // than a spelling change.
 var NoLabels = rule.Rule{
 	Name: "no-labels",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// A rule configured as a bare `"error"` is handed NIL rather than a decoded struct, because
 		// `DecodeOptionsInto` errors on empty input and the config turns that into nil. Without this
 		// the type assertion yields the zero value anyway, which happens to be correct here, but
@@ -236,10 +236,10 @@ var NoLabels = rule.Rule{
 				node.ForEachChild(visit)
 
 				for _, labeled := range labelFindings {
-					ctx.ReportNode(labeled, messageUnexpectedLabel)
+					ruleContext.ReportNode(labeled, messageUnexpectedLabel)
 				}
 				for _, jump := range jumpFindings {
-					ctx.ReportNode(jump.node, jump.message)
+					ruleContext.ReportNode(jump.node, jump.message)
 				}
 			},
 		}

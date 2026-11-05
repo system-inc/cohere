@@ -45,7 +45,7 @@ var messageUnexpectedVar = rule.Message{
 // program into a broken one.
 var NoVar = rule.Rule{
 	Name: "no-var",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// reportIfVar reports when a declaration list declares with `var`.
 		//
 		// let and const both carry a flag, and `var` is the absence of both. Reading it as an
@@ -60,7 +60,7 @@ var NoVar = rule.Rule{
 			if declarationList.Flags&blockScoped != 0 {
 				return
 			}
-			ctx.ReportNode(declarationList, messageUnexpectedVar)
+			ruleContext.ReportNode(declarationList, messageUnexpectedVar)
 		}
 
 		// loopInitializer returns a loop's initializer when it declares bindings rather than

@@ -185,7 +185,7 @@ func (e *unicodeBomUnknownSetting) Error() string {
 // prefix test rather than a search.
 var UnicodeBom = rule.Rule{
 	Name: "unicode-bom",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// A rule configured as a bare severity is handed nil, which the type assertion turns into a
 		// zero-valued struct whose Require is nil. That is the live config's shape, so the fallback
 		// below is the ordinary path rather than a defensive one.
@@ -197,7 +197,7 @@ var UnicodeBom = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				hasMark := strings.HasPrefix(ctx.SourceFile.Text(), unicodeBomMark)
+				hasMark := strings.HasPrefix(ruleContext.SourceFile.Text(), unicodeBomMark)
 
 				// The empty range at position zero, which is upstream's `{line: 1, column: 0}` and
 				// is inside the mark rather than after it.
@@ -205,11 +205,11 @@ var UnicodeBom = rule.Rule{
 
 				switch {
 				case require == UnicodeBomAlways && !hasMark:
-					ctx.ReportRangeWithFixes(start, messageUnicodeBomExpected,
+					ruleContext.ReportRangeWithFixes(start, messageUnicodeBomExpected,
 						rule.ReplaceRange(start, unicodeBomMark))
 				case require == UnicodeBomNever && hasMark:
 					markRange := core.NewTextRange(0, len(unicodeBomMark))
-					ctx.ReportRangeWithFixes(start, messageUnicodeBomUnexpected,
+					ruleContext.ReportRangeWithFixes(start, messageUnicodeBomUnexpected,
 						rule.RemoveRange(markRange))
 				}
 			},

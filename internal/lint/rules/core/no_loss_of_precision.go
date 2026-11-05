@@ -70,13 +70,13 @@ var messageNoLossOfPrecision = rule.Message{
 // on the unsigned literal inside them.
 var NoLossOfPrecision = rule.Rule{
 	Name: "no-loss-of-precision",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindNumericLiteral: func(node *ast.Node) {
-				literalRange := rule.TokenRange(ctx.SourceFile, node)
-				raw := ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]
+				literalRange := rule.TokenRange(ruleContext.SourceFile, node)
+				raw := ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]
 				if numericLiteralLosesPrecision(raw) {
-					ctx.ReportNode(node, messageNoLossOfPrecision)
+					ruleContext.ReportNode(node, messageNoLossOfPrecision)
 				}
 			},
 		}

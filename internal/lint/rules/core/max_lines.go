@@ -102,8 +102,8 @@ func DecodeMaxLinesOptions(raw []byte) (any, error) {
 var MaxLines = rule.Rule{
 	Name:       "max-lines",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 		settings, hasSettings := rule.OptionsAs[MaxLinesOptions](options)
@@ -111,10 +111,10 @@ var MaxLines = rule.Rule{
 			settings = DefaultMaxLinesOptions()
 		}
 
-		text := ctx.SourceFile.Text()
+		text := ruleContext.SourceFile.Text()
 		var commentOnly func(start int, end int) bool
 		if settings.SkipComments {
-			commentOnly = maxLinesCommentOnly(text, comments.ForFile(ctx))
+			commentOnly = maxLinesCommentOnly(text, comments.ForFile(ruleContext))
 		}
 
 		// Counted as the lines go by, keeping only where the first line past the maximum starts, so a
@@ -136,7 +136,7 @@ var MaxLines = rule.Rule{
 		if counted <= settings.Maximum {
 			return nil
 		}
-		ctx.ReportRange(core.NewTextRange(excessStart, len(text)), maxLinesMessage(counted, settings.Maximum))
+		ruleContext.ReportRange(core.NewTextRange(excessStart, len(text)), maxLinesMessage(counted, settings.Maximum))
 		return nil
 	},
 }

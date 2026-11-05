@@ -216,10 +216,10 @@ var UnsupportedSyntax = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				if node.Text() != "eval" {
@@ -231,17 +231,17 @@ var UnsupportedSyntax = rule.Rule{
 				if !utilsreact.IsInsideComponentOrHook(node) {
 					return
 				}
-				symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
-				if !rule.IsSymbolFromDefaultLibrary(ctx.Program, symbol) {
+				symbol := ruleContext.TypeChecker.GetSymbolAtLocation(node)
+				if !rule.IsSymbolFromDefaultLibrary(ruleContext.Program, symbol) {
 					return
 				}
-				ctx.ReportNode(node, messageUnsupportedEval)
+				ruleContext.ReportNode(node, messageUnsupportedEval)
 			},
 			ast.KindWithStatement: func(node *ast.Node) {
 				if !utilsreact.IsInsideComponentOrHook(node) {
 					return
 				}
-				ctx.ReportNode(node, messageUnsupportedWith)
+				ruleContext.ReportNode(node, messageUnsupportedWith)
 			},
 			ast.KindClassDeclaration: func(node *ast.Node) {
 				// A class declaration whose parent is the source file is module scope, which is
@@ -251,7 +251,7 @@ var UnsupportedSyntax = rule.Rule{
 				if !utilsreact.IsInsideComponentOrHook(node) {
 					return
 				}
-				ctx.ReportNode(node, messageUnsupportedInlineClass)
+				ruleContext.ReportNode(node, messageUnsupportedInlineClass)
 			},
 		}
 	},

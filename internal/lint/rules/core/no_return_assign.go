@@ -101,7 +101,7 @@ type NoReturnAssignOptions = NoReturnAssignMode
 // not a sentinel: an assignment written in a body is an `ExpressionStatement`, which is.
 var NoReturnAssign = rule.Rule{
 	Name: "no-return-assign",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Unrecognized and absent both land on the permissive mode. A rule enabled with a bare
 		// severity must not silently run the strict half, and a typo must not silently escalate.
 		// Same reasoning, and the same direction, as no-cond-assign.
@@ -115,7 +115,7 @@ var NoReturnAssign = rule.Rule{
 				if !isAssignmentExpression(node) {
 					return
 				}
-				if !always && isPositionallyParenthesized(ctx.SourceFile, node) {
+				if !always && isPositionallyParenthesized(ruleContext.SourceFile, node) {
 					return
 				}
 
@@ -126,13 +126,13 @@ var NoReturnAssign = rule.Rule{
 
 				switch sentinel.Kind {
 				case ast.KindReturnStatement:
-					ctx.ReportNode(sentinel, messageReturnAssignment)
+					ruleContext.ReportNode(sentinel, messageReturnAssignment)
 				case ast.KindArrowFunction:
 					// Only when the walk came up through the arrow's BODY. An assignment in a
 					// parameter default reaches the same arrow through a different child, and
 					// `(a = b) => c` is a default rather than a returned write.
 					if sentinel.AsArrowFunction().Body == child {
-						ctx.ReportNode(sentinel, messageArrowAssignment)
+						ruleContext.ReportNode(sentinel, messageArrowAssignment)
 					}
 				}
 			},

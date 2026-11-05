@@ -46,10 +46,10 @@ func noUnusedVarsRemovalMessage(id string, name string) rule.Message {
 // importRemoval is the edit that removes an unused import binding, and which of upstream's two messages
 // names it. It declines (false) where upstream's fixer does: a binding with more than one declaration, or
 // a declaration whose tokens are not the shape the edit needs.
-func importRemoval(ctx rule.Context, candidate candidateBinding, symbol *ast.Symbol, reportedUnused map[*ast.Node]bool) (rule.Fix, string, bool) {
+func importRemoval(ruleContext rule.Context, candidate candidateBinding, symbol *ast.Symbol, reportedUnused map[*ast.Node]bool) (rule.Fix, string, bool) {
 	// Upstream fixes only a variable with exactly one definition, since cleaning up several is a
 	// different edit it declines to guess at.
-	if symbol != nil && len(rule.DeclarationsIn(ctx.SourceFile, symbol)) > 1 {
+	if symbol != nil && len(rule.DeclarationsIn(ruleContext.SourceFile, symbol)) > 1 {
 		return rule.Fix{}, "", false
 	}
 
@@ -57,7 +57,7 @@ func importRemoval(ctx rule.Context, candidate candidateBinding, symbol *ast.Sym
 	switch declaration.Kind {
 	case ast.KindImportEqualsDeclaration:
 		// One binding per declaration, so the declaration goes.
-		return removeNodeWithTrailingNewline(ctx.SourceFile, declaration), "removeUnusedImportDeclaration", true
+		return removeNodeWithTrailingNewline(ruleContext.SourceFile, declaration), "removeUnusedImportDeclaration", true
 
 	case ast.KindNamespaceImport:
 		// Upstream removes the declaration here unconditionally, on the comment that a namespace import
@@ -68,7 +68,7 @@ func importRemoval(ctx rule.Context, candidate candidateBinding, symbol *ast.Sym
 		if importDeclaration == nil || !allReported(importDeclarationBindings(importDeclaration), reportedUnused) {
 			return rule.Fix{}, "", false
 		}
-		return removeNodeWithTrailingNewline(ctx.SourceFile, importDeclaration), "removeUnusedImportDeclaration", true
+		return removeNodeWithTrailingNewline(ruleContext.SourceFile, importDeclaration), "removeUnusedImportDeclaration", true
 
 	case ast.KindImportClause:
 		// The default binding.
@@ -78,11 +78,11 @@ func importRemoval(ctx rule.Context, candidate candidateBinding, symbol *ast.Sym
 		}
 		bindings := importDeclarationBindings(importDeclaration)
 		if len(bindings) == 1 || allReported(bindings, reportedUnused) {
-			return removeNodeWithTrailingNewline(ctx.SourceFile, importDeclaration), "removeUnusedImportDeclaration", true
+			return removeNodeWithTrailingNewline(ruleContext.SourceFile, importDeclaration), "removeUnusedImportDeclaration", true
 		}
 		// `import Unused, { Used } from 'm'`: the default and the comma after it.
-		list := tokens.Of(ctx.SourceFile, importDeclaration)
-		name := rule.TokenRange(ctx.SourceFile, candidate.name)
+		list := tokens.Of(ruleContext.SourceFile, importDeclaration)
+		name := rule.TokenRange(ruleContext.SourceFile, candidate.name)
 		comma, found := list.After(name.End())
 		if !found || comma.Kind != ast.KindCommaToken {
 			return rule.Fix{}, "", false
@@ -96,10 +96,10 @@ func importRemoval(ctx rule.Context, candidate candidateBinding, symbol *ast.Sym
 		}
 		bindings := importDeclarationBindings(importDeclaration)
 		if len(bindings) == 1 || allReported(bindings, reportedUnused) {
-			return removeNodeWithTrailingNewline(ctx.SourceFile, importDeclaration), "removeUnusedImportDeclaration", true
+			return removeNodeWithTrailingNewline(ruleContext.SourceFile, importDeclaration), "removeUnusedImportDeclaration", true
 		}
-		list := tokens.Of(ctx.SourceFile, importDeclaration)
-		statement := rule.TokenRange(ctx.SourceFile, importDeclaration)
+		list := tokens.Of(ruleContext.SourceFile, importDeclaration)
+		statement := rule.TokenRange(ruleContext.SourceFile, importDeclaration)
 
 		usedNamed := 0
 		for _, binding := range bindings {
@@ -126,7 +126,7 @@ func importRemoval(ctx rule.Context, candidate candidateBinding, symbol *ast.Sym
 
 		// One specifier and a comma: the one before it where there is one, which leaves the nicer text,
 		// else the one after, for a specifier first in its list.
-		specifier := rule.TokenRange(ctx.SourceFile, declaration)
+		specifier := rule.TokenRange(ruleContext.SourceFile, declaration)
 		comma, found := list.Before(specifier.Pos())
 		if !found || comma.Kind != ast.KindCommaToken {
 			comma, found = list.After(specifier.End())

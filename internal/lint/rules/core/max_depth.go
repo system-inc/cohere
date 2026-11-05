@@ -175,7 +175,7 @@ var messageMaxDepthTooDeeply = rule.Message{
 var MaxDepth = rule.Rule{
 	Name: "max-depth",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := maxDepthSettingsFrom(options)
 		if settings.Disabled {
 			// `{"maximum": 0}` leaves upstream comparing against `undefined`, so it reports
@@ -189,7 +189,7 @@ var MaxDepth = rule.Rule{
 				// The walk is done here rather than through per-kind listeners because the rule
 				// needs a counter that rises entering a block and falls leaving it, and the
 				// listener walk is pre-order with no exit hook to decrement on.
-				walker := &maxDepthWalker{ctx: ctx, settings: settings}
+				walker := &maxDepthWalker{ctx: ruleContext, settings: settings}
 				// Upstream's `Program: startFunction`: the file itself is a function frame, so
 				// top-level blocks are measured rather than ignored.
 				walker.depths = append(walker.depths, 0)

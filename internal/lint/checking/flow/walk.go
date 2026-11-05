@@ -218,10 +218,10 @@ const walkerKey = "flow.Walker"
 // WalkerFor is the walker of ctx's file, made by the first rule that asks and shared by the rest. A
 // context with no file cache gets a walker of its own each time, which shares nothing and judges the same.
 // The walker is made empty and given the checker after, so the ask allocates no closure.
-func WalkerFor(ctx rule.Context) *Walker {
-	walker := rule.Cached(ctx.FileCache, walkerKey, func() *Walker { return &Walker{} })
+func WalkerFor(ruleContext rule.Context) *Walker {
+	walker := rule.Cached(ruleContext.FileCache, walkerKey, func() *Walker { return &Walker{} })
 	if walker.typeChecker == nil {
-		walker.typeChecker = ctx.TypeChecker
+		walker.typeChecker = ruleContext.TypeChecker
 	}
 	return walker
 }

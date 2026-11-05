@@ -83,14 +83,14 @@ var NoClassAssign = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		reportWritesTo := func(node *ast.Node) {
 			// The engine hands every rule a nil checker when the program could not be built, and
 			// this rule can answer nothing without one. Removing this survives the fixtures,
 			// because typescript-go tolerates a nil receiver on this path and returns no symbol;
 			// that is an implementation detail of a vendored compiler rather than a promise, so the
 			// guard stays and the rule does not depend on it.
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 
@@ -101,7 +101,7 @@ var NoClassAssign = rule.Rule{
 				return
 			}
 
-			declaration := declarationAnchoredAt(ctx, name)
+			declaration := declarationAnchoredAt(ruleContext, name)
 			if declaration == nil {
 				return
 			}
@@ -135,8 +135,8 @@ var NoClassAssign = rule.Rule{
 				if current.Kind == ast.KindIdentifier &&
 					current.Text() == name.Text() &&
 					reference.WritesToBinding(current) &&
-					resolvesToDeclaration(ctx, current, declaration) {
-					ctx.ReportNode(current, messageNoClassAssign)
+					resolvesToDeclaration(ruleContext, current, declaration) {
+					ruleContext.ReportNode(current, messageNoClassAssign)
 				}
 				current.ForEachChild(func(child *ast.Node) bool {
 					visit(child)
@@ -165,10 +165,10 @@ var NoClassAssign = rule.Rule{
 // from the class node directly so that both sides of the later comparison are answers to the same
 // question. Asking the AST for one side and the checker for the other would compare two things that
 // happen to agree today.
-func declarationAnchoredAt(ctx rule.Context, name *ast.Node) *ast.Node {
+func declarationAnchoredAt(ruleContext rule.Context, name *ast.Node) *ast.Node {
 	// Only this file's declarations, as ESLint's scope manager sees one file: a binding declared in
 	// another file is not one this rule can say was reassigned from a class, function or import.
-	declarations := rule.DeclarationsIn(ctx.SourceFile, ctx.TypeChecker.GetSymbolAtLocation(name))
+	declarations := rule.DeclarationsIn(ruleContext.SourceFile, ruleContext.TypeChecker.GetSymbolAtLocation(name))
 	if len(declarations) == 0 {
 		return nil
 	}
@@ -185,12 +185,12 @@ func declarationAnchoredAt(ctx rule.Context, name *ast.Node) *ast.Node {
 // An identifier the checker cannot resolve answers false. `(class A {}, A = 1)` and the if/else pair
 // both land there, and both are clean upstream: a name nothing declares is not provably this class,
 // and reporting it would be a guess in the direction that costs a false positive.
-func resolvesToDeclaration(ctx rule.Context, identifier *ast.Node, declaration *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func resolvesToDeclaration(ruleContext rule.Context, identifier *ast.Node, declaration *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if identifier.Parent != nil && identifier.Parent.Kind == ast.KindShorthandPropertyAssignment {
-		symbol = ctx.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent)
+		symbol = ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent)
 	}
 	// The anchor is a declaration in this file, so only this file's declarations can be it.
-	declarations := rule.DeclarationsIn(ctx.SourceFile, symbol)
+	declarations := rule.DeclarationsIn(ruleContext.SourceFile, symbol)
 	return len(declarations) > 0 && declarations[0] == declaration
 }

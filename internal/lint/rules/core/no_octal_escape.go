@@ -85,18 +85,18 @@ var messageOctalEscape = rule.Message{
 // `8` is likewise data. A fixer getting that wrong changes the string unattended.
 var NoOctalEscape = rule.Rule{
 	Name: "no-octal-escape",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindStringLiteral: func(node *ast.Node) {
-				literalRange := rule.TokenRange(ctx.SourceFile, node)
-				raw := ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]
+				literalRange := rule.TokenRange(ruleContext.SourceFile, node)
+				raw := ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]
 
 				sequence, found := firstOctalEscapeSequence(raw)
 				if !found {
 					return
 				}
 
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: messageOctalEscape.Id,
 					Description: fmt.Sprintf("Do not use the octal escape `\\%s`. %s",
 						sequence, messageOctalEscape.Description),

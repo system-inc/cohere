@@ -130,7 +130,7 @@ func DecodeConsistentTypeDefinitionsOptions(raw []byte) (any, error) {
 // touch is a defect no message-id fixture can see, because the finding is identical either way.
 var ConsistentTypeDefinitions = rule.Rule{
 	Name: "@typescript-eslint/consistent-type-definitions",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, configured := rule.OptionsAs[ConsistentTypeDefinitionsOptions](options)
 		if !configured {
 			settings = DefaultConsistentTypeDefinitionsSettings()
@@ -139,20 +139,20 @@ var ConsistentTypeDefinitions = rule.Rule{
 		if settings.Style == ConsistentTypeDefinitionsInterface {
 			return rule.Listeners{
 				ast.KindTypeAliasDeclaration: func(node *ast.Node) {
-					checkConsistentTypeDefinitionsAlias(ctx, node)
+					checkConsistentTypeDefinitionsAlias(ruleContext, node)
 				},
 			}
 		}
 		return rule.Listeners{
 			ast.KindInterfaceDeclaration: func(node *ast.Node) {
-				checkConsistentTypeDefinitionsInterface(ctx, node)
+				checkConsistentTypeDefinitionsInterface(ruleContext, node)
 			},
 		}
 	},
 }
 
 // checkConsistentTypeDefinitionsAlias handles `type T = { ... }` under the `interface` option.
-func checkConsistentTypeDefinitionsAlias(ctx rule.Context, node *ast.Node) {
+func checkConsistentTypeDefinitionsAlias(ruleContext rule.Context, node *ast.Node) {
 	alias := node.AsTypeAliasDeclaration()
 	if alias == nil || alias.Type == nil {
 		return
@@ -175,12 +175,12 @@ func checkConsistentTypeDefinitionsAlias(ctx rule.Context, node *ast.Node) {
 		return
 	}
 
-	fixes := consistentTypeDefinitionsAliasFixes(ctx, node, alias, body)
+	fixes := consistentTypeDefinitionsAliasFixes(ruleContext, node, alias, body)
 	if len(fixes) == 0 {
-		ctx.ReportNode(name, messageConsistentTypeDefinitionsInterfaceOverType)
+		ruleContext.ReportNode(name, messageConsistentTypeDefinitionsInterfaceOverType)
 		return
 	}
-	ctx.ReportNodeWithFixes(name, messageConsistentTypeDefinitionsInterfaceOverType, fixes...)
+	ruleContext.ReportNodeWithFixes(name, messageConsistentTypeDefinitionsInterfaceOverType, fixes...)
 }
 
 // consistentTypeDefinitionsAliasFixes builds the three edits that turn an alias into an interface.
@@ -189,16 +189,16 @@ func checkConsistentTypeDefinitionsAlias(ctx rule.Context, node *ast.Node) {
 // decision upstream expresses by throwing on a missing token: a fixer that applies two of three
 // edits writes source that does not parse.
 func consistentTypeDefinitionsAliasFixes(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	alias *ast.TypeAliasDeclaration,
 	body *ast.Node,
 ) []rule.Fix {
-	if ctx.SourceFile == nil {
+	if ruleContext.SourceFile == nil {
 		return nil
 	}
-	text := ctx.SourceFile.Text()
-	statement := rule.TokenRange(ctx.SourceFile, node)
+	text := ruleContext.SourceFile.Text()
+	statement := rule.TokenRange(ruleContext.SourceFile, node)
 	if statement.Pos() < 0 || statement.End() > len(text) {
 		return nil
 	}
@@ -214,7 +214,7 @@ func consistentTypeDefinitionsAliasFixes(
 	// `output` for `type Foo = (({ a: string }))` is `interface Foo { a: string }` -- and taking the
 	// span from the unwrapped node makes the surrounding parens fall inside the spans that are
 	// replaced and removed, which strips them for the same reason.
-	bodyRange := rule.TokenRange(ctx.SourceFile, body)
+	bodyRange := rule.TokenRange(ruleContext.SourceFile, body)
 
 	// Everything from the end of whatever precedes the `=` through the start of the body becomes a
 	// single space. Upstream computes this as [beforeEqualsToken.end, typeAnnotation.start] so that
@@ -239,7 +239,7 @@ func consistentTypeDefinitionsAliasFixes(
 }
 
 // checkConsistentTypeDefinitionsInterface handles `interface I { ... }` under the `type` option.
-func checkConsistentTypeDefinitionsInterface(ctx rule.Context, node *ast.Node) {
+func checkConsistentTypeDefinitionsInterface(ruleContext rule.Context, node *ast.Node) {
 	name := node.Name()
 	if name == nil {
 		return
@@ -248,29 +248,29 @@ func checkConsistentTypeDefinitionsInterface(ctx rule.Context, node *ast.Node) {
 	// `declare global { interface I {} }` is reported and deliberately not repaired. See the rule's
 	// doc comment; upstream cites its issue 2707.
 	if consistentTypeDefinitionsIsInsideDeclareGlobal(node) {
-		ctx.ReportNode(name, messageConsistentTypeDefinitionsTypeOverInterface)
+		ruleContext.ReportNode(name, messageConsistentTypeDefinitionsTypeOverInterface)
 		return
 	}
 
-	fixes := consistentTypeDefinitionsInterfaceFixes(ctx, node)
+	fixes := consistentTypeDefinitionsInterfaceFixes(ruleContext, node)
 	if len(fixes) == 0 {
-		ctx.ReportNode(name, messageConsistentTypeDefinitionsTypeOverInterface)
+		ruleContext.ReportNode(name, messageConsistentTypeDefinitionsTypeOverInterface)
 		return
 	}
-	ctx.ReportNodeWithFixes(name, messageConsistentTypeDefinitionsTypeOverInterface, fixes...)
+	ruleContext.ReportNodeWithFixes(name, messageConsistentTypeDefinitionsTypeOverInterface, fixes...)
 }
 
 // consistentTypeDefinitionsInterfaceFixes builds the edits that turn an interface into an alias.
-func consistentTypeDefinitionsInterfaceFixes(ctx rule.Context, node *ast.Node) []rule.Fix {
-	if ctx.SourceFile == nil {
+func consistentTypeDefinitionsInterfaceFixes(ruleContext rule.Context, node *ast.Node) []rule.Fix {
+	if ruleContext.SourceFile == nil {
 		return nil
 	}
 	declaration := node.AsInterfaceDeclaration()
 	if declaration == nil {
 		return nil
 	}
-	text := ctx.SourceFile.Text()
-	statement := rule.TokenRange(ctx.SourceFile, node)
+	text := ruleContext.SourceFile.Text()
+	statement := rule.TokenRange(ruleContext.SourceFile, node)
 	if statement.Pos() < 0 || statement.End() > len(text) {
 		return nil
 	}
@@ -282,12 +282,12 @@ func consistentTypeDefinitionsInterfaceFixes(ctx rule.Context, node *ast.Node) [
 
 	// The head ends after the type parameters when there are any, and after the name otherwise.
 	// Upstream: `node.typeParameters ?? node.id`.
-	headEnd := rule.TokenRange(ctx.SourceFile, node.Name()).End()
+	headEnd := rule.TokenRange(ruleContext.SourceFile, node.Name()).End()
 	if parameters := declaration.TypeParameters; parameters != nil && len(parameters.Nodes) > 0 {
 		last := parameters.Nodes[len(parameters.Nodes)-1]
 		// The closing `>` sits past the last parameter, so the head runs to it rather than to the
 		// parameter's own end.
-		headEnd = consistentTypeDefinitionsCloseAngleAfter(text, rule.TokenRange(ctx.SourceFile, last).End(), statement.End())
+		headEnd = consistentTypeDefinitionsCloseAngleAfter(text, rule.TokenRange(ruleContext.SourceFile, last).End(), statement.End())
 		if headEnd < 0 {
 			return nil
 		}
@@ -318,7 +318,7 @@ func consistentTypeDefinitionsInterfaceFixes(ctx rule.Context, node *ast.Node) [
 	if len(heritage) > 0 {
 		var appended strings.Builder
 		for _, clause := range heritage {
-			clauseRange := rule.TokenRange(ctx.SourceFile, clause)
+			clauseRange := rule.TokenRange(ruleContext.SourceFile, clause)
 			appended.WriteString(" & ")
 			appended.WriteString(text[clauseRange.Pos():clauseRange.End()])
 		}

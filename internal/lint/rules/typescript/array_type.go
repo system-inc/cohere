@@ -162,8 +162,8 @@ func messageArrayTypeGenericSimple(className string, elementType string, readonl
 //	{ type Array<Y> = Y; } const y: Array<2>;                    REPORTS, a sibling block does not shadow
 var ArrayType = rule.Rule{
 	Name: "@typescript-eslint/array-type",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -179,17 +179,17 @@ var ArrayType = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindArrayType: func(node *ast.Node) {
-				reportArrayTypeSuffixForm(ctx, node, parsed)
+				reportArrayTypeSuffixForm(ruleContext, node, parsed)
 			},
 			ast.KindTypeReference: func(node *ast.Node) {
-				reportArrayTypeGenericForm(ctx, node, parsed)
+				reportArrayTypeGenericForm(ruleContext, node, parsed)
 			},
 		}
 	},
 }
 
 // reportArrayTypeSuffixForm is upstream's `TSArrayType` visitor.
-func reportArrayTypeSuffixForm(ctx rule.Context, node *ast.Node, options ArrayTypeOptions) {
+func reportArrayTypeSuffixForm(ruleContext rule.Context, node *ast.Node, options ArrayTypeOptions) {
 	elementType := node.AsArrayTypeNode().ElementType
 	if elementType == nil {
 		return
@@ -217,7 +217,7 @@ func reportArrayTypeSuffixForm(ctx rule.Context, node *ast.Node, options ArrayTy
 		readonlyPrefix = "readonly "
 	}
 
-	messageType := arrayTypeMessageType(ctx, elementType)
+	messageType := arrayTypeMessageType(ruleContext, elementType)
 	message := messageArrayTypeGeneric(className, messageType, readonlyPrefix)
 	if current == ArrayTypeArraySimple {
 		message = messageArrayTypeGenericSimple(className, messageType, readonlyPrefix)
@@ -227,16 +227,16 @@ func reportArrayTypeSuffixForm(ctx rule.Context, node *ast.Node, options ArrayTy
 	// element type is already the inner node. Without the skip the repair would open its generic
 	// inside the parentheses and leave the closing one stranded.
 	inner := arrayTypeSkipParentheses(elementType)
-	errorRange := rule.TokenRange(ctx.SourceFile, errorNode)
-	innerRange := rule.TokenRange(ctx.SourceFile, inner)
+	errorRange := rule.TokenRange(ruleContext.SourceFile, errorNode)
+	innerRange := rule.TokenRange(ruleContext.SourceFile, inner)
 
-	ctx.ReportRangeWithFixes(errorRange, message,
+	ruleContext.ReportRangeWithFixes(errorRange, message,
 		rule.ReplaceRange(shimcore.NewTextRange(errorRange.Pos(), innerRange.Pos()), className+"<"),
 		rule.ReplaceRange(shimcore.NewTextRange(innerRange.End(), errorRange.End()), ">"))
 }
 
 // reportArrayTypeGenericForm is upstream's `TSTypeReference` visitor.
-func reportArrayTypeGenericForm(ctx rule.Context, node *ast.Node, options ArrayTypeOptions) {
+func reportArrayTypeGenericForm(ruleContext rule.Context, node *ast.Node, options ArrayTypeOptions) {
 	reference := node.AsTypeReferenceNode()
 	typeName := reference.TypeName
 	if typeName == nil || typeName.Kind != ast.KindIdentifier {
@@ -321,7 +321,7 @@ func reportArrayTypeGenericForm(ctx rule.Context, node *ast.Node, options ArrayT
 	}
 
 	argument := typeArguments[0]
-	messageType := arrayTypeMessageType(ctx, argument)
+	messageType := arrayTypeMessageType(ruleContext, argument)
 
 	var message rule.Message
 	switch {
@@ -368,10 +368,10 @@ func reportArrayTypeGenericForm(ctx rule.Context, node *ast.Node, options ArrayT
 		end += ")"
 	}
 
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	argumentRange := rule.TokenRange(ctx.SourceFile, argument)
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	argumentRange := rule.TokenRange(ruleContext.SourceFile, argument)
 
-	ctx.ReportRangeWithFixes(nodeRange, message,
+	ruleContext.ReportRangeWithFixes(nodeRange, message,
 		rule.ReplaceRange(shimcore.NewTextRange(nodeRange.Pos(), argumentRange.Pos()), start),
 		rule.ReplaceRange(shimcore.NewTextRange(argumentRange.End(), nodeRange.End()), end))
 }
@@ -555,12 +555,12 @@ func arrayTypeIsDirectElementOfAnArray(node *ast.Node) bool {
 // The text is taken from the node AS WRITTEN, parentheses included, because upstream slices the
 // range of the node TSESTree gave it and that range covers whatever the source held. Only the
 // simplicity JUDGMENT skips parentheses.
-func arrayTypeMessageType(ctx rule.Context, node *ast.Node) string {
+func arrayTypeMessageType(ruleContext rule.Context, node *ast.Node) string {
 	if !arrayTypeIsSimple(node) {
 		return "T"
 	}
-	trimmed := rule.TokenRange(ctx.SourceFile, node)
-	return ctx.SourceFile.Text()[trimmed.Pos():trimmed.End()]
+	trimmed := rule.TokenRange(ruleContext.SourceFile, node)
+	return ruleContext.SourceFile.Text()[trimmed.Pos():trimmed.End()]
 }
 
 // ArrayTypeSetting is one of upstream's three spellings for one axis.

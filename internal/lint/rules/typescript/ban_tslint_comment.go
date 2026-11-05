@@ -112,24 +112,24 @@ func messageBanTslintComment(text string) rule.Message {
 // cannot destroy source.
 var BanTslintComment = rule.Rule{
 	Name: "@typescript-eslint/ban-tslint-comment",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				reportBanTslintComments(ctx)
+				reportBanTslintComments(ruleContext)
 			},
 		}
 	},
 }
 
 // reportBanTslintComments is upstream's `Program` body.
-func reportBanTslintComments(ctx rule.Context) {
-	sourceText := ctx.SourceFile.Text()
+func reportBanTslintComments(ruleContext rule.Context) {
+	sourceText := ruleContext.SourceFile.Text()
 
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		interior, readable := banTslintCommentInterior(comment)
 		if !readable {
 			continue
@@ -138,7 +138,7 @@ func reportBanTslintComments(ctx rule.Context) {
 			continue
 		}
 
-		ctx.ReportRangeWithFixes(comment.Range,
+		ruleContext.ReportRangeWithFixes(comment.Range,
 			messageBanTslintComment(banTslintCommentRenderedText(interior, comment.IsBlock)),
 			rule.RemoveRange(banTslintCommentFixRange(comment, sourceText)))
 	}

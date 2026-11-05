@@ -30,17 +30,17 @@ func inlinedFixture(test *testing.T, source string, drop bool) (*Function, int) 
 	probe := rule.Rule{
 		Name:             "inline-iife-fixture",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						return
 					}
 					ForEachFunctionLike(node, func(functionNode *ast.Node) {
 						if result != nil {
 							return
 						}
-						lowered := Lower(functionNode, ctx.TypeChecker)
+						lowered := Lower(functionNode, ruleContext.TypeChecker)
 						if lowered == nil {
 							return
 						}

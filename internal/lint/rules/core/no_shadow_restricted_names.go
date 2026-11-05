@@ -152,7 +152,7 @@ var NoShadowRestrictedNames = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := NoShadowRestrictedNamesOptions{}
 		if configured, isConfigured := rule.OptionsAs[NoShadowRestrictedNamesOptions](options); isConfigured {
 			settings = configured
@@ -176,10 +176,10 @@ var NoShadowRestrictedNames = rule.Rule{
 			if name == nil || name.Kind != ast.KindIdentifier || !isRestricted(name.Text()) {
 				return
 			}
-			if name.Text() == "undefined" && safelyShadowsUndefined(ctx, name) {
+			if name.Text() == "undefined" && safelyShadowsUndefined(ruleContext, name) {
 				return
 			}
-			ctx.ReportNode(name, messageShadowingRestrictedName)
+			ruleContext.ReportNode(name, messageShadowingRestrictedName)
 		}
 
 		// The declaration forms, and the list is the rule's coverage.
@@ -243,7 +243,7 @@ var NoShadowRestrictedNames = rule.Rule{
 // so a write can sit textually before its declaration, and a nested block or function can hold one
 // that still binds to the outer declaration. Anchoring the search on the file and the match on
 // declaration identity is what makes the position of the write irrelevant.
-func safelyShadowsUndefined(ctx rule.Context, name *ast.Node) bool {
+func safelyShadowsUndefined(ruleContext rule.Context, name *ast.Node) bool {
 	// A binding in any other declaration form is not the carved-out shape. A parameter named
 	// `undefined` receives whatever the caller passed, a destructured one takes a value out of the
 	// object, and an import binds the module's export, so none of them holds the global's value.
@@ -266,11 +266,11 @@ func safelyShadowsUndefined(ctx rule.Context, name *ast.Node) bool {
 	// The engine hands every rule a nil checker when the program could not be built. Without one
 	// this cannot tell a write to this binding from a write to another, and the safe direction is
 	// to decline the carve-out and report, which is what a missing checker gets here.
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
 
-	anchor := declarationAnchoredAt(ctx, name)
+	anchor := declarationAnchoredAt(ruleContext, name)
 	if anchor == nil {
 		return false
 	}
@@ -293,7 +293,7 @@ func safelyShadowsUndefined(ctx rule.Context, name *ast.Node) bool {
 		if current.Kind == ast.KindIdentifier &&
 			current.Text() == "undefined" &&
 			reference.WritesToBinding(current) &&
-			resolvesToDeclaration(ctx, current, anchor) {
+			resolvesToDeclaration(ruleContext, current, anchor) {
 			written = true
 			return
 		}

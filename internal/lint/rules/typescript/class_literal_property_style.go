@@ -117,8 +117,8 @@ var ClassLiteralPropertyStyle = rule.Rule{
 	// (StringSchema.ts against BaseSchema.ts), so the verdict reads the program as well.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -135,7 +135,7 @@ var ClassLiteralPropertyStyle = rule.Rule{
 		if parsed.Style == ClassLiteralPropertyStyleFields {
 			return rule.Listeners{
 				ast.KindGetAccessor: func(node *ast.Node) {
-					reportClassLiteralGetterShouldBeField(ctx, node)
+					reportClassLiteralGetterShouldBeField(ruleContext, node)
 				},
 			}
 		}
@@ -146,17 +146,17 @@ var ClassLiteralPropertyStyle = rule.Rule{
 		// `rule.OnExit` here, so the class is walked in one pass from its own listener.
 		return rule.Listeners{
 			ast.KindClassDeclaration: func(node *ast.Node) {
-				reportClassLiteralFieldsShouldBeGetters(ctx, node.Members())
+				reportClassLiteralFieldsShouldBeGetters(ruleContext, node.Members())
 			},
 			ast.KindClassExpression: func(node *ast.Node) {
-				reportClassLiteralFieldsShouldBeGetters(ctx, node.Members())
+				reportClassLiteralFieldsShouldBeGetters(ruleContext, node.Members())
 			},
 		}
 	},
 }
 
 // reportClassLiteralGetterShouldBeField is upstream's `MethodDefinition` visitor under `fields`.
-func reportClassLiteralGetterShouldBeField(ctx rule.Context, node *ast.Node) {
+func reportClassLiteralGetterShouldBeField(ruleContext rule.Context, node *ast.Node) {
 	accessor := node.AsGetAccessorDeclaration()
 
 	// Upstream's `node.override` guard. An overriding getter cannot become a field without changing
@@ -166,7 +166,7 @@ func reportClassLiteralGetterShouldBeField(ctx rule.Context, node *ast.Node) {
 	}
 	// The same guard for an override the keyword does not mark, and narrower: only where the field
 	// would not compile. Deliberately quieter than upstream.
-	if classLiteralConversionBreaksAnOverride(ctx, node, true) {
+	if classLiteralConversionBreaksAnOverride(ruleContext, node, true) {
 		return
 	}
 
@@ -195,28 +195,28 @@ func reportClassLiteralGetterShouldBeField(ctx rule.Context, node *ast.Node) {
 	// A getter paired with a setter of the same name is exempt: turning it into a field would leave
 	// the setter with nothing to pair against. Upstream compares the STATIC MEMBER ACCESS VALUE
 	// rather than the source text, so `get x` pairs with `set 'x'`.
-	if classLiteralHasMatchingSetter(ctx, node, name) {
+	if classLiteralHasMatchingSetter(ruleContext, node, name) {
 		return
 	}
 
 	// A decorator applies to the member as declared, so upstream reports without offering a repair.
 	// The finding still fires; only the suggestion is withheld.
 	if classLiteralHasDecorator(node) {
-		ctx.ReportNode(classLiteralReportedKey(name), messageClassLiteralPropertyStylePreferField())
+		ruleContext.ReportNode(classLiteralReportedKey(name), messageClassLiteralPropertyStylePreferField())
 		return
 	}
 
-	replacement, buildable := classLiteralFieldReplacementFor(ctx, node, accessor, name, argument)
+	replacement, buildable := classLiteralFieldReplacementFor(ruleContext, node, accessor, name, argument)
 	if !buildable {
-		ctx.ReportNode(classLiteralReportedKey(name), messageClassLiteralPropertyStylePreferField())
+		ruleContext.ReportNode(classLiteralReportedKey(name), messageClassLiteralPropertyStylePreferField())
 		return
 	}
 
-	ctx.ReportNodeWithSuggestions(classLiteralReportedKey(name), messageClassLiteralPropertyStylePreferField(),
+	ruleContext.ReportNodeWithSuggestions(classLiteralReportedKey(name), messageClassLiteralPropertyStylePreferField(),
 		rule.Suggestion{
 			Message: messageClassLiteralPropertyStylePreferFieldSuggestion(),
 			Fixes: []rule.Fix{
-				rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), replacement),
+				rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), replacement),
 			},
 		})
 }
@@ -241,8 +241,8 @@ func reportClassLiteralGetterShouldBeField(ctx rule.Context, node *ast.Node) {
 //
 // The real site is `nexus/source/validation/schema/StringSchema.ts:37` in ahra, a `typeDefault` getter
 // overriding `BaseSchema`'s concrete getter, where ESLint's suggested field is TS2610.
-func classLiteralConversionBreaksAnOverride(ctx rule.Context, member *ast.Node, becomesProperty bool) bool {
-	if ctx.TypeChecker == nil || classLiteralHasModifier(member, ast.KindStaticKeyword) {
+func classLiteralConversionBreaksAnOverride(ruleContext rule.Context, member *ast.Node, becomesProperty bool) bool {
+	if ruleContext.TypeChecker == nil || classLiteralHasModifier(member, ast.KindStaticKeyword) {
 		return false
 	}
 	class := member.Parent
@@ -258,12 +258,12 @@ func classLiteralConversionBreaksAnOverride(ctx rule.Context, member *ast.Node, 
 		return false
 	}
 
-	classType := ctx.TypeChecker.GetDeclaredTypeOfSymbol(classSymbol)
+	classType := ruleContext.TypeChecker.GetDeclaredTypeOfSymbol(classSymbol)
 	if classType == nil {
 		return false
 	}
-	for _, baseType := range ctx.TypeChecker.GetBaseTypes(classType) {
-		base := ctx.TypeChecker.GetPropertyOfType(baseType, memberSymbol.Name)
+	for _, baseType := range ruleContext.TypeChecker.GetBaseTypes(classType) {
+		base := ruleContext.TypeChecker.GetPropertyOfType(baseType, memberSymbol.Name)
 		if base == nil {
 			continue
 		}
@@ -324,7 +324,7 @@ func classLiteralBaseIsAbstractOrInterface(base *ast.Symbol, baseModifiers ast.M
 // from the source rather than re-rendered, which is what preserves a return annotation, its spacing,
 // and any comment written there. See the rule's doc comment for the four measured inputs.
 func classLiteralFieldReplacementFor(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	accessor *ast.GetAccessorDeclaration,
 	name *ast.Node,
@@ -338,23 +338,23 @@ func classLiteralFieldReplacementFor(
 	// The closing parenthesis is the last `)` before the body. Scanning back from the body's own
 	// start rather than forward from the parameter list, because a return annotation sits between
 	// them and its own text may contain parentheses.
-	closingParen := classLiteralClosingParenBefore(ctx, node, body)
+	closingParen := classLiteralClosingParenBefore(ruleContext, node, body)
 	if closingParen < 0 {
 		return "", false
 	}
 
-	sourceText := ctx.SourceFile.Text()
-	bodyStart := rule.TokenRange(ctx.SourceFile, body).Pos()
+	sourceText := ruleContext.SourceFile.Text()
+	bodyStart := rule.TokenRange(ruleContext.SourceFile, body).Pos()
 	if closingParen >= bodyStart || bodyStart > len(sourceText) {
 		return "", false
 	}
 	betweenParensAndBody := sourceText[closingParen:bodyStart]
 
-	nameText, readable := classLiteralNameText(ctx, name)
+	nameText, readable := classLiteralNameText(ruleContext, name)
 	if !readable {
 		return "", false
 	}
-	argumentText, argumentReadable := classLiteralNodeText(ctx, argument)
+	argumentText, argumentReadable := classLiteralNodeText(ruleContext, argument)
 	if !argumentReadable {
 		return "", false
 	}
@@ -378,10 +378,10 @@ func classLiteralFieldReplacementFor(
 // is what the boolean on the caller is for.
 //
 // Returning an offset PAST the paren rather than at it, matching upstream's `closingParen.range[1]`.
-func classLiteralClosingParenBefore(ctx rule.Context, node *ast.Node, body *ast.Node) int {
-	sourceText := ctx.SourceFile.Text()
-	memberRange := rule.TokenRange(ctx.SourceFile, node)
-	bodyStart := rule.TokenRange(ctx.SourceFile, body).Pos()
+func classLiteralClosingParenBefore(ruleContext rule.Context, node *ast.Node, body *ast.Node) int {
+	sourceText := ruleContext.SourceFile.Text()
+	memberRange := rule.TokenRange(ruleContext.SourceFile, node)
+	bodyStart := rule.TokenRange(ruleContext.SourceFile, body).Pos()
 	if bodyStart > len(sourceText) {
 		return -1
 	}
@@ -400,13 +400,13 @@ func classLiteralClosingParenBefore(ctx rule.Context, node *ast.Node, body *ast.
 // assigned in the constructor is exempt and the constructor can be written after it. There is no
 // exit hook here, so the class's members are read in one pass: the exclusion set is built from every
 // constructor first, then the properties are judged against it. Same two phases, one traversal.
-func reportClassLiteralFieldsShouldBeGetters(ctx rule.Context, members []*ast.Node) {
+func reportClassLiteralFieldsShouldBeGetters(ruleContext rule.Context, members []*ast.Node) {
 	excluded := map[string]bool{}
 	for _, member := range members {
 		if member.Kind != ast.KindConstructor {
 			continue
 		}
-		classLiteralCollectConstructorAssignments(ctx, member, excluded)
+		classLiteralCollectConstructorAssignments(ruleContext, member, excluded)
 	}
 
 	for _, member := range members {
@@ -427,7 +427,7 @@ func reportClassLiteralFieldsShouldBeGetters(ctx rule.Context, members []*ast.No
 			continue
 		}
 		// An unmarked override whose getter would not compile. Deliberately quieter than upstream.
-		if classLiteralConversionBreaksAnOverride(ctx, member, false) {
+		if classLiteralConversionBreaksAnOverride(ruleContext, member, false) {
 			continue
 		}
 
@@ -441,15 +441,15 @@ func reportClassLiteralFieldsShouldBeGetters(ctx rule.Context, members []*ast.No
 			continue
 		}
 
-		if key, keyed := classLiteralStaticMemberAccessValue(ctx, name); keyed && excluded[key] {
+		if key, keyed := classLiteralStaticMemberAccessValue(ruleContext, name); keyed && excluded[key] {
 			continue
 		}
 
-		nameText, readable := classLiteralNameText(ctx, name)
+		nameText, readable := classLiteralNameText(ruleContext, name)
 		if !readable {
 			continue
 		}
-		valueText, valueReadable := classLiteralNodeText(ctx, value)
+		valueText, valueReadable := classLiteralNodeText(ruleContext, value)
 		if !valueReadable {
 			continue
 		}
@@ -462,18 +462,18 @@ func reportClassLiteralFieldsShouldBeGetters(ctx rule.Context, members []*ast.No
 		// right either, because a field decorator and an accessor decorator receive different
 		// arguments, which is the same reason upstream withholds the repair in the other direction.
 		if classLiteralHasDecorator(member) {
-			ctx.ReportNode(classLiteralReportedKey(name), messageClassLiteralPropertyStylePreferGetter())
+			ruleContext.ReportNode(classLiteralReportedKey(name), messageClassLiteralPropertyStylePreferGetter())
 			continue
 		}
 
 		replacement := classLiteralPrintModifiers(member, "get") + nameText +
 			"() { return " + valueText + "; }"
 
-		ctx.ReportNodeWithSuggestions(classLiteralReportedKey(name), messageClassLiteralPropertyStylePreferGetter(),
+		ruleContext.ReportNodeWithSuggestions(classLiteralReportedKey(name), messageClassLiteralPropertyStylePreferGetter(),
 			rule.Suggestion{
 				Message: messageClassLiteralPropertyStylePreferGetterSuggestion(),
 				Fixes: []rule.Fix{
-					rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, member), replacement),
+					rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, member), replacement),
 				},
 			})
 	}
@@ -486,7 +486,7 @@ func reportClassLiteralFieldsShouldBeGetters(ctx rule.Context, members []*ast.No
 // assignment inside a nested function, whose `this` need not be the instance. The same question is
 // answered here by walking down and refusing to descend into a nested function-like, which reaches
 // the same set without the upward walk.
-func classLiteralCollectConstructorAssignments(ctx rule.Context, constructor *ast.Node, excluded map[string]bool) {
+func classLiteralCollectConstructorAssignments(ruleContext rule.Context, constructor *ast.Node, excluded map[string]bool) {
 	body := constructor.AsConstructorDeclaration().Body
 	if body == nil {
 		return
@@ -509,7 +509,7 @@ func classLiteralCollectConstructorAssignments(ctx rule.Context, constructor *as
 		if node.Kind == ast.KindBinaryExpression {
 			binary := node.AsBinaryExpression()
 			if binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
-				if key, keyed := classLiteralThisPropertyKey(ctx, binary.Left); keyed {
+				if key, keyed := classLiteralThisPropertyKey(ruleContext, binary.Left); keyed {
 					excluded[key] = true
 				}
 			}
@@ -528,7 +528,7 @@ func classLiteralCollectConstructorAssignments(ctx rule.Context, constructor *as
 }
 
 // classLiteralThisPropertyKey reads the property name off a `this.x` or `this['x']` target.
-func classLiteralThisPropertyKey(ctx rule.Context, target *ast.Node) (string, bool) {
+func classLiteralThisPropertyKey(ruleContext rule.Context, target *ast.Node) (string, bool) {
 	if target == nil {
 		return "", false
 	}
@@ -549,7 +549,7 @@ func classLiteralThisPropertyKey(ctx rule.Context, target *ast.Node) (string, bo
 		if access.Expression == nil || access.Expression.Kind != ast.KindThisKeyword {
 			return "", false
 		}
-		return classLiteralStaticValueOf(ctx, access.ArgumentExpression)
+		return classLiteralStaticValueOf(ruleContext, access.ArgumentExpression)
 	}
 
 	return "", false
@@ -559,8 +559,8 @@ func classLiteralThisPropertyKey(ctx rule.Context, target *ast.Node) (string, bo
 //
 // The comparison is on the static member access VALUE rather than on the source text, so a getter
 // keyed `x` pairs with a setter keyed `'x'` or `["x"]`.
-func classLiteralHasMatchingSetter(ctx rule.Context, getter *ast.Node, name *ast.Node) bool {
-	key, keyed := classLiteralStaticMemberAccessValue(ctx, name)
+func classLiteralHasMatchingSetter(ruleContext rule.Context, getter *ast.Node, name *ast.Node) bool {
+	key, keyed := classLiteralStaticMemberAccessValue(ruleContext, name)
 	if !keyed {
 		return false
 	}
@@ -583,7 +583,7 @@ func classLiteralHasMatchingSetter(ctx rule.Context, getter *ast.Node, name *ast
 		if memberName == nil {
 			continue
 		}
-		if otherKey, otherKeyed := classLiteralStaticMemberAccessValue(ctx, memberName); otherKeyed && otherKey == key {
+		if otherKey, otherKeyed := classLiteralStaticMemberAccessValue(ruleContext, memberName); otherKeyed && otherKey == key {
 			return true
 		}
 	}
@@ -600,7 +600,7 @@ func classLiteralHasMatchingSetter(ctx rule.Context, getter *ast.Node, name *ast
 // only literals, which is every shape the corpus and this tree write. The narrowing is stated rather
 // than silent: a computed key like `[SOME_CONSTANT]` is keyed by upstream and declined here, which
 // costs an exemption rather than adding a finding, so the failure direction is silence.
-func classLiteralStaticMemberAccessValue(ctx rule.Context, key *ast.Node) (string, bool) {
+func classLiteralStaticMemberAccessValue(ruleContext rule.Context, key *ast.Node) (string, bool) {
 	if key == nil {
 		return "", false
 	}
@@ -609,10 +609,10 @@ func classLiteralStaticMemberAccessValue(ctx rule.Context, key *ast.Node) (strin
 	case ast.KindIdentifier, ast.KindPrivateIdentifier:
 		return key.Text(), true
 	case ast.KindComputedPropertyName:
-		return classLiteralStaticValueOf(ctx, key.AsComputedPropertyName().Expression)
+		return classLiteralStaticValueOf(ruleContext, key.AsComputedPropertyName().Expression)
 	}
 
-	return classLiteralStaticValueOf(ctx, key)
+	return classLiteralStaticValueOf(ruleContext, key)
 }
 
 // classLiteralStaticValueOf evaluates the shapes a key can take, upstream's `getStaticValue`.
@@ -643,7 +643,7 @@ func classLiteralStaticMemberAccessValue(ctx rule.Context, key *ast.Node) (strin
 // finding, so the failure direction is a false positive on a getter that upstream would have paired
 // with its setter. No case in the corpus and no shape measured in this tree reaches it. Closing the
 // gap means a constant evaluator with scope, which is substrate rather than a line in this rule.
-func classLiteralStaticValueOf(ctx rule.Context, expression *ast.Node) (string, bool) {
+func classLiteralStaticValueOf(ruleContext rule.Context, expression *ast.Node) (string, bool) {
 	if expression == nil {
 		return "", false
 	}
@@ -651,7 +651,7 @@ func classLiteralStaticValueOf(ctx rule.Context, expression *ast.Node) (string, 
 	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindNoSubstitutionTemplateLiteral:
 		return expression.Text(), true
 	case ast.KindIdentifier:
-		return classLiteralResolveVariableLiteral(ctx, expression.Text())
+		return classLiteralResolveVariableLiteral(ruleContext, expression.Text())
 	}
 	return "", false
 }
@@ -668,14 +668,14 @@ func classLiteralStaticValueOf(ctx rule.Context, expression *ast.Node) (string, 
 // declaration of the same name shadows the first at the point the class is written. No corpus case
 // writes two, so this is stated rather than measured, and it is stated because the alternative is a
 // reader assuming the first wins.
-func classLiteralResolveVariableLiteral(ctx rule.Context, name string) (string, bool) {
-	if ctx.SourceFile == nil {
+func classLiteralResolveVariableLiteral(ruleContext rule.Context, name string) (string, bool) {
+	if ruleContext.SourceFile == nil {
 		return "", false
 	}
 
 	value := ""
 	found := false
-	for _, statement := range ctx.SourceFile.AsNode().Statements() {
+	for _, statement := range ruleContext.SourceFile.AsNode().Statements() {
 		if statement.Kind != ast.KindVariableStatement {
 			continue
 		}
@@ -824,8 +824,8 @@ func classLiteralHasDecorator(node *ast.Node) bool {
 // INNER expression, and then re-adds the brackets with `node.computed ? `[${name}]` : name`. Our
 // `Name()` for a computed member IS the bracketed node, so its own text already carries them and
 // re-adding would double them. Same output, one fewer step.
-func classLiteralNameText(ctx rule.Context, name *ast.Node) (string, bool) {
-	return classLiteralNodeText(ctx, name)
+func classLiteralNameText(ruleContext rule.Context, name *ast.Node) (string, bool) {
+	return classLiteralNodeText(ruleContext, name)
 }
 
 // classLiteralReportedKey is the node a finding points at.
@@ -848,12 +848,12 @@ func classLiteralReportedKey(name *ast.Node) *ast.Node {
 }
 
 // classLiteralNodeText slices a node's own source text, trivia excluded.
-func classLiteralNodeText(ctx rule.Context, node *ast.Node) (string, bool) {
+func classLiteralNodeText(ruleContext rule.Context, node *ast.Node) (string, bool) {
 	if node == nil {
 		return "", false
 	}
-	trimmed := rule.TokenRange(ctx.SourceFile, node)
-	sourceText := ctx.SourceFile.Text()
+	trimmed := rule.TokenRange(ruleContext.SourceFile, node)
+	sourceText := ruleContext.SourceFile.Text()
 	if trimmed.Pos() < 0 || trimmed.End() > len(sourceText) || trimmed.Pos() > trimmed.End() {
 		return "", false
 	}

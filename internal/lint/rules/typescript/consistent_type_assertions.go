@@ -165,12 +165,12 @@ func consistentTypeAssertionsLiteralSettingOf(
 var ConsistentTypeAssertions = rule.Rule{
 	Name: "@typescript-eslint/consistent-type-assertions",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[ConsistentTypeAssertionsOptions](options)
 		if !isSettings {
 			settings = DefaultConsistentTypeAssertionsSettings()
 		}
-		state := &consistentTypeAssertionsState{ctx: ctx, settings: settings}
+		state := &consistentTypeAssertionsState{ctx: ruleContext, settings: settings}
 
 		return rule.Listeners{
 			ast.KindAsExpression: func(node *ast.Node) {

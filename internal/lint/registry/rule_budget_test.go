@@ -147,10 +147,10 @@ func measureOne(graph *program.Graph, subject rule.Rule, deadline time.Duration)
 		err    error
 	}
 	done := make(chan answer, 1)
-	ctx, cancel := context.WithCancel(context.Background())
+	cancelContext, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
-		result, walkError := graph.Walk(ctx, graph.ProjectFiles(), []rule.Rule{subject})
+		result, walkError := graph.Walk(cancelContext, graph.ProjectFiles(), []rule.Rule{subject})
 		done <- answer{result, walkError}
 	}()
 	timer := time.NewTimer(deadline)

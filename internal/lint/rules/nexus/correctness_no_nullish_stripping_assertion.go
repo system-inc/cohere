@@ -122,13 +122,13 @@ var CorrectnessNoNullishStrippingAssertion = rule.Rule{
 	// The rule asks only for the types at the assertion itself, never into an imported body.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		check := func(node *ast.Node, expression *ast.Node, typeNode *ast.Node) {
-			if correctnessNoNullishStrippingAssertionStrips(ctx.TypeChecker, node, expression, typeNode) {
-				ctx.ReportNode(node, correctnessNoNullishStrippingAssertionMessage())
+			if correctnessNoNullishStrippingAssertionStrips(ruleContext.TypeChecker, node, expression, typeNode) {
+				ruleContext.ReportNode(node, correctnessNoNullishStrippingAssertionMessage())
 			}
 		}
 		return rule.Listeners{

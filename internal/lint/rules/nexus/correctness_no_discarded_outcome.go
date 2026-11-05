@@ -115,8 +115,8 @@ var CorrectnessNoDiscardedOutcome = rule.Rule{
 	// body, so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{
@@ -130,12 +130,12 @@ var CorrectnessNoDiscardedOutcome = rule.Rule{
 				if expression.Kind != ast.KindCallExpression {
 					return
 				}
-				valueType := ctx.TypeChecker.GetTypeAtLocation(expression)
+				valueType := ruleContext.TypeChecker.GetTypeAtLocation(expression)
 				if valueType != nil && awaited {
-					valueType = checker.Checker_getAwaitedType(ctx.TypeChecker, valueType)
+					valueType = checker.Checker_getAwaitedType(ruleContext.TypeChecker, valueType)
 				}
 				if typeName := correctnessNoDiscardedOutcomeTypeName(valueType); typeName != "" {
-					ctx.ReportNode(node, correctnessNoDiscardedOutcomeMessage(typeName))
+					ruleContext.ReportNode(node, correctnessNoDiscardedOutcomeMessage(typeName))
 				}
 			},
 		}

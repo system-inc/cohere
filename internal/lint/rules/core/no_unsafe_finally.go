@@ -82,21 +82,21 @@ var messageUnsafeFinallyContinue = rule.Message{
 // the author's knowledge rather than the linter's.
 var NoUnsafeFinally = rule.Rule{
 	Name: "no-unsafe-finally",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		return rule.Listeners{
 			ast.KindReturnStatement: func(node *ast.Node) {
 				if escapesIntoFinally(node, stopsReturnOrThrow, nil) {
-					ctx.ReportNode(node, messageUnsafeFinallyReturn)
+					ruleContext.ReportNode(node, messageUnsafeFinallyReturn)
 				}
 			},
 
 			ast.KindThrowStatement: func(node *ast.Node) {
 				if escapesIntoFinally(node, stopsReturnOrThrow, nil) {
-					ctx.ReportNode(node, messageUnsafeFinallyThrow)
+					ruleContext.ReportNode(node, messageUnsafeFinallyThrow)
 				}
 			},
 
@@ -110,12 +110,12 @@ var NoUnsafeFinally = rule.Rule{
 				// as `return`, plus the label itself.
 				if breakStatement.Label != nil {
 					if escapesIntoFinally(node, stopsReturnOrThrow, breakStatement.Label) {
-						ctx.ReportNode(node, messageUnsafeFinallyBreak)
+						ruleContext.ReportNode(node, messageUnsafeFinallyBreak)
 					}
 					return
 				}
 				if escapesIntoFinally(node, stopsUnlabeledBreak, nil) {
-					ctx.ReportNode(node, messageUnsafeFinallyBreak)
+					ruleContext.ReportNode(node, messageUnsafeFinallyBreak)
 				}
 			},
 
@@ -128,12 +128,12 @@ var NoUnsafeFinally = rule.Rule{
 				// keeps the loop stopping point and adds the label to it.
 				if continueStatement.Label != nil {
 					if escapesIntoFinally(node, stopsContinue, continueStatement.Label) {
-						ctx.ReportNode(node, messageUnsafeFinallyContinue)
+						ruleContext.ReportNode(node, messageUnsafeFinallyContinue)
 					}
 					return
 				}
 				if escapesIntoFinally(node, stopsContinue, nil) {
-					ctx.ReportNode(node, messageUnsafeFinallyContinue)
+					ruleContext.ReportNode(node, messageUnsafeFinallyContinue)
 				}
 			},
 		}

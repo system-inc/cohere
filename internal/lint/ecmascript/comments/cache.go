@@ -16,8 +16,8 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // consistency-no-long-line-comment 619ms, consistency-no-single-line-jsdoc 601ms, each visiting
 // exactly one node per file. Flat node counts with unequal times is the signature of work done
 // outside the walk.
-func ForFile(ctx rule.Context) []Comment {
-	return rule.Cached(ctx.FileCache, "comments.All", func() []Comment {
-		return All(ctx.SourceFile)
+func ForFile(ruleContext rule.Context) []Comment {
+	return rule.Cached(ruleContext.FileCache, "comments.All", func() []Comment {
+		return All(ruleContext.SourceFile)
 	})
 }

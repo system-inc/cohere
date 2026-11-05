@@ -39,7 +39,7 @@ var messageIncorrectDirection = rule.Message{
 // narrowing recorded below.
 var ForDirection = rule.Rule{
 	Name: "for-direction",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindForStatement: func(node *ast.Node) {
 				forStatement := node.AsForStatement()
@@ -85,7 +85,7 @@ var ForDirection = rule.Rule{
 						continue
 					}
 					if modificationDirection(modifications[0], operand.Text()) == side.wrongDirection {
-						ctx.ReportNode(node, messageIncorrectDirection)
+						ruleContext.ReportNode(node, messageIncorrectDirection)
 						return
 					}
 				}

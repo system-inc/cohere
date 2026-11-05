@@ -17,7 +17,7 @@ func firstKey(test *testing.T, source string, ask func(key *ast.Node)) {
 	found := false
 	rule_testing.Run(test, rule.Rule{
 		Name: "key-probe",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindObjectLiteralExpression: func(node *ast.Node) {
 					if found {
@@ -185,7 +185,7 @@ func TestAccessedName(test *testing.T) {
 		found := false
 		rule_testing.Run(test, rule.Rule{
 			Name: "access-probe",
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				check := func(node *ast.Node) {
 					if found {
 						return

@@ -229,7 +229,7 @@ var NoRestrictedGlobals = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoRestrictedGlobalsSettings](options)
 		if !ok || len(settings.Globals) == 0 {
 			// Upstream returns an empty visitor when nothing is restricted. Registering no listener
@@ -240,25 +240,25 @@ var NoRestrictedGlobals = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
-				checkNoRestrictedGlobalReference(ctx, node, settings)
+				checkNoRestrictedGlobalReference(ruleContext, node, settings)
 			},
 		}
 	},
 }
 
 // checkNoRestrictedGlobalReference judges one identifier.
-func checkNoRestrictedGlobalReference(ctx rule.Context, node *ast.Node,
+func checkNoRestrictedGlobalReference(ruleContext rule.Context, node *ast.Node,
 	settings NoRestrictedGlobalsSettings) {
 
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return
 	}
 
 	// The bare-reference half, which is upstream's `Program` listener.
 	if _, restricted := settings.Globals[node.Text()]; restricted &&
 		reference.IsValueReference(node) &&
-		!rule.IsDeclaredInASourceFile(reference.ReadSymbol(ctx.TypeChecker, node)) {
-		ctx.ReportNode(node, buildNoRestrictedGlobalsMessage(node.Text(), settings))
+		!rule.IsDeclaredInASourceFile(reference.ReadSymbol(ruleContext.TypeChecker, node)) {
+		ruleContext.ReportNode(node, buildNoRestrictedGlobalsMessage(node.Text(), settings))
 		return
 	}
 
@@ -291,14 +291,14 @@ func checkNoRestrictedGlobalReference(ctx rule.Context, node *ast.Node,
 	//
 	// A local binding is still not the global object either, which is upstream's four
 	// `let window; window.foo()` cases, and `identifierIsShadowed` answers that half.
-	if !noRestrictedGlobalsObjectResolves(ctx, node) || identifierIsShadowed(ctx, node) {
+	if !noRestrictedGlobalsObjectResolves(ruleContext, node) || identifierIsShadowed(ruleContext, node) {
 		return
 	}
-	reportNoRestrictedGlobalThroughObject(ctx, node, settings)
+	reportNoRestrictedGlobalThroughObject(ruleContext, node, settings)
 }
 
 // reportNoRestrictedGlobalThroughObject walks out from the global object to the property it reads.
-func reportNoRestrictedGlobalThroughObject(ctx rule.Context, node *ast.Node,
+func reportNoRestrictedGlobalThroughObject(ruleContext rule.Context, node *ast.Node,
 	settings NoRestrictedGlobalsSettings) {
 
 	access := node.Parent
@@ -345,7 +345,7 @@ func reportNoRestrictedGlobalThroughObject(ctx rule.Context, node *ast.Node,
 	if target == nil {
 		return
 	}
-	ctx.ReportNode(target, buildNoRestrictedGlobalsMessage(name, settings))
+	ruleContext.ReportNode(target, buildNoRestrictedGlobalsMessage(name, settings))
 }
 
 // isNoRestrictedGlobalsAccessObject says whether `inner` is the object half of the access `outer`.
@@ -383,11 +383,11 @@ func noRestrictedGlobalsAccessedNameNode(access *ast.Node) *ast.Node {
 // Deliberately NOT `identifierIsShadowed` inverted. That helper answers false for a nil symbol,
 // which is the right answer to "is this shadowed" and the wrong one to "does this exist", and the
 // two questions are both asked at this site for different reasons.
-func noRestrictedGlobalsObjectResolves(ctx rule.Context, node *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func noRestrictedGlobalsObjectResolves(ruleContext rule.Context, node *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
-	return ctx.TypeChecker.GetSymbolAtLocation(node) != nil
+	return ruleContext.TypeChecker.GetSymbolAtLocation(node) != nil
 }
 
 // isNoRestrictedGlobalsObjectName says whether a name denotes the global object.

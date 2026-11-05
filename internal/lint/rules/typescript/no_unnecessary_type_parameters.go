@@ -103,20 +103,20 @@ var NoUnnecessaryTypeParameters = rule.Rule{
 	// required rather than merely convenient.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Declared above AND guarded here. NeedsTypeChecker governs the REGISTRATION path only, and
 		// the test harness builds a rule.Context by hand, which is how a typed rule panics with a
 		// nil receiver while its declaration reads as correct. Declining once in Run costs one
 		// comparison per file instead of one per node.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
 		checkFunctionLike := func(node *ast.Node) {
-			checkTypeParameterOwner(ctx, node, "function")
+			checkTypeParameterOwner(ruleContext, node, "function")
 		}
 		checkClassLike := func(node *ast.Node) {
-			checkTypeParameterOwner(ctx, node, "class")
+			checkTypeParameterOwner(ruleContext, node, "class")
 		}
 
 		// Upstream's two selector groups, expanded into the kinds this parser produces. The first
@@ -145,7 +145,7 @@ var NoUnnecessaryTypeParameters = rule.Rule{
 // For each type parameter the node declares, it asks the AST pass first and reaches the type
 // checker only when the AST pass could not prove the parameter is used enough. The type counts are
 // computed at most once per node, on first need, exactly as upstream's `counts ??=` does.
-func checkTypeParameterOwner(ctx rule.Context, node *ast.Node, descriptor string) {
+func checkTypeParameterOwner(ruleContext rule.Context, node *ast.Node, descriptor string) {
 	typeParameters := node.TypeParameters()
 	if len(typeParameters) == 0 {
 		return
@@ -167,12 +167,12 @@ func checkTypeParameterOwner(ctx rule.Context, node *ast.Node, descriptor string
 			continue
 		}
 
-		if isTypeParameterRepeatedInSyntax(ctx, node, typeParameter, name.Text(), countUsesBefore) {
+		if isTypeParameterRepeatedInSyntax(ruleContext, node, typeParameter, name.Text(), countUsesBefore) {
 			continue
 		}
 
 		if !typeCountsComputed {
-			typeCounts = countTypeParameterUsage(ctx, node)
+			typeCounts = countTypeParameterUsage(ruleContext, node)
 			typeCountsComputed = true
 		}
 
@@ -182,12 +182,12 @@ func checkTypeParameterOwner(ctx rule.Context, node *ast.Node, descriptor string
 		}
 
 		// Deliberately quieter than upstream. See isTypeWitnessParameter.
-		if isTypeWitnessParameter(ctx, node, typeParameter) {
+		if isTypeWitnessParameter(ruleContext, node, typeParameter) {
 			continue
 		}
 
 		// Deliberately quieter than upstream. See isPhantomBrandParameter.
-		if isPhantomBrandParameter(ctx, node, typeParameter) {
+		if isPhantomBrandParameter(ruleContext, node, typeParameter) {
 			continue
 		}
 
@@ -196,7 +196,7 @@ func checkTypeParameterOwner(ctx rule.Context, node *ast.Node, descriptor string
 			uses = "never used"
 		}
 
-		ctx.ReportNodeWithSuggestions(typeParameter,
+		ruleContext.ReportNodeWithSuggestions(typeParameter,
 			buildSoleTypeParameterMessage(name.Text(), uses, descriptor),
 			rule.Suggestion{Message: buildReplaceUsagesWithConstraintMessage()})
 	}
@@ -240,7 +240,7 @@ func checkTypeParameterOwner(ctx rule.Context, node *ast.Node, descriptor string
 // `declare`, has nothing to read and keeps the exemption.
 //
 // typescript-eslint reports every one of these (its own corpus pins `Equal<X, Y>` as invalid57).
-func isTypeWitnessParameter(ctx rule.Context, owner *ast.Node, typeParameter *ast.Node) bool {
+func isTypeWitnessParameter(ruleContext rule.Context, owner *ast.Node, typeParameter *ast.Node) bool {
 	if !ast.IsFunctionLike(owner) || len(owner.Parameters()) > 0 {
 		return false
 	}
@@ -261,7 +261,7 @@ func isTypeWitnessParameter(ctx rule.Context, owner *ast.Node, typeParameter *as
 		return false
 	}
 	declarationName := typeParameter.Name()
-	declarationSymbol := ctx.TypeChecker.GetSymbolAtLocation(declarationName)
+	declarationSymbol := ruleContext.TypeChecker.GetSymbolAtLocation(declarationName)
 	if declarationSymbol == nil {
 		return false
 	}
@@ -275,7 +275,7 @@ func isTypeWitnessParameter(ctx rule.Context, owner *ast.Node, typeParameter *as
 			return false
 		}
 		if node.Kind == ast.KindIdentifier && node != declarationName &&
-			ctx.TypeChecker.GetSymbolAtLocation(node) == declarationSymbol {
+			ruleContext.TypeChecker.GetSymbolAtLocation(node) == declarationSymbol {
 			if node.Pos() >= returnType.Pos() && node.End() <= returnType.End() {
 				insideReturn = true
 			} else {
@@ -317,11 +317,11 @@ func isTypeWitnessParameter(ctx rule.Context, owner *ast.Node, typeParameter *as
 // modifier of their own) still reports, since each is a real slot or a real signature.
 //
 // typescript-eslint reports every one of these (measured on the installed 8.67.0 build).
-func isPhantomBrandParameter(ctx rule.Context, owner *ast.Node, typeParameter *ast.Node) bool {
+func isPhantomBrandParameter(ruleContext rule.Context, owner *ast.Node, typeParameter *ast.Node) bool {
 	if !ast.IsClassLike(owner) {
 		return false
 	}
-	declarationSymbol := ctx.TypeChecker.GetSymbolAtLocation(typeParameter.Name())
+	declarationSymbol := ruleContext.TypeChecker.GetSymbolAtLocation(typeParameter.Name())
 	if declarationSymbol == nil {
 		return false
 	}
@@ -333,7 +333,7 @@ func isPhantomBrandParameter(ctx rule.Context, owner *ast.Node, typeParameter *a
 			return true
 		}
 		if node.Kind == ast.KindIdentifier && isIdentifierInTypePosition(node) &&
-			ctx.TypeChecker.GetSymbolAtLocation(node) == declarationSymbol {
+			ruleContext.TypeChecker.GetSymbolAtLocation(node) == declarationSymbol {
 			referenced = true
 			return true
 		}
@@ -452,13 +452,13 @@ const maximumSourcePosition = int(^uint(0) >> 1)
 // anything. It can never prove a parameter is used too LITTLE, because a use can hide in an
 // inferred type that no syntax mentions, which is what the type phase is for.
 func isTypeParameterRepeatedInSyntax(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	owner *ast.Node,
 	typeParameter *ast.Node,
 	typeParameterName string,
 	countUsesBefore int,
 ) bool {
-	declarationSymbol := ctx.TypeChecker.GetSymbolAtLocation(typeParameter.Name())
+	declarationSymbol := ruleContext.TypeChecker.GetSymbolAtLocation(typeParameter.Name())
 
 	total := 0
 	repeated := false
@@ -470,7 +470,7 @@ func isTypeParameterRepeatedInSyntax(
 		}
 
 		if node.Kind == ast.KindIdentifier && node.Text() == typeParameterName {
-			if countsAsRelatingUse(ctx, node, typeParameter, declarationSymbol, countUsesBefore) {
+			if countsAsRelatingUse(ruleContext, node, typeParameter, declarationSymbol, countUsesBefore) {
 				if isUsedAsTypeArgument(node) {
 					repeated = true
 					return true
@@ -494,7 +494,7 @@ func isTypeParameterRepeatedInSyntax(
 
 // countsAsRelatingUse applies upstream's three skip filters to one identifier.
 func countsAsRelatingUse(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	identifier *ast.Node,
 	typeParameter *ast.Node,
 	declarationSymbol *ast.Symbol,
@@ -550,7 +550,7 @@ func countsAsRelatingUse(
 	// type parameter declared by a nested signature as if it were this one. Upstream separates
 	// those with the scope manager; resolving the symbol answers the same question here.
 	if declarationSymbol != nil {
-		symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+		symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 		if symbol != declarationSymbol {
 			return false
 		}
@@ -700,33 +700,33 @@ type typeUsageWalk struct {
 //
 // A class counts uses across its own type parameters and every one of its members; anything else
 // counts uses in the declaration itself.
-func countTypeParameterUsage(ctx rule.Context, node *ast.Node) map[*ast.Node]int {
+func countTypeParameterUsage(ruleContext rule.Context, node *ast.Node) map[*ast.Node]int {
 	counts := map[*ast.Node]int{}
 
 	if node.Kind == ast.KindClassDeclaration || node.Kind == ast.KindClassExpression {
 		for _, typeParameter := range node.TypeParameters() {
-			collectTypeParameterUsageCounts(ctx, typeParameter, counts, true)
+			collectTypeParameterUsageCounts(ruleContext, typeParameter, counts, true)
 		}
 		for _, member := range node.Members() {
-			collectTypeParameterUsageCounts(ctx, member, counts, true)
+			collectTypeParameterUsageCounts(ruleContext, member, counts, true)
 		}
 		return counts
 	}
 
-	collectTypeParameterUsageCounts(ctx, node, counts, false)
+	collectTypeParameterUsageCounts(ruleContext, node, counts, false)
 	return counts
 }
 
 // collectTypeParameterUsageCounts is upstream's function of the same name: a limited subset of a
 // scope manager, but over types rather than over names.
 func collectTypeParameterUsageCounts(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	counts map[*ast.Node]int,
 	fromClass bool,
 ) {
 	walk := &typeUsageWalk{
-		ctx:                  ctx,
+		ctx:                  ruleContext,
 		counts:               counts,
 		typeUsages:           map[*checker.Type]int{},
 		visitedConstraints:   map[*checker.Type]bool{},
@@ -738,11 +738,11 @@ func collectTypeParameterUsageCounts(
 	// their type at a location is not the thing whose parameters and return type need counting.
 	if node.Kind == ast.KindCallSignature || node.Kind == ast.KindConstructor {
 		walk.functionLikeType = true
-		walk.visitSignature(ctx.TypeChecker.GetSignatureFromDeclaration(node))
+		walk.visitSignature(ruleContext.TypeChecker.GetSignatureFromDeclaration(node))
 	}
 
 	if !walk.functionLikeType {
-		walk.visitType(ctx.TypeChecker.GetTypeAtLocation(node), false, false)
+		walk.visitType(ruleContext.TypeChecker.GetTypeAtLocation(node), false, false)
 	}
 }
 

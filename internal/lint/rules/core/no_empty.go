@@ -73,8 +73,8 @@ var messageEmptySwitch = rule.Message{
 // down. Both repairs are the author's.
 var NoEmpty = rule.Rule{
 	Name: "no-empty",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -103,11 +103,11 @@ var NoEmpty = rule.Rule{
 					return
 				}
 
-				if blockContainsComment(ctx.SourceFile, node) {
+				if blockContainsComment(ruleContext.SourceFile, node) {
 					return
 				}
 
-				ctx.ReportNode(node, messageEmptyBlock)
+				ruleContext.ReportNode(node, messageEmptyBlock)
 			},
 
 			ast.KindSwitchStatement: func(node *ast.Node) {
@@ -120,11 +120,11 @@ var NoEmpty = rule.Rule{
 					return
 				}
 
-				if blockContainsComment(ctx.SourceFile, switchStatement.CaseBlock) {
+				if blockContainsComment(ruleContext.SourceFile, switchStatement.CaseBlock) {
 					return
 				}
 
-				ctx.ReportNode(node, messageEmptySwitch)
+				ruleContext.ReportNode(node, messageEmptySwitch)
 			},
 		}
 	},

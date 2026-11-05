@@ -132,7 +132,7 @@ var NoMeaninglessVoidOperator = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[NoMeaninglessVoidOperatorOptions](options)
 		if !isSettings {
 			settings = DefaultNoMeaninglessVoidOperatorSettings()
@@ -151,7 +151,7 @@ var NoMeaninglessVoidOperator = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindVoidExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -160,7 +160,7 @@ var NoMeaninglessVoidOperator = rule.Rule{
 					return
 				}
 
-				argumentType := ctx.TypeChecker.GetTypeAtLocation(argument)
+				argumentType := ruleContext.TypeChecker.GetTypeAtLocation(argument)
 				if argumentType == nil {
 					return
 				}
@@ -172,8 +172,8 @@ var NoMeaninglessVoidOperator = rule.Rule{
 				// `Pos()` includes leading trivia and would put the range's END inside the
 				// whitespace, leaving a stray fragment behind. That is the fix hazard the span
 				// hazard is usually described as, arriving through the other side of the range.
-				voidKeyword := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())
-				removal := core.NewTextRange(voidKeyword.Pos(), rule.TokenRange(ctx.SourceFile, argument).Pos())
+				voidKeyword := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, node.Pos())
+				removal := core.NewTextRange(voidKeyword.Pos(), rule.TokenRange(ruleContext.SourceFile, argument).Pos())
 
 				inner := unwrapVoidArgument(argument)
 				if !isDiscardedCall(inner) {
@@ -188,18 +188,18 @@ var NoMeaninglessVoidOperator = rule.Rule{
 						// and logical assignment included.
 						return
 					}
-					if type_checking.IsThenableType(ctx.TypeChecker, argument, argumentType) {
+					if type_checking.IsThenableType(ruleContext.TypeChecker, argument, argumentType) {
 						// Left to no-floating-promises, which asks for exactly this.
 						return
 					}
 					if isWholeStatement(node) {
-						ctx.ReportNodeWithFixes(node, buildMeaninglessVoidOnNonCallMessage(),
+						ruleContext.ReportNodeWithFixes(node, buildMeaninglessVoidOnNonCallMessage(),
 							rule.RemoveRange(removal))
 						return
 					}
 					// Anywhere else the void's undefined is the value, so removing it would change
 					// what the expression evaluates to.
-					ctx.ReportNode(node, buildMeaninglessVoidOnNonCallMessage())
+					ruleContext.ReportNode(node, buildMeaninglessVoidOnNonCallMessage())
 					return
 				}
 
@@ -217,12 +217,12 @@ var NoMeaninglessVoidOperator = rule.Rule{
 				// equivalence is a property of which types get here rather than of the two
 				// functions. A later widening of the type test would make the difference real, and
 				// `GetTypeName` would then start naming a type the reader never wrote.
-				typeName := ctx.TypeChecker.TypeToString(argumentType)
+				typeName := ruleContext.TypeChecker.TypeToString(argumentType)
 
 				if everyConstituentHasFlag(argumentType, checker.TypeFlagsVoid|checker.TypeFlagsUndefined) {
 					// Removing the operator cannot change behavior here, so it is applied
 					// unattended.
-					ctx.ReportNodeWithFixes(node, buildMeaninglessVoidOperatorMessage(typeName),
+					ruleContext.ReportNodeWithFixes(node, buildMeaninglessVoidOperatorMessage(typeName),
 						rule.RemoveRange(removal))
 					return
 				}
@@ -231,7 +231,7 @@ var NoMeaninglessVoidOperator = rule.Rule{
 					checker.TypeFlagsVoid|checker.TypeFlagsUndefined|checker.TypeFlagsNever) {
 					// `never` means this expression does not return, so the same edit becomes a
 					// judgment rather than a rewrite and a person chooses it.
-					ctx.ReportNodeWithSuggestions(node, buildMeaninglessVoidOperatorMessage(typeName),
+					ruleContext.ReportNodeWithSuggestions(node, buildMeaninglessVoidOperatorMessage(typeName),
 						rule.Suggestion{
 							Message: buildRemoveVoidMessage(),
 							Fixes:   []rule.Fix{rule.RemoveRange(removal)},

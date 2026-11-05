@@ -94,8 +94,8 @@ var DisplayName = rule.Rule{
 	// and not the other, so a name comparison would be wrong.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -110,10 +110,10 @@ var DisplayName = rule.Rule{
 				// more dangerous failure because every quiet fixture then passes vacuously.
 				// `TestDisplayNameRequiresTheTypedHarness` fails loudly if this is reached without
 				// one.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				reportMissingDisplayNames(ctx, node, settings)
+				reportMissingDisplayNames(ruleContext, node, settings)
 			},
 		}
 	},
@@ -125,8 +125,8 @@ var DisplayName = rule.Rule{
 // `displayName` assignment in the file has been seen, and those can appear far below the definition.
 // Our walk is pre-order, so a source-file listener fires before its children and gathering has to
 // happen here rather than in per-kind listeners.
-func reportMissingDisplayNames(ctx rule.Context, sourceFile *ast.Node, settings DisplayNameOptions) {
-	components := collectDetectedComponents(ctx, sourceFile)
+func reportMissingDisplayNames(ruleContext rule.Context, sourceFile *ast.Node, settings DisplayNameOptions) {
+	components := collectDetectedComponents(ruleContext, sourceFile)
 
 	// named is the set of component nodes that have a display name by either route.
 	named := map[*ast.Node]bool{}
@@ -140,7 +140,7 @@ func reportMissingDisplayNames(ctx rule.Context, sourceFile *ast.Node, settings 
 	// `Ctx.displayName = ...` write resolves back to that same declaration through the checker.
 	contexts := map[*ast.Node]*ast.Node{}
 	if settings.CheckContextObjects {
-		collectContextObjects(ctx, sourceFile, contexts)
+		collectContextObjects(ruleContext, sourceFile, contexts)
 	}
 	namedContexts := map[*ast.Node]bool{}
 
@@ -150,7 +150,7 @@ func reportMissingDisplayNames(ctx rule.Context, sourceFile *ast.Node, settings 
 	}
 
 	// One walk for every display-name declaration in the file, whatever form it takes.
-	markDeclaredDisplayNames(ctx, sourceFile, byNode, named, contexts, namedContexts)
+	markDeclaredDisplayNames(ruleContext, sourceFile, byNode, named, contexts, namedContexts)
 
 	for _, component := range components {
 		if named[component.node] {
@@ -161,10 +161,10 @@ func reportMissingDisplayNames(ctx rule.Context, sourceFile *ast.Node, settings 
 			// skips the inner one so a single anonymous component does not produce two findings.
 			continue
 		}
-		if isShadowedPragmaWrapper(ctx, component.node) {
+		if isShadowedPragmaWrapper(ruleContext, component.node) {
 			continue
 		}
-		reportComponentNode(ctx, component.node)
+		reportComponentNode(ruleContext, component.node)
 	}
 
 	// No second `CheckContextObjects` test here: the collection above is already gated on it, so
@@ -175,7 +175,7 @@ func reportMissingDisplayNames(ctx rule.Context, sourceFile *ast.Node, settings 
 		if namedContexts[declaration] {
 			continue
 		}
-		ctx.ReportNode(anchor, messageNoContextDisplayName)
+		ruleContext.ReportNode(anchor, messageNoContextDisplayName)
 	}
 }
 
@@ -312,7 +312,7 @@ func isEs5ComponentFactoryArgument(node *ast.Node) bool {
 // class method, and a property inside an ES5 factory object. All four are folded into one walk here
 // because the gathering has to happen inside the source-file listener anyway.
 func markDeclaredDisplayNames(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	sourceFile *ast.Node,
 	componentNodes map[*ast.Node]bool,
 	named map[*ast.Node]bool,
@@ -360,11 +360,11 @@ func markDeclaredDisplayNames(
 			if !isDisplayNameKey(access.Name()) {
 				break
 			}
-			target := relatedComponentFor(ctx, access.Expression, componentNodes)
+			target := relatedComponentFor(ruleContext, access.Expression, componentNodes)
 			if target != nil {
 				named[target] = true
 			}
-			for _, declaration := range resolvedDeclarationsOf(ctx, access.Expression) {
+			for _, declaration := range resolvedDeclarationsOf(ruleContext, access.Expression) {
 				if _, isContext := contexts[declaration]; isContext {
 					namedContexts[declaration] = true
 				}
@@ -416,12 +416,12 @@ func isDisplayNameKey(key *ast.Node) bool {
 // stays silent here only because every declaration is offered.
 //
 // Never index blindly either way; the list is what the question wants.
-func resolvedDeclarationsOf(ctx rule.Context, expression *ast.Node) []*ast.Node {
+func resolvedDeclarationsOf(ruleContext rule.Context, expression *ast.Node) []*ast.Node {
 	expression = skipParenthesesOptional(expression)
-	if expression == nil || ctx.TypeChecker == nil {
+	if expression == nil || ruleContext.TypeChecker == nil {
 		return nil
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(expression)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(expression)
 	if symbol == nil {
 		return nil
 	}
@@ -437,8 +437,8 @@ func resolvedDeclarationsOf(ctx rule.Context, expression *ast.Node) []*ast.Node 
 // Reproducing the reference walk would be reproducing a workaround for a constraint we do not have.
 // What has to match is the DECISION about which writes count, and that is what the shadowing
 // measurement above pins.
-func relatedComponentFor(ctx rule.Context, object *ast.Node, componentNodes map[*ast.Node]bool) *ast.Node {
-	for _, declaration := range resolvedDeclarationsOf(ctx, object) {
+func relatedComponentFor(ruleContext rule.Context, object *ast.Node, componentNodes map[*ast.Node]bool) *ast.Node {
+	for _, declaration := range resolvedDeclarationsOf(ruleContext, object) {
 		if found := componentForDeclaration(declaration, componentNodes); found != nil {
 			return found
 		}
@@ -556,7 +556,7 @@ func isNestedPragmaWrapperArgument(component *ast.Node) bool {
 //
 // The bare half is answered by resolution rather than by a scope walk: if the callee identifier
 // resolves to a declaration in this file, it is a local binding and not React's.
-func isShadowedPragmaWrapper(ctx rule.Context, component *ast.Node) bool {
+func isShadowedPragmaWrapper(ruleContext rule.Context, component *ast.Node) bool {
 	if component.Kind != ast.KindCallExpression {
 		return false
 	}
@@ -568,7 +568,7 @@ func isShadowedPragmaWrapper(ctx rule.Context, component *ast.Node) bool {
 		return false
 	}
 
-	declarations := resolvedDeclarationsOf(ctx, callee)
+	declarations := resolvedDeclarationsOf(ruleContext, callee)
 	if len(declarations) == 0 {
 		return false
 	}
@@ -669,21 +669,21 @@ func isCreateContextCall(expression *ast.Node) bool {
 // TestDisplayNameAnchorsOnTheComponent.
 //
 // Every other component shape has no modifiers and is reported unchanged.
-func reportComponentNode(ctx rule.Context, component *ast.Node) {
+func reportComponentNode(ruleContext rule.Context, component *ast.Node) {
 	modifiers := component.Modifiers()
 	if modifiers == nil || len(modifiers.Nodes) == 0 {
-		ctx.ReportNode(component, messageNoDisplayName)
+		ruleContext.ReportNode(component, messageNoDisplayName)
 		return
 	}
 	last := modifiers.Nodes[len(modifiers.Nodes)-1]
 	if last.End() >= component.End() {
-		ctx.ReportNode(component, messageNoDisplayName)
+		ruleContext.ReportNode(component, messageNoDisplayName)
 		return
 	}
 	// The modifier's end sits before the whitespace preceding the keyword, so the range is scanned
 	// forward to the next token rather than taken raw. Without that the span carries a leading
 	// space and the assertion fails by one byte, which reads exactly like an off-by-one in the
 	// rule.
-	start := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, last.End()).Pos()
-	ctx.ReportRange(core.NewTextRange(start, component.End()), messageNoDisplayName)
+	start := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, last.End()).Pos()
+	ruleContext.ReportRange(core.NewTextRange(start, component.End()), messageNoDisplayName)
 }

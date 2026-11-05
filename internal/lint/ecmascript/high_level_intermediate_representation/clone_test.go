@@ -44,15 +44,15 @@ function useEverything(properties: { items: number[]; flag: boolean }) {
   return [value, x, doubled, properties.flag ? total : 0];
 }`
 	visited := 0
-	probe := rule.Rule{Name: "clone", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
+	probe := rule.Rule{Name: "clone", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 			forEachFunctionLike(node, func(node *ast.Node) {
-				original := Lower(node, ctx.TypeChecker)
+				original := Lower(node, ruleContext.TypeChecker)
 				if original == nil {
 					return
 				}
 				Construct(original)
-				untouched := Lower(node, ctx.TypeChecker)
+				untouched := Lower(node, ruleContext.TypeChecker)
 				Construct(untouched)
 				forgetIdentifierSlabs(original)
 				forgetIdentifierSlabs(untouched)
@@ -64,14 +64,14 @@ function useEverything(properties: { items: number[]; flag: boolean }) {
 				if !reflect.DeepEqual(clone, original) {
 					test.Fatal("the copy differs from the function it copies")
 				}
-				fromClone := AnalyzePreservedManualMemoization(clone, ctx.TypeChecker)
+				fromClone := AnalyzePreservedManualMemoization(clone, ruleContext.TypeChecker)
 
 				if !reflect.DeepEqual(original, untouched) {
 					test.Error("the pipeline run over the copy changed the original")
 				}
-				direct := Lower(node, ctx.TypeChecker)
+				direct := Lower(node, ruleContext.TypeChecker)
 				Construct(direct)
-				fromLowering := AnalyzePreservedManualMemoization(direct, ctx.TypeChecker)
+				fromLowering := AnalyzePreservedManualMemoization(direct, ruleContext.TypeChecker)
 				if len(fromLowering) == 0 {
 					test.Error("the fixture produced no finding, so the comparison below proves nothing about the copy")
 				}

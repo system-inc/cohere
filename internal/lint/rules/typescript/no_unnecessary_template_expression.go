@@ -93,10 +93,10 @@ var NoUnnecessaryTemplateExpression = rule.Rule{
 	// whether `${s}` collapses, so the checker is required.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// NeedsTypeChecker governs registration; the harness builds a Context by hand and can hand
 		// this rule a nil checker. Declining the file once here is cheaper than a guard per node.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -107,10 +107,10 @@ var NoUnnecessaryTemplateExpression = rule.Rule{
 				if node.Parent != nil && node.Parent.Kind == ast.KindTaggedTemplateExpression {
 					return
 				}
-				reportUnnecessaryTemplateParts(ctx, node, false)
+				reportUnnecessaryTemplateParts(ruleContext, node, false)
 			},
 			ast.KindTemplateLiteralType: func(node *ast.Node) {
-				reportUnnecessaryTemplateParts(ctx, node, true)
+				reportUnnecessaryTemplateParts(ruleContext, node, true)
 			},
 		}
 	},
@@ -139,7 +139,7 @@ type templatePart struct {
 //
 // Handles both a template expression and a template literal type: the two node kinds carry the same
 // head-plus-spans shape under different accessors, and the rest of the rule is identical.
-func templatePartsOf(ctx rule.Context, node *ast.Node, isType bool) (head *ast.Node, parts []templatePart) {
+func templatePartsOf(ruleContext rule.Context, node *ast.Node, isType bool) (head *ast.Node, parts []templatePart) {
 	var spans []*ast.Node
 	if isType {
 		literalType := node.AsTemplateLiteralTypeNode()
@@ -172,15 +172,15 @@ func templatePartsOf(ctx rule.Context, node *ast.Node, isType bool) (head *ast.N
 			return head, nil
 		}
 
-		previousEnd := quasiRawRange(ctx, previous).End()
+		previousEnd := quasiRawRange(ruleContext, previous).End()
 		parts = append(parts, templatePart{
 			interpolation: interpolation,
-			previousRaw:   quasiRawText(ctx, previous),
-			nextRaw:       quasiRawText(ctx, literal),
+			previousRaw:   quasiRawText(ruleContext, previous),
+			nextRaw:       quasiRawText(ruleContext, literal),
 			// The `${` sits immediately after the previous quasi's raw text, and the `}` sits
 			// immediately before this literal's raw text.
 			openStart:   previousEnd,
-			closeEnd:    quasiRawRange(ctx, literal).Pos(),
+			closeEnd:    quasiRawRange(ruleContext, literal).Pos(),
 			previousEnd: previousEnd,
 		})
 		previous = literal
@@ -197,8 +197,8 @@ func templatePartsOf(ctx rule.Context, node *ast.Node, isType bool) (head *ast.N
 // `TokenRange` rather than `Pos()`, because `Pos()` includes leading trivia and would put the start
 // before the backtick. Measured: the head of a template preceded by a space reported its raw body
 // as "`x" until the trim was added.
-func quasiRawRange(ctx rule.Context, quasi *ast.Node) core.TextRange {
-	start := rule.TokenRange(ctx.SourceFile, quasi).Pos()
+func quasiRawRange(ruleContext rule.Context, quasi *ast.Node) core.TextRange {
+	start := rule.TokenRange(ruleContext.SourceFile, quasi).Pos()
 	trailer := 1
 	switch quasi.Kind {
 	case ast.KindTemplateHead, ast.KindTemplateMiddle:
@@ -215,9 +215,9 @@ func quasiRawRange(ctx rule.Context, quasi *ast.Node) core.TextRange {
 //
 // Raw rather than cooked, because every escaping decision below counts backslashes and a cooked
 // value has already consumed them. `a\nb` is four raw characters and three cooked ones.
-func quasiRawText(ctx rule.Context, quasi *ast.Node) string {
-	textRange := quasiRawRange(ctx, quasi)
-	text := ctx.SourceFile.Text()
+func quasiRawText(ruleContext rule.Context, quasi *ast.Node) string {
+	textRange := quasiRawRange(ruleContext, quasi)
+	text := ruleContext.SourceFile.Text()
 	if textRange.Pos() < 0 || textRange.End() > len(text) || textRange.Pos() > textRange.End() {
 		return ""
 	}
@@ -225,8 +225,8 @@ func quasiRawText(ctx rule.Context, quasi *ast.Node) string {
 }
 
 // reportUnnecessaryTemplateParts is the shared body behind both anchors.
-func reportUnnecessaryTemplateParts(ctx rule.Context, node *ast.Node, isType bool) {
-	head, parts := templatePartsOf(ctx, node, isType)
+func reportUnnecessaryTemplateParts(ruleContext rule.Context, node *ast.Node, isType bool) {
+	head, parts := templatePartsOf(ruleContext, node, isType)
 	if head == nil || len(parts) == 0 {
 		return
 	}
@@ -239,23 +239,23 @@ func reportUnnecessaryTemplateParts(ctx rule.Context, node *ast.Node, isType boo
 	// unconditionally here loses eighteen of upstream's reporting cases, all of them a lone
 	// non-string literal, and every one of those was silent in the first draft.
 	if len(parts) == 1 && parts[0].previousRaw == "" && parts[0].nextRaw == "" &&
-		!commentsBetweenQuasis(ctx, parts[0]) {
-		if singleInterpolationCollapses(ctx, parts[0].interpolation, isType) {
-			reportSingleInterpolation(ctx, node, parts[0])
+		!commentsBetweenQuasis(ruleContext, parts[0]) {
+		if singleInterpolationCollapses(ruleContext, parts[0].interpolation, isType) {
+			reportSingleInterpolation(ruleContext, node, parts[0])
 			return
 		}
 	}
 
 	unnecessary := parts[:0:0]
 	for _, part := range parts {
-		if isUnnecessaryInterpolation(ctx, part, isType) {
+		if isUnnecessaryInterpolation(ruleContext, part, isType) {
 			unnecessary = append(unnecessary, part)
 		}
 	}
 	if len(unnecessary) == 0 {
 		return
 	}
-	reportTemplateParts(ctx, unnecessary)
+	reportTemplateParts(ruleContext, unnecessary)
 }
 
 // singleInterpolationCollapses answers whether `${x}` alone can become x.
@@ -263,12 +263,12 @@ func reportUnnecessaryTemplateParts(ctx rule.Context, node *ast.Node, isType boo
 // The value side wants the constrained type to be string-like. The type side additionally declines
 // a type parameter and an enum member, because both stringify differently in a type position than
 // their source text suggests.
-func singleInterpolationCollapses(ctx rule.Context, interpolation *ast.Node, isType bool) bool {
-	interpolationType := ctx.TypeChecker.GetTypeAtLocation(interpolation)
+func singleInterpolationCollapses(ruleContext rule.Context, interpolation *ast.Node, isType bool) bool {
+	interpolationType := ruleContext.TypeChecker.GetTypeAtLocation(interpolation)
 	if interpolationType == nil {
 		return false
 	}
-	constraintType, isTypeParameter := type_checking.GetConstraintInfo(ctx.TypeChecker, interpolationType)
+	constraintType, isTypeParameter := type_checking.GetConstraintInfo(ruleContext.TypeChecker, interpolationType)
 	if constraintType == nil || !isStringLikeType(constraintType) {
 		return false
 	}
@@ -320,8 +320,8 @@ func isEnumMemberType(subject *checker.Type) bool {
 //
 // No checker call: past the single-interpolation case upstream judges only literals, nested
 // templates, and three specific identifiers, all of which are the same spliced in raw.
-func isUnnecessaryInterpolation(ctx rule.Context, part templatePart, isType bool) bool {
-	if commentsBetweenQuasis(ctx, part) {
+func isUnnecessaryInterpolation(ruleContext rule.Context, part templatePart, isType bool) bool {
+	if commentsBetweenQuasis(ruleContext, part) {
 		return false
 	}
 
@@ -350,7 +350,7 @@ func isUnnecessaryInterpolation(ctx rule.Context, part templatePart, isType bool
 		// A nested template with a single whitespace quasi before a newline is the deliberate
 		// trailing-space shape, so it survives.
 		if startsWithNewLine(part.nextRaw) {
-			return !(nestedTemplateIsSingleWhitespaceQuasi(ctx, interpolation))
+			return !(nestedTemplateIsSingleWhitespaceQuasi(ruleContext, interpolation))
 		}
 		return true
 	case isPlainLiteral(interpolation):
@@ -394,7 +394,7 @@ func isTemplateLiteralKind(node *ast.Node) bool {
 
 // nestedTemplateIsSingleWhitespaceQuasi answers whether a nested template is exactly one whitespace
 // quasi, which is the shape upstream protects before a newline.
-func nestedTemplateIsSingleWhitespaceQuasi(ctx rule.Context, node *ast.Node) bool {
+func nestedTemplateIsSingleWhitespaceQuasi(ruleContext rule.Context, node *ast.Node) bool {
 	if node.Kind != ast.KindNoSubstitutionTemplateLiteral {
 		return false
 	}
@@ -412,13 +412,13 @@ func nestedTemplateIsSingleWhitespaceQuasi(ctx rule.Context, node *ast.Node) boo
 //
 // A trailing comment (`${ 'bar' /* after */ }`) is not leading trivia of the interpolation, so it
 // needs its own scan from the interpolation's END.
-func commentsBetweenQuasis(ctx rule.Context, part templatePart) bool {
-	interpolationStart := rule.TokenRange(ctx.SourceFile, part.interpolation).Pos()
-	if type_checking.HasCommentsInRange(ctx.SourceFile,
+func commentsBetweenQuasis(ruleContext rule.Context, part templatePart) bool {
+	interpolationStart := rule.TokenRange(ruleContext.SourceFile, part.interpolation).Pos()
+	if type_checking.HasCommentsInRange(ruleContext.SourceFile,
 		core.NewTextRange(part.interpolation.Pos(), interpolationStart)) {
 		return true
 	}
-	return commentTextBetween(ctx, part.interpolation.End(), part.closeEnd)
+	return commentTextBetween(ruleContext, part.interpolation.End(), part.closeEnd)
 }
 
 // commentTextBetween answers whether a comment delimiter appears in a span of source.
@@ -427,8 +427,8 @@ func commentsBetweenQuasis(ctx rule.Context, part templatePart) bool {
 // anybody's leading trivia, so the scanner-based helper cannot see it. The span is short and
 // contains only whitespace and comments, so looking for the delimiters directly is exact here
 // rather than a heuristic.
-func commentTextBetween(ctx rule.Context, start int, end int) bool {
-	text := ctx.SourceFile.Text()
+func commentTextBetween(ruleContext rule.Context, start int, end int) bool {
+	text := ruleContext.SourceFile.Text()
 	if start < 0 || end > len(text) || start >= end {
 		return false
 	}
@@ -440,19 +440,19 @@ func commentTextBetween(ctx rule.Context, start int, end int) bool {
 //
 // The finding points at `${x}` including its delimiters, and the repair replaces the entire
 // template with the interpolation's own text.
-func reportSingleInterpolation(ctx rule.Context, node *ast.Node, part templatePart) {
-	interpolationText := movedInterpolationText(ctx, node, part.interpolation)
-	templateRange := rule.TokenRange(ctx.SourceFile, node)
+func reportSingleInterpolation(ruleContext rule.Context, node *ast.Node, part templatePart) {
+	interpolationText := movedInterpolationText(ruleContext, node, part.interpolation)
+	templateRange := rule.TokenRange(ruleContext.SourceFile, node)
 
 	// Upstream anchors this finding two characters BEFORE the interpolation and one after it,
 	// rather than on the `${` and `}` themselves. With no whitespace those coincide; with
 	// `${    'a'    }` they do not, and the reported span is `  'a' ` rather than the whole
 	// interpolation. Three corpus cases pin the difference and it is invisible without them.
-	interpolationStart := rule.TokenRange(ctx.SourceFile, part.interpolation).Pos()
-	ctx.Report(rule.Diagnostic{
+	interpolationStart := rule.TokenRange(ruleContext.SourceFile, part.interpolation).Pos()
+	ruleContext.Report(rule.Diagnostic{
 		Range:      core.NewTextRange(interpolationStart-2, part.interpolation.End()+1),
 		Message:    unnecessaryTemplateExpressionMessage(),
-		SourceFile: ctx.SourceFile,
+		SourceFile: ruleContext.SourceFile,
 		Fixes: []rule.Fix{
 			rule.ReplaceRange(core.NewTextRange(templateRange.Pos(), node.End()), interpolationText),
 		},
@@ -485,8 +485,8 @@ func literalValueText(node *ast.Node, raw string) string {
 // Two questions, both upstream's. A strong-precedence node never needs parentheses because its
 // binding cannot change. Otherwise the DESTINATION decides: only a parent that could bind more
 // tightly than what is moving in needs them.
-func movedInterpolationText(ctx rule.Context, template *ast.Node, interpolation *ast.Node) string {
-	code := ctx.SourceFile.Text()[rule.TokenRange(ctx.SourceFile, interpolation).Pos():interpolation.End()]
+func movedInterpolationText(ruleContext rule.Context, template *ast.Node, interpolation *ast.Node) string {
+	code := ruleContext.SourceFile.Text()[rule.TokenRange(ruleContext.SourceFile, interpolation).Pos():interpolation.End()]
 	if type_checking.IsStrongPrecedenceNode(interpolation) {
 		return code
 	}
@@ -580,8 +580,8 @@ var trailingDollarSign = regexp.MustCompile(`\$$`)
 // carries `nextCharacterIsOpeningCurlyBrace` backwards so each removal knows whether the text that
 // will follow it begins with `{`. A `$` meeting that `{` forms a new interpolation in the repaired
 // source, which is a parse change rather than a formatting one.
-func reportTemplateParts(ctx rule.Context, parts []templatePart) {
-	text := ctx.SourceFile.Text()
+func reportTemplateParts(ruleContext rule.Context, parts []templatePart) {
+	text := ruleContext.SourceFile.Text()
 	nextCharacterIsOpeningCurlyBrace := false
 
 	type pendingReport struct {
@@ -605,7 +605,7 @@ func reportTemplateParts(ctx rule.Context, parts []templatePart) {
 
 		switch {
 		case isPlainLiteral(interpolation) || isFixableIdentifier(interpolation):
-			literalRange := rule.TokenRange(ctx.SourceFile, interpolation)
+			literalRange := rule.TokenRange(ruleContext.SourceFile, interpolation)
 			raw := text[literalRange.Pos():interpolation.End()]
 
 			var spliced string
@@ -641,8 +641,8 @@ func reportTemplateParts(ctx rule.Context, parts []templatePart) {
 				core.NewTextRange(literalRange.Pos(), interpolation.End()), spliced))
 
 		case isTemplateLiteralKind(interpolation):
-			nestedRange := rule.TokenRange(ctx.SourceFile, interpolation)
-			lastQuasiRaw := nestedTemplateLastQuasiRaw(ctx, interpolation)
+			nestedRange := rule.TokenRange(ruleContext.SourceFile, interpolation)
+			lastQuasiRaw := nestedTemplateLastQuasiRaw(ruleContext, interpolation)
 
 			// The nested template's own last quasi can end in `$`, which would meet a following
 			// `{` once the backticks come off.
@@ -651,7 +651,7 @@ func reportTemplateParts(ctx rule.Context, parts []templatePart) {
 				fixes = append(fixes, rule.ReplaceRange(
 					core.NewTextRange(escapeAt, escapeAt), `\`))
 			}
-			if firstRaw, single := nestedTemplateSingleQuasiRaw(ctx, interpolation); single && firstRaw != "" {
+			if firstRaw, single := nestedTemplateSingleQuasiRaw(ruleContext, interpolation); single && firstRaw != "" {
 				nextCharacterIsOpeningCurlyBrace = strings.HasPrefix(firstRaw, "{")
 			}
 
@@ -672,7 +672,7 @@ func reportTemplateParts(ctx rule.Context, parts []templatePart) {
 				core.NewTextRange(escapeAt, escapeAt+1), `\$`))
 		}
 
-		interpolationRange := rule.TokenRange(ctx.SourceFile, part.interpolation)
+		interpolationRange := rule.TokenRange(ruleContext.SourceFile, part.interpolation)
 		fixes = append(fixes,
 			// Remove `${` and anything between it and the interpolation.
 			rule.RemoveRange(core.NewTextRange(part.openStart, interpolationRange.Pos())),
@@ -688,34 +688,34 @@ func reportTemplateParts(ctx rule.Context, parts []templatePart) {
 	// Emitted in source order, because the reverse walk exists to compute the escaping rather than
 	// to decide the reporting order.
 	for index := len(pending) - 1; index >= 0; index-- {
-		ctx.Report(rule.Diagnostic{
+		ruleContext.Report(rule.Diagnostic{
 			Range:      pending[index].findingRange,
 			Message:    unnecessaryTemplateExpressionMessage(),
-			SourceFile: ctx.SourceFile,
+			SourceFile: ruleContext.SourceFile,
 			Fixes:      pending[index].fixes,
 		})
 	}
 }
 
 // nestedTemplateLastQuasiRaw answers the raw text of a nested template's final quasi.
-func nestedTemplateLastQuasiRaw(ctx rule.Context, node *ast.Node) string {
+func nestedTemplateLastQuasiRaw(ruleContext rule.Context, node *ast.Node) string {
 	if node.Kind == ast.KindNoSubstitutionTemplateLiteral {
-		return quasiRawText(ctx, node)
+		return quasiRawText(ruleContext, node)
 	}
 	expression := node.AsTemplateExpression()
 	if expression.TemplateSpans == nil || len(expression.TemplateSpans.Nodes) == 0 {
-		return quasiRawText(ctx, expression.Head)
+		return quasiRawText(ruleContext, expression.Head)
 	}
 	spans := expression.TemplateSpans.Nodes
-	return quasiRawText(ctx, spans[len(spans)-1].AsTemplateSpan().Literal)
+	return quasiRawText(ruleContext, spans[len(spans)-1].AsTemplateSpan().Literal)
 }
 
 // nestedTemplateSingleQuasiRaw answers a nested template's only quasi, when it has exactly one.
-func nestedTemplateSingleQuasiRaw(ctx rule.Context, node *ast.Node) (string, bool) {
+func nestedTemplateSingleQuasiRaw(ruleContext rule.Context, node *ast.Node) (string, bool) {
 	if node.Kind != ast.KindNoSubstitutionTemplateLiteral {
 		return "", false
 	}
-	return quasiRawText(ctx, node), true
+	return quasiRawText(ruleContext, node), true
 }
 
 // isAllWhitespace answers upstream's `isWhitespace`, which accepts the empty string.

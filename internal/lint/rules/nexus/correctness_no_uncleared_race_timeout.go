@@ -78,13 +78,13 @@ var CorrectnessNoUnclearedRaceTimeout = rule.Rule{
 	// Whether `race` and `Promise` are the default library's, through type_checking.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				correctnessNoUnclearedRaceTimeoutCheckRace(ctx, node)
+				correctnessNoUnclearedRaceTimeoutCheckRace(ruleContext, node)
 			},
 		}
 	},
@@ -92,7 +92,7 @@ var CorrectnessNoUnclearedRaceTimeout = rule.Rule{
 
 // correctnessNoUnclearedRaceTimeoutCheckRace reports the lost timers in every timeout promise of one
 // `Promise.race([...])` call.
-func correctnessNoUnclearedRaceTimeoutCheckRace(ctx rule.Context, node *ast.Node) {
+func correctnessNoUnclearedRaceTimeoutCheckRace(ruleContext rule.Context, node *ast.Node) {
 	call := node.AsCallExpression()
 	callee := ast.SkipParentheses(call.Expression)
 	if callee.Kind != ast.KindPropertyAccessExpression {
@@ -102,7 +102,7 @@ func correctnessNoUnclearedRaceTimeoutCheckRace(ctx rule.Context, node *ast.Node
 	if name.Kind != ast.KindIdentifier || name.Text() != "race" {
 		return
 	}
-	if !correctnessNoUnclearedRaceTimeoutIsLibraryMember(ctx, ctx.TypeChecker.GetSymbolAtLocation(name), "PromiseConstructor") {
+	if !correctnessNoUnclearedRaceTimeoutIsLibraryMember(ruleContext, ruleContext.TypeChecker.GetSymbolAtLocation(name), "PromiseConstructor") {
 		return
 	}
 	if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
@@ -113,19 +113,19 @@ func correctnessNoUnclearedRaceTimeoutCheckRace(ctx rule.Context, node *ast.Node
 		return
 	}
 	for _, element := range array.AsArrayLiteralExpression().Elements.Nodes {
-		promise := correctnessNoUnclearedRaceTimeoutPromise(ctx, ast.SkipParentheses(element))
+		promise := correctnessNoUnclearedRaceTimeoutPromise(ruleContext, ast.SkipParentheses(element))
 		if promise == nil {
 			continue
 		}
-		for _, timer := range correctnessNoUnclearedRaceTimeoutLostTimers(ctx, promise) {
-			ctx.ReportNode(timer, correctnessNoUnclearedRaceTimeoutMessage())
+		for _, timer := range correctnessNoUnclearedRaceTimeoutLostTimers(ruleContext, promise) {
+			ruleContext.ReportNode(timer, correctnessNoUnclearedRaceTimeoutMessage())
 		}
 	}
 }
 
 // correctnessNoUnclearedRaceTimeoutIsLibraryMember says whether a symbol is a member of the named
 // interface in the default library, with every declaration there.
-func correctnessNoUnclearedRaceTimeoutIsLibraryMember(ctx rule.Context, symbol *ast.Symbol, interfaceName string) bool {
+func correctnessNoUnclearedRaceTimeoutIsLibraryMember(ruleContext rule.Context, symbol *ast.Symbol, interfaceName string) bool {
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false
 	}
@@ -135,7 +135,7 @@ func correctnessNoUnclearedRaceTimeoutIsLibraryMember(ctx rule.Context, symbol *
 			return false
 		}
 		file := ast.GetSourceFileOfNode(declaration)
-		if file == nil || !rule.IsSourceFileDefaultLibrary(ctx.Program, file) {
+		if file == nil || !rule.IsSourceFileDefaultLibrary(ruleContext.Program, file) {
 			return false
 		}
 	}
@@ -144,14 +144,14 @@ func correctnessNoUnclearedRaceTimeoutIsLibraryMember(ctx rule.Context, symbol *
 
 // correctnessNoUnclearedRaceTimeoutPromise is the `new Promise(executor)` a race element is, written
 // in place or named by a `const` of this file initialized to one, and nil for anything else.
-func correctnessNoUnclearedRaceTimeoutPromise(ctx rule.Context, element *ast.Node) *ast.Node {
+func correctnessNoUnclearedRaceTimeoutPromise(ruleContext rule.Context, element *ast.Node) *ast.Node {
 	if element.Kind == ast.KindIdentifier {
-		symbol := ctx.TypeChecker.GetSymbolAtLocation(element)
+		symbol := ruleContext.TypeChecker.GetSymbolAtLocation(element)
 		if symbol == nil || len(symbol.Declarations) != 1 {
 			return nil
 		}
 		declaration := symbol.Declarations[0]
-		if declaration.Kind != ast.KindVariableDeclaration || ast.GetSourceFileOfNode(declaration) != ctx.SourceFile {
+		if declaration.Kind != ast.KindVariableDeclaration || ast.GetSourceFileOfNode(declaration) != ruleContext.SourceFile {
 			return nil
 		}
 		list := declaration.Parent
@@ -169,7 +169,7 @@ func correctnessNoUnclearedRaceTimeoutPromise(ctx rule.Context, element *ast.Nod
 	}
 	constructor := ast.SkipParentheses(element.AsNewExpression().Expression)
 	if constructor.Kind != ast.KindIdentifier || constructor.Text() != "Promise" ||
-		!rule.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(constructor)) {
+		!rule.IsSymbolFromDefaultLibrary(ruleContext.Program, ruleContext.TypeChecker.GetSymbolAtLocation(constructor)) {
 		return nil
 	}
 	return element
@@ -177,7 +177,7 @@ func correctnessNoUnclearedRaceTimeoutPromise(ctx rule.Context, element *ast.Nod
 
 // correctnessNoUnclearedRaceTimeoutLostTimers returns the global `setTimeout` calls made directly in a
 // promise's executor whose handle nothing can reach.
-func correctnessNoUnclearedRaceTimeoutLostTimers(ctx rule.Context, promise *ast.Node) []*ast.Node {
+func correctnessNoUnclearedRaceTimeoutLostTimers(ruleContext rule.Context, promise *ast.Node) []*ast.Node {
 	arguments := promise.AsNewExpression().Arguments
 	if arguments == nil || len(arguments.Nodes) == 0 {
 		return nil
@@ -199,8 +199,8 @@ func correctnessNoUnclearedRaceTimeoutLostTimers(ctx rule.Context, promise *ast.
 			// executor's.
 			return false
 		}
-		if node.Kind == ast.KindCallExpression && correctnessNoUnclearedRaceTimeoutIsGlobalSetTimeout(ctx, node) &&
-			correctnessNoUnclearedRaceTimeoutHandleIsLost(ctx, executor, node) {
+		if node.Kind == ast.KindCallExpression && correctnessNoUnclearedRaceTimeoutIsGlobalSetTimeout(ruleContext, node) &&
+			correctnessNoUnclearedRaceTimeoutHandleIsLost(ruleContext, executor, node) {
 			lost = append(lost, node)
 		}
 		node.ForEachChild(visit)
@@ -212,7 +212,7 @@ func correctnessNoUnclearedRaceTimeoutLostTimers(ctx rule.Context, promise *ast.
 
 // correctnessNoUnclearedRaceTimeoutIsGlobalSetTimeout says whether a call is to the global
 // `setTimeout`, directly or through `globalThis.` or `window.`.
-func correctnessNoUnclearedRaceTimeoutIsGlobalSetTimeout(ctx rule.Context, call *ast.Node) bool {
+func correctnessNoUnclearedRaceTimeoutIsGlobalSetTimeout(ruleContext rule.Context, call *ast.Node) bool {
 	callee := ast.SkipParentheses(call.AsCallExpression().Expression)
 	var name *ast.Node
 	switch callee.Kind {
@@ -230,12 +230,12 @@ func correctnessNoUnclearedRaceTimeoutIsGlobalSetTimeout(ctx rule.Context, call 
 	if name.Kind != ast.KindIdentifier || name.Text() != "setTimeout" {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false
 	}
 	for _, declaration := range symbol.Declarations {
-		if !correctnessNoUnclearedRaceTimeoutIsGlobalTimer(ctx, declaration) {
+		if !correctnessNoUnclearedRaceTimeoutIsGlobalTimer(ruleContext, declaration) {
 			return false
 		}
 	}
@@ -247,7 +247,7 @@ func correctnessNoUnclearedRaceTimeoutIsGlobalSetTimeout(ctx rule.Context, call 
 // the default library's `WindowOrWorkerGlobalScope` member. lib.dom declares the global function and
 // that member (`window.setTimeout` resolves to both at once); `@types/node` declares the function,
 // and a namespace merged with it, inside `declare global`.
-func correctnessNoUnclearedRaceTimeoutIsGlobalTimer(ctx rule.Context, declaration *ast.Node) bool {
+func correctnessNoUnclearedRaceTimeoutIsGlobalTimer(ruleContext rule.Context, declaration *ast.Node) bool {
 	file := ast.GetSourceFileOfNode(declaration)
 	if file == nil || !file.IsDeclarationFile {
 		return false
@@ -262,14 +262,14 @@ func correctnessNoUnclearedRaceTimeoutIsGlobalTimer(ctx rule.Context, declaratio
 		return ast.IsGlobalScopeAugmentation(container.Parent)
 	case container.Kind == ast.KindInterfaceDeclaration:
 		return container.Name() != nil && container.Name().Text() == "WindowOrWorkerGlobalScope" &&
-			rule.IsSourceFileDefaultLibrary(ctx.Program, file)
+			rule.IsSourceFileDefaultLibrary(ruleContext.Program, file)
 	}
 	return false
 }
 
 // correctnessNoUnclearedRaceTimeoutHandleIsLost says whether the value a `setTimeout` call returns
 // can never be reached: dropped where it is made, or kept in a binding nothing reads.
-func correctnessNoUnclearedRaceTimeoutHandleIsLost(ctx rule.Context, executor *ast.Node, call *ast.Node) bool {
+func correctnessNoUnclearedRaceTimeoutHandleIsLost(ruleContext rule.Context, executor *ast.Node, call *ast.Node) bool {
 	outer := call
 	for outer.Parent != nil && outer.Parent.Kind == ast.KindParenthesizedExpression {
 		outer = outer.Parent
@@ -288,7 +288,7 @@ func correctnessNoUnclearedRaceTimeoutHandleIsLost(ctx rule.Context, executor *a
 		if name == nil || name.Kind != ast.KindIdentifier {
 			return false
 		}
-		return correctnessNoUnclearedRaceTimeoutNeverRead(ctx, ctx.TypeChecker.GetSymbolAtLocation(name))
+		return correctnessNoUnclearedRaceTimeoutNeverRead(ruleContext, ruleContext.TypeChecker.GetSymbolAtLocation(name))
 	case parent.Kind == ast.KindBinaryExpression:
 		binary := parent.AsBinaryExpression()
 		if binary.OperatorToken.Kind != ast.KindEqualsToken || binary.Right != outer {
@@ -306,7 +306,7 @@ func correctnessNoUnclearedRaceTimeoutHandleIsLost(ctx rule.Context, executor *a
 		if assignment.Parent == nil || assignment.Parent.Kind != ast.KindExpressionStatement {
 			return false
 		}
-		return correctnessNoUnclearedRaceTimeoutNeverRead(ctx, ctx.TypeChecker.GetSymbolAtLocation(target))
+		return correctnessNoUnclearedRaceTimeoutNeverRead(ruleContext, ruleContext.TypeChecker.GetSymbolAtLocation(target))
 	}
 	return false
 }
@@ -314,12 +314,12 @@ func correctnessNoUnclearedRaceTimeoutHandleIsLost(ctx rule.Context, executor *a
 // correctnessNoUnclearedRaceTimeoutNeverRead says whether a binding of this file is never read: its
 // every reference is its own declaration name or the target of a plain `=` assignment. A binding
 // declared outside this file, or with more than one declaration, is assumed read.
-func correctnessNoUnclearedRaceTimeoutNeverRead(ctx rule.Context, symbol *ast.Symbol) bool {
+func correctnessNoUnclearedRaceTimeoutNeverRead(ruleContext rule.Context, symbol *ast.Symbol) bool {
 	if symbol == nil || len(symbol.Declarations) != 1 {
 		return false
 	}
 	declaration := symbol.Declarations[0]
-	if declaration.Kind != ast.KindVariableDeclaration || ast.GetSourceFileOfNode(declaration) != ctx.SourceFile {
+	if declaration.Kind != ast.KindVariableDeclaration || ast.GetSourceFileOfNode(declaration) != ruleContext.SourceFile {
 		return false
 	}
 	declared := declaration.Name()
@@ -331,9 +331,9 @@ func correctnessNoUnclearedRaceTimeoutNeverRead(ctx rule.Context, symbol *ast.Sy
 			return true
 		}
 		if node.Kind == ast.KindIdentifier && node.Text() == name && node != declared {
-			resolved := ctx.TypeChecker.GetSymbolAtLocation(node)
+			resolved := ruleContext.TypeChecker.GetSymbolAtLocation(node)
 			if parent := node.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
-				if valueSymbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent); valueSymbol != nil {
+				if valueSymbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(parent); valueSymbol != nil {
 					resolved = valueSymbol
 				}
 			}
@@ -345,7 +345,7 @@ func correctnessNoUnclearedRaceTimeoutNeverRead(ctx rule.Context, symbol *ast.Sy
 		node.ForEachChild(visit)
 		return false
 	}
-	ctx.SourceFile.AsNode().ForEachChild(visit)
+	ruleContext.SourceFile.AsNode().ForEachChild(visit)
 	return !read
 }
 

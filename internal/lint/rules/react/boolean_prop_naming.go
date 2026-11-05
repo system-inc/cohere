@@ -154,14 +154,14 @@ var BooleanPropNaming = rule.Rule{
 	// resolution answers the same question without being fooled by a shadowing declaration.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 		// Declared once per file rather than once per listener. `NeedsTypeChecker` governs the
 		// registration path and says nothing about the harness path, where a Context is built by
 		// hand and the checker can be nil.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -190,7 +190,7 @@ var BooleanPropNaming = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				checkBooleanPropNaming(ctx, node, settings, pattern)
+				checkBooleanPropNaming(ruleContext, node, settings, pattern)
 			},
 		}
 	},
@@ -203,7 +203,7 @@ var BooleanPropNaming = rule.Rule{
 // file. Our walk is pre-order, so a source-file listener fires before its children and the
 // gathering has to happen here.
 func checkBooleanPropNaming(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	sourceFile *ast.Node,
 	settings BooleanPropNamingOptions,
 	pattern *esregexp.RegExp,
@@ -216,7 +216,7 @@ func checkBooleanPropNaming(
 			return
 		}
 		reported[property] = true
-		ctx.ReportNode(property, messageBooleanPropNaming(name, settings.Rule, settings.Message))
+		ruleContext.ReportNode(property, messageBooleanPropNaming(name, settings.Rule, settings.Message))
 	}
 
 	var visit func(*ast.Node)
@@ -228,7 +228,7 @@ func checkBooleanPropNaming(
 			if !isPropTypesName(declaration.Name()) {
 				break
 			}
-			checkPropTypesValue(ctx, declaration.Initializer, settings, pattern, report)
+			checkPropTypesValue(ruleContext, declaration.Initializer, settings, pattern, report)
 
 		case ast.KindBinaryExpression:
 			// `C.propTypes = {...}` written after the class or function.
@@ -243,14 +243,14 @@ func checkBooleanPropNaming(
 			if !isPropTypesName(target.AsPropertyAccessExpression().Name()) {
 				break
 			}
-			checkPropTypesValue(ctx, binary.Right, settings, pattern, report)
+			checkPropTypesValue(ruleContext, binary.Right, settings, pattern, report)
 
 		case ast.KindPropertyAssignment:
 			// `{ propTypes: {...} }` inside an object passed to the ES5 factory.
 			if !isPropTypesName(node.AsPropertyAssignment().Name()) {
 				break
 			}
-			checkPropTypesValue(ctx, node.AsPropertyAssignment().Initializer, settings, pattern, report)
+			checkPropTypesValue(ruleContext, node.AsPropertyAssignment().Initializer, settings, pattern, report)
 		}
 
 		node.ForEachChild(func(child *ast.Node) bool {
@@ -263,12 +263,12 @@ func checkBooleanPropNaming(
 	// The TypeScript half. Every detected component's first parameter type is resolved and its
 	// members judged, which is what reaches `function C(p: Props)` through an interface declared
 	// elsewhere in the file.
-	for _, component := range collectDetectedComponents(ctx, sourceFile) {
+	for _, component := range collectDetectedComponents(ruleContext, sourceFile) {
 		propertiesType := componentPropsTypeNode(component.node)
 		if propertiesType == nil {
 			continue
 		}
-		for _, member := range collectTypeMembers(ctx, propertiesType, map[*ast.Node]bool{}) {
+		for _, member := range collectTypeMembers(ruleContext, propertiesType, map[*ast.Node]bool{}) {
 			checkTypeMember(member, pattern, report)
 		}
 	}
@@ -305,7 +305,7 @@ func isPropTypesName(name *ast.Node) bool {
 // that a missing gate should fail open; that reported on two of upstream's own passing cases, both
 // of which write a wrapper the corpus deliberately leaves unconfigured.
 func checkPropTypesValue(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	value *ast.Node,
 	settings BooleanPropNamingOptions,
 	pattern *esregexp.RegExp,
@@ -527,7 +527,7 @@ func componentPropsTypeNode(component *ast.Node) *ast.Node {
 //
 // The visited set breaks reference cycles: `interface A { self: A }` resolves back to itself and
 // would otherwise recurse forever.
-func collectTypeMembers(ctx rule.Context, typeNode *ast.Node, visited map[*ast.Node]bool) []*ast.Node {
+func collectTypeMembers(ruleContext rule.Context, typeNode *ast.Node, visited map[*ast.Node]bool) []*ast.Node {
 	if typeNode == nil || visited[typeNode] {
 		return nil
 	}
@@ -535,7 +535,7 @@ func collectTypeMembers(ctx rule.Context, typeNode *ast.Node, visited map[*ast.N
 
 	switch typeNode.Kind {
 	case ast.KindParenthesizedType:
-		return collectTypeMembers(ctx, typeNode.AsParenthesizedTypeNode().Type, visited)
+		return collectTypeMembers(ruleContext, typeNode.AsParenthesizedTypeNode().Type, visited)
 
 	case ast.KindTypeLiteral:
 		return typeNode.AsTypeLiteralNode().Members.Nodes
@@ -548,7 +548,7 @@ func collectTypeMembers(ctx rule.Context, typeNode *ast.Node, visited map[*ast.N
 	case ast.KindIntersectionType:
 		var members []*ast.Node
 		for _, constituent := range typeNode.AsIntersectionTypeNode().Types.Nodes {
-			members = append(members, collectTypeMembers(ctx, constituent, visited)...)
+			members = append(members, collectTypeMembers(ruleContext, constituent, visited)...)
 		}
 		return members
 
@@ -558,14 +558,14 @@ func collectTypeMembers(ctx rule.Context, typeNode *ast.Node, visited map[*ast.N
 		// shapes is an unusual thing to write.
 		var members []*ast.Node
 		for _, constituent := range typeNode.AsUnionTypeNode().Types.Nodes {
-			members = append(members, collectTypeMembers(ctx, constituent, visited)...)
+			members = append(members, collectTypeMembers(ruleContext, constituent, visited)...)
 		}
 		return members
 
 	case ast.KindTypeReference:
 		// A named props type. Upstream keeps its own map from name to declaration; resolution
 		// answers the same question and is not fooled by a shadowing declaration of the same name.
-		return collectTypeMembers(ctx, resolvedTypeDeclarationBody(ctx, typeNode), visited)
+		return collectTypeMembers(ruleContext, resolvedTypeDeclarationBody(ruleContext, typeNode), visited)
 	}
 	return nil
 }
@@ -575,12 +575,12 @@ func collectTypeMembers(ctx rule.Context, typeNode *ast.Node, visited map[*ast.N
 // An interface resolves to the declaration itself, because our parser hangs members directly off it
 // with no body wrapper. A type alias resolves to whatever it aliases, which is then walked by the
 // caller and may itself be a parenthesized intersection.
-func resolvedTypeDeclarationBody(ctx rule.Context, reference *ast.Node) *ast.Node {
+func resolvedTypeDeclarationBody(ruleContext rule.Context, reference *ast.Node) *ast.Node {
 	typeName := reference.AsTypeReferenceNode().TypeName
 	if typeName == nil || typeName.Kind != ast.KindIdentifier {
 		return nil
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(typeName)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(typeName)
 	if symbol == nil {
 		return nil
 	}

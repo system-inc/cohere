@@ -144,7 +144,7 @@ var CheckedRequiresOnChangeOrReadOnly = rule.Rule{
 	Name:             "react/checked-requires-onchange-or-readonly",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[CheckedRequiresOnChangeOrReadOnlyOptions](options)
 
 		report := func(node *ast.Node, present map[string]bool) {
@@ -152,10 +152,10 @@ var CheckedRequiresOnChangeOrReadOnly = rule.Rule{
 				return
 			}
 			if !settings.IgnoreExclusiveCheckedAttribute && present["defaultChecked"] {
-				ctx.ReportNode(node, messageCheckedExclusiveAttribute)
+				ruleContext.ReportNode(node, messageCheckedExclusiveAttribute)
 			}
 			if !settings.IgnoreMissingProperties && !present["onChange"] && !present["readOnly"] {
-				ctx.ReportNode(node, messageCheckedMissingProperty)
+				ruleContext.ReportNode(node, messageCheckedMissingProperty)
 			}
 		}
 
@@ -184,10 +184,10 @@ var CheckedRequiresOnChangeOrReadOnly = rule.Rule{
 			ast.KindJsxSelfClosingElement: checkElement,
 
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				if !isPragmaCreateElementCall(ctx, node) {
+				if !isPragmaCreateElementCall(ruleContext, node) {
 					return
 				}
 				arguments := node.AsCallExpression().Arguments
@@ -252,7 +252,7 @@ func propertyIdentifierName(property *ast.Node) string {
 // that name resolves to a binding introduced by the pragma module. Upstream answers this with
 // `eslint-scope` and four accepted definition shapes; each is reproduced in
 // `rule.IsReactPragmaBinding` against the declaration the checker hands back.
-func isPragmaCreateElementCall(ctx rule.Context, node *ast.Node) bool {
+func isPragmaCreateElementCall(ruleContext rule.Context, node *ast.Node) bool {
 	callee := node.AsCallExpression().Expression
 	if callee == nil {
 		return false
@@ -282,7 +282,7 @@ func isPragmaCreateElementCall(ctx rule.Context, node *ast.Node) bool {
 		if callee.Text() != "createElement" {
 			return false
 		}
-		return rule.IsReactPragmaBinding(ctx.SourceFile, ctx.TypeChecker, ctx.FileCache, callee)
+		return rule.IsReactPragmaBinding(ruleContext.SourceFile, ruleContext.TypeChecker, ruleContext.FileCache, callee)
 	}
 
 	return false

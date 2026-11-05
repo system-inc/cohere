@@ -101,16 +101,16 @@ var NoUnmodifiedLoopCondition = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// The judgment is the whole file's, made once, at the first loop that has a condition. A file
 		// with none cannot report, and most files have none, so they never build the reference index.
 		judged := false
 		judge := func(node *ast.Node) {
-			if judged || ctx.TypeChecker == nil || unmodifiedLoopTestOf(node) == nil {
+			if judged || ruleContext.TypeChecker == nil || unmodifiedLoopTestOf(node) == nil {
 				return
 			}
 			judged = true
-			reportUnmodifiedLoopConditions(ctx)
+			reportUnmodifiedLoopConditions(ruleContext)
 		}
 		return rule.Listeners{
 			ast.KindWhileStatement: judge,
@@ -137,12 +137,12 @@ type unmodifiedLoopCondition struct {
 }
 
 // reportUnmodifiedLoopConditions judges every variable in the file.
-func reportUnmodifiedLoopConditions(ctx rule.Context) {
+func reportUnmodifiedLoopConditions(ruleContext rule.Context) {
 	// Same index the loop-function rule builds: every identifier grouped by the declaration it
 	// resolves to. Upstream reads the equivalent off eslint-scope, walking every scope and every
 	// variable in it; iterating the index's keys reaches the same set of bindings, since a binding
 	// with no reference anywhere has nothing in a loop condition either.
-	referencesByDeclaration := loopFuncReferenceIndex(ctx)
+	referencesByDeclaration := loopFuncReferenceIndex(ruleContext)
 
 	// Declarations in a stable order, because map iteration is randomised and findings are sorted
 	// by position at the end regardless. Sorting here as well keeps a group's members in source
@@ -164,7 +164,7 @@ func reportUnmodifiedLoopConditions(ctx rule.Context) {
 
 		conditions := []*unmodifiedLoopCondition{}
 		for _, identifier := range references {
-			if condition := unmodifiedLoopConditionFor(ctx, identifier); condition != nil {
+			if condition := unmodifiedLoopConditionFor(ruleContext, identifier); condition != nil {
 				conditions = append(conditions, condition)
 			}
 		}
@@ -194,7 +194,7 @@ func reportUnmodifiedLoopConditions(ctx rule.Context) {
 				if condition.modified {
 					break
 				}
-				condition.modified = unmodifiedLoopHasModifierInLoop(ctx, condition, modifier, referencesByDeclaration)
+				condition.modified = unmodifiedLoopHasModifierInLoop(ruleContext, condition, modifier, referencesByDeclaration)
 			}
 		}
 
@@ -231,7 +231,7 @@ func reportUnmodifiedLoopConditions(ctx rule.Context) {
 	})
 
 	for _, identifier := range reported {
-		ctx.ReportNode(identifier, rule.Message{
+		ruleContext.ReportNode(identifier, rule.Message{
 			Id: messageUnmodifiedLoopCondition.Id,
 			Description: fmt.Sprintf("%s The variable is '%s'.",
 				messageUnmodifiedLoopCondition.Description, identifier.Text()),
@@ -244,7 +244,7 @@ func reportUnmodifiedLoopConditions(ctx rule.Context) {
 //
 // Upstream's `toLoopCondition`. The climb stops at the first "sentinel" node, which is its way of
 // saying "we have left the expression the condition is made of".
-func unmodifiedLoopConditionFor(ctx rule.Context, identifier *ast.Node) *unmodifiedLoopCondition {
+func unmodifiedLoopConditionFor(ruleContext rule.Context, identifier *ast.Node) *unmodifiedLoopCondition {
 	// An initializer reference is never a condition read. `var foo = 0` is not the loop testing
 	// `foo`, and upstream returns null for it before anything else.
 	//
@@ -480,7 +480,7 @@ func unmodifiedLoopIsInLoop(loop *ast.Node, identifier *ast.Node) bool {
 // function DECLARATION whose name is referenced from inside the loop, which is upstream's
 // `hasModifierInLoop` reaching through a call.
 func unmodifiedLoopHasModifierInLoop(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	condition *unmodifiedLoopCondition,
 	modifier *ast.Node,
 	referencesByDeclaration map[*ast.Node][]*ast.Node,

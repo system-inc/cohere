@@ -161,30 +161,30 @@ var SetStateInRender = rule.Rule{
 	// no alias and this rule declines the whole file in silence. `structure/react-hook-no-any-type`
 	// reads this flag to name that cost at the site where the types went bad.
 	ResolvesReactValueTypes: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// The whole file at once, for the reason `static_components.go` gives: lowering already
 			// descends into nested functions through the function arena, so listening per function
 			// kind would lower every inner function twice, the second time without the bindings its
 			// parent supplies.
 			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				// A file that cannot hold a component or a hook is not lowered at all; see
 				// high_level_intermediate_representation.MayHoldComponentOrHook for why that is exact.
-				if !high_level_intermediate_representation.MayHoldComponentOrHook(ctx) {
+				if !high_level_intermediate_representation.MayHoldComponentOrHook(ruleContext) {
 					return
 				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
 					// Shared with the other rules that lower this same function; see high_level_intermediate_representation.ForFunction.
 					// Construct runs inside the cached computation, because it mutates in place and is
 					// not idempotent.
-					lowered := high_level_intermediate_representation.ForFunction(ctx, functionNode)
+					lowered := high_level_intermediate_representation.ForFunction(ruleContext, functionNode)
 					if lowered == nil {
 						return
 					}
-					analyzeSetStateSubject(ctx, lowered)
+					analyzeSetStateSubject(ruleContext, lowered)
 				})
 			},
 		}
@@ -203,21 +203,21 @@ var SetStateInRender = rule.Rule{
 //
 // A function the gate declines is still descended into, because a component nested inside a plain
 // wrapper is a unit even when the wrapper is not.
-func analyzeSetStateSubject(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+func analyzeSetStateSubject(ruleContext rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
 	if function.Node == nil || !utilsreact.IsComponentOrHookLike(function.Node) {
 		for _, nested := range function.Functions {
-			analyzeSetStateSubject(ctx, nested)
+			analyzeSetStateSubject(ruleContext, nested)
 		}
 		return
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+	function = high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunction)
-	reportSetStateInRender(ctx, function, function.Node, true, map[static_single_assignment.IdentifierId]bool{})
+	reportSetStateInRender(ruleContext, function, function.Node, true, map[static_single_assignment.IdentifierId]bool{})
 }
 
 // reportSetStateInRender is upstream's `validate_impl` over one lowered function.
@@ -251,7 +251,7 @@ func analyzeSetStateSubject(ctx rule.Context, function *high_level_intermediate_
 // not shadow, while one inside the component does. Passing the nested function instead would stop
 // the scope walk early and make a binding in the component invisible to a callback inside it.
 func reportSetStateInRender(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	compiledUnit *ast.Node,
 	emit bool,
@@ -304,7 +304,7 @@ func reportSetStateInRender(
 				// The nested function names its captures with its OWN identifier ids, so the set
 				// built in this function's namespace means nothing inside it. Translate across the
 				// boundary rather than passing the map down; see setterCapturesOf.
-				nestedSetters, capturesOne := setterCapturesOf(ctx, function, value, nested, unconditionalSetStateFunctions)
+				nestedSetters, capturesOne := setterCapturesOf(ruleContext, function, value, nested, unconditionalSetStateFunctions)
 
 				// A `useMemo` callback is analysed whatever it captures, and this is not an
 				// optimization waiver. Upstream inlines that callback into the render graph before
@@ -336,7 +336,7 @@ func reportSetStateInRender(
 				// A `useCallback` callback is replaced by a LoadLocal instead, so it is never
 				// invoked during render and reports nothing. That asymmetry is measured, not
 				// guessed; see the rule comment.
-				if reportSetStateInRender(ctx, nested, compiledUnit, emitFromNested, nestedSetters) {
+				if reportSetStateInRender(ruleContext, nested, compiledUnit, emitFromNested, nestedSetters) {
 					unconditionalSetStateFunctions[instruction.LValue.Identifier] = true
 				}
 
@@ -345,7 +345,7 @@ func reportSetStateInRender(
 				if value.Optional {
 					continue
 				}
-				if !isStateSetter(ctx, function, value.Callee.Identifier) &&
+				if !isStateSetter(ruleContext, function, value.Callee.Identifier) &&
 					!unconditionalSetStateFunctions[value.Callee.Identifier] {
 					continue
 				}
@@ -353,7 +353,7 @@ func reportSetStateInRender(
 				// a `useMemo` reports even where it is conditional within that callback.
 				if isUseMemoCallbackOf(function.Node, compiledUnit) {
 					if emit {
-						reportSetterCall(ctx, function, value.Callee.Identifier, setStateInUseMemoMessage)
+						reportSetterCall(ruleContext, function, value.Callee.Identifier, setStateInUseMemoMessage)
 					}
 					reported = true
 					continue
@@ -362,7 +362,7 @@ func reportSetStateInRender(
 					continue
 				}
 				if emit {
-					reportSetterCall(ctx, function, value.Callee.Identifier, setStateInRenderMessage)
+					reportSetterCall(ruleContext, function, value.Callee.Identifier, setStateInRenderMessage)
 				}
 				reported = true
 			}
@@ -420,7 +420,7 @@ func nestedFunction(function *high_level_intermediate_representation.Function, v
 // `unconditionalSetStateFunctions` as well as the type, and why the walk must reach the definitions
 // in evaluation order, which `Function.Blocks` being in reverse postorder already guarantees.
 func setterCapturesOf(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	enclosing *high_level_intermediate_representation.Function,
 	value *high_level_intermediate_representation.FunctionExpression,
 	nested *high_level_intermediate_representation.Function,
@@ -429,7 +429,7 @@ func setterCapturesOf(
 	translated := map[static_single_assignment.IdentifierId]bool{}
 	for index, captured := range value.Captures {
 		isSetter := unconditionalSetStateFunctions[captured.Identifier] ||
-			isStateSetter(ctx, enclosing, captured.Identifier)
+			isStateSetter(ruleContext, enclosing, captured.Identifier)
 		if !isSetter {
 			continue
 		}
@@ -452,15 +452,15 @@ func setterCapturesOf(
 // `ActionDispatch`, which `useReducer` produces, is deliberately not accepted. Upstream gives it a
 // different built-in shape and its own diagnostics, and a dispatch called during render is not the
 // same defect.
-func isStateSetter(ctx rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) bool {
-	if ctx.TypeChecker == nil {
+func isStateSetter(ruleContext rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
 	node := identifierNodeOf(function, id)
 	if node == nil {
 		return false
 	}
-	valueType := ctx.TypeChecker.GetTypeAtLocation(node)
+	valueType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 	if valueType == nil {
 		return false
 	}
@@ -493,14 +493,14 @@ func identifierNodeOf(function *high_level_intermediate_representation.Function,
 // golden for `setX(1)` underlines four characters and the one for `aliased(2)` underlines seven.
 // Reporting through `ctx.ReportNode` routes via `rule.TokenRange`, which trims leading trivia at
 // the harness.
-func reportSetterCall(ctx rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId, message rule.Message) {
+func reportSetterCall(ruleContext rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId, message rule.Message) {
 	if node := identifierNodeOf(function, id); node != nil {
-		ctx.ReportNode(node, message)
+		ruleContext.ReportNode(node, message)
 		return
 	}
 	if int(id) < len(function.Identifiers) {
 		if identifier := function.Identifiers[id]; identifier != nil && identifier.Node != nil {
-			ctx.ReportNode(identifier.Node, message)
+			ruleContext.ReportNode(identifier.Node, message)
 		}
 	}
 }

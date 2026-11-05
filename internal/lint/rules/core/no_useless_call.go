@@ -77,8 +77,8 @@ func buildNoUselessCallMessage(methodName string) rule.Message {
 // `.apply()` form has to be unpacked into an argument list whose spacing carries intent.
 var NoUselessCall = rule.Rule{
 	Name: "no-useless-call",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -134,13 +134,13 @@ var NoUselessCall = rule.Rule{
 				expectedReceiver := memberAccessObject(appliedFunction)
 				if expectedReceiver == nil {
 					if isNullOrUndefined(thisArgument) {
-						ctx.ReportNode(node, buildNoUselessCallMessage(methodName))
+						ruleContext.ReportNode(node, buildNoUselessCallMessage(methodName))
 					}
 					return
 				}
 
-				if hasSameTokens(ctx.SourceFile, expectedReceiver, thisArgument) {
-					ctx.ReportNode(node, buildNoUselessCallMessage(methodName))
+				if hasSameTokens(ruleContext.SourceFile, expectedReceiver, thisArgument) {
+					ruleContext.ReportNode(node, buildNoUselessCallMessage(methodName))
 				}
 			},
 		}

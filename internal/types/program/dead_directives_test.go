@@ -15,12 +15,12 @@ import (
 
 func deadDirectiveRules() []rule.Rule {
 	return []rule.Rule{
-		{Name: "test-quiet", Run: func(ctx rule.Context, options any) rule.Listeners {
+		{Name: "test-quiet", Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {}}
 		}},
-		{Name: "test-live", Run: func(ctx rule.Context, options any) rule.Listeners {
+		{Name: "test-live", Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindDebuggerStatement: func(node *ast.Node) {
-				ctx.ReportNode(node, rule.Message{Id: "debugger", Description: "debugger"})
+				ruleContext.ReportNode(node, rule.Message{Id: "debugger", Description: "debugger"})
 			}}
 		}},
 	}

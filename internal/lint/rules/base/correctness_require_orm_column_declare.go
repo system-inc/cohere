@@ -70,7 +70,7 @@ var declareRequiringColumnDecorators = map[string]bool{
 // first match, which is what makes the message name the triggering decorator rather than the last one.
 var CorrectnessRequireOrmColumnDeclare = rule.Rule{
 	Name: "base/correctness-require-orm-column-declare",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
 				modifiers := node.Modifiers()
@@ -118,7 +118,7 @@ var CorrectnessRequireOrmColumnDeclare = rule.Rule{
 					propertyName = key.AsIdentifier().Text
 				}
 
-				ctx.ReportNode(key, rule.Message{
+				ruleContext.ReportNode(key, rule.Message{
 					Id: correctnessRequireOrmColumnDeclareText.Id,
 					Description: correctnessRequireOrmColumnDeclareText.Render(map[string]string{
 						"propertyName":  propertyName,

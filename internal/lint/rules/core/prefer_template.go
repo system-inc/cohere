@@ -65,7 +65,7 @@ var messagePreferTemplateUnexpectedStringConcatenation = rule.Message{
 // while one template plus an identifier reports. 14 corpus cases exercise this.
 var PreferTemplate = rule.Rule{
 	Name: "prefer-template",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Upstream's `done` map, keyed on the top expression. Both a string literal and a template
 		// literal operand reach the same chain, so without this a two-literal concatenation reports
 		// twice.
@@ -87,11 +87,11 @@ var PreferTemplate = rule.Rule{
 			if !preferTemplateHasNonStringLiteral(top) {
 				return
 			}
-			if fixes, repairable := preferTemplateFix(ctx, top); repairable {
-				ctx.ReportNodeWithFixes(top, messagePreferTemplateUnexpectedStringConcatenation, fixes...)
+			if fixes, repairable := preferTemplateFix(ruleContext, top); repairable {
+				ruleContext.ReportNodeWithFixes(top, messagePreferTemplateUnexpectedStringConcatenation, fixes...)
 				return
 			}
-			ctx.ReportNode(top, messagePreferTemplateUnexpectedStringConcatenation)
+			ruleContext.ReportNode(top, messagePreferTemplateUnexpectedStringConcatenation)
 		}
 
 		return rule.Listeners{
@@ -216,20 +216,20 @@ func preferTemplateSkipParentheses(node *ast.Node) *ast.Node {
 //
 // Reads the raw source rather than `Text()`, which returns the COOKED value with escapes already
 // resolved -- by which point `\033` and the character it denotes are indistinguishable.
-func preferTemplateHasOctalOrNonOctalDecimalEscape(ctx rule.Context, node *ast.Node) bool {
+func preferTemplateHasOctalOrNonOctalDecimalEscape(ruleContext rule.Context, node *ast.Node) bool {
 	unwrapped := preferTemplateSkipParentheses(node)
 	if unwrapped == nil {
 		return false
 	}
 	if preferTemplateIsConcatenation(unwrapped) {
 		expression := unwrapped.AsBinaryExpression()
-		return preferTemplateHasOctalOrNonOctalDecimalEscape(ctx, expression.Left) ||
-			preferTemplateHasOctalOrNonOctalDecimalEscape(ctx, expression.Right)
+		return preferTemplateHasOctalOrNonOctalDecimalEscape(ruleContext, expression.Left) ||
+			preferTemplateHasOctalOrNonOctalDecimalEscape(ruleContext, expression.Right)
 	}
-	if unwrapped.Kind != ast.KindStringLiteral || ctx.SourceFile == nil {
+	if unwrapped.Kind != ast.KindStringLiteral || ruleContext.SourceFile == nil {
 		return false
 	}
-	raw := preferTemplateRawText(ctx, unwrapped)
+	raw := preferTemplateRawText(ruleContext, unwrapped)
 	return preferTemplateRawHasLegacyEscape(raw)
 }
 
@@ -284,11 +284,11 @@ func preferTemplateRawHasLegacyEscape(raw string) bool {
 // `Text()` on a string literal returns the cooked value, which is the wrong thing for every
 // question about escapes: by the time it is cooked, `\033` and the character it denotes are the
 // same string.
-func preferTemplateRawText(ctx rule.Context, node *ast.Node) string {
-	if ctx.SourceFile == nil {
+func preferTemplateRawText(ruleContext rule.Context, node *ast.Node) string {
+	if ruleContext.SourceFile == nil {
 		return ""
 	}
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 	start, end := node.Pos(), node.End()
 	if start < 0 || end > len(source) || start >= end {
 		return ""
@@ -309,14 +309,14 @@ func preferTemplateRawText(ctx rule.Context, node *ast.Node) string {
 // arm, and reproducing it needs `isStartOfExpressionStatement` plus `needsPrecedingSemicolon`, two
 // helpers this tree does not have. It is a stated gap rather than a silent one, and it is in the
 // safe direction: the repair is withheld, not written wrong. See preferTemplateNeedsSemicolonGuard.
-func preferTemplateFix(ctx rule.Context, top *ast.Node) ([]rule.Fix, bool) {
-	if ctx.SourceFile == nil {
+func preferTemplateFix(ruleContext rule.Context, top *ast.Node) ([]rule.Fix, bool) {
+	if ruleContext.SourceFile == nil {
 		return nil, false
 	}
-	if preferTemplateHasOctalOrNonOctalDecimalEscape(ctx, top) {
+	if preferTemplateHasOctalOrNonOctalDecimalEscape(ruleContext, top) {
 		return nil, false
 	}
-	built, ok := preferTemplateLiteralFor(ctx, top, "", "")
+	built, ok := preferTemplateLiteralFor(ruleContext, top, "", "")
 	if !ok {
 		return nil, false
 	}
@@ -325,7 +325,7 @@ func preferTemplateFix(ctx rule.Context, top *ast.Node) ([]rule.Fix, bool) {
 	// previous token could join with the new backtick under automatic semicolon insertion. Five
 	// corpus cases pin it -- `foo\n'bar' + baz` becomes `foo\n;\`bar${  baz}\`` -- and each has a
 	// different preceding shape: an identifier, a call, an index, a string, a template.
-	if preferTemplateNeedsSemicolonGuard(ctx, top) {
+	if preferTemplateNeedsSemicolonGuard(ruleContext, top) {
 		built = ";" + built
 	}
 	// `Pos()` is where a node's LEADING TRIVIA begins, not where its first token does, so replacing
@@ -333,7 +333,7 @@ func preferTemplateFix(ctx rule.Context, top *ast.Node) ([]rule.Fix, bool) {
 	// `var foo =` with the space eaten. Every one of the 74 repair fixtures caught this at once,
 	// which is what a systematic off-by-trivia looks like.
 	return []rule.Fix{
-		rule.ReplaceRange(core.NewTextRange(preferTemplateTokenStart(ctx, top), top.End()), built),
+		rule.ReplaceRange(core.NewTextRange(preferTemplateTokenStart(ruleContext, top), top.End()), built),
 	}, true
 }
 
@@ -365,7 +365,7 @@ func preferTemplateFix(ctx rule.Context, top *ast.Node) ([]rule.Fix, bool) {
 //
 // Five corpus cases pin it, each with a different preceding shape: an identifier, a call, an index,
 // a string literal, and a template literal.
-func preferTemplateNeedsSemicolonGuard(ctx rule.Context, top *ast.Node) bool {
+func preferTemplateNeedsSemicolonGuard(ruleContext rule.Context, top *ast.Node) bool {
 	parent := top.Parent
 	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
 		parent = parent.Parent
@@ -373,11 +373,11 @@ func preferTemplateNeedsSemicolonGuard(ctx rule.Context, top *ast.Node) bool {
 	if parent == nil || parent.Kind != ast.KindExpressionStatement {
 		return false
 	}
-	if ctx.SourceFile == nil {
+	if ruleContext.SourceFile == nil {
 		return false
 	}
-	text := ctx.SourceFile.Text()
-	position := preferTemplateTokenStart(ctx, top) - 1
+	text := ruleContext.SourceFile.Text()
+	position := preferTemplateTokenStart(ruleContext, top) - 1
 	for position >= 0 {
 		switch text[position] {
 		case ' ', '\t', '\r', '\n':
@@ -410,7 +410,7 @@ func preferTemplateNeedsSemicolonGuard(ctx rule.Context, top *ast.Node) bool {
 // `textBefore` and `textAfter` carry the source text that sat around a `+` sign -- comments, in
 // practice -- so it can be placed inside a curly where it remains legal. Upstream's two corpus
 // cases with comments are what pin this.
-func preferTemplateLiteralFor(ctx rule.Context, node *ast.Node, textBefore string, textAfter string) (string, bool) {
+func preferTemplateLiteralFor(ruleContext rule.Context, node *ast.Node, textBefore string, textAfter string) (string, bool) {
 	if node == nil {
 		return "", false
 	}
@@ -418,7 +418,7 @@ func preferTemplateLiteralFor(ctx rule.Context, node *ast.Node, textBefore strin
 	// paren rather than with what it wraps. Upstream never sees one, so unwrapping here is what
 	// keeps `('baz')` taking the string-literal arm instead of the catch-all.
 	if unwrapped := preferTemplateSkipParentheses(node); unwrapped != nil && unwrapped != node {
-		return preferTemplateLiteralFor(ctx, unwrapped, textBefore, textAfter)
+		return preferTemplateLiteralFor(ruleContext, unwrapped, textBefore, textAfter)
 	}
 
 	if node.Kind == ast.KindStringLiteral {
@@ -426,7 +426,7 @@ func preferTemplateLiteralFor(ctx rule.Context, node *ast.Node, textBefore strin
 		// `/* a */ 'bar'` would carry the comment into the template text -- and since the
 		// replacement span also starts after that comment, the result duplicates it. Upstream reads
 		// `currentNode.raw`, which is the literal alone.
-		raw := preferTemplateRawTextFromToken(ctx, node)
+		raw := preferTemplateRawTextFromToken(ruleContext, node)
 		if len(raw) < 2 {
 			return "", false
 		}
@@ -436,7 +436,7 @@ func preferTemplateLiteralFor(ctx rule.Context, node *ast.Node, textBefore strin
 	}
 
 	if node.Kind == ast.KindNoSubstitutionTemplateLiteral || node.Kind == ast.KindTemplateExpression {
-		return preferTemplateRawText(ctx, node), true
+		return preferTemplateRawText(ruleContext, node), true
 	}
 
 	if preferTemplateIsConcatenation(node) && preferTemplateHasStringLiteral(node) {
@@ -449,20 +449,20 @@ func preferTemplateLiteralFor(ctx rule.Context, node *ast.Node, textBefore strin
 		// So the operator CHARACTER is located rather than the token trusted, and the two gaps are
 		// measured against that. All 74 repair fixtures depend on it, which is what made the defect
 		// systematic rather than incidental.
-		plusOffset, located := preferTemplateOperatorOffset(ctx, expression)
+		plusOffset, located := preferTemplateOperatorOffset(ruleContext, expression)
 		if !located {
 			return "", false
 		}
-		textBeforePlus := preferTemplateTextBetween(ctx, expression.Left.End(), plusOffset)
+		textBeforePlus := preferTemplateTextBetween(ruleContext, expression.Left.End(), plusOffset)
 		// The right operand's `Pos()` includes its own leading trivia, so measuring to it makes the
 		// second gap empty and the rendered curly comes out `${ x }` where upstream writes
 		// `${  x  }`. Upstream's `right.range[0]` is the TOKEN start, which is what this helper
 		// answers. Same trivia distinction as the replacement span above, one level down.
-		textAfterPlus := preferTemplateTextBetween(ctx, plusOffset+1,
-			preferTemplateTokenStart(ctx, expression.Right))
+		textAfterPlus := preferTemplateTextBetween(ruleContext, plusOffset+1,
+			preferTemplateTokenStart(ruleContext, expression.Right))
 
-		leftEndsWithCurly := preferTemplateEndsWithCurly(ctx, expression.Left)
-		rightStartsWithCurly := preferTemplateStartsWithCurly(ctx, expression.Right)
+		leftEndsWithCurly := preferTemplateEndsWithCurly(ruleContext, expression.Left)
+		rightStartsWithCurly := preferTemplateStartsWithCurly(ruleContext, expression.Right)
 
 		// `textBeforePlus` and `textAfterPlus` are the raw gaps around the operator, which for
 		// ordinary code is the surrounding WHITESPACE rather than a comment. Upstream carries it
@@ -471,8 +471,8 @@ func preferTemplateLiteralFor(ctx rule.Context, node *ast.Node, textBefore strin
 		// the corpus asserts the rewritten file byte for byte.
 		if leftEndsWithCurly {
 			// The left side already ends in a curly, so the text around the `+` goes inside it.
-			left, leftOk := preferTemplateLiteralFor(ctx, expression.Left, textBefore, textBeforePlus+textAfterPlus)
-			right, rightOk := preferTemplateLiteralFor(ctx, expression.Right, "", textAfter)
+			left, leftOk := preferTemplateLiteralFor(ruleContext, expression.Left, textBefore, textBeforePlus+textAfterPlus)
+			right, rightOk := preferTemplateLiteralFor(ruleContext, expression.Right, "", textAfter)
 			if !leftOk || !rightOk || len(left) < 1 || len(right) < 1 {
 				return "", false
 			}
@@ -480,8 +480,8 @@ func preferTemplateLiteralFor(ctx rule.Context, node *ast.Node, textBefore strin
 		}
 		if rightStartsWithCurly {
 			// Otherwise the right side opens with a curly and the text goes there.
-			left, leftOk := preferTemplateLiteralFor(ctx, expression.Left, textBefore, "")
-			right, rightOk := preferTemplateLiteralFor(ctx, expression.Right, textBeforePlus+textAfterPlus, textAfter)
+			left, leftOk := preferTemplateLiteralFor(ruleContext, expression.Left, textBefore, "")
+			right, rightOk := preferTemplateLiteralFor(ruleContext, expression.Right, textBeforePlus+textAfterPlus, textAfter)
 			if !leftOk || !rightOk || len(left) < 1 || len(right) < 1 {
 				return "", false
 			}
@@ -490,8 +490,8 @@ func preferTemplateLiteralFor(ctx rule.Context, node *ast.Node, textBefore strin
 
 		// Neither side has a curly to hold the text, so the `+` survives and the two halves stay
 		// separate template literals. Upstream does the same rather than dropping the text.
-		left, leftOk := preferTemplateLiteralFor(ctx, expression.Left, textBefore, "")
-		right, rightOk := preferTemplateLiteralFor(ctx, expression.Right, textAfter, "")
+		left, leftOk := preferTemplateLiteralFor(ruleContext, expression.Left, textBefore, "")
+		right, rightOk := preferTemplateLiteralFor(ruleContext, expression.Right, textAfter, "")
 		if !leftOk || !rightOk {
 			return "", false
 		}
@@ -509,7 +509,7 @@ func preferTemplateLiteralFor(ctx rule.Context, node *ast.Node, textBefore strin
 	// From the TOKEN start for the same reason the literal arm is: the operand's `Pos()` includes
 	// the comment that sat after the `+`, and `textBefore` already carries that comment. Reading
 	// from `Pos()` here emits it twice.
-	return "`${" + textBefore + preferTemplateRawTextFromToken(ctx, inner) + textAfter + "}`", true
+	return "`${" + textBefore + preferTemplateRawTextFromToken(ruleContext, inner) + textAfter + "}`", true
 }
 
 // preferTemplateEscapeForTemplate escapes what a template literal treats specially.
@@ -570,11 +570,11 @@ func preferTemplateUnescapeQuote(inner string, quote byte) string {
 // Upstream's `getTextBetween` walks the tokens and concatenates the gaps, which is how it keeps
 // comments and drops the tokens themselves. Between an operand and its `+` there are no intervening
 // tokens, so the gap IS the text and a slice answers the same question.
-func preferTemplateTextBetween(ctx rule.Context, from int, to int) string {
-	if ctx.SourceFile == nil || from < 0 || to > len(ctx.SourceFile.Text()) || from >= to {
+func preferTemplateTextBetween(ruleContext rule.Context, from int, to int) string {
+	if ruleContext.SourceFile == nil || from < 0 || to > len(ruleContext.SourceFile.Text()) || from >= to {
 		return ""
 	}
-	return ctx.SourceFile.Text()[from:to]
+	return ruleContext.SourceFile.Text()[from:to]
 }
 
 // preferTemplateHasStringLiteral answers upstream's `hasStringLiteral`.
@@ -597,16 +597,16 @@ func preferTemplateHasStringLiteral(node *ast.Node) bool {
 // template literal starts with a curly when its first quasi is EMPTY, which is upstream's
 // `quasis[0].range[0] === quasis[0].range[1]`; anything that is not a string literal becomes a curly
 // outright.
-func preferTemplateStartsWithCurly(ctx rule.Context, node *ast.Node) bool {
+func preferTemplateStartsWithCurly(ruleContext rule.Context, node *ast.Node) bool {
 	unwrapped := preferTemplateSkipParentheses(node)
 	if unwrapped == nil {
 		return false
 	}
 	if preferTemplateIsConcatenation(unwrapped) {
-		return preferTemplateStartsWithCurly(ctx, unwrapped.AsBinaryExpression().Left)
+		return preferTemplateStartsWithCurly(ruleContext, unwrapped.AsBinaryExpression().Left)
 	}
 	if unwrapped.Kind == ast.KindTemplateExpression {
-		raw := preferTemplateRawText(ctx, unwrapped)
+		raw := preferTemplateRawText(ruleContext, unwrapped)
 		// The head runs from the opening backtick to the first `${`; an empty head means the
 		// literal opens with a curly.
 		return strings.HasPrefix(raw, "`${")
@@ -622,16 +622,16 @@ func preferTemplateStartsWithCurly(ctx rule.Context, node *ast.Node) bool {
 // Note upstream's own asymmetry, reproduced here: for a concatenation it calls
 // `startsWithTemplateCurly(node.right)` rather than `endsWith`. That reads like a slip and is what
 // the corpus asserts, so it is copied rather than corrected.
-func preferTemplateEndsWithCurly(ctx rule.Context, node *ast.Node) bool {
+func preferTemplateEndsWithCurly(ruleContext rule.Context, node *ast.Node) bool {
 	unwrapped := preferTemplateSkipParentheses(node)
 	if unwrapped == nil {
 		return false
 	}
 	if preferTemplateIsConcatenation(unwrapped) {
-		return preferTemplateStartsWithCurly(ctx, unwrapped.AsBinaryExpression().Right)
+		return preferTemplateStartsWithCurly(ruleContext, unwrapped.AsBinaryExpression().Right)
 	}
 	if unwrapped.Kind == ast.KindTemplateExpression {
-		raw := preferTemplateRawText(ctx, unwrapped)
+		raw := preferTemplateRawText(ruleContext, unwrapped)
 		return strings.HasSuffix(raw, "}`")
 	}
 	if unwrapped.Kind == ast.KindNoSubstitutionTemplateLiteral {
@@ -654,11 +654,11 @@ func preferTemplateEndsWithCurly(ctx rule.Context, node *ast.Node) bool {
 // starts one byte into the comment and the repaired source reads `\`* a */ 'bar...` -- a template
 // literal that swallowed most of a comment and is still valid syntax. Upstream's own corpus case
 // with a leading comment is what caught it, and it was the last of the 74 to pass.
-func preferTemplateTokenStart(ctx rule.Context, node *ast.Node) int {
-	if ctx.SourceFile == nil {
+func preferTemplateTokenStart(ruleContext rule.Context, node *ast.Node) int {
+	if ruleContext.SourceFile == nil {
 		return node.Pos()
 	}
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 	position := node.Pos()
 	for position < len(text) && position < node.End() {
 		switch text[position] {
@@ -696,11 +696,11 @@ func preferTemplateTokenStart(ctx rule.Context, node *ast.Node) int {
 //
 // Comments in that gap are skipped rather than searched, since a `+` inside a comment would
 // otherwise be mistaken for the operator.
-func preferTemplateOperatorOffset(ctx rule.Context, expression *ast.BinaryExpression) (int, bool) {
-	if ctx.SourceFile == nil || expression.Left == nil || expression.Right == nil {
+func preferTemplateOperatorOffset(ruleContext rule.Context, expression *ast.BinaryExpression) (int, bool) {
+	if ruleContext.SourceFile == nil || expression.Left == nil || expression.Right == nil {
 		return 0, false
 	}
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 	position := expression.Left.End()
 	limit := expression.Right.Pos()
 	if position < 0 || limit > len(text) {
@@ -737,12 +737,12 @@ func preferTemplateOperatorOffset(ctx rule.Context, expression *ast.BinaryExpres
 // before it and wrong for one with a comment: trimming whitespace leaves the comment in place. This
 // uses the same trivia skip the replacement span uses, so the two agree about where the node begins
 // and neither drops nor duplicates what sits before it.
-func preferTemplateRawTextFromToken(ctx rule.Context, node *ast.Node) string {
-	if ctx.SourceFile == nil {
+func preferTemplateRawTextFromToken(ruleContext rule.Context, node *ast.Node) string {
+	if ruleContext.SourceFile == nil {
 		return ""
 	}
-	text := ctx.SourceFile.Text()
-	start := preferTemplateTokenStart(ctx, node)
+	text := ruleContext.SourceFile.Text()
+	start := preferTemplateTokenStart(ruleContext, node)
 	end := node.End()
 	if start < 0 || end > len(text) || start >= end {
 		return ""

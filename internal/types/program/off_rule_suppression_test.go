@@ -22,13 +22,13 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 	test.Parallel()
 	quiet := rule.Rule{
 		Name: "test-quiet",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {}}
 		},
 	}
 	registeredOff := rule.Rule{
 		Name: "test-registered-off",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {}}
 		},
 	}
@@ -37,7 +37,7 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 	// directives as unported (#6dc4f7k).
 	prefixed := rule.Rule{
 		Name: "plugin/test-prefixed",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {}}
 		},
 	}
@@ -111,15 +111,15 @@ func TestADeadDirectiveIsNamedWhereItIs(test *testing.T) {
 	test.Parallel()
 	reporting := rule.Rule{
 		Name: "test-reporting",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-				ctx.ReportNode(node, rule.Message{Id: "sawDeclaration", Description: "saw a declaration"})
+				ruleContext.ReportNode(node, rule.Message{Id: "sawDeclaration", Description: "saw a declaration"})
 			}}
 		},
 	}
 	quiet := rule.Rule{
 		Name: "test-quiet",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {}}
 		},
 	}

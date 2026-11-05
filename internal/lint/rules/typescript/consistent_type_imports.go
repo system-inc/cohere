@@ -200,7 +200,7 @@ var ConsistentTypeImports = rule.Rule{
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[ConsistentTypeImportsOptions](options)
 		if !ok {
 			// A rule configured as a bare `"error"` is handed nil, and every default here is
@@ -211,7 +211,7 @@ var ConsistentTypeImports = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				sourceFile := node.AsSourceFile()
@@ -222,15 +222,15 @@ var ConsistentTypeImports = rule.Rule{
 				declarations := imports.Declarations(sourceFile)
 				judgesValueImports := settings.Prefer != ConsistentTypeImportsPreferNoTypeImports &&
 					consistentTypeImportsHasValueImport(declarations)
-				facts := consistentTypeImportsScan(ctx, sourceFile, settings.DisallowTypeAnnotations,
+				facts := consistentTypeImportsScan(ruleContext, sourceFile, settings.DisallowTypeAnnotations,
 					judgesValueImports, declarations)
 
 				switch settings.Prefer {
 				case ConsistentTypeImportsPreferNoTypeImports:
-					reportTypeKeywordsToRemove(ctx, declarations)
+					reportTypeKeywordsToRemove(ruleContext, declarations)
 				default:
 					if judgesValueImports {
-						reportImportsUsedOnlyAsTypes(ctx, sourceFile, declarations, facts, settings.FixStyle)
+						reportImportsUsedOnlyAsTypes(ruleContext, sourceFile, declarations, facts, settings.FixStyle)
 					}
 				}
 			},
@@ -267,7 +267,7 @@ type consistentTypeImportsFacts struct {
 // source. The `import()` findings come out in source order, ahead of the declarations' findings,
 // which is what the corpus asserts.
 func consistentTypeImportsScan(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	sourceFile *ast.SourceFile,
 	reportImportTypes bool,
 	gatherFacts bool,
@@ -285,7 +285,7 @@ func consistentTypeImportsScan(
 		wanted = consistentTypeImportsLocalNames(declarations)
 		byText = make(map[string][]*ast.Node, len(wanted))
 		metadataRoots = map[*ast.Node]bool{}
-		metadata = decoratorMetadataSettingsOf(ctx)
+		metadata = decoratorMetadataSettingsOf(ruleContext)
 	}
 	hasJsx := false
 	hasFragment := false
@@ -296,7 +296,7 @@ func consistentTypeImportsScan(
 			return
 		}
 		if reportImportTypes && current.Kind == ast.KindImportType {
-			ctx.ReportNode(current, messageConsistentTypeImportsNoImportTypeAnnotations)
+			ruleContext.ReportNode(current, messageConsistentTypeImportsNoImportTypeAnnotations)
 		}
 		if gatherFacts {
 			switch current.Kind {
@@ -327,7 +327,7 @@ func consistentTypeImportsScan(
 	return consistentTypeImportsFacts{
 		byText:        byText,
 		metadataRoots: metadataRoots,
-		jsxValueNames: consistentTypeImportsJsxValueNames(ctx, hasJsx, hasFragment),
+		jsxValueNames: consistentTypeImportsJsxValueNames(ruleContext, hasJsx, hasFragment),
 	}
 }
 
@@ -356,23 +356,27 @@ func consistentTypeImportsHasValueImport(declarations []*ast.Node) bool {
 //
 // declarations is every import declaration, including those inside an ambient module body, the way
 // upstream visits ImportDeclaration wherever it sits.
-func reportTypeKeywordsToRemove(ctx rule.Context, declarations []*ast.Node) {
+func reportTypeKeywordsToRemove(ruleContext rule.Context, declarations []*ast.Node) {
 	for _, statement := range declarations {
 		clause := statement.AsImportDeclaration().ImportClause
 		if clause == nil {
 			continue
 		}
 		if clause.AsImportClause().IsTypeOnly() {
-			reportConsistentTypeImportsWithFix(ctx, statement, messageConsistentTypeImportsAvoidImportType,
-				func() (rule.Fix, bool) { return consistentTypeImportsRemoveTypeFix(ctx.SourceFile, statement, nil) })
+			reportConsistentTypeImportsWithFix(ruleContext, statement, messageConsistentTypeImportsAvoidImportType,
+				func() (rule.Fix, bool) {
+					return consistentTypeImportsRemoveTypeFix(ruleContext.SourceFile, statement, nil)
+				})
 			continue
 		}
 		// An inline `type` on a specifier is only reachable when the declaration itself is not
 		// type-only: `import type { type A }` is a syntax error, so the two forms never coexist.
 		for _, named := range imports.BindingsOf(statement).Named {
 			if named.Kind == ast.KindImportSpecifier && named.AsImportSpecifier().IsTypeOnly {
-				reportConsistentTypeImportsWithFix(ctx, named, messageConsistentTypeImportsAvoidImportType,
-					func() (rule.Fix, bool) { return consistentTypeImportsRemoveTypeFix(ctx.SourceFile, statement, named) })
+				reportConsistentTypeImportsWithFix(ruleContext, named, messageConsistentTypeImportsAvoidImportType,
+					func() (rule.Fix, bool) {
+						return consistentTypeImportsRemoveTypeFix(ruleContext.SourceFile, statement, named)
+					})
 			}
 		}
 	}
@@ -390,7 +394,7 @@ func reportTypeKeywordsToRemove(ctx rule.Context, declarations []*ast.Node) {
 // declarations is every import declaration, including those inside an ambient module body
 // (#7g5r6vt), and facts is consistentTypeImportsScan's answer for the file.
 func reportImportsUsedOnlyAsTypes(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	sourceFile *ast.SourceFile,
 	declarations []*ast.Node,
 	facts consistentTypeImportsFacts,
@@ -428,7 +432,7 @@ func reportImportsUsedOnlyAsTypes(
 			if alreadyTypeOnly {
 				return
 			}
-			if isReferencedOnlyAsType(ctx, facts.byText, facts.metadataRoots, local) {
+			if isReferencedOnlyAsType(ruleContext, facts.byText, facts.metadataRoots, local) {
 				typeOnlyNames = append(typeOnlyNames, local.Text())
 				typeOnlySpecifiers[specifier] = true
 			}
@@ -458,23 +462,23 @@ func reportImportsUsedOnlyAsTypes(
 			// than proposing something that cannot be written. Probed: an import with an `assert`
 			// clause is silent even when every name is type-only.
 			if declaration.Attributes == nil {
-				reportConsistentTypeImportsWithFix(ctx, statement, messageConsistentTypeImportsTypeOverValue, fix)
+				reportConsistentTypeImportsWithFix(ruleContext, statement, messageConsistentTypeImportsTypeOverValue, fix)
 			}
 			continue
 		}
 
-		reportConsistentTypeImportsWithFix(ctx, statement, consistentTypeImportsSomeAreOnlyTypes(typeOnlyNames), fix)
+		reportConsistentTypeImportsWithFix(ruleContext, statement, consistentTypeImportsSomeAreOnlyTypes(typeOnlyNames), fix)
 	}
 }
 
 // reportConsistentTypeImportsWithFix reports with the repair when one can be built, and bare when the
 // fixer declines, so a declaration it cannot rewrite safely is still named.
-func reportConsistentTypeImportsWithFix(ctx rule.Context, node *ast.Node, message rule.Message, fix func() (rule.Fix, bool)) {
+func reportConsistentTypeImportsWithFix(ruleContext rule.Context, node *ast.Node, message rule.Message, fix func() (rule.Fix, bool)) {
 	if proposed, ok := fix(); ok {
-		ctx.ReportNodeWithFixes(node, message, proposed)
+		ruleContext.ReportNodeWithFixes(node, message, proposed)
 		return
 	}
-	ctx.ReportNode(node, message)
+	ruleContext.ReportNode(node, message)
 }
 
 // consistentTypeImportsJsxValueNames names the bindings JSX in this file uses as values.
@@ -492,7 +496,7 @@ func reportConsistentTypeImportsWithFix(ctx rule.Context, node *ast.Node, messag
 //
 // hasJsx and hasFragment are whether the file holds any JSX element or fragment, and any fragment,
 // from consistentTypeImportsScan's walk.
-func consistentTypeImportsJsxValueNames(ctx rule.Context, hasJsx bool, hasFragment bool) map[string]bool {
+func consistentTypeImportsJsxValueNames(ruleContext rule.Context, hasJsx bool, hasFragment bool) map[string]bool {
 	if !hasJsx {
 		return nil
 	}
@@ -501,8 +505,8 @@ func consistentTypeImportsJsxValueNames(ctx rule.Context, hasJsx bool, hasFragme
 		return text.TrimWhitespace(strings.SplitN(factory, ".", 2)[0])
 	}
 	names := map[string]bool{"React": true}
-	if ctx.Program != nil {
-		options := ctx.Program.Options()
+	if ruleContext.Program != nil {
+		options := ruleContext.Program.Options()
 		if options.JsxFactory != "" {
 			names = map[string]bool{firstIdentifier(options.JsxFactory): true}
 		}
@@ -554,19 +558,19 @@ func consistentTypeImportsLocalNames(declarations []*ast.Node) map[string]bool {
 // False when the name has no references at all, which is upstream's own first line and not an
 // accident of the loop: an unused import is a different rule's finding.
 func isReferencedOnlyAsType(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	byText map[string][]*ast.Node,
 	metadataRoots map[*ast.Node]bool,
 	local *ast.Node,
 ) bool {
-	target := ctx.TypeChecker.GetSymbolAtLocation(local)
+	target := ruleContext.TypeChecker.GetSymbolAtLocation(local)
 	if target == nil {
 		return false
 	}
 
 	found := false
 	for _, candidate := range byText[local.Text()] {
-		if candidate == local || !resolvesToImport(ctx, candidate, target) {
+		if candidate == local || !resolvesToImport(ruleContext, candidate, target) {
 			continue
 		}
 		found = true
@@ -574,7 +578,7 @@ func isReferencedOnlyAsType(
 			// One value use settles it, and the remaining candidates cannot change the answer.
 			return false
 		}
-		if metadataRoots[candidate] && isRuntimeValueImport(ctx, target) {
+		if metadataRoots[candidate] && isRuntimeValueImport(ruleContext, target) {
 			// A type position that decorator metadata emits as a runtime reference. See
 			// `decoratorMetadataRoots`.
 			return false
@@ -651,8 +655,8 @@ type decoratorMetadataSettings struct {
 }
 
 // decoratorMetadataSettingsOf reads the options that decide whether and how metadata is emitted.
-func decoratorMetadataSettingsOf(ctx rule.Context) decoratorMetadataSettings {
-	options := ctx.Program.Options()
+func decoratorMetadataSettingsOf(ruleContext rule.Context) decoratorMetadataSettings {
+	options := ruleContext.Program.Options()
 	return decoratorMetadataSettings{
 		enabled:          options.EmitDecoratorMetadata.IsTrue(),
 		legacyDecorators: options.ExperimentalDecorators.IsTrue(),
@@ -774,8 +778,8 @@ func decoratorMetadataOtherAccessor(accessor *ast.Node) *ast.Node {
 // not a const enum, whose uses are inlined. An interface or type alias is serialized as `Object`
 // and needs no binding; under `isolatedModules` the compiler goes further and requires those to be
 // imported with `import type` (TS1272), so continuing to report them is exactly what tsc asks for.
-func isRuntimeValueImport(ctx rule.Context, binding *ast.Symbol) bool {
-	resolved := ctx.TypeChecker.GetAliasedSymbol(binding)
+func isRuntimeValueImport(ruleContext rule.Context, binding *ast.Symbol) bool {
+	resolved := ruleContext.TypeChecker.GetAliasedSymbol(binding)
 	if resolved == nil {
 		return false
 	}
@@ -789,11 +793,11 @@ func isRuntimeValueImport(ctx rule.Context, binding *ast.Symbol) bool {
 // which is a perfectly good symbol that simply is not this one. Asking only the first accessor
 // answers "no reference here" for every `export { X }`, `export type { X }` and `export default X`
 // in the file, which is silence on six corpus cases rather than a crash.
-func resolvesToImport(ctx rule.Context, identifier *ast.Node, target *ast.Symbol) bool {
-	if ctx.TypeChecker.GetSymbolAtLocation(identifier) == target {
+func resolvesToImport(ruleContext rule.Context, identifier *ast.Node, target *ast.Symbol) bool {
+	if ruleContext.TypeChecker.GetSymbolAtLocation(identifier) == target {
 		return true
 	}
-	return ctx.TypeChecker.GetExportSpecifierLocalTargetSymbol(identifier) == target
+	return ruleContext.TypeChecker.GetExportSpecifierLocalTargetSymbol(identifier) == target
 }
 
 // isTypeReference reports whether one identifier's occurrence is a type reference.

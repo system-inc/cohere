@@ -60,8 +60,8 @@ var negativeZeroComparisonOperators = map[ast.Kind]string{
 // condition.
 var NoCompareNegZero = rule.Rule{
 	Name: "no-compare-neg-zero",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -84,7 +84,7 @@ var NoCompareNegZero = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: "unexpected",
 					Description: "Comparing against `-0` with `" + operatorText + "`: every comparison " +
 						"operator treats `-0` and `0` as the same number, so this is true for positive " +

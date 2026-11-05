@@ -246,7 +246,7 @@ var Globals = rule.Rule{
 	// for the reporting case and a `KindParameter` inside the component for the silent one.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				// The engine hands a rule a nil checker when the program could not be built. This
@@ -254,7 +254,7 @@ var Globals = rule.Rule{
 				// silence rather than a panic, because `GetSymbolAtLocation` tolerates a nil
 				// receiver. Silence is the more dangerous of the two, so the guard is explicit and
 				// `TestGlobalsRequiresTheTypedHarness` fails loudly if it is ever removed.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -289,11 +289,11 @@ var Globals = rule.Rule{
 					return
 				}
 
-				if !declaredOutsideCompilationRoot(ctx, node, root) {
+				if !declaredOutsideCompilationRoot(ruleContext, node, root) {
 					return
 				}
 
-				ctx.ReportNode(globalStoreReportNode(node), rule.Message{
+				ruleContext.ReportNode(globalStoreReportNode(node), rule.Message{
 					Id: messageGlobalReassignmentId,
 					Description: fmt.Sprintf(
 						"This writes to `%s`, which is declared outside the component or hook, "+
@@ -613,8 +613,8 @@ func statementListOf(node *ast.Node) ([]*ast.Node, bool) {
 //
 // An unresolved name is outside by definition, and it is the case the rule's own name suggests and
 // the smallest part of what it catches.
-func declaredOutsideCompilationRoot(ctx rule.Context, identifier *ast.Node, root *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func declaredOutsideCompilationRoot(ruleContext rule.Context, identifier *ast.Node, root *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 
 	// A shorthand property in a destructuring target resolves through the plain accessor to the
 	// PROPERTY's own symbol, which is declared in source inside the component and therefore reads
@@ -631,7 +631,7 @@ func declaredOutsideCompilationRoot(ctx rule.Context, identifier *ast.Node, root
 	// failed, because falling back to the plain symbol hands this function the property's own
 	// declaration sitting inside the component and it correctly answers "inside".
 	if identifier.Parent != nil && identifier.Parent.Kind == ast.KindShorthandPropertyAssignment {
-		symbol = ctx.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent)
+		symbol = ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent)
 	}
 
 	// No binding anywhere in the program. `someUnknownGlobal = true` is upstream's own first

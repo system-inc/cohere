@@ -79,7 +79,7 @@ type NoUnusedExpressionsOptions struct {
 // every `'use client'` at the top of a component file would report.
 var NoUnusedExpressions = rule.Rule{
 	Name: "@typescript-eslint/no-unused-expressions",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		verdict := unusedExpressionVerdict{}
 		if parsed, ok := rule.OptionsAs[NoUnusedExpressionsOptions](options); ok {
 			verdict.options = parsed
@@ -93,7 +93,7 @@ var NoUnusedExpressions = rule.Rule{
 				if isDirectivePrologueStatement(node) {
 					return
 				}
-				ctx.ReportNode(node, messageUnusedExpression)
+				ruleContext.ReportNode(node, messageUnusedExpression)
 			},
 		}
 	},

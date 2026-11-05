@@ -57,17 +57,17 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(test *testing.T) {
 	// message id is the only thing separating the pair.
 	forward := rule.Rule{
 		Name: "zeta-forward",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-				ctx.ReportNode(node, rule.Message{Id: "b", Description: declarationName(node)})
-				ctx.ReportNode(node, rule.Message{Id: "a", Description: declarationName(node)})
+				ruleContext.ReportNode(node, rule.Message{Id: "b", Description: declarationName(node)})
+				ruleContext.ReportNode(node, rule.Message{Id: "a", Description: declarationName(node)})
 			}}
 		},
 	}
 	// Dispatched second, sorts first: reports from the file node, last declaration first.
 	reverse := rule.Rule{
 		Name: "alpha-reverse",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				var declarations []*ast.Node
 				var collect func(*ast.Node)
@@ -83,7 +83,7 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(test *testing.T) {
 				collect(node)
 				slices.Reverse(declarations)
 				for _, declaration := range declarations {
-					ctx.ReportNode(declaration, rule.Message{Id: "only", Description: declarationName(declaration)})
+					ruleContext.ReportNode(declaration, rule.Message{Id: "only", Description: declarationName(declaration)})
 				}
 			}}
 		},

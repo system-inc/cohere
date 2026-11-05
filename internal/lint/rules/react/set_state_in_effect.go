@@ -244,19 +244,19 @@ var SetStateInEffect = rule.Rule{
 	// Same predicate as `set-state-in-render`: the setter is the type's alias, so an `any` hook
 	// return takes every finding in the file with it. Declared so the tripwire can name it.
 	ResolvesReactValueTypes: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// The whole file at once, matching `static-components`. Lowering already descends into
 			// nested functions through the function arena, so listening per function kind would
 			// lower every inner function twice, once as a child and once standalone without the
 			// bindings its parent supplies.
 			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				// A file that cannot hold a component or a hook is not lowered at all; see
 				// high_level_intermediate_representation.MayHoldComponentOrHook for why that is exact.
-				if !high_level_intermediate_representation.MayHoldComponentOrHook(ctx) {
+				if !high_level_intermediate_representation.MayHoldComponentOrHook(ruleContext) {
 					return
 				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
@@ -264,11 +264,11 @@ var SetStateInEffect = rule.Rule{
 					// where `useMemo` and `useCallback` are already gone; see
 					// high_level_intermediate_representation.ForFunctionWithoutManualMemoization for why that is a separate cache
 					// entry rather than a step in the shared one.
-					lowered := high_level_intermediate_representation.ForFunctionWithoutManualMemoization(ctx, functionNode)
+					lowered := high_level_intermediate_representation.ForFunctionWithoutManualMemoization(ruleContext, functionNode)
 					if lowered == nil {
 						return
 					}
-					analyzeSetStateInEffectSubject(ctx, lowered)
+					analyzeSetStateInEffectSubject(ruleContext, lowered)
 				})
 			},
 		}
@@ -288,25 +288,25 @@ var SetStateInEffect = rule.Rule{
 // is silent there, measured on `function notAComponent() { const [s, setS] = useState(0);
 // useEffect(() => setS(1)); }`. Gating also makes `hir.MayHoldComponentOrHook` exact for this rule,
 // so a file that cannot hold a component is not lowered at all (#1pmwkmv).
-func analyzeSetStateInEffectSubject(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+func analyzeSetStateInEffectSubject(ruleContext rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
 	if function.Node == nil || !utilsreact.IsComponentOrHookLike(function.Node) {
 		for _, nested := range function.Functions {
-			analyzeSetStateInEffectSubject(ctx, nested)
+			analyzeSetStateInEffectSubject(ruleContext, nested)
 		}
 		return
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+	function = high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunctionWithoutManualMemoization)
-	reportSetStateInEffects(ctx, function)
+	reportSetStateInEffects(ruleContext, function)
 }
 
 // reportSetStateInEffects is upstream's `validateNoSetStateInEffects` over one compiled function.
-func reportSetStateInEffects(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+func reportSetStateInEffects(ruleContext rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
@@ -371,7 +371,7 @@ func reportSetStateInEffects(ctx rule.Context, function *high_level_intermediate
 			// fidelity, and the fixture that would "cover" it is in the silent test asserting the
 			// observable behaviour both versions share.
 			case *high_level_intermediate_representation.FunctionExpression:
-				if !anyOperandIsSetter(ctx, function, value, setStateFunctions) {
+				if !anyOperandIsSetter(ruleContext, function, value, setStateFunctions) {
 					continue
 				}
 				nested := setStateInEffectNestedFunction(function, value)
@@ -383,16 +383,16 @@ func reportSetStateInEffects(ctx rule.Context, function *high_level_intermediate
 				// callback handed to an effect; when this value is instead CALLED from a later
 				// effect body, that body's own call site supplies the span. See the note on where
 				// findings point in `findSetStateCall`.
-				if callee, found := findSetStateCall(ctx, nested, translateAcrossCaptures(value, nested, setStateFunctions)); found {
+				if callee, found := findSetStateCall(ruleContext, nested, translateAcrossCaptures(value, nested, setStateFunctions)); found {
 					setStateFunctions[target] = callee
 				}
 
 			case *high_level_intermediate_representation.CallExpression:
-				handleEffectCall(ctx, function, target, value.Callee, value.Args, setStateFunctions)
+				handleEffectCall(ruleContext, function, target, value.Callee, value.Args, setStateFunctions)
 			case *high_level_intermediate_representation.MethodCall:
 				// `React.useEffect(...)`. The property Place is the callee, exactly as upstream
 				// selects `instr.value.property` for a MethodCall.
-				handleEffectCall(ctx, function, target, value.Property, value.Args, setStateFunctions)
+				handleEffectCall(ruleContext, function, target, value.Property, value.Args, setStateFunctions)
 			}
 		}
 	}
@@ -402,7 +402,7 @@ func reportSetStateInEffects(ctx rule.Context, function *high_level_intermediate
 	// component or hook and this validator runs per lowered function; here the arena is walked so an
 	// effect written inside a nested component is still seen.
 	for _, nested := range function.Functions {
-		reportSetStateInEffects(ctx, nested)
+		reportSetStateInEffects(ruleContext, nested)
 	}
 }
 
@@ -415,7 +415,7 @@ func reportSetStateInEffects(ctx rule.Context, function *high_level_intermediate
 // `useEffect(() => {...})` reach the report through the FunctionExpression arm above rather than
 // here.
 func handleEffectCall(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	target static_single_assignment.IdentifierId,
 	callee high_level_intermediate_representation.Place,
@@ -431,11 +431,11 @@ func handleEffectCall(
 		return
 	}
 
-	switch effectHookKind(ctx, function, callee) {
+	switch effectHookKind(ruleContext, function, callee) {
 	case effectHookUseEffectEvent:
 		setStateFunctions[target] = setter
 	case effectHookEffect:
-		reportSetter(ctx, function, setter)
+		reportSetter(ruleContext, function, setter)
 	}
 }
 
@@ -449,7 +449,7 @@ func handleEffectCall(
 // setter call whose first argument is ref-derived is skipped. `refDerivedValues` is upstream's set
 // of the same name.
 func findSetStateCall(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	setStateFunctions map[static_single_assignment.IdentifierId]high_level_intermediate_representation.Place,
 ) (high_level_intermediate_representation.Place, bool) {
@@ -464,7 +464,7 @@ func findSetStateCall(
 	}
 
 	isDerivedFromRef := func(place high_level_intermediate_representation.Place) bool {
-		return refDerived[place.Identifier] || isRefTyped(ctx, function, place)
+		return refDerived[place.Identifier] || isRefTyped(ruleContext, function, place)
 	}
 
 	// The control-dominance half of the ref exemption, upstream's `isRefControlledBlock`.
@@ -498,7 +498,7 @@ func findSetStateCall(
 			// `ref.current` is the canonical ref read. Upstream special-cases exactly this shape,
 			// keying on the property name and the object being ref-typed.
 			if load, isLoad := instruction.Value.(*high_level_intermediate_representation.PropertyLoad); isLoad {
-				if load.Property == "current" && isRefTyped(ctx, function, load.Object) {
+				if load.Property == "current" && isRefTyped(ruleContext, function, load.Object) {
 					refDerived[target] = true
 				}
 			}
@@ -596,7 +596,7 @@ func findSetStateCall(
 					local[target] = origin
 				}
 			case *high_level_intermediate_representation.CallExpression:
-				if !isSetterPlace(ctx, function, value.Callee, local) {
+				if !isSetterPlace(ruleContext, function, value.Callee, local) {
 					continue
 				}
 				// The value-taint half of the ref exemption: a setter fed a ref-derived value is
@@ -779,7 +779,7 @@ func firstIdentifierArgument(args []high_level_intermediate_representation.Argum
 // it only started being populated one commit before this rule was written; before that it was
 // always empty and this branch could never fire.
 func anyOperandIsSetter(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	value *high_level_intermediate_representation.FunctionExpression,
 	setStateFunctions map[static_single_assignment.IdentifierId]high_level_intermediate_representation.Place,
@@ -788,7 +788,7 @@ func anyOperandIsSetter(
 		if _, known := setStateFunctions[capture.Identifier]; known {
 			return true
 		}
-		if isSetterTyped(ctx, function, capture) {
+		if isSetterTyped(ruleContext, function, capture) {
 			return true
 		}
 	}
@@ -802,7 +802,7 @@ func anyOperandIsSetter(
 		if _, known := setStateFunctions[contextPlace.Identifier]; known {
 			return true
 		}
-		if isSetterTyped(ctx, function, contextPlace) {
+		if isSetterTyped(ruleContext, function, contextPlace) {
 			return true
 		}
 	}
@@ -811,7 +811,7 @@ func anyOperandIsSetter(
 
 // isSetterPlace reports whether a callee is a setter, by type or by the propagation map.
 func isSetterPlace(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	place high_level_intermediate_representation.Place,
 	known map[static_single_assignment.IdentifierId]high_level_intermediate_representation.Place,
@@ -819,7 +819,7 @@ func isSetterPlace(
 	if _, ok := known[place.Identifier]; ok {
 		return true
 	}
-	return isSetterTyped(ctx, function, place)
+	return isSetterTyped(ruleContext, function, place)
 }
 
 // setStateTypeAliasName is the alias `@types/react` puts on a `useState` setter.
@@ -842,17 +842,17 @@ const setStateTypeAliasName = "Dispatch"
 const refTypeSymbolName = "RefObject"
 
 // isSetterTyped asks the checker whether a value is a `useState` setter.
-func isSetterTyped(ctx rule.Context, function *high_level_intermediate_representation.Function, place high_level_intermediate_representation.Place) bool {
-	return typeAliasNameOf(ctx, function, place) == setStateTypeAliasName
+func isSetterTyped(ruleContext rule.Context, function *high_level_intermediate_representation.Function, place high_level_intermediate_representation.Place) bool {
+	return typeAliasNameOf(ruleContext, function, place) == setStateTypeAliasName
 }
 
 // isRefTyped asks the checker whether a value is a ref object.
-func isRefTyped(ctx rule.Context, function *high_level_intermediate_representation.Function, place high_level_intermediate_representation.Place) bool {
+func isRefTyped(ruleContext rule.Context, function *high_level_intermediate_representation.Function, place high_level_intermediate_representation.Place) bool {
 	node := setStateInEffectIdentifierNodeOf(function, place.Identifier)
-	if node == nil || ctx.TypeChecker == nil {
+	if node == nil || ruleContext.TypeChecker == nil {
 		return false
 	}
-	valueType := ctx.TypeChecker.GetTypeAtLocation(node)
+	valueType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 	if valueType == nil {
 		return false
 	}
@@ -861,12 +861,12 @@ func isRefTyped(ctx rule.Context, function *high_level_intermediate_representati
 }
 
 // typeAliasNameOf returns the name of the type alias on a value, or the empty string.
-func typeAliasNameOf(ctx rule.Context, function *high_level_intermediate_representation.Function, place high_level_intermediate_representation.Place) string {
+func typeAliasNameOf(ruleContext rule.Context, function *high_level_intermediate_representation.Function, place high_level_intermediate_representation.Place) string {
 	node := setStateInEffectIdentifierNodeOf(function, place.Identifier)
-	if node == nil || ctx.TypeChecker == nil {
+	if node == nil || ruleContext.TypeChecker == nil {
 		return ""
 	}
-	valueType := ctx.TypeChecker.GetTypeAtLocation(node)
+	valueType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 	if valueType == nil {
 		return ""
 	}
@@ -896,9 +896,9 @@ const (
 // `import {useEffect as useFx}` report and `import {somethingElse as useEffect}` stay silent, which
 // is upstream's `binding.imported` rule. It is also what makes `React.useEffect` need no separate
 // member-expression case: the property access resolves to the same declaration.
-func effectHookKind(ctx rule.Context, function *high_level_intermediate_representation.Function, callee high_level_intermediate_representation.Place) effectHookKindOf {
+func effectHookKind(ruleContext rule.Context, function *high_level_intermediate_representation.Function, callee high_level_intermediate_representation.Place) effectHookKindOf {
 	node := setStateInEffectIdentifierNodeOf(function, callee.Identifier)
-	if node == nil || ctx.TypeChecker == nil {
+	if node == nil || ruleContext.TypeChecker == nil {
 		return effectHookNone
 	}
 
@@ -915,7 +915,7 @@ func effectHookKind(ctx rule.Context, function *high_level_intermediate_represen
 	//
 	// A namespace member falls out of the same read: `React.useEffect` resolves to the same
 	// declaration as the named import, so this rule needs no member-expression case anywhere.
-	calleeType := ctx.TypeChecker.GetTypeAtLocation(node)
+	calleeType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 	if calleeType == nil {
 		return effectHookNone
 	}
@@ -986,7 +986,7 @@ func setStateInEffectIdentifierNodeOf(function *high_level_intermediate_represen
 // Our Diagnostic has one Range, so the primary is kept where upstream puts it and the containing
 // effect is not named. That is a deliberate shape difference rather than dropped information: the
 // setter is the line a reader has to change.
-func reportSetter(ctx rule.Context, function *high_level_intermediate_representation.Function, setter high_level_intermediate_representation.Place) {
+func reportSetter(ruleContext rule.Context, function *high_level_intermediate_representation.Function, setter high_level_intermediate_representation.Place) {
 	// `Place.Range` rather than `Identifier.Node`, and the distinction is the whole correctness of
 	// this function.
 	//
@@ -1008,12 +1008,12 @@ func reportSetter(ctx rule.Context, function *high_level_intermediate_representa
 	// function cannot use, so the same job is done explicitly: a Place's range begins at the raw
 	// start of the reference, which includes the newline and indentation before it, and an
 	// untrimmed span reports `"\n    setState"` where upstream underlines `"setState"`.
-	if span := trimmedRange(ctx, setter.Range); span.Pos() < span.End() {
-		ctx.ReportRange(span, messageSetStateInEffect)
+	if span := trimmedRange(ruleContext, setter.Range); span.Pos() < span.End() {
+		ruleContext.ReportRange(span, messageSetStateInEffect)
 		return
 	}
 	if node := setStateInEffectIdentifierNodeOf(function, setter.Identifier); node != nil {
-		ctx.ReportNode(node, messageSetStateInEffect)
+		ruleContext.ReportNode(node, messageSetStateInEffect)
 	}
 }
 
@@ -1025,11 +1025,11 @@ func reportSetter(ctx rule.Context, function *high_level_intermediate_representa
 // that comment was `// eslint-disable-next-line react-hooks/set-state-in-effect`: the finding moved
 // onto the comment's line, the suppression naming the next line no longer covered it, and cohere
 // reported what the author had suppressed and React does not (#zx5xvtg item 8).
-func trimmedRange(ctx rule.Context, span core.TextRange) core.TextRange {
-	if ctx.SourceFile == nil {
+func trimmedRange(ruleContext rule.Context, span core.TextRange) core.TextRange {
+	if ruleContext.SourceFile == nil {
 		return span
 	}
-	sourceText := ctx.SourceFile.Text()
+	sourceText := ruleContext.SourceFile.Text()
 	start, end := span.Pos(), span.End()
 	if start < 0 || end > len(sourceText) || start >= end {
 		return span

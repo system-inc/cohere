@@ -82,24 +82,24 @@ var NoUselessBackreference = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				pattern, flags := regexsyntax.PatternAndFlags(node.Text())
 				if pattern == "" {
 					return
 				}
-				reportUselessBackreferences(ctx, node, pattern, flags)
+				reportUselessBackreferences(ruleContext, node, pattern, flags)
 			},
 			ast.KindSourceFile: func(node *ast.Node) {
 				// Every trace starts at a reference to `RegExp`, so a file that never spells it has
 				// nothing to follow, and the tracker's index is never built.
-				if ctx.TypeChecker == nil || !strings.Contains(ctx.SourceFile.Text(), "RegExp") {
+				if ruleContext.TypeChecker == nil || !strings.Contains(ruleContext.SourceFile.Text(), "RegExp") {
 					return
 				}
-				tracker := reference.NewTracker(ctx.SourceFile, ctx.TypeChecker, nil)
+				tracker := reference.NewTracker(ruleContext.SourceFile, ruleContext.TypeChecker, nil)
 				for _, tracked := range tracker.GlobalReferences(regExpCallTraceMap) {
-					checkBackreferencesInRegExpCall(ctx, tracked.Node)
+					checkBackreferencesInRegExpCall(ruleContext, tracked.Node)
 				}
 			},
 		}
@@ -110,20 +110,20 @@ var NoUselessBackreference = rule.Rule{
 var regExpCallTraceMap = map[string]*reference.TraceMap{"RegExp": {Call: true, Construct: true}}
 
 // checkBackreferencesInRegExpCall checks a call or construction of RegExp whose pattern is a constant.
-func checkBackreferencesInRegExpCall(ctx rule.Context, call *ast.Node) {
+func checkBackreferencesInRegExpCall(ruleContext rule.Context, call *ast.Node) {
 	arguments := call.Arguments()
 	if len(arguments) == 0 {
 		return
 	}
-	pattern, isConstant := reference.ConstantStringIn(ctx, arguments[0])
+	pattern, isConstant := reference.ConstantStringIn(ruleContext, arguments[0])
 	if !isConstant {
 		return
 	}
 	flags := ""
 	if len(arguments) > 1 {
-		flags, _ = reference.ConstantStringIn(ctx, arguments[1])
+		flags, _ = reference.ConstantStringIn(ruleContext, arguments[1])
 	}
-	reportUselessBackreferences(ctx, call, pattern, flags)
+	reportUselessBackreferences(ruleContext, call, pattern, flags)
 }
 
 // regexNodeKind is what a node on a backreference's or group's enclosing path is.
@@ -179,7 +179,7 @@ type regexStructure struct {
 
 // reportUselessBackreferences scans one pattern and reports every backreference that cannot match, at
 // the node the pattern came from.
-func reportUselessBackreferences(ctx rule.Context, node *ast.Node, pattern string, flagsText string) {
+func reportUselessBackreferences(ruleContext rule.Context, node *ast.Node, pattern string, flagsText string) {
 	flags := regexsyntax.ParseRegexFlags(flagsText)
 
 	structure, ok := scanRegexStructure(pattern, flags)
@@ -239,7 +239,7 @@ func reportUselessBackreferences(ctx rule.Context, node *ast.Node, pattern strin
 			toReport = sameDisjunction
 		}
 		first := toReport[0]
-		ctx.ReportNode(node, rule.Message{
+		ruleContext.ReportNode(node, rule.Message{
 			Id: first.problem.id,
 			Description: first.problem.describe(pattern[reference.start:reference.end],
 				pattern[first.group.start:first.group.end], len(toReport)-1),

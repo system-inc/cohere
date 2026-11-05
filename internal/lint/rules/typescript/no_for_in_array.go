@@ -149,32 +149,32 @@ var NoForInArray = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		hasArrayishLength := func(t *checker.Type) bool {
-			lengthProperty := checker.Checker_getPropertyOfType(ctx.TypeChecker, t, "length")
+			lengthProperty := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, t, "length")
 			if lengthProperty == nil {
 				return false
 			}
 
-			return type_checking.IsTypeFlagSet(checker.Checker_getTypeOfSymbol(ctx.TypeChecker, lengthProperty), checker.TypeFlagsNumberLike)
+			return type_checking.IsTypeFlagSet(checker.Checker_getTypeOfSymbol(ruleContext.TypeChecker, lengthProperty), checker.TypeFlagsNumberLike)
 		}
 		isArrayLike := func(t *checker.Type) bool {
 			return type_checking.TypeRecurser(t, func(t *checker.Type) bool {
-				return type_checking.GetNumberIndexType(ctx.TypeChecker, t) != nil && hasArrayishLength(t)
+				return type_checking.GetNumberIndexType(ruleContext.TypeChecker, t) != nil && hasArrayishLength(t)
 			})
 		}
 
 		return rule.Listeners{
 			ast.KindForInStatement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
-				t := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.AsForInOrOfStatement().Expression)
+				t := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, node.AsForInOrOfStatement().Expression)
 
 				if isArrayLike(t) {
-					ctx.ReportRange(
-						type_checking.GetForStatementHeadLoc(ctx.SourceFile, node),
+					ruleContext.ReportRange(
+						type_checking.GetForStatementHeadLoc(ruleContext.SourceFile, node),
 						buildForInViolationMessage(),
 					)
 				}

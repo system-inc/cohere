@@ -86,7 +86,7 @@ var PreferFind = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// isArrayish answers upstream's `isArrayish`: a possibly-nullable array or tuple, or a
 		// union of those, where an intersection must be arrayish in EVERY part.
 		//
@@ -106,7 +106,7 @@ var PreferFind = rule.Rule{
 				// by part. Upstream carries the same comment for the same reason.
 				everyPartIsArray := true
 				for _, intersectionPart := range type_checking.IntersectionTypeParts(unionPart) {
-					if !checker.Checker_isArrayType(ctx.TypeChecker, intersectionPart) &&
+					if !checker.Checker_isArrayType(ruleContext.TypeChecker, intersectionPart) &&
 						!checker.IsTupleType(intersectionPart) {
 						everyPartIsArray = false
 						break
@@ -156,10 +156,10 @@ var PreferFind = rule.Rule{
 				}
 			}
 
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return "", false
 			}
-			expressionType := ctx.TypeChecker.GetTypeAtLocation(expression)
+			expressionType := ruleContext.TypeChecker.GetTypeAtLocation(expression)
 			if expressionType == nil {
 				return "", false
 			}
@@ -176,7 +176,7 @@ var PreferFind = rule.Rule{
 				!type_checking.IsTypeFlagSet(expressionType, checker.TypeFlagsBigIntLiteral) {
 				return "", false
 			}
-			rendered := ctx.TypeChecker.TypeToString(expressionType)
+			rendered := ruleContext.TypeChecker.TypeToString(expressionType)
 			// A string literal type renders with its quotes, which are not part of the value.
 			if len(rendered) >= 2 && (rendered[0] == '"' || rendered[0] == '\'') &&
 				rendered[len(rendered)-1] == rendered[0] {
@@ -295,10 +295,10 @@ var PreferFind = rule.Rule{
 			}
 
 			receiver := receiverOfMemberAccess(callee)
-			if receiver == nil || ctx.TypeChecker == nil {
+			if receiver == nil || ruleContext.TypeChecker == nil {
 				return nil
 			}
-			if !isArrayish(type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, receiver)) {
+			if !isArrayish(type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, receiver)) {
 				return nil
 			}
 			return []filterCall{{nameNode: nameNode, isComputed: isComputed}}
@@ -317,15 +317,15 @@ var PreferFind = rule.Rule{
 					replacement = `"find"`
 				}
 				fixes = append(fixes, rule.ReplaceRange(
-					rule.TokenRange(ctx.SourceFile, filter.nameNode), replacement))
+					rule.TokenRange(ruleContext.SourceFile, filter.nameNode), replacement))
 			}
 
 			// The index access is removed from the `.` or `[` that begins it through the end of the
 			// whole expression, which covers `[0]`, `.at(0)` and `["at"](0)` alike.
 			accessStart, hasAccessStart := memberAccessTokenAfter(
-				ctx.SourceFile.Text(),
-				rule.TokenRange(ctx.SourceFile, arrayExpression).End(),
-				rule.TokenRange(ctx.SourceFile, wholeExpression).End())
+				ruleContext.SourceFile.Text(),
+				rule.TokenRange(ruleContext.SourceFile, arrayExpression).End(),
+				rule.TokenRange(ruleContext.SourceFile, wholeExpression).End())
 			if !hasAccessStart {
 				// The token has to be there for this shape to have parsed, so this is unreachable
 				// from any source that produced these nodes. Declining the whole suggestion rather
@@ -334,23 +334,23 @@ var PreferFind = rule.Rule{
 				return rule.Suggestion{}, false
 			}
 			fixes = append(fixes, rule.RemoveRange(core.NewTextRange(
-				accessStart, rule.TokenRange(ctx.SourceFile, wholeExpression).End())))
+				accessStart, rule.TokenRange(ruleContext.SourceFile, wholeExpression).End())))
 
 			return rule.Suggestion{Message: buildPreferFindSuggestionMessage(), Fixes: fixes}, true
 		}
 
 		report := func(wholeExpression *ast.Node, arrayExpression *ast.Node, filters []filterCall) {
 			if suggestion, hasSuggestion := buildSuggestion(filters, arrayExpression, wholeExpression); hasSuggestion {
-				ctx.ReportNodeWithSuggestions(wholeExpression, buildPreferFindMessage(), suggestion)
+				ruleContext.ReportNodeWithSuggestions(wholeExpression, buildPreferFindMessage(), suggestion)
 				return
 			}
-			ctx.ReportNode(wholeExpression, buildPreferFindMessage())
+			ruleContext.ReportNode(wholeExpression, buildPreferFindMessage())
 		}
 
 		return rule.Listeners{
 			// `filtered.at(0)`
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				call := node.AsCallExpression()
@@ -381,7 +381,7 @@ var PreferFind = rule.Rule{
 
 			// `filtered[0]`
 			ast.KindElementAccessExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				access := node.AsElementAccessExpression()

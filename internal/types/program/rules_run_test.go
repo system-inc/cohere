@@ -35,11 +35,11 @@ func TestRulesRunCountsOnlyTheRulesOfferedAFile(test *testing.T) {
 	}
 
 	listens := func(name string) rule.Rule {
-		return rule.Rule{Name: name, Run: func(ctx rule.Context, options any) rule.Listeners {
+		return rule.Rule{Name: name, Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {}}
 		}}
 	}
-	declines := rule.Rule{Name: "test-declines", Run: func(ctx rule.Context, options any) rule.Listeners { return nil }}
+	declines := rule.Rule{Name: "test-declines", Run: func(ruleContext rule.Context, options any) rule.Listeners { return nil }}
 	rules := []rule.Rule{listens("test-listens"), declines, listens("test-off"), listens("test-only-in-special"),
 		listens("test-nobody-configured")}
 

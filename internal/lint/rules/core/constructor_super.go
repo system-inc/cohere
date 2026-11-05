@@ -118,17 +118,17 @@ import (
 // a later reader can see it was a decision.
 var ConstructorSuper = rule.Rule{
 	Name: "constructor-super",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindConstructor: func(constructor *ast.Node) {
-				checkConstructorSuper(ctx, constructor)
+				checkConstructorSuper(ruleContext, constructor)
 			},
 		}
 	},
 }
 
 // checkConstructorSuper is the whole decision for one constructor.
-func checkConstructorSuper(ctx rule.Context, constructor *ast.Node) {
+func checkConstructorSuper(ruleContext rule.Context, constructor *ast.Node) {
 	class := constructor.Parent
 	if class == nil ||
 		(class.Kind != ast.KindClassDeclaration && class.Kind != ast.KindClassExpression) {
@@ -177,7 +177,7 @@ func checkConstructorSuper(ctx rule.Context, constructor *ast.Node) {
 		// reported, because each is separately deletable.
 		if len(calls) > 0 {
 			for _, call := range calls {
-				ctx.ReportNode(call, rule.Message{
+				ruleContext.ReportNode(call, rule.Message{
 					Id: "badSuper",
 					Description: "This `super()` call has no constructor to call, because the " +
 						"`extends` clause names something that cannot be constructed.",
@@ -191,26 +191,26 @@ func checkConstructorSuper(ctx rule.Context, constructor *ast.Node) {
 		// which is `class A extends null { constructor() { return a; } }` in the pass list against
 		// `class A extends null { constructor() { } }` in the fail list.
 		if !bodyReturnsAValue(body.AsNode()) {
-			reportMissingSuper(ctx, constructor, "missingAll")
+			reportMissingSuper(ruleContext, constructor, "missingAll")
 		}
 		return
 
 	case superClassConstructable:
-		checkConstructableSuperPaths(ctx, constructor, body.AsNode(), calls)
+		checkConstructableSuperPaths(ruleContext, constructor, body.AsNode(), calls)
 	}
 }
 
 // checkConstructableSuperPaths is the path analysis, run only once the superclass is known to be
 // callable.
 func checkConstructableSuperPaths(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	constructor *ast.Node,
 	body *ast.Node,
 	calls []*ast.Node,
 ) {
 	if len(calls) == 0 {
 		// Nothing to be on some paths rather than others.
-		reportMissingSuper(ctx, constructor, "missingAll")
+		reportMissingSuper(ruleContext, constructor, "missingAll")
 		return
 	}
 
@@ -226,13 +226,13 @@ func checkConstructableSuperPaths(
 	// as no path having a call. See the note on the rule.
 	switch {
 	case flow.calls == superNever:
-		reportMissingSuper(ctx, constructor, "missingAll")
+		reportMissingSuper(ruleContext, constructor, "missingAll")
 	case flow.calls == superSometimes || flow.escapedWithoutCalling:
 		// `escapedWithoutCalling` is the second way to reach `missingSome`, and it is the one a
 		// state lattice alone cannot express. `if (a) return; super();` comes out `superAlways`,
 		// because the live path really does call it, and it is still `missingSome` because the
 		// path that returned early is finished and never did.
-		reportMissingSuper(ctx, constructor, "missingSome")
+		reportMissingSuper(ruleContext, constructor, "missingSome")
 	}
 
 	// Duplicate detection is a separate walk from the path analysis and has to be, because the two
@@ -242,7 +242,7 @@ func checkConstructableSuperPaths(
 	// The same loop is therefore `superNever` above and a duplicate source here, which is exactly
 	// how upstream reads it and why its lattice needs both `Mixed` and `Multiple`.
 	for _, duplicate := range findDuplicateSuperCalls(body) {
-		ctx.ReportNode(duplicate, rule.Message{
+		ruleContext.ReportNode(duplicate, rule.Message{
 			Id: "duplicate",
 			Description: "This `super()` call can run on a path that already called `super()`, " +
 				"which throws a ReferenceError because a constructor may only call it once.",
@@ -257,14 +257,14 @@ func checkConstructableSuperPaths(
 // `constructor.span`, which is the method definition rather than the function value. Built through
 // `rule.TokenRange` so a constructor preceded by a comment reports at the keyword and a
 // `-next-line` suppression written above it can match.
-func reportMissingSuper(ctx rule.Context, constructor *ast.Node, messageId string) {
+func reportMissingSuper(ruleContext rule.Context, constructor *ast.Node, messageId string) {
 	description := "This derived constructor never calls `super()`, so constructing the class " +
 		"throws a ReferenceError before the body finishes."
 	if messageId == "missingSome" {
 		description = "This derived constructor calls `super()` on some paths and not others, " +
 			"so the paths without it throw a ReferenceError."
 	}
-	ctx.ReportRange(rule.TokenRange(ctx.SourceFile, constructor), rule.Message{
+	ruleContext.ReportRange(rule.TokenRange(ruleContext.SourceFile, constructor), rule.Message{
 		Id:          messageId,
 		Description: description,
 	})

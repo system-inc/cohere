@@ -36,21 +36,21 @@ func messageNoDirectFetch() rule.Message {
 // and an error path, which is the work the rule is asking for rather than something to generate.
 var NetworkNoDirectFetch = rule.Rule{
 	Name: "structure/network-no-direct-fetch",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		// The implementation is the one place the raw primitive is allowed, so it declines the file
 		// before any node is visited.
-		if FileContextFor(ctx.SourceFile.FileName().AsString()).IsNetworkServiceFile {
+		if FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsNetworkServiceFile {
 			return nil
 		}
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if isFetchCallee(node.AsCallExpression().Expression) {
-					ctx.ReportNode(node, messageNoDirectFetch())
+					ruleContext.ReportNode(node, messageNoDirectFetch())
 				}
 			},
 		}

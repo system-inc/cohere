@@ -62,8 +62,8 @@ var hooksWithDependencies = map[string]bool{
 // call would collapse them into one finding at a line the author has to search.
 var ReactHookNoPropertiesInDependencies = rule.Rule{
 	Name: "structure/react-hook-no-properties-in-dependencies",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil || !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 
@@ -100,7 +100,7 @@ var ReactHookNoPropertiesInDependencies = rule.Rule{
 					if element.Text() != "properties" {
 						continue
 					}
-					ctx.ReportNode(element, messageExtractPropertiesFirst())
+					ruleContext.ReportNode(element, messageExtractPropertiesFirst())
 				}
 			},
 		}

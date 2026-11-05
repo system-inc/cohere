@@ -157,7 +157,7 @@ var ArrayCallbackReturn = rule.Rule{
 	// asks its scope analysis nothing here either.
 	NeedsTypeChecker: false,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// A rule configured as a bare severity is handed nil, which `options.(T)` turns into the
 		// zero value. All three defaults are false upstream, so the zero value is right, and the
 		// fallback is still written out rather than relied on.
@@ -167,7 +167,7 @@ var ArrayCallbackReturn = rule.Rule{
 		}
 
 		check := func(node *ast.Node) {
-			checkArrayCallback(ctx, node, settings)
+			checkArrayCallback(ruleContext, node, settings)
 		}
 
 		return rule.Listeners{
@@ -178,7 +178,7 @@ var ArrayCallbackReturn = rule.Rule{
 }
 
 // checkArrayCallback judges one function expression or arrow function.
-func checkArrayCallback(ctx rule.Context, node *ast.Node, settings ArrayCallbackReturnOptions) {
+func checkArrayCallback(ruleContext rule.Context, node *ast.Node, settings ArrayCallbackReturnOptions) {
 	methodName, isCallback := arrayMethodNameFor(node)
 	if !isCallback {
 		return
@@ -190,7 +190,7 @@ func checkArrayCallback(ctx rule.Context, node *ast.Node, settings ArrayCallback
 	returns := returnStatementsIn(node)
 
 	if methodName == "forEach" {
-		checkForEachCallback(ctx, node, returns, settings)
+		checkForEachCallback(ruleContext, node, returns, settings)
 		return
 	}
 
@@ -214,10 +214,10 @@ func checkArrayCallback(ctx rule.Context, node *ast.Node, settings ArrayCallback
 			// sentence to write and a different thing for the reader to fix.
 			message = messageArrayCallbackExpectedAtEnd
 		}
-		reportAtFunctionHead(ctx, node, rule.Message{
+		reportAtFunctionHead(ruleContext, node, rule.Message{
 			Id: message.Id,
 			Description: fmt.Sprintf("%s %s", message.Description,
-				arrayCallbackContextSentence(ctx, node, methodName)),
+				arrayCallbackContextSentence(ruleContext, node, methodName)),
 		})
 	}
 
@@ -228,10 +228,10 @@ func checkArrayCallback(ctx rule.Context, node *ast.Node, settings ArrayCallback
 			if returnStatement.AsReturnStatement().Expression != nil {
 				continue
 			}
-			ctx.ReportNode(returnStatement, rule.Message{
+			ruleContext.ReportNode(returnStatement, rule.Message{
 				Id: messageArrayCallbackExpectedReturnValue.Id,
 				Description: fmt.Sprintf("%s %s", messageArrayCallbackExpectedReturnValue.Description,
-					arrayCallbackContextSentence(ctx, node, methodName)),
+					arrayCallbackContextSentence(ruleContext, node, methodName)),
 			})
 		}
 	}
@@ -242,7 +242,7 @@ func checkArrayCallback(ctx rule.Context, node *ast.Node, settings ArrayCallback
 // The whole arm is inert unless `checkForEach` is on, which is upstream's default, so the common
 // configuration reaches this and returns immediately.
 func checkForEachCallback(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	returns []*ast.Node,
 	settings ArrayCallbackReturnOptions,
@@ -259,15 +259,15 @@ func checkForEachCallback(
 			// Already saying the value is discarded, which is what allowVoid asks for.
 			return
 		}
-		suggestions := []rule.Suggestion{arrayCallbackWrapBracesSuggestion(ctx, node, body)}
+		suggestions := []rule.Suggestion{arrayCallbackWrapBracesSuggestion(ruleContext, node, body)}
 		if settings.AllowVoid {
-			suggestions = append(suggestions, arrayCallbackPrependVoidSuggestion(ctx, body))
+			suggestions = append(suggestions, arrayCallbackPrependVoidSuggestion(ruleContext, body))
 		}
-		reportAtFunctionHeadWithSuggestions(ctx, node, rule.Message{
+		reportAtFunctionHeadWithSuggestions(ruleContext, node, rule.Message{
 			Id: messageArrayCallbackExpectedNoReturnValue.Id,
 			Description: fmt.Sprintf("%s %s",
 				messageArrayCallbackExpectedNoReturnValue.Description,
-				arrayCallbackContextSentence(ctx, node, "forEach")),
+				arrayCallbackContextSentence(ruleContext, node, "forEach")),
 		}, suggestions...)
 		return
 	}
@@ -286,16 +286,16 @@ func checkForEachCallback(
 			Id: messageArrayCallbackExpectedNoReturnValue.Id,
 			Description: fmt.Sprintf("%s %s",
 				messageArrayCallbackExpectedNoReturnValue.Description,
-				arrayCallbackContextSentence(ctx, node, "forEach")),
+				arrayCallbackContextSentence(ruleContext, node, "forEach")),
 		}
 		if settings.AllowVoid {
-			ctx.ReportNodeWithSuggestions(returnStatement, message,
-				arrayCallbackPrependVoidSuggestion(ctx, argument))
+			ruleContext.ReportNodeWithSuggestions(returnStatement, message,
+				arrayCallbackPrependVoidSuggestion(ruleContext, argument))
 			continue
 		}
 		// Without allowVoid there is nothing to offer: upstream sets `suggest` to null here, because
 		// the only repair it knows is the one the option enables.
-		ctx.ReportNode(returnStatement, message)
+		ruleContext.ReportNode(returnStatement, message)
 	}
 }
 
@@ -303,13 +303,13 @@ func checkForEachCallback(
 //
 // `x => x` becomes `x => {x}`, which turns the returned expression into a statement. It changes what
 // the arrow means, so it is a suggestion rather than a fix, exactly as upstream has it.
-func arrayCallbackWrapBracesSuggestion(ctx rule.Context, node *ast.Node, body *ast.Node) rule.Suggestion {
+func arrayCallbackWrapBracesSuggestion(ruleContext rule.Context, node *ast.Node, body *ast.Node) rule.Suggestion {
 	_ = node
 	return rule.Suggestion{
 		Message: messageArrayCallbackWrapBraces,
 		Fixes: []rule.Fix{
-			ctx.InsertBefore(body, "{"),
-			ctx.InsertAfter(body, "}"),
+			ruleContext.InsertBefore(body, "{"),
+			ruleContext.InsertAfter(body, "}"),
 		},
 	}
 }
@@ -319,7 +319,7 @@ func arrayCallbackWrapBracesSuggestion(ctx rule.Context, node *ast.Node, body *a
 // Upstream additionally parenthesizes when the expression binds looser than `void` and is not
 // already parenthesized, which it decides through its token API. That narrowing is reproduced for
 // the operators the corpus writes; see the rule doc comment for the stated limit.
-func arrayCallbackPrependVoidSuggestion(ctx rule.Context, expression *ast.Node) rule.Suggestion {
+func arrayCallbackPrependVoidSuggestion(ruleContext rule.Context, expression *ast.Node) rule.Suggestion {
 	// A leading space is needed when the token before the expression is `return` and the two are
 	// written adjacent, because `returnvoid x` is one identifier. Upstream computes exactly this,
 	// comparing the return token's end against the first token's start, and the corpus pins it:
@@ -328,7 +328,7 @@ func arrayCallbackPrependVoidSuggestion(ctx rule.Context, expression *ast.Node) 
 	// An arrow's `=>` needs no such space, which is why upstream's condition tests for `return`
 	// specifically rather than for adjacency alone.
 	prefix := "void "
-	if arrayCallbackReturnIsAdjacentTo(ctx, expression) {
+	if arrayCallbackReturnIsAdjacentTo(ruleContext, expression) {
 		prefix = " void "
 	}
 
@@ -336,14 +336,14 @@ func arrayCallbackPrependVoidSuggestion(ctx rule.Context, expression *ast.Node) 
 		return rule.Suggestion{
 			Message: messageArrayCallbackPrependVoid,
 			Fixes: []rule.Fix{
-				ctx.InsertBefore(expression, prefix+"("),
-				ctx.InsertAfter(expression, ")"),
+				ruleContext.InsertBefore(expression, prefix+"("),
+				ruleContext.InsertAfter(expression, ")"),
 			},
 		}
 	}
 	return rule.Suggestion{
 		Message: messageArrayCallbackPrependVoid,
-		Fixes:   []rule.Fix{ctx.InsertBefore(expression, prefix)},
+		Fixes:   []rule.Fix{ruleContext.InsertBefore(expression, prefix)},
 	}
 }
 
@@ -352,17 +352,17 @@ func arrayCallbackPrependVoidSuggestion(ctx rule.Context, expression *ast.Node) 
 //
 // `ctx.InsertBefore` anchors on the token range, which starts past leading trivia, so the check is
 // whether the source immediately before that token is the end of `return`.
-func arrayCallbackReturnIsAdjacentTo(ctx rule.Context, expression *ast.Node) bool {
+func arrayCallbackReturnIsAdjacentTo(ruleContext rule.Context, expression *ast.Node) bool {
 	parent := expression.Parent
 	if parent == nil || parent.Kind != ast.KindReturnStatement {
 		return false
 	}
-	start := rule.TokenRange(ctx.SourceFile, expression).Pos()
+	start := rule.TokenRange(ruleContext.SourceFile, expression).Pos()
 	const keyword = "return"
 	if start < len(keyword) {
 		return false
 	}
-	return ctx.SourceFile.Text()[start-len(keyword):start] == keyword
+	return ruleContext.SourceFile.Text()[start-len(keyword):start] == keyword
 }
 
 // arrayCallbackNeedsParensUnderVoid reports whether prepending `void` to an expression would bind
@@ -446,18 +446,18 @@ func returnStatementsIn(node *ast.Node) []*ast.Node {
 // keyword through the parameter list for a function expression and just the `=>` for an arrow. The
 // distinction is not cosmetic: a callback body can be hundreds of lines, and a finding spanning all
 // of it is unreadable in any editor that highlights ranges.
-func reportAtFunctionHead(ctx rule.Context, node *ast.Node, message rule.Message) {
-	ctx.ReportRange(arrayCallbackFunctionHeadRange(ctx, node), message)
+func reportAtFunctionHead(ruleContext rule.Context, node *ast.Node, message rule.Message) {
+	ruleContext.ReportRange(arrayCallbackFunctionHeadRange(ruleContext, node), message)
 }
 
 // reportAtFunctionHeadWithSuggestions is reportAtFunctionHead for a finding that offers repairs.
 func reportAtFunctionHeadWithSuggestions(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	message rule.Message,
 	suggestions ...rule.Suggestion,
 ) {
-	ctx.ReportRangeWithSuggestions(arrayCallbackFunctionHeadRange(ctx, node), message, suggestions...)
+	ruleContext.ReportRangeWithSuggestions(arrayCallbackFunctionHeadRange(ruleContext, node), message, suggestions...)
 }
 
 // arrayCallbackFunctionHeadRange is upstream's `getFunctionHeadLoc`.
@@ -465,14 +465,14 @@ func reportAtFunctionHeadWithSuggestions(
 // For an arrow function the head is the `=>` token itself. For a function expression it runs from
 // the start of the function through the end of its parameter list, so a named callback's name is
 // inside the span and its body is not.
-func arrayCallbackFunctionHeadRange(ctx rule.Context, node *ast.Node) core.TextRange {
+func arrayCallbackFunctionHeadRange(ruleContext rule.Context, node *ast.Node) core.TextRange {
 	if node.Kind == ast.KindArrowFunction {
 		if arrow := node.AsArrowFunction(); arrow != nil && arrow.EqualsGreaterThanToken != nil {
-			return rule.TokenRange(ctx.SourceFile, arrow.EqualsGreaterThanToken)
+			return rule.TokenRange(ruleContext.SourceFile, arrow.EqualsGreaterThanToken)
 		}
 	}
 
-	start := rule.TokenRange(ctx.SourceFile, node).Pos()
+	start := rule.TokenRange(ruleContext.SourceFile, node).Pos()
 	end := start
 	if parameters := node.ParameterList(); parameters != nil {
 		end = parameters.End()
@@ -480,7 +480,7 @@ func arrayCallbackFunctionHeadRange(ctx rule.Context, node *ast.Node) core.TextR
 	// The parameter list node ends before its closing parenthesis, so the span is extended to it.
 	// Measured on `foo.every(function cb() {})`: upstream's column places the finding on the
 	// `function` keyword, and the span it uses reaches the `)`.
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 	for end < len(text) && text[end] != ')' {
 		end++
 	}
@@ -488,7 +488,7 @@ func arrayCallbackFunctionHeadRange(ctx rule.Context, node *ast.Node) core.TextR
 		end++
 	}
 	if end <= start {
-		return rule.TokenRange(ctx.SourceFile, node)
+		return rule.TokenRange(ruleContext.SourceFile, node)
 	}
 	return core.NewTextRange(start, end)
 }
@@ -499,9 +499,9 @@ func arrayCallbackFunctionHeadRange(ctx rule.Context, node *ast.Node) core.TextR
 // `rule.Message` carries no interpolation layer, so the per-finding half is rendered here. The two
 // values are upstream's `arrayMethodName` and `name`, spelled the same way so a reader moving
 // between the two linters sees the same words.
-func arrayCallbackContextSentence(ctx rule.Context, node *ast.Node, methodName string) string {
+func arrayCallbackContextSentence(ruleContext rule.Context, node *ast.Node, methodName string) string {
 	return fmt.Sprintf("Here %s() is being passed %s.",
-		arrayCallbackQualifiedMethodName(methodName), arrayCallbackFunctionNameWithKind(ctx, node))
+		arrayCallbackQualifiedMethodName(methodName), arrayCallbackFunctionNameWithKind(ruleContext, node))
 }
 
 // arrayCallbackQualifiedMethodName is upstream's `fullMethodName`.
@@ -522,7 +522,7 @@ func arrayCallbackQualifiedMethodName(methodName string) string {
 // The renderings the corpus asserts are `arrow function`, `function`, and `function 'cb'`. The
 // quoting is single quotes around the name, which is upstream's spelling and is asserted by its
 // message text.
-func arrayCallbackFunctionNameWithKind(ctx rule.Context, node *ast.Node) string {
+func arrayCallbackFunctionNameWithKind(ruleContext rule.Context, node *ast.Node) string {
 	if node.Kind == ast.KindArrowFunction {
 		return "arrow function"
 	}
@@ -531,6 +531,6 @@ func arrayCallbackFunctionNameWithKind(ctx rule.Context, node *ast.Node) string 
 			return fmt.Sprintf("function '%s'", functionName)
 		}
 	}
-	_ = ctx
+	_ = ruleContext
 	return "function"
 }

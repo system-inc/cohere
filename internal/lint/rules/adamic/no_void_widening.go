@@ -23,12 +23,12 @@ var NoVoidWidening = rule.Rule{
 	Name:             "adamic/no-void-widening",
 	NeedsTypeChecker: true,
 	ProgramReads:     rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
-		tc := ctx.TypeChecker
-		walker := flow.WalkerFor(ctx)
+		tc := ruleContext.TypeChecker
+		walker := flow.WalkerFor(ruleContext)
 		proof := voidBodyProof{checker: tc, empty: make(map[*ast.Node]bool)}
 		var sourceNode *ast.Node
 		var sourceRoot *checker.Type
@@ -60,8 +60,8 @@ var NoVoidWidening = rule.Rule{
 			if !wrong {
 				return
 			}
-			ctx.ReportNode(site.Node, rule.Message{Id: "voidWidening", Description: voidWideningText.Render(map[string]string{
-				"slot":   slotText(ctx.SourceFile, site.Node, found.Path),
+			ruleContext.ReportNode(site.Node, rule.Message{Id: "voidWidening", Description: voidWideningText.Render(map[string]string{
+				"slot":   slotText(ruleContext.SourceFile, site.Node, found.Path),
 				"source": type_checking.StableTypeText(tc, found.Source),
 				"target": type_checking.StableTypeText(tc, found.Target),
 			})})

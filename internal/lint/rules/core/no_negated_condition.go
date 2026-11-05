@@ -54,7 +54,7 @@ var messageNoNegatedCondition = rule.Message{
 // applying De Morgan.
 var NoNegatedCondition = rule.Rule{
 	Name: "no-negated-condition",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIfStatement: func(node *ast.Node) {
 				statement := node.AsIfStatement()
@@ -62,12 +62,12 @@ var NoNegatedCondition = rule.Rule{
 					return
 				}
 				if noNegatedConditionIsNegated(statement.Expression) {
-					ctx.ReportNode(node, messageNoNegatedCondition)
+					ruleContext.ReportNode(node, messageNoNegatedCondition)
 				}
 			},
 			ast.KindConditionalExpression: func(node *ast.Node) {
 				if noNegatedConditionIsNegated(node.AsConditionalExpression().Condition) {
-					ctx.ReportNode(node, messageNoNegatedCondition)
+					ruleContext.ReportNode(node, messageNoNegatedCondition)
 				}
 			},
 		}

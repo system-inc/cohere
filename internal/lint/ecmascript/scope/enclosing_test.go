@@ -15,7 +15,7 @@ func atMarker(test *testing.T, source string, ask func(node *ast.Node)) {
 	found := false
 	rule_testing.Run(test, rule.Rule{
 		Name: "scope-probe",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindIdentifier: func(node *ast.Node) {
 					if found || node.Text() != "marker" {

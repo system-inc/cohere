@@ -69,21 +69,21 @@ var NoObjCalls = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				// Every trace starts at a reference to one of these names, so a file that never
 				// spells any of them has nothing to follow, and the index is never built.
-				if !spellsANonCallableGlobal(ctx.SourceFile.Text()) {
+				if !spellsANonCallableGlobal(ruleContext.SourceFile.Text()) {
 					return
 				}
-				tracker := reference.NewTracker(ctx.SourceFile, ctx.TypeChecker, nil)
+				tracker := reference.NewTracker(ruleContext.SourceFile, ruleContext.TypeChecker, nil)
 				for _, tracked := range tracker.GlobalReferences(nonCallableTraceMap) {
 					callee := tracked.Node.Expression()
-					ctx.ReportNode(tracked.Node, objCallsMessage(calleeName(callee), tracked.Path[0]))
+					ruleContext.ReportNode(tracked.Node, objCallsMessage(calleeName(callee), tracked.Path[0]))
 				}
 			},
 		}

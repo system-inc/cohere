@@ -703,7 +703,7 @@ func TestComplexityNameBuilderBranches(test *testing.T) {
 		var located *ast.Node
 		probe := rule.Rule{
 			Name: "probe/complexity-name",
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(file *ast.Node) {
 						var walk func(*ast.Node)
@@ -719,7 +719,7 @@ func TestComplexityNameBuilderBranches(test *testing.T) {
 						}
 						walk(file)
 						if located != nil {
-							if got := complexityNameOf(ctx, located); got != testCase.want {
+							if got := complexityNameOf(ruleContext, located); got != testCase.want {
 								test.Errorf("%q: expected the name builder to render %q, got %q",
 									testCase.source, testCase.want, got)
 							}

@@ -24,7 +24,7 @@ func messageNoEnum() rule.Message {
 // reference, which is a judgment the rule cannot make from one declaration.
 var ConsistencyNoEnum = rule.Rule{
 	Name: "nexus/consistency-no-enum",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {
 				declaration := node.AsEnumDeclaration()
@@ -38,7 +38,7 @@ var ConsistencyNoEnum = rule.Rule{
 				if target == nil {
 					target = node
 				}
-				ctx.ReportNode(target, messageNoEnum())
+				ruleContext.ReportNode(target, messageNoEnum())
 			},
 		}
 	},

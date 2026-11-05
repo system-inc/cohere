@@ -82,7 +82,7 @@ var messageUnexpectedThis = rule.Message{
 // this reason.
 var NoInvalidThis = rule.Rule{
 	Name: "@typescript-eslint/no-invalid-this",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := noInvalidThisSettingsFrom(options)
 
 		return rule.Listeners{
@@ -90,7 +90,7 @@ var NoInvalidThis = rule.Rule{
 				// The walk is done here rather than through per-kind listeners because the rule
 				// needs to know what it is INSIDE when it meets a `this`, and the listener walk is
 				// pre-order with no exit hook to pop a stack on.
-				walker := &noInvalidThisWalker{ctx: ctx, settings: settings}
+				walker := &noInvalidThisWalker{ctx: ruleContext, settings: settings}
 				walker.walk(node)
 			},
 		}
@@ -248,13 +248,13 @@ func declaresThisParameter(node *ast.Node) bool {
 // The direction is worth stating because it inverts twice on the way to the report site: this returns
 // true when `this` is UNBOUND, the stack stores whether `this` is VALID, and the report fires when
 // the stack says invalid.
-func thisIsDefaultBoundIn(ctx rule.Context, node *ast.Node, settings noInvalidThisSettings) bool {
+func thisIsDefaultBoundIn(ruleContext rule.Context, node *ast.Node, settings noInvalidThisSettings) bool {
 	// A capitalized name is the convention for a constructor, and upstream trusts it. This is the
 	// single option surface, and it reads the function's own name.
 	if settings.CapIsConstructor && startsWithUpperCase(functionOwnName(node)) {
 		return false
 	}
-	if hasJSDocThisTag(ctx, node) {
+	if hasJSDocThisTag(ruleContext, node) {
 		return false
 	}
 
@@ -453,14 +453,14 @@ func startsWithUpperCase(name string) bool {
 // with NO closing word boundary. So `@thisx` satisfies it and `@nothis` does not, both measured.
 // That reads as a defect and is reproduced rather than corrected, because fidelity is the authority
 // where upstream gives no reasoning.
-func hasJSDocThisTag(ctx rule.Context, node *ast.Node) bool {
-	if ctx.SourceFile == nil {
+func hasJSDocThisTag(ruleContext rule.Context, node *ast.Node) bool {
+	if ruleContext.SourceFile == nil {
 		return false
 	}
-	if commentTextHasThisTag(jsDocCommentFor(ctx, node)) {
+	if commentTextHasThisTag(jsDocCommentFor(ruleContext, node)) {
 		return true
 	}
-	for _, comment := range commentsImmediatelyBefore(ctx, node) {
+	for _, comment := range commentsImmediatelyBefore(ruleContext, node) {
 		if commentTextHasThisTag(comment.Text) {
 			return true
 		}
@@ -470,38 +470,38 @@ func hasJSDocThisTag(ctx rule.Context, node *ast.Node) bool {
 
 // jsDocCommentFor is upstream's `getJSDocComment` for the function shapes this rule reaches, which
 // are a declaration and an expression. It returns the documenting comment's text, or empty.
-func jsDocCommentFor(ctx rule.Context, node *ast.Node) string {
+func jsDocCommentFor(ruleContext rule.Context, node *ast.Node) string {
 	if node.Kind == ast.KindFunctionDeclaration {
-		return jsDocBlockBefore(ctx, node)
+		return jsDocBlockBefore(ruleContext, node)
 	}
 
 	parent := node.Parent
 	if parent == nil {
-		return jsDocBlockBefore(ctx, node)
+		return jsDocBlockBefore(ruleContext, node)
 	}
 	// A function handed straight to a call does not walk out. This is what separates
 	// `q(function () {...})` from `var q = function () {...}` and it is upstream's own guard.
 	if parent.Kind == ast.KindCallExpression || parent.Kind == ast.KindNewExpression {
-		return jsDocBlockBefore(ctx, node)
+		return jsDocBlockBefore(ruleContext, node)
 	}
 
 	for parent != nil {
-		if len(commentsImmediatelyBefore(ctx, parent)) > 0 || isFunctionLike(parent) ||
+		if len(commentsImmediatelyBefore(ruleContext, parent)) > 0 || isFunctionLike(parent) ||
 			parent.Kind == ast.KindMethodDeclaration || parent.Kind == ast.KindPropertyAssignment {
 			break
 		}
 		parent = parent.Parent
 	}
 	if parent != nil && parent.Kind != ast.KindFunctionDeclaration && parent.Kind != ast.KindSourceFile {
-		return jsDocBlockBefore(ctx, parent)
+		return jsDocBlockBefore(ruleContext, parent)
 	}
-	return jsDocBlockBefore(ctx, node)
+	return jsDocBlockBefore(ruleContext, node)
 }
 
 // jsDocBlockBefore is upstream's `findJSDocComment`: the token immediately before the node has to be
 // a block comment whose text opens with an asterisk, and it has to end no more than one line above.
-func jsDocBlockBefore(ctx rule.Context, node *ast.Node) string {
-	preceding := commentsImmediatelyBefore(ctx, node)
+func jsDocBlockBefore(ruleContext rule.Context, node *ast.Node) string {
+	preceding := commentsImmediatelyBefore(ruleContext, node)
 	if len(preceding) == 0 {
 		return ""
 	}
@@ -509,9 +509,9 @@ func jsDocBlockBefore(ctx rule.Context, node *ast.Node) string {
 	if !last.IsBlock || !strings.HasPrefix(strings.TrimPrefix(last.Text, "/*"), "*") {
 		return ""
 	}
-	nodeLine, _ := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile,
-		rule.TokenRange(ctx.SourceFile, node).Pos())
-	commentLine, _ := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, last.Range.End())
+	nodeLine, _ := scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile,
+		rule.TokenRange(ruleContext.SourceFile, node).Pos())
+	commentLine, _ := scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile, last.Range.End())
 	if nodeLine-commentLine > 1 {
 		return ""
 	}
@@ -524,16 +524,16 @@ func jsDocBlockBefore(ctx rule.Context, node *ast.Node) string {
 // Other comments in the gap do not close it, which is why the span is scanned for comments rather
 // than merely tested for whitespace. Any non-comment text does close it, and that is what makes the
 // gap belong to `1` rather than to the callback in `z(/* @this */ 1, function () {})`.
-func commentsImmediatelyBefore(ctx rule.Context, node *ast.Node) []comments.Comment {
-	tokenStart := rule.TokenRange(ctx.SourceFile, node).Pos()
-	text := ctx.SourceFile.Text()
+func commentsImmediatelyBefore(ruleContext rule.Context, node *ast.Node) []comments.Comment {
+	tokenStart := rule.TokenRange(ruleContext.SourceFile, node).Pos()
+	text := ruleContext.SourceFile.Text()
 	if tokenStart > len(text) {
 		return nil
 	}
 
 	found := []comments.Comment{}
 	cursor := tokenStart
-	all := comments.ForFile(ctx)
+	all := comments.ForFile(ruleContext)
 	for index := len(all) - 1; index >= 0; index-- {
 		comment := all[index]
 		if comment.Range.End() > cursor {

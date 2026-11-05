@@ -55,8 +55,8 @@ type BoundaryNoProjectImportOptions struct {
 // tree by accident.
 var BoundaryNoProjectImport = rule.Rule{
 	Name: "nexus/boundary-no-project-import",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -64,10 +64,10 @@ var BoundaryNoProjectImport = rule.Rule{
 		if !hasSettings || settings.LibraryDirectory == "" {
 			// Failing closed is right, and silent is not: a rule enabled without the directory it guards
 			// checks nothing, so the skip names the missing option (#pa7k7zv).
-			ctx.Skip("no libraryDirectory is configured")
+			ruleContext.Skip("no libraryDirectory is configured")
 			return nil
 		}
-		if !strings.Contains(imports.NormalizedFileName(ctx.SourceFile), settings.LibraryDirectory) {
+		if !strings.Contains(imports.NormalizedFileName(ruleContext.SourceFile), settings.LibraryDirectory) {
 			return nil
 		}
 
@@ -78,7 +78,7 @@ var BoundaryNoProjectImport = rule.Rule{
 
 		return imports.SourceVisitors(func(source string, node *ast.Node) {
 			if isProjectAlias(source) && !allowed[source] {
-				ctx.ReportNode(imports.SpecifierNode(node), messageForbiddenProjectImport())
+				ruleContext.ReportNode(imports.SpecifierNode(node), messageForbiddenProjectImport())
 			}
 		})
 	},

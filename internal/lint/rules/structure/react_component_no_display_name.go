@@ -64,7 +64,7 @@ var anonymousComponentWrapperNames = map[string]bool{
 // cannot run.
 var ReactComponentNoDisplayName = rule.Rule{
 	Name: "structure/react-component-no-display-name",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Scoped to this file's walk, which is the whole lifetime that matters: the original keys
 		// the same set on one `create` call per file.
 		wrappedAsAnonymous := map[string]bool{}
@@ -111,13 +111,13 @@ var ReactComponentNoDisplayName = rule.Rule{
 					return
 				}
 				if componentNames == nil {
-					componentNames = componentsDeclaredAtTopLevel(ctx.SourceFile.AsNode())
+					componentNames = componentsDeclaredAtTopLevel(ruleContext.SourceFile.AsNode())
 				}
 				if !componentNames[target.Text()] {
 					return
 				}
 
-				ctx.ReportNode(node, messageNoDisplayNameAssignment())
+				ruleContext.ReportNode(node, messageNoDisplayNameAssignment())
 			},
 		}
 	},

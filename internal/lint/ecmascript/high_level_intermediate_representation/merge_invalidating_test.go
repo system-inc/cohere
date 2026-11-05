@@ -517,15 +517,15 @@ func withInvalidatingScopes(test *testing.T, visit func(*Function, *shimchecker.
 	probe := rule.Rule{
 		Name:             "merge-guards-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Fatal("the typed harness handed this probe a nil checker, so the type " +
 							"arm would answer false and the baseline could never merge")
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
@@ -534,9 +534,9 @@ func withInvalidatingScopes(test *testing.T, visit func(*Function, *shimchecker.
 							if identifier == nil {
 								continue
 							}
-							if IsAlwaysInvalidatingType(function, identifier.Id, ctx.TypeChecker) {
+							if IsAlwaysInvalidatingType(function, identifier.Id, ruleContext.TypeChecker) {
 								ran = true
-								visit(function, ctx.TypeChecker, identifier.Id)
+								visit(function, ruleContext.TypeChecker, identifier.Id)
 								return
 							}
 						}

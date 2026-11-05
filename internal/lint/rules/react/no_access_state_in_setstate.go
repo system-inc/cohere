@@ -79,8 +79,8 @@ var messageUseSetStateCallback = rule.Message{
 // narrowing it would go silent on upstream's own case.
 var NoAccessStateInSetstate = rule.Rule{
 	Name: "react/no-access-state-in-setstate",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -101,13 +101,13 @@ var NoAccessStateInSetstate = rule.Rule{
 				visit = func(node *ast.Node) {
 					switch node.Kind {
 					case ast.KindCallExpression:
-						noAccessStateVisitCall(ctx, node, &methods)
+						noAccessStateVisitCall(ruleContext, node, &methods)
 
 					case ast.KindPropertyAccessExpression:
-						noAccessStateVisitStateAccess(ctx, node, &methods, &variables)
+						noAccessStateVisitStateAccess(ruleContext, node, &methods, &variables)
 
 					case ast.KindIdentifier:
-						noAccessStateVisitIdentifier(ctx, node, variables)
+						noAccessStateVisitIdentifier(ruleContext, node, variables)
 
 					case ast.KindObjectBindingPattern:
 						noAccessStateVisitObjectPattern(node, &variables)
@@ -145,7 +145,7 @@ type noAccessStateVariable struct {
 //
 // Two jobs. It propagates the "reads this.state" mark from a called method up to the method doing
 // the calling, and it reports when a marked method is called inside a `setState` first argument.
-func noAccessStateVisitCall(ctx rule.Context, node *ast.Node, methods *[]noAccessStateMethod) {
+func noAccessStateVisitCall(ruleContext rule.Context, node *ast.Node, methods *[]noAccessStateMethod) {
 	if enclosingComponentOf(node) == nil {
 		return
 	}
@@ -180,7 +180,7 @@ func noAccessStateVisitCall(ctx rule.Context, node *ast.Node, methods *[]noAcces
 		if noAccessStateIsFirstArgumentOfSetState(current, node) {
 			for _, method := range *methods {
 				if method.name == calleeName {
-					ctx.ReportNode(method.node, messageUseSetStateCallback)
+					ruleContext.ReportNode(method.node, messageUseSetStateCallback)
 				}
 			}
 			break
@@ -193,7 +193,7 @@ func noAccessStateVisitCall(ctx rule.Context, node *ast.Node, methods *[]noAcces
 // One walk upward from the access, taking the first of four exits: report, record as a method,
 // record as a variable, or fall off the top.
 func noAccessStateVisitStateAccess(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	methods *[]noAccessStateMethod,
 	variables *[]noAccessStateVariable,
@@ -212,7 +212,7 @@ func noAccessStateVisitStateAccess(
 
 	for current := node; current != nil; current = current.Parent {
 		if noAccessStateIsFirstArgumentOfSetState(current, node) {
-			ctx.ReportNode(node, messageUseSetStateCallback)
+			ruleContext.ReportNode(node, messageUseSetStateCallback)
 			return
 		}
 
@@ -245,7 +245,7 @@ func noAccessStateVisitStateAccess(
 // either the VALUE of a property or the OBJECT of a member access. That pair is what keeps a
 // property KEY and a bare argument from matching: `{value: v}` matches on `v` as the value, and
 // `v.value` matches on `v` as the object.
-func noAccessStateVisitIdentifier(ctx rule.Context, node *ast.Node, variables []noAccessStateVariable) {
+func noAccessStateVisitIdentifier(ruleContext rule.Context, node *ast.Node, variables []noAccessStateVariable) {
 	current := node
 	for current.Parent != nil && current.Parent.Kind == ast.KindBinaryExpression {
 		current = current.Parent
@@ -263,7 +263,7 @@ func noAccessStateVisitIdentifier(ctx rule.Context, node *ast.Node, variables []
 		scope := noAccessStateScopeOf(node)
 		for _, variable := range variables {
 			if variable.scope == scope && variable.name == node.Text() {
-				ctx.ReportNode(variable.node, messageUseSetStateCallback)
+				ruleContext.ReportNode(variable.node, messageUseSetStateCallback)
 			}
 		}
 	}

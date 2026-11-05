@@ -146,8 +146,8 @@ var RequireDescription = rule.Rule{
 	// Upstream's plugin-qualified name, so the same config key means the same thing in ESLint and
 	// in cohere.
 	Name: "@eslint-community/eslint-comments/require-description",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 		// A bare severity decodes to the zero options, and a harness that bypasses the decoder hands
@@ -156,21 +156,21 @@ var RequireDescription = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				reportRequireDescription(ctx, configured)
+				reportRequireDescription(ruleContext, configured)
 			},
 		}
 	},
 }
 
 // reportRequireDescription is upstream's `create` body, run once per file.
-func reportRequireDescription(ctx rule.Context, options RequireDescriptionOptions) {
+func reportRequireDescription(ruleContext rule.Context, options RequireDescriptionOptions) {
 	ignored := map[string]bool{}
 	for _, kind := range options.Ignore {
 		ignored[kind] = true
 	}
 	additional := requireDescriptionAdditionalPattern(options.AdditionalDirectives)
 
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		interior, readable := requireDescriptionInterior(comment)
 		if !readable {
 			continue
@@ -189,7 +189,7 @@ func reportRequireDescription(ctx rule.Context, options RequireDescriptionOption
 		if requireDescriptionHasDescription(interior) {
 			continue
 		}
-		ctx.ReportRange(comment.Range, messageRequireDescriptionMissing)
+		ruleContext.ReportRange(comment.Range, messageRequireDescriptionMissing)
 	}
 }
 

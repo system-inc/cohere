@@ -67,7 +67,7 @@ var noSelfCompareOperators = map[ast.Kind]bool{
 // reproduced rather than improved on.
 var NoSelfCompare = rule.Rule{
 	Name: "no-self-compare",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binaryExpression := node.AsBinaryExpression()
@@ -77,8 +77,8 @@ var NoSelfCompare = rule.Rule{
 				if !noSelfCompareOperators[binaryExpression.OperatorToken.Kind] {
 					return
 				}
-				if hasSameTokens(ctx.SourceFile, binaryExpression.Left, binaryExpression.Right) {
-					ctx.ReportNode(node, messageNoSelfCompareComparingToSelf)
+				if hasSameTokens(ruleContext.SourceFile, binaryExpression.Left, binaryExpression.Right) {
+					ruleContext.ReportNode(node, messageNoSelfCompareComparingToSelf)
 				}
 			},
 		}

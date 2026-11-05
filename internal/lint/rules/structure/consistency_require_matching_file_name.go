@@ -180,8 +180,8 @@ var companionFileSuffixes = []string{".test", ".spec", ".stories", ".story"}
 var ConsistencyRequireMatchingFileName = rule.Rule{
 	Name:       "structure/consistency-require-matching-file-name",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -190,7 +190,7 @@ var ConsistencyRequireMatchingFileName = rule.Rule{
 		// harness alike, so a fold here could never change anything. Measured rather than assumed:
 		// a probe rule run on `C:\repository\source\Button.tsx` read `C:/repository/source/Button.tsx`,
 		// and a mutation deleting the fold survived a fixture written to catch it.
-		fileName := path.Base(ctx.SourceFile.FileName().AsString())
+		fileName := path.Base(ruleContext.SourceFile.FileName().AsString())
 		fileBaseName, isComponentFile := componentFileBaseName(fileName)
 		if !isComponentFile || isNextJsConventionFile(fileBaseName) || isCompanionFile(fileBaseName) {
 			return nil
@@ -198,7 +198,7 @@ var ConsistencyRequireMatchingFileName = rule.Rule{
 
 		// The decision is about the file rather than any node, so it is made once here over the
 		// top-level statements, and no listener is registered.
-		components := componentsNamingTheFile(ctx.SourceFile.AsNode())
+		components := componentsNamingTheFile(ruleContext.SourceFile.AsNode())
 		if len(components) != 1 {
 			return nil
 		}
@@ -209,7 +209,7 @@ var ConsistencyRequireMatchingFileName = rule.Rule{
 		if component.nameNode.Text() == fileBaseName {
 			return nil
 		}
-		ctx.ReportNode(component.nameNode,
+		ruleContext.ReportNode(component.nameNode,
 			messageRequireMatchingFileName(component.nameNode.Text(), fileName, fileBaseName))
 		return nil
 	},

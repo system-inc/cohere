@@ -76,14 +76,14 @@ var NoHtmlLinkForPages = rule.Rule{
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles,
 	// A file's verdict reads its own bytes and the route model, so the model is the whole fingerprint.
 	ProgramFingerprint: noHtmlLinkForPagesFingerprint,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[NoHtmlLinkForPagesOptions](options)
 		// A harness that builds its Context by hand has no program and so no disk to read, which is
 		// upstream's no-directory case: an empty visitor.
-		if ctx.Program == nil {
+		if ruleContext.Program == nil {
 			return nil
 		}
-		model := noHtmlLinkForPagesRouteModelFor(ctx.Program, ctx.Program.GetCurrentDirectory(), settings)
+		model := noHtmlLinkForPagesRouteModelFor(ruleContext.Program, ruleContext.Program.GetCurrentDirectory(), settings)
 		if !model.found {
 			return nil
 		}
@@ -124,7 +124,7 @@ var NoHtmlLinkForPages = rule.Rule{
 			// it unchanged and is not repeated here.
 			for _, route := range model.routes {
 				if route.Test(hrefPath) {
-					ctx.ReportNode(node, noHtmlLinkForPagesMessage(hrefPath))
+					ruleContext.ReportNode(node, noHtmlLinkForPagesMessage(hrefPath))
 				}
 			}
 		}

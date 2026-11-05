@@ -56,8 +56,8 @@ var messagePreferSpread = rule.Message{
 // rewrite changes how many times they run.
 var PreferSpread = rule.Rule{
 	Name: "prefer-spread",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -123,15 +123,15 @@ var PreferSpread = rule.Rule{
 					if !isNullOrUndefined(thisArgument) {
 						return
 					}
-					ctx.ReportNode(node, messagePreferSpread)
+					ruleContext.ReportNode(node, messagePreferSpread)
 					return
 				}
 
-				if !hasSameTokens(ctx.SourceFile, expectedReceiver, thisArgument) {
+				if !hasSameTokens(ruleContext.SourceFile, expectedReceiver, thisArgument) {
 					return
 				}
 
-				ctx.ReportNode(node, messagePreferSpread)
+				ruleContext.ReportNode(node, messagePreferSpread)
 			},
 		}
 	},

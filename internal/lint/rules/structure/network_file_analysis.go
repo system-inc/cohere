@@ -56,13 +56,13 @@ type NetworkFileAnalysis struct {
 
 // NetworkFileAnalysisFor returns the analysis for the file being linted, computing it at most once
 // per file across every rule that asks.
-func NetworkFileAnalysisFor(ctx rule.Context) *NetworkFileAnalysis {
-	return rule.Cached(ctx.FileCache, "structure.networkFileAnalysis", func() *NetworkFileAnalysis {
+func NetworkFileAnalysisFor(ruleContext rule.Context) *NetworkFileAnalysis {
+	return rule.Cached(ruleContext.FileCache, "structure.networkFileAnalysis", func() *NetworkFileAnalysis {
 		analysis := &NetworkFileAnalysis{}
-		if ctx.SourceFile == nil {
+		if ruleContext.SourceFile == nil {
 			return analysis
 		}
-		analysis.collect(ctx.SourceFile.AsNode())
+		analysis.collect(ruleContext.SourceFile.AsNode())
 
 		// Without the import, no hook in the file can be calling NetworkService, and the original
 		// clears the list rather than returning hooks nobody should judge. Reproduced: every rule

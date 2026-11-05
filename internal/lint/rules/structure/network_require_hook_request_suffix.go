@@ -52,8 +52,8 @@ func messageFileShouldEndWithRequest() rule.Message {
 var NetworkRequireHookRequestSuffix = rule.Rule{
 	Name:       "structure/network-require-hook-request-suffix",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		analysis := NetworkFileAnalysisFor(ctx)
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		analysis := NetworkFileAnalysisFor(ruleContext)
 		if len(analysis.HookDeclarations) == 0 {
 			// Declining the file rather than registering a listener that would find nothing. A file
 			// with no NetworkService hooks is the overwhelming majority of files.
@@ -62,15 +62,15 @@ var NetworkRequireHookRequestSuffix = rule.Rule{
 
 		for _, hook := range analysis.HookDeclarations {
 			if !strings.HasSuffix(hook.Name, "Request") {
-				ctx.ReportNode(hook.NameNode, messageHookShouldEndWithRequest())
+				ruleContext.ReportNode(hook.NameNode, messageHookShouldEndWithRequest())
 			}
 		}
 
 		// The file check reports at most once, against the first hook, even when several hooks are
 		// declared. The defect is the file's name, and reporting it once per hook would say the same
 		// thing three times about one rename.
-		if fileNeedsRequestSuffix(ctx.SourceFile.FileName().AsString()) {
-			ctx.ReportNode(analysis.HookDeclarations[0].NameNode, messageFileShouldEndWithRequest())
+		if fileNeedsRequestSuffix(ruleContext.SourceFile.FileName().AsString()) {
+			ruleContext.ReportNode(analysis.HookDeclarations[0].NameNode, messageFileShouldEndWithRequest())
 		}
 
 		return nil

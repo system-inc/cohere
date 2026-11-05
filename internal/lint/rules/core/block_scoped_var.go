@@ -50,13 +50,13 @@ var BlockScopedVar = rule.Rule{
 	Name:             "block-scoped-var",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(file *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				checkBlockScopedVar(ctx, file)
+				checkBlockScopedVar(ruleContext, file)
 			},
 		}
 	},
@@ -78,7 +78,7 @@ type blockScopedVarFinding struct {
 // could be a reference. Asking the checker per identifier is what connects them, and it is asked
 // once per identifier rather than once per (declaration, identifier) pair, so the cost is linear
 // rather than quadratic in a file full of `var`.
-func checkBlockScopedVar(ctx rule.Context, file *ast.Node) {
+func checkBlockScopedVar(ruleContext rule.Context, file *ast.Node) {
 	var declarations []*ast.Node
 	var identifiers []*ast.Node
 
@@ -106,7 +106,7 @@ func checkBlockScopedVar(ctx rule.Context, file *ast.Node) {
 	// One symbol lookup per identifier, reused across every declaration below.
 	symbols := make(map[*ast.Node]any, len(identifiers))
 	for _, identifier := range identifiers {
-		if symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier); symbol != nil {
+		if symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier); symbol != nil {
 			symbols[identifier] = symbol
 		}
 	}
@@ -139,7 +139,7 @@ func checkBlockScopedVar(ctx rule.Context, file *ast.Node) {
 		}
 	}
 
-	blockScopedVarReport(ctx, findings)
+	blockScopedVarReport(ruleContext, findings)
 }
 
 // blockScopedVarReport emits findings ordered by where the USE is, then by the declaration.
@@ -153,7 +153,7 @@ func checkBlockScopedVar(ctx rule.Context, file *ast.Node) {
 // visible: six findings across three uses, and the two orders differ on every one of them while
 // producing the identical multiset. No count-based fixture can see it, and the pairing of a span
 // with its message is exactly what a reader checks first.
-func blockScopedVarReport(ctx rule.Context, findings []blockScopedVarFinding) {
+func blockScopedVarReport(ruleContext rule.Context, findings []blockScopedVarFinding) {
 	slices.SortStableFunc(findings, func(left, right blockScopedVarFinding) int {
 		if left.reference.Pos() != right.reference.Pos() {
 			return left.reference.Pos() - right.reference.Pos()
@@ -161,9 +161,9 @@ func blockScopedVarReport(ctx rule.Context, findings []blockScopedVarFinding) {
 		return left.declarationName.Pos() - right.declarationName.Pos()
 	})
 	for _, finding := range findings {
-		line, column := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile,
-			rule.TokenRange(ctx.SourceFile, finding.declarationName).Pos())
-		ctx.ReportNode(finding.reference, rule.Message{
+		line, column := scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile,
+			rule.TokenRange(ruleContext.SourceFile, finding.declarationName).Pos())
+		ruleContext.ReportNode(finding.reference, rule.Message{
 			Id: "outOfScope",
 			Description: fmt.Sprintf(
 				"`%s` is declared with `var` inside a block on line %d column %d, and used here, "+

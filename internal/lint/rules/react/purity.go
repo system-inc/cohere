@@ -230,28 +230,28 @@ var Purity = rule.Rule{
 	NeedsTypeChecker: true,
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// The whole file at once, for the reason `static_components.go` gives: lowering already
 			// descends into nested functions through the function arena, so listening per function
 			// kind would lower every inner function twice, the second time without the bindings its
 			// parent supplies.
 			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				// A file that cannot hold a component or a hook is not lowered at all; see
 				// high_level_intermediate_representation.MayHoldComponentOrHook for why that is exact.
-				if !high_level_intermediate_representation.MayHoldComponentOrHook(ctx) {
+				if !high_level_intermediate_representation.MayHoldComponentOrHook(ruleContext) {
 					return
 				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
 					// Shared with the other rules that lower this same function; see high_level_intermediate_representation.ForFunction.
-					lowered := high_level_intermediate_representation.ForFunction(ctx, functionNode)
+					lowered := high_level_intermediate_representation.ForFunction(ruleContext, functionNode)
 					if lowered == nil {
 						return
 					}
-					purityAnalyzeSubject(ctx, lowered)
+					purityAnalyzeSubject(ruleContext, lowered)
 				})
 			},
 		}
@@ -263,21 +263,21 @@ var Purity = rule.Rule{
 // A declined function is descended into rather than skipped, because a component nested inside a
 // plain wrapper is still a unit. That is the same shape `set_state_in_render.go` uses and it is
 // upstream's traversal rather than a convenience.
-func purityAnalyzeSubject(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+func purityAnalyzeSubject(ruleContext rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
 	if function.Node == nil || !utilsreact.IsComponentOrHookLike(function.Node) {
 		for _, nested := range function.Functions {
-			purityAnalyzeSubject(ctx, nested)
+			purityAnalyzeSubject(ruleContext, nested)
 		}
 		return
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+	function = high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunction)
-	purityReportImpureCalls(ctx, function, true)
+	purityReportImpureCalls(ruleContext, function, true)
 }
 
 // purityValueKind is the small abstract domain described on the rule.
@@ -328,9 +328,9 @@ type purityFinding struct {
 // declaration lowering did not give a local slot, so the wrapper in `const g = () => Math.random();
 // const f = () => g(); f();` sees `g` only if the enclosing values are visible to it. Measured on
 // React, that input REPORTS, and with per-function state it did not.
-func purityReportImpureCalls(ctx rule.Context, function *high_level_intermediate_representation.Function, emit bool) []purityFinding {
+func purityReportImpureCalls(ruleContext rule.Context, function *high_level_intermediate_representation.Function, emit bool) []purityFinding {
 	unit := &purityUnit{
-		ctx:       ctx,
+		ctx:       ruleContext,
 		values:    map[static_single_assignment.IdentifierId]purityValue{},
 		byName:    map[string]purityValue{},
 		nested:    map[*high_level_intermediate_representation.Function][]purityFinding{},

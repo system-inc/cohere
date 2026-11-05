@@ -176,7 +176,7 @@ var ErrorBoundaries = rule.Rule{
 	// the namespace on a `/` boundary, so a self-namespaced `react-error-boundaries` would match no
 	// inventory entry.
 	Name: "react-hooks/error-boundaries",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
 			enclosing := enclosingFunctionOf(node)
 			if enclosing == nil || !isInsideTryBlockWithin(node, enclosing) {
@@ -185,7 +185,7 @@ var ErrorBoundaries = rule.Rule{
 			if !isReactCompiledFunction(enclosing) {
 				return
 			}
-			ctx.ReportNode(node, messageJsxInTryStatement)
+			ruleContext.ReportNode(node, messageJsxInTryStatement)
 		}
 
 		return rule.Listeners{

@@ -75,7 +75,7 @@ func noPlusplusUnexpectedUnaryOp(operator string) rule.Message {
 // written from reading our AST rather than from upstream's cases.
 var NoPlusplus = rule.Rule{
 	Name: "no-plusplus",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		allowForLoopAfterthoughts := false
 		if resolved, isNoPlusplusOptions := rule.OptionsAs[NoPlusplusOptions](options); isNoPlusplusOptions {
 			allowForLoopAfterthoughts = resolved.AllowForLoopAfterthoughts
@@ -90,7 +90,7 @@ var NoPlusplus = rule.Rule{
 				if allowForLoopAfterthoughts && noPlusplusIsForLoopAfterthought(node) {
 					return
 				}
-				ctx.ReportNode(node, noPlusplusUnexpectedUnaryOp(
+				ruleContext.ReportNode(node, noPlusplusUnexpectedUnaryOp(
 					noPlusplusOperatorText(expression.Operator)))
 			},
 
@@ -109,7 +109,7 @@ var NoPlusplus = rule.Rule{
 				if allowForLoopAfterthoughts && noPlusplusIsForLoopAfterthought(node) {
 					return
 				}
-				ctx.ReportNode(node, noPlusplusUnexpectedUnaryOp(
+				ruleContext.ReportNode(node, noPlusplusUnexpectedUnaryOp(
 					noPlusplusOperatorText(expression.Operator)))
 			},
 		}

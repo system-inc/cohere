@@ -52,8 +52,8 @@ func messageRenameToProperties() rule.Message {
 // then updates the body, which is the work only they can do correctly anyway.
 var ReactComponentRequirePropertiesParameter = rule.Rule{
 	Name: "structure/react-component-require-properties-parameter",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 
@@ -71,9 +71,9 @@ var ReactComponentRequirePropertiesParameter = rule.Rule{
 			if name == nil || name.Kind != ast.KindIdentifier || name.Text() != "props" {
 				return
 			}
-			ctx.ReportNodeWithSuggestions(name, messageUsePropertiesNotProps(), rule.Suggestion{
+			ruleContext.ReportNodeWithSuggestions(name, messageUsePropertiesNotProps(), rule.Suggestion{
 				Message: messageRenameToProperties(),
-				Fixes:   []rule.Fix{ctx.ReplaceNode(name, "properties")},
+				Fixes:   []rule.Fix{ruleContext.ReplaceNode(name, "properties")},
 			})
 		}
 

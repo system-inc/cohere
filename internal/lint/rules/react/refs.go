@@ -165,27 +165,27 @@ var Refs = rule.Rule{
 	NeedsTypeChecker: true,
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// Taken at the file level for the reason static_components.go gives: lowering already
 			// descends into nested functions through the function arena, so listening per function
 			// kind would lower every inner function twice, once as a child and once standalone
 			// with no enclosing context.
 			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				// A file that cannot hold a component or a hook is not lowered at all; see
 				// high_level_intermediate_representation.MayHoldComponentOrHook for why that is exact.
-				if !high_level_intermediate_representation.MayHoldComponentOrHook(ctx) {
+				if !high_level_intermediate_representation.MayHoldComponentOrHook(ruleContext) {
 					return
 				}
 				refsForEachCompiledFunction(node, func(functionNode *ast.Node) {
-					lowered := high_level_intermediate_representation.ForFunctionWithoutManualMemoization(ctx, functionNode)
+					lowered := high_level_intermediate_representation.ForFunctionWithoutManualMemoization(ruleContext, functionNode)
 					if lowered == nil {
 						return
 					}
-					refsAnalyzeCompilationUnit(ctx, lowered)
+					refsAnalyzeCompilationUnit(ruleContext, lowered)
 				})
 			},
 		}
@@ -218,23 +218,23 @@ func refsForEachCompiledFunction(root *ast.Node, visit func(*ast.Node)) {
 // like a component or a hook AND its body actually creates JSX or calls a hook. A function that is
 // not a unit is walked past into the functions it contains, because one of those may be a unit even
 // when its wrapper is not.
-func refsAnalyzeCompilationUnit(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+func refsAnalyzeCompilationUnit(ruleContext rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
 	if !refsIsCompilationUnit(function) {
 		for _, nested := range function.Functions {
-			refsAnalyzeCompilationUnit(ctx, nested)
+			refsAnalyzeCompilationUnit(ruleContext, nested)
 		}
 		return
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+	function = high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunctionWithoutManualMemoization)
-	findings := refsSweepFunction(ctx, function)
+	findings := refsSweepFunction(ruleContext, function)
 	for _, finding := range findings {
-		refsReport(ctx, function, finding)
+		refsReport(ruleContext, function, finding)
 	}
 }
 
@@ -396,15 +396,15 @@ func refsIsRefLikeName(name string) bool {
 // The symbol is compared positively rather than checked for non-nil. The shim is a hand-mirrored
 // struct read through `unsafe.Pointer` and has returned a silently wrong type before, so asserting
 // that what came back is what was asked for is the only check that can see that class of failure.
-func refsIsUseRefType(ctx rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) bool {
-	if ctx.TypeChecker == nil {
+func refsIsUseRefType(ruleContext rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
 	node := refsIdentifierNode(function, id)
 	if node == nil || refsCannotHaveRefType(node) {
 		return false
 	}
-	return refsNodeHasRefType(ctx, node)
+	return refsNodeHasRefType(ruleContext, node)
 }
 
 // refsCannotHaveRefType reports whether the language fixes a node's type as something no ref type
@@ -461,8 +461,8 @@ func refsOperatorYieldsAPrimitive(operator ast.Kind) bool {
 }
 
 // refsNodeHasRefType is refsIsUseRefType's checker half, over a node.
-func refsNodeHasRefType(ctx rule.Context, node *ast.Node) bool {
-	valueType := ctx.TypeChecker.GetTypeAtLocation(node)
+func refsNodeHasRefType(ruleContext rule.Context, node *ast.Node) bool {
+	valueType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 	if valueType == nil {
 		return false
 	}
@@ -972,9 +972,9 @@ func (env *refsEnvironment) noteDeclaration(function *high_level_intermediate_re
 // iterate the whole function in block order until the environment stops moving or ten rounds pass.
 // `Blocks` is in reverse postorder, which is what lets a single forward pass settle an acyclic
 // region in one round; a loop needs the second round, which is what the bound is for.
-func refsSweepFunction(ctx rule.Context, function *high_level_intermediate_representation.Function) []refsFinding {
+func refsSweepFunction(ruleContext rule.Context, function *high_level_intermediate_representation.Function) []refsFinding {
 	env := newRefsEnvironment()
-	refsCollectTemporaries(ctx, function, env)
+	refsCollectTemporaries(ruleContext, function, env)
 
 	var findings []refsFinding
 	for iteration := 0; iteration < 10; iteration++ {
@@ -982,7 +982,7 @@ func refsSweepFunction(ctx rule.Context, function *high_level_intermediate_repre
 			break
 		}
 		env.changed = false
-		findings = refsRunOneRound(ctx, function, env)
+		findings = refsRunOneRound(ruleContext, function, env)
 		// Upstream returns as soon as any error exists rather than iterating to a fixpoint over a
 		// function it has already decided about. Reproduced: it also bounds the work.
 		if len(findings) > 0 {
@@ -1002,7 +1002,7 @@ func refsSweepFunction(ctx rule.Context, function *high_level_intermediate_repre
 // that IS a ref is deliberately NOT aliased. That is what keeps `ref` and `ref.current` distinct,
 // which is the entire distinction between "you passed a ref somewhere" and "you read a ref's
 // value". Aliasing them would collapse two of the four diagnostics into one.
-func refsCollectTemporaries(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment) {
+func refsCollectTemporaries(ruleContext rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment) {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := refsInstructionAt(function, instructionId)
@@ -1049,7 +1049,7 @@ func refsCollectTemporaries(ctx rule.Context, function *high_level_intermediate_
 				// `props.fooRef.current` stays silent, because only the former's inner name is a
 				// ref-like name that upstream's regex accepts in this position.
 				env.setPropertyName(instruction.LValue.Identifier, value.Property)
-				if value.Property == "current" && refsIsRefBinding(ctx, function, env, value.Object.Identifier) {
+				if value.Property == "current" && refsIsRefBinding(ruleContext, function, env, value.Object.Identifier) {
 					continue
 				}
 				// A load whose RESULT is itself a ref is not aliased to its object either, for the
@@ -1062,7 +1062,7 @@ func refsCollectTemporaries(ctx rule.Context, function *high_level_intermediate_
 				// `columnId: string` produced six findings in one file, all on the non-ref fields.
 				// Upstream never has this problem because it types each property independently
 				// rather than aliasing through the object.
-				if refsIsUseRefType(ctx, function, instruction.LValue.Identifier) {
+				if refsIsUseRefType(ruleContext, function, instruction.LValue.Identifier) {
 					continue
 				}
 				env.define(instruction.LValue.Identifier, value.Object.Identifier)
@@ -1089,8 +1089,8 @@ func refsCollectTemporaries(ctx rule.Context, function *high_level_intermediate_
 // `props.ref.current` the object is `t11` with an empty name, and `t11` resolves through the
 // temporaries map to the value produced by the `ref` property load. `refsEnvironment.operandId` is
 // upstream's `Env::operand_id` and is the resolution that recovers it.
-func refsIsRefBinding(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, id static_single_assignment.IdentifierId) bool {
-	if refsIsUseRefType(ctx, function, id) {
+func refsIsRefBinding(ruleContext rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, id static_single_assignment.IdentifierId) bool {
+	if refsIsUseRefType(ruleContext, function, id) {
 		return true
 	}
 	if refsIsRefLikeName(refsIdentifierName(function, id)) {
@@ -1110,7 +1110,7 @@ func refsIsRefBinding(ctx rule.Context, function *high_level_intermediate_repres
 		return true
 	}
 	resolved := env.operandId(id)
-	return resolved != id && refsIsUseRefType(ctx, function, resolved)
+	return resolved != id && refsIsUseRefType(ruleContext, function, resolved)
 }
 
 // refsRunOneRound is one pass over every block, phi and instruction.
@@ -1118,13 +1118,13 @@ func refsIsRefBinding(ctx rule.Context, function *high_level_intermediate_repres
 // Returns the findings this round produced. Findings are recomputed each round rather than
 // accumulated, because the same instruction is visited on every round and an accumulating list
 // would report each finding up to ten times.
-func refsRunOneRound(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment) []refsFinding {
+func refsRunOneRound(ruleContext rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment) []refsFinding {
 	var findings []refsFinding
 
 	// Parameters are seeded from their declared type. A parameter that is a ref by type or by name
 	// enters as one, which is how `function Component({ref})` reports with no `useRef` in sight.
 	for _, param := range function.Params {
-		env.set(param.Identifier, refsSeedType(ctx, function, param.Identifier, env))
+		env.set(param.Identifier, refsSeedType(ruleContext, function, param.Identifier, env))
 	}
 
 	// A value interpolated as a JSX child is checked more leniently than one passed to a function:
@@ -1180,7 +1180,7 @@ func refsRunOneRound(ctx rule.Context, function *high_level_intermediate_represe
 			if instruction == nil {
 				continue
 			}
-			findings = refsTransfer(ctx, function, env, instruction, interpolatedAsJsx, findings, &safeBlocks)
+			findings = refsTransfer(ruleContext, function, env, instruction, interpolatedAsJsx, findings, &safeBlocks)
 
 			// A guard value may only be consumed by an `if` test. Using one anywhere else means the
 			// code read `ref.current` for its value rather than to check it against null.
@@ -1201,7 +1201,7 @@ func refsRunOneRound(ctx rule.Context, function *high_level_intermediate_represe
 			// Whatever the transfer decided, a value the checker calls a ref is a ref. This is
 			// upstream's post-pass and it is what catches a ref arriving through a shape the
 			// instruction switch does not model.
-			refsApplyDeclaredType(ctx, function, env, instruction.LValue.Identifier)
+			refsApplyDeclaredType(ruleContext, function, env, instruction.LValue.Identifier)
 		}
 
 		if branch, isIf := block.Terminal.(*high_level_intermediate_representation.If); isIf {
@@ -1237,8 +1237,8 @@ func refsRunOneRound(ctx rule.Context, function *high_level_intermediate_represe
 //
 // Consulted whenever the instruction switch has nothing better to say. A value the checker types as
 // `RefObject` enters as a ref; everything else enters as none.
-func refsSeedType(ctx rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId, env *refsEnvironment) *refsAccessType {
-	if refsIsRefBinding(ctx, function, env, id) {
+func refsSeedType(ruleContext rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId, env *refsEnvironment) *refsAccessType {
+	if refsIsRefBinding(ruleContext, function, env, id) {
 		return &refsAccessType{Kind: refsRef, RefId: env.nextRefId(), HasRefId: true}
 	}
 	return &refsAccessType{Kind: refsNone}
@@ -1249,8 +1249,8 @@ func refsSeedType(ctx rule.Context, function *high_level_intermediate_representa
 // Upstream runs this after every instruction, so a ref reaching a value through a shape the switch
 // does not model is still recognized. Skipped when the value is already a ref, so the join does not
 // mint an id on every round and stall the fixpoint.
-func refsApplyDeclaredType(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, id static_single_assignment.IdentifierId) {
-	if !refsIsRefBinding(ctx, function, env, id) {
+func refsApplyDeclaredType(ruleContext rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, id static_single_assignment.IdentifierId) {
+	if !refsIsRefBinding(ruleContext, function, env, id) {
 		return
 	}
 	current := env.get(id)
@@ -1338,7 +1338,7 @@ func refsCheckUpdate(env *refsEnvironment, id static_single_assignment.Identifie
 // instruction not modelled here checks every operand for a ref value, so a construct this port does
 // not know about fails toward reporting rather than toward silence.
 func refsTransfer(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	env *refsEnvironment,
 	instruction *high_level_intermediate_representation.Instruction,
@@ -1359,30 +1359,30 @@ func refsTransfer(
 	// Reading a property off a ref produces a ref VALUE, which is the element the whole rule is
 	// about. Reading a property off a structure yields what the structure carries.
 	case *high_level_intermediate_representation.PropertyLoad:
-		findings = refsPropertyLoadTransfer(ctx, function, env, instruction, value.Object.Identifier, target, findings)
+		findings = refsPropertyLoadTransfer(ruleContext, function, env, instruction, value.Object.Identifier, target, findings)
 
 	case *high_level_intermediate_representation.ComputedLoad:
 		findings = refsCheckDirectValueAccess(env, value.Property.Identifier, findings)
-		findings = refsPropertyLoadTransfer(ctx, function, env, instruction, value.Object.Identifier, target, findings)
+		findings = refsPropertyLoadTransfer(ruleContext, function, env, instruction, value.Object.Identifier, target, findings)
 
 	// A cast is a no-op at runtime and carries its operand's element through unchanged.
 	case *high_level_intermediate_representation.TypeCastExpression:
-		env.set(target, refsCarryOrSeed(ctx, function, env, value.Value.Identifier, target))
+		env.set(target, refsCarryOrSeed(ruleContext, function, env, value.Value.Identifier, target))
 
 	case *high_level_intermediate_representation.LoadLocal:
 		env.carryAccessNode(target, value.Place.Identifier)
-		env.set(target, refsCarryOrSeed(ctx, function, env, value.Place.Identifier, target))
+		env.set(target, refsCarryOrSeed(ruleContext, function, env, value.Place.Identifier, target))
 
 	case *high_level_intermediate_representation.LoadContext:
 		env.carryAccessNode(target, value.Place.Identifier)
-		env.set(target, refsCarryOrSeed(ctx, function, env, value.Place.Identifier, target))
+		env.set(target, refsCarryOrSeed(ruleContext, function, env, value.Place.Identifier, target))
 
 	case *high_level_intermediate_representation.StoreLocal:
-		stored := refsCarryOrSeed(ctx, function, env, value.Value.Identifier, value.LValue.Identifier)
+		stored := refsCarryOrSeed(ruleContext, function, env, value.Value.Identifier, value.LValue.Identifier)
 		env.carryAccessNode(value.LValue.Identifier, value.Value.Identifier)
 		env.carryAccessNode(target, value.Value.Identifier)
 		env.set(value.LValue.Identifier, stored)
-		env.set(target, refsCarryOrSeed(ctx, function, env, value.Value.Identifier, target))
+		env.set(target, refsCarryOrSeed(ruleContext, function, env, value.Value.Identifier, target))
 		// Pin the value under the WRITTEN binding's declaration. `env.set` records against whatever
 		// the lvalue resolves to through the aliasing map, which for a store into a fresh binding is
 		// an unnamed temporary carrying no declaration, so the entry the declaration fallback needs
@@ -1393,8 +1393,8 @@ func refsTransfer(
 		}
 
 	case *high_level_intermediate_representation.StoreContext:
-		env.set(value.LValue.Identifier, refsCarryOrSeed(ctx, function, env, value.Value.Identifier, value.LValue.Identifier))
-		env.set(target, refsCarryOrSeed(ctx, function, env, value.Value.Identifier, target))
+		env.set(value.LValue.Identifier, refsCarryOrSeed(ruleContext, function, env, value.Value.Identifier, value.LValue.Identifier))
+		env.set(target, refsCarryOrSeed(ruleContext, function, env, value.Value.Identifier, target))
 
 	// Destructuring distributes what the source structure carries to every bound name, which is how
 	// `const {current} = ref` reaches the same verdict as `ref.current`.
@@ -1404,7 +1404,7 @@ func refsTransfer(
 			carried = source.Value
 		}
 		if carried == nil {
-			carried = refsSeedType(ctx, function, target, env)
+			carried = refsSeedType(ruleContext, function, target, env)
 		}
 		env.set(target, carried)
 		high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
@@ -1416,10 +1416,10 @@ func refsTransfer(
 	// A nested function is analysed as an inner subject and its verdict is recorded ON THE VALUE.
 	// A ref touched inside it does not report there; it reports where the function is CALLED.
 	case *high_level_intermediate_representation.FunctionExpression:
-		findings = refsNestedFunctionTransfer(ctx, function, env, instruction, value, target, findings)
+		findings = refsNestedFunctionTransfer(ruleContext, function, env, instruction, value, target, findings)
 
 	case *high_level_intermediate_representation.CallExpression:
-		findings = refsCallTransfer(ctx, function, env, instruction, value.Callee.Identifier, interpolatedAsJsx, findings)
+		findings = refsCallTransfer(ruleContext, function, env, instruction, value.Callee.Identifier, interpolatedAsJsx, findings)
 
 	// A method call keeps its receiver, so `object.foo()` arrives here rather than as a property
 	// load plus a call. The callee to score is the PROPERTY, but the property is a fresh temporary
@@ -1447,7 +1447,7 @@ func refsTransfer(
 			receiverType.Kind == refsStructure && receiverType.Function != nil {
 			env.set(value.Property.Identifier, receiverType)
 		}
-		findings = refsCallTransfer(ctx, function, env, instruction, value.Property.Identifier, interpolatedAsJsx, findings)
+		findings = refsCallTransfer(ruleContext, function, env, instruction, value.Property.Identifier, interpolatedAsJsx, findings)
 
 	// An aggregate becomes a structure carrying the join of what its elements carry, so a ref put
 	// into an object is still findable through the object.
@@ -1475,7 +1475,7 @@ func refsTransfer(
 			if current := env.get(place.Identifier); current != nil {
 				isRefObject = refsDestructure(current).Kind == refsRef
 			}
-			if !isRefObject || !refsAggregateIsExempt(ctx, function, env, instruction) {
+			if !isRefObject || !refsAggregateIsExempt(ruleContext, function, env, instruction) {
 				findings = refsCheckDirectValueAccess(env, place.Identifier, findings)
 			}
 			elementTypes = append(elementTypes, env.get(place.Identifier))
@@ -1547,15 +1547,15 @@ func refsTransfer(
 //
 // `refsIsRefBinding` reaches the checker through `Identifier.Node`, which a call's temporary lvalue
 // does not have. This asks the same question of the call expression instead.
-func refsCallResultIsRef(ctx rule.Context, instruction *high_level_intermediate_representation.Instruction) bool {
-	if ctx.TypeChecker == nil || instruction == nil || instruction.Node == nil {
+func refsCallResultIsRef(ruleContext rule.Context, instruction *high_level_intermediate_representation.Instruction) bool {
+	if ruleContext.TypeChecker == nil || instruction == nil || instruction.Node == nil {
 		return false
 	}
 	node := instruction.Node
 	if node.Kind != ast.KindCallExpression {
 		return false
 	}
-	resultType := ctx.TypeChecker.GetTypeAtLocation(node)
+	resultType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 	if resultType == nil {
 		return false
 	}
@@ -1601,7 +1601,7 @@ func refsCallResultIsRef(ctx rule.Context, instruction *high_level_intermediate_
 //
 // The state hooks are deliberately NOT exempt here, for the same reason they are not at the call:
 // `useState`, `useReducer` and `useMemo` run what they are given during render.
-func refsAggregateIsExempt(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, instruction *high_level_intermediate_representation.Instruction) bool {
+func refsAggregateIsExempt(ruleContext rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, instruction *high_level_intermediate_representation.Instruction) bool {
 	aggregate := instruction.LValue.Identifier
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
@@ -1622,8 +1622,8 @@ func refsAggregateIsExempt(ctx rule.Context, function *high_level_intermediate_r
 				if env.operandId(argument.Place.Identifier) != env.operandId(aggregate) {
 					continue
 				}
-				if refsIsRefBinding(ctx, function, env, candidate.LValue.Identifier) ||
-					refsCallResultIsRef(ctx, candidate) {
+				if refsIsRefBinding(ruleContext, function, env, candidate.LValue.Identifier) ||
+					refsCallResultIsRef(ruleContext, candidate) {
 					return true
 				}
 				calleeName := ""
@@ -1644,11 +1644,11 @@ func refsAggregateIsExempt(ctx rule.Context, function *high_level_intermediate_r
 }
 
 // refsCarryOrSeed passes an operand's element through, falling back to its declared type.
-func refsCarryOrSeed(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, from static_single_assignment.IdentifierId, to static_single_assignment.IdentifierId) *refsAccessType {
+func refsCarryOrSeed(ruleContext rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, from static_single_assignment.IdentifierId, to static_single_assignment.IdentifierId) *refsAccessType {
 	if current := env.get(from); current != nil {
 		return current
 	}
-	return refsSeedType(ctx, function, to, env)
+	return refsSeedType(ruleContext, function, to, env)
 }
 
 // refsPropertyLoadTransfer decides what reading a property off a value yields.
@@ -1656,7 +1656,7 @@ func refsCarryOrSeed(ctx rule.Context, function *high_level_intermediate_represe
 // Off a ref, it is a ref VALUE carrying where the access happened. Off a structure, it is whatever
 // the structure carries. Otherwise it falls back to the declared type.
 func refsPropertyLoadTransfer(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	env *refsEnvironment,
 	instruction *high_level_intermediate_representation.Instruction,
@@ -1689,7 +1689,7 @@ func refsPropertyLoadTransfer(
 			HasRefId:   objectType.HasRefId,
 		})
 	default:
-		env.set(target, refsSeedType(ctx, function, target, env))
+		env.set(target, refsSeedType(ruleContext, function, target, env))
 	}
 	return findings
 }
@@ -1704,7 +1704,7 @@ func refsPropertyLoadTransfer(
 // The inner sweep shares the OUTER environment rather than starting fresh, which is upstream's
 // choice and is what lets a captured ref be visible inside the nested function at all.
 func refsNestedFunctionTransfer(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	env *refsEnvironment,
 	instruction *high_level_intermediate_representation.Instruction,
@@ -1758,8 +1758,8 @@ func refsNestedFunctionTransfer(
 		}
 	}
 
-	refsCollectTemporaries(ctx, inner, inner_env)
-	innerFindings := refsRunOneRound(ctx, inner, inner_env)
+	refsCollectTemporaries(ruleContext, inner, inner_env)
+	innerFindings := refsRunOneRound(ruleContext, inner, inner_env)
 	// Ref identity is minted from a single counter so two functions cannot collide on an id; the
 	// seed travels back out rather than the whole environment.
 	env.refIdSeed = inner_env.refIdSeed
@@ -1848,7 +1848,7 @@ func refsNestedFunction(function *high_level_intermediate_representation.Functio
 // passed to one is allowed, EXCEPT for `useState` and `useReducer`, whose initializers run during
 // render and so genuinely would read the ref then.
 func refsCallTransfer(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	env *refsEnvironment,
 	instruction *high_level_intermediate_representation.Instruction,
@@ -1878,8 +1878,8 @@ func refsCallTransfer(
 		//
 		// Measured on Kirk's tree: without this the eight `mergeReferences([inner, ref])` sites all
 		// report, and upstream is silent on that exact input.
-		isRefResult := refsIsRefBinding(ctx, function, env, target) ||
-			refsCallResultIsRef(ctx, instruction)
+		isRefResult := refsIsRefBinding(ruleContext, function, env, target) ||
+			refsCallResultIsRef(ruleContext, instruction)
 		hookName := env.nameOf(function, callee)
 		isHook := refsIsHookName(hookName)
 		// `useState`, `useReducer` and `useMemo` are NOT exempt, because each runs the argument it
@@ -2067,19 +2067,19 @@ func refsMessageFor(kind refsFindingKind) rule.Message {
 // node that produced the INSTRUCTION, and reporting through the node routes via `rule.TokenRange`,
 // which trims leading trivia at the harness. A finding whose value is a pure temporary with no
 // syntactic source falls back to the function's own node rather than being dropped.
-func refsReport(ctx rule.Context, function *high_level_intermediate_representation.Function, finding refsFinding) {
+func refsReport(ruleContext rule.Context, function *high_level_intermediate_representation.Function, finding refsFinding) {
 	message := refsMessageFor(finding.Kind)
 	if finding.Node != nil {
-		ctx.ReportNode(finding.Node, message)
+		ruleContext.ReportNode(finding.Node, message)
 		return
 	}
 	if finding.HasValue {
 		if node := refsIdentifierNode(function, finding.Value); node != nil {
-			ctx.ReportNode(node, message)
+			ruleContext.ReportNode(node, message)
 			return
 		}
 	}
 	if function.Node != nil {
-		ctx.ReportNode(function.Node, message)
+		ruleContext.ReportNode(function.Node, message)
 	}
 }

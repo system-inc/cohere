@@ -207,12 +207,12 @@ var ErrTailwindNotInstalled = errors.New("tailwindcss does not resolve from the 
 // skipWithoutTailwind skips the file when err is a missing Tailwind, and says whether it did. A
 // design system that failed to build is not a skip, and the rule declines it loudly instead. Each
 // reason is written at its Skip, where TestEverySkipSaysWhichKindItIs reads it.
-func skipWithoutTailwind(ctx rule.Context, err error) bool {
+func skipWithoutTailwind(ruleContext rule.Context, err error) bool {
 	switch {
 	case errors.Is(err, ErrNoTailwindEntryPoint):
-		ctx.Skip("no Tailwind entry point is configured")
+		ruleContext.Skip("no Tailwind entry point is configured")
 	case errors.Is(err, ErrTailwindNotInstalled):
-		ctx.Skip("tailwindcss does not resolve from the configured cwd")
+		ruleContext.Skip("tailwindcss does not resolve from the configured cwd")
 	default:
 		return false
 	}

@@ -197,20 +197,20 @@ func runTypedSource(test *testing.T, source string, visit func(*Function, *shimc
 	probe := rule.Rule{
 		Name:             "prune-non-escaping-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Fatal("the typed harness handed this probe a nil checker")
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
 						ran = true
-						visit(function, ctx.TypeChecker)
+						visit(function, ruleContext.TypeChecker)
 					})
 				},
 			}
@@ -435,19 +435,19 @@ func memoMarkerCountsForSource(test *testing.T, source string) (pruned, reached 
 	probe := rule.Rule{
 		Name:             "memo-marker-counts",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						return
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
-						markerPruned, markerReached := markerCounts(function, ctx.TypeChecker)
+						markerPruned, markerReached := markerCounts(function, ruleContext.TypeChecker)
 						pruned += markerPruned
 						reached += markerReached
 						ok = true

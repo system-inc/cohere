@@ -461,12 +461,12 @@ func AllWithoutGuard(sourceFile *ast.SourceFile) []Comment {
 // run rather than once per node it asks about. That is not a micro-optimization: three rules calling
 // a well-factored scan directly each rescanned the file, measured at 807ms, 619ms and 601ms while
 // visiting exactly one node per file.
-func LeadingRunFor(ctx rule.Context, node *ast.Node) []Comment {
-	if node == nil || ctx.SourceFile == nil {
+func LeadingRunFor(ruleContext rule.Context, node *ast.Node) []Comment {
+	if node == nil || ruleContext.SourceFile == nil {
 		return nil
 	}
 
-	all := ForFile(ctx)
+	all := ForFile(ruleContext)
 	if len(all) == 0 {
 		return nil
 	}
@@ -474,7 +474,7 @@ func LeadingRunFor(ctx rule.Context, node *ast.Node) []Comment {
 	// The comments above the node are those ending at or before where its own text begins. The
 	// token position is used rather than Pos(), since Pos() sits before the leading trivia and would
 	// place the node before its own comments.
-	nodeStart := rule.TokenRange(ctx.SourceFile, node).Pos()
+	nodeStart := rule.TokenRange(ruleContext.SourceFile, node).Pos()
 
 	last := -1
 	for index, comment := range all {
@@ -490,7 +490,7 @@ func LeadingRunFor(ctx rule.Context, node *ast.Node) []Comment {
 
 	// Only a comment the node actually follows counts. A comment separated from it by code belongs
 	// to that code, and one separated by a blank line is a passage of its own.
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 	if !isAdjacentGap(text, all[last].Range.End(), nodeStart) {
 		return nil
 	}

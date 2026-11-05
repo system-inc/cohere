@@ -84,10 +84,10 @@ var JsxNoUndef = rule.Rule{
 	Name:             "react/jsx-no-undef",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's `allowGlobals: false`.
 		settings, _ := rule.OptionsAs[JsxNoUndefOptions](options)
-		stopsAtModuleScope := !settings.AllowGlobals && !strings.HasSuffix(ctx.SourceFile.FileName().AsString(), ".cjs")
+		stopsAtModuleScope := !settings.AllowGlobals && !strings.HasSuffix(ruleContext.SourceFile.FileName().AsString(), ".cjs")
 
 		check := func(node *ast.Node) {
 			tagName, _ := jsx.ElementParts(node)
@@ -95,15 +95,15 @@ var JsxNoUndef = rule.Rule{
 			if reference == nil {
 				return
 			}
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
-			if symbol := ctx.TypeChecker.GetSymbolAtLocation(reference); symbol != nil {
-				if !stopsAtModuleScope || jsxNoUndefDeclaredInFile(symbol, ctx.SourceFile) {
+			if symbol := ruleContext.TypeChecker.GetSymbolAtLocation(reference); symbol != nil {
+				if !stopsAtModuleScope || jsxNoUndefDeclaredInFile(symbol, ruleContext.SourceFile) {
 					return
 				}
 			}
-			ctx.ReportNode(reference, messageJsxIdentifierNotDefined)
+			ruleContext.ReportNode(reference, messageJsxIdentifierNotDefined)
 		}
 
 		return rule.Listeners{

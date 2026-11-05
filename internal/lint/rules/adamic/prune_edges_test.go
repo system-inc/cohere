@@ -17,12 +17,12 @@ import (
 var offeredSites = rule.Rule{
 	Name:             "adamic/offered-sites",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
-		return flow.WalkerFor(ctx).Listeners(func(site flow.Site) {
-			ctx.ReportNode(site.Node, rule.Message{Id: "offered", Description: ctx.TypeChecker.TypeToString(site.Target)})
+		return flow.WalkerFor(ruleContext).Listeners(func(site flow.Site) {
+			ruleContext.ReportNode(site.Node, rule.Message{Id: "offered", Description: ruleContext.TypeChecker.TypeToString(site.Target)})
 		})
 	},
 }

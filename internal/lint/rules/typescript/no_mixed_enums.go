@@ -150,10 +150,10 @@ var NoMixedEnums = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -166,7 +166,7 @@ var NoMixedEnums = rule.Rule{
 				// A pointer rather than a value, because "no desired type yet" is a real state
 				// distinct from "the desired type is Number". Upstream spells it as `undefined`
 				// and its `??=` adoption line only fires in that state.
-				desiredType := noMixedEnumsDesiredType(ctx, node, members)
+				desiredType := noMixedEnumsDesiredType(ruleContext, node, members)
 
 				// Upstream's `if (desiredType === ts.TypeFlags.Unknown) return;`, which sits above
 				// the member scan and abandons the declaration outright. It is reachable only when
@@ -179,7 +179,7 @@ var NoMixedEnums = rule.Rule{
 				}
 
 				for _, member := range members {
-					currentType := noMixedEnumsClassify(ctx, member)
+					currentType := noMixedEnumsClassify(ruleContext, member)
 
 					// Not "unclassifiable, keep going". Reaching one abandons the whole enum.
 					if currentType == noMixedEnumsUnknown {
@@ -230,7 +230,7 @@ var NoMixedEnums = rule.Rule{
 						} else if skipped := ast.SkipParentheses(target); skipped != nil {
 							target = skipped
 						}
-						ctx.ReportNode(target, buildNoMixedEnumsMessage())
+						ruleContext.ReportNode(target, buildNoMixedEnumsMessage())
 						return
 					}
 				}
@@ -250,13 +250,13 @@ var NoMixedEnums = rule.Rule{
 // The ordering upstream encodes is preserved: a declaration from ANOTHER FILE wins over a local
 // sibling, because an ambient module augmentation is upstream's first case and its sibling scan is
 // the second.
-func noMixedEnumsDesiredType(ctx rule.Context, node *ast.Node, members []*ast.Node) *noMixedEnumsMemberType {
+func noMixedEnumsDesiredType(ruleContext rule.Context, node *ast.Node, members []*ast.Node) *noMixedEnumsMemberType {
 	name := node.AsEnumDeclaration().Name()
 	if name == nil {
-		return noMixedEnumsClassifyFirst(ctx, members)
+		return noMixedEnumsClassifyFirst(ruleContext, members)
 	}
 
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 
 	// An EXPORTED declaration is handed a symbol carrying only itself, and the merged list lives on
 	// the declaration's LocalSymbol. Without this fallback every exported enum in a namespace would
@@ -310,14 +310,14 @@ func noMixedEnumsDesiredType(ctx rule.Context, node *ast.Node, members []*ast.No
 		}
 
 		if reference := fromOtherFile; reference != nil {
-			return noMixedEnumsClassifyFirst(ctx, reference.AsEnumDeclaration().Members.Nodes)
+			return noMixedEnumsClassifyFirst(ruleContext, reference.AsEnumDeclaration().Members.Nodes)
 		}
 		if earlierSibling != nil {
-			return noMixedEnumsClassifyFirst(ctx, earlierSibling.AsEnumDeclaration().Members.Nodes)
+			return noMixedEnumsClassifyFirst(ruleContext, earlierSibling.AsEnumDeclaration().Members.Nodes)
 		}
 	}
 
-	return noMixedEnumsClassifyFirst(ctx, members)
+	return noMixedEnumsClassifyFirst(ruleContext, members)
 }
 
 // noMixedEnumsClassifyFirst classifies a declaration's first member, which is what every merge case
@@ -337,11 +337,11 @@ func noMixedEnumsDesiredType(ctx rule.Context, node *ast.Node, members []*ast.No
 //
 // Found by a fixture written for a mutant that survived, which is the only reason it surfaced: the
 // mutant was equivalent, and chasing why produced the probe that caught this.
-func noMixedEnumsClassifyFirst(ctx rule.Context, members []*ast.Node) *noMixedEnumsMemberType {
+func noMixedEnumsClassifyFirst(ruleContext rule.Context, members []*ast.Node) *noMixedEnumsMemberType {
 	if len(members) == 0 {
 		return nil
 	}
-	classified := noMixedEnumsClassify(ctx, members[0])
+	classified := noMixedEnumsClassify(ruleContext, members[0])
 	return &classified
 }
 
@@ -351,7 +351,7 @@ func noMixedEnumsClassifyFirst(ctx rule.Context, members []*ast.Node) *noMixedEn
 // initializer's ESTree node type. Everything else asks the checker whether the type is StringLike,
 // and a negative answer is NUMBER rather than unknown -- upstream's ternary has no third branch,
 // which is why a call returning a boolean classifies as Number rather than aborting.
-func noMixedEnumsClassify(ctx rule.Context, member *ast.Node) noMixedEnumsMemberType {
+func noMixedEnumsClassify(ruleContext rule.Context, member *ast.Node) noMixedEnumsMemberType {
 	initializer := member.AsEnumMember().Initializer
 
 	// No initializer is an implicit number.
@@ -391,10 +391,10 @@ func noMixedEnumsClassify(ctx rule.Context, member *ast.Node) noMixedEnumsMember
 		return noMixedEnumsUnknown
 	}
 
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return noMixedEnumsNumber
 	}
-	initializerType := ctx.TypeChecker.GetTypeAtLocation(initializer)
+	initializerType := ruleContext.TypeChecker.GetTypeAtLocation(initializer)
 	if initializerType == nil {
 		return noMixedEnumsNumber
 	}

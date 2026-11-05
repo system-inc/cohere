@@ -72,7 +72,7 @@ import (
 var PreferFunctionType = rule.Rule{
 	Name: "@typescript-eslint/prefer-function-type",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindInterfaceDeclaration: func(node *ast.Node) {
 				declaration := node.AsInterfaceDeclaration()
@@ -82,7 +82,7 @@ var PreferFunctionType = rule.Rule{
 				if interfaceHasOneSupertype(declaration) {
 					return
 				}
-				checkPreferFunctionTypeMember(ctx, declaration.Members.Nodes[0], node,
+				checkPreferFunctionTypeMember(ruleContext, declaration.Members.Nodes[0], node,
 					collectInterfaceThisTypes(declaration.Members.Nodes[0]))
 			},
 			ast.KindTypeLiteral: func(node *ast.Node) {
@@ -92,7 +92,7 @@ var PreferFunctionType = rule.Rule{
 				}
 				// A type literal never reports the `this` message: upstream's tracking array is
 				// populated only while inside an interface, and it passes null here.
-				checkPreferFunctionTypeMember(ctx, literal.Members.Nodes[0], node, nil)
+				checkPreferFunctionTypeMember(ruleContext, literal.Members.Nodes[0], node, nil)
 			},
 		}
 	},
@@ -170,7 +170,7 @@ func collectInterfaceThisTypes(member *ast.Node) []*ast.Node {
 
 // checkPreferFunctionTypeMember is upstream's `checkMember`, the single body both anchors share.
 func checkPreferFunctionTypeMember(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	member *ast.Node,
 	node *ast.Node,
 	thisTypes []*ast.Node,
@@ -188,7 +188,7 @@ func checkPreferFunctionTypeMember(
 	if isInterface && len(thisTypes) > 0 {
 		// Pointing at the whole member here would make the message confusing, and reporting every
 		// `this` would make it repetitive. Upstream picks the first and says why at the line.
-		ctx.ReportNode(thisTypes[0], rule.Message{
+		ruleContext.ReportNode(thisTypes[0], rule.Message{
 			Id: "unexpectedThisOnFunctionOnlyInterface",
 			Description: "`this` refers to the function type '" +
 				node.AsInterfaceDeclaration().Name().Text() +
@@ -208,12 +208,12 @@ func checkPreferFunctionTypeMember(
 			" only has a call signature, you should use a function type instead.",
 	}
 
-	fix, hasFix := preferFunctionTypeFix(ctx, member, node, returnType, isInterface)
+	fix, hasFix := preferFunctionTypeFix(ruleContext, member, node, returnType, isInterface)
 	if !hasFix {
-		ctx.ReportNode(member, message)
+		ruleContext.ReportNode(member, message)
 		return
 	}
-	ctx.ReportNodeWithFixes(member, message, fix)
+	ruleContext.ReportNodeWithFixes(member, message, fix)
 }
 
 // preferFunctionTypeReturnType answers the member's annotated return type, or nil when the member is
@@ -233,7 +233,7 @@ func preferFunctionTypeReturnType(member *ast.Node) *ast.Node {
 // The second return is false for `export default interface`, which upstream declines because the
 // only replacement would be `export default type`, and that is not valid TypeScript.
 func preferFunctionTypeFix(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	member *ast.Node,
 	node *ast.Node,
 	returnType *ast.Node,
@@ -243,17 +243,17 @@ func preferFunctionTypeFix(
 		return rule.Fix{}, false
 	}
 
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 
 	// The member's own text, without the leading trivia. Upstream slices from `member.range[0]`,
 	// which is the token start; our `Pos()` would include the comment above it and the newline,
 	// and the comment is handled separately below.
-	memberRange := rule.TokenRange(ctx.SourceFile, member)
+	memberRange := rule.TokenRange(ruleContext.SourceFile, member)
 	memberText := source[memberRange.Pos():memberRange.End()]
 
 	// The colon that opens the return annotation becomes the arrow. Offsets are relative to the
 	// member's own start, as upstream's are.
-	colonOffset := rule.TokenRange(ctx.SourceFile, returnType).Pos() - memberRange.Pos() - 1
+	colonOffset := rule.TokenRange(ruleContext.SourceFile, returnType).Pos() - memberRange.Pos() - 1
 	for colonOffset > 0 && colonOffset < len(memberText) && memberText[colonOffset] != ':' {
 		// Upstream computes this as `returnType.range[0] - start - 1` and relies on the colon
 		// sitting exactly one character before the type. That holds when the annotation is written
@@ -294,7 +294,7 @@ func preferFunctionTypeFix(
 		suggestion = "(" + suggestion + ")"
 	}
 
-	memberComments := preferFunctionTypeCommentsFor(ctx, member, node)
+	memberComments := preferFunctionTypeCommentsFor(ruleContext, member, node)
 
 	if isInterface {
 		declaration := node.AsInterfaceDeclaration()
@@ -302,7 +302,7 @@ func preferFunctionTypeFix(
 		if declaration.TypeParameters != nil {
 			// The type parameters have to survive, so the alias is rebuilt from the source text
 			// spanning the name through the closing angle bracket rather than from the name alone.
-			nameStart := rule.TokenRange(ctx.SourceFile, name).Pos()
+			nameStart := rule.TokenRange(ruleContext.SourceFile, name).Pos()
 			// TypeParameters.End() is the last parameter's end, and the closing angle bracket is the
 			// next token after it, past any trivia and a trailing comma. Upstream's
 			// `node.typeParameters.range[1]` is past the bracket, because estree models the parameter
@@ -333,7 +333,7 @@ func preferFunctionTypeFix(
 	// covers plus the keyword upstream leaves in place. The first version of this rule added a
 	// modifier adjustment on top of that and deleted the `export` from two of upstream's own
 	// outputs; the range needs no adjustment at all.
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
 
 	if isInterface && isExportedInterface(node) {
 		// A comment cannot sit between `export` and `type`, so it has to go above the whole
@@ -356,7 +356,7 @@ func preferFunctionTypeFix(
 		// line when it was on its own line and inline when it was inline.
 		// The same helper the comments shelf uses to fill Comment.StartLine, so the two line
 		// numbers are computed the same way and are comparable.
-		memberLine, _ := scanner.GetECMALineAndByteOffsetOfPosition(ctx.SourceFile, memberRange.Pos())
+		memberLine, _ := scanner.GetECMALineAndByteOffsetOfPosition(ruleContext.SourceFile, memberRange.Pos())
 		for _, comment := range memberComments {
 			separator := "\n"
 			if comment.StartLine == memberLine {
@@ -375,18 +375,18 @@ func preferFunctionTypeFix(
 // comment lying inside the declaration's braces but outside the member's own text, which is the same
 // set for a one-member body and is expressible without a token-level comment index.
 func preferFunctionTypeCommentsFor(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	member *ast.Node,
 	node *ast.Node,
 ) []comments.Comment {
-	memberRange := rule.TokenRange(ctx.SourceFile, member)
+	memberRange := rule.TokenRange(ruleContext.SourceFile, member)
 	// The declaration's own token range, not its Pos: `Pos()` reaches back over leading trivia, so
 	// a comment written ABOVE the interface falls inside it. That is not a comment on the member and
 	// upstream does not move it; collecting it duplicated a file-leading comment in one of
 	// upstream's own outputs.
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
 	within := []comments.Comment{}
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() < nodeRange.Pos() || comment.Range.End() > nodeRange.End() {
 			continue
 		}
