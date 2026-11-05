@@ -113,7 +113,7 @@ func TestCoverageCountsAddUpToTheRuleTotal(t *testing.T) {
 	}
 
 	// The Swift record's parts add up to its whole the same way.
-	swift, err := classifySwiftCoverage(&swiftLintRecord{
+	swift, err := classifyEngineCoverage(&engineLintRecord{
 		RulesRun: 9, RulesWatchedAndQuiet: 3, RulesSilent: []string{"a", "b", "c"},
 		RulesNotConfigured: []string{"a"}, RulesScopedOff: map[string]int{"b": 2, "quiet-but-partly-off": 1},
 	})
@@ -129,7 +129,7 @@ func TestCoverageCountsAddUpToTheRuleTotal(t *testing.T) {
 // counted line would state arithmetic nobody can vouch for.
 func TestSwiftCoverageRefusesPartsLargerThanTheWhole(t *testing.T) {
 	t.Parallel()
-	_, err := classifySwiftCoverage(&swiftLintRecord{RulesRun: 2, RulesWatchedAndQuiet: 2, RulesSilent: []string{"a"}})
+	_, err := classifyEngineCoverage(&engineLintRecord{RulesRun: 2, RulesWatchedAndQuiet: 2, RulesSilent: []string{"a"}})
 	if err == nil || !strings.Contains(err.Error(), "more than that") {
 		t.Fatalf("a record counting 3 rules among 2 was accepted: %v", err)
 	}
@@ -317,7 +317,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 	// Not parallel: it drives the Swift record stream through renderRecords, whose acceptors set the package-level
 	// activeSummary
 	t.Run("unreadable files", func(t *testing.T) {
-		output, _, _ := renderRecords(t, swiftModeCheck, contractFixture(t, "Unreadable.jsonl"), 1)
+		output, _, _ := renderRecords(t, engineModeCheck, contractFixture(t, "Unreadable.jsonl"), 1)
 		requireLines(t, output, "  not checked: /project/Sources/Example/Latin1.swift (could not be read:")
 	})
 
