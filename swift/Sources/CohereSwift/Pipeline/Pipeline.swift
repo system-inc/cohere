@@ -21,6 +21,13 @@ public struct Pipeline {
     private let writer: ContractWriter
     private let workingDirectory: URL
     private let runner: ProcessRunner
+    /*
+     Under `--no-cache`, a scratch of this run's own in the system's temporary directory, removed when the run
+     ends. Every cache the engine keeps lives under its scratch (the package description, the build and its
+     records, the build-input snapshot, the prune stamp), so a fresh one reads nothing a run before left and
+     writes nothing to the project's `.cache`, as TypeScript's `--no-cache` promises.
+     */
+    private let freshScratch: URL?
 
     public init(
         options: CommandOptions,
@@ -32,6 +39,13 @@ public struct Pipeline {
         self.writer = writer
         self.workingDirectory = workingDirectory
         self.runner = runner
+        freshScratch =
+            options.noCache
+            ? FileManager.default.temporaryDirectory.appendingPathComponent(
+                "cohere-swift-no-cache-\(UUID().uuidString)",
+                isDirectory: true,
+            )
+            : nil
     }
 
     /* A run that could not happen at all. Exit 2, no summary: the front door says nothing was checked. */
@@ -40,6 +54,16 @@ public struct Pipeline {
     }
 
     public func run() async throws -> Int32 {
+        defer {
+            if let freshScratch {
+                do {
+                    try FileManager.default.removeItem(at: freshScratch)
+                }
+                catch {
+                    /* Left in the temporary directory, which the system clears; the run's answer stands either way. */
+                }
+            }
+        }
         let toolchain = EngineVersion.toolchain(runner: runner)
         try writer.write(EngineVersion.provenance(toolchain: toolchain))
         if options.showVersion {
@@ -93,7 +117,7 @@ public struct Pipeline {
         let describeStart = Date()
         let package = try PackageModel.load(
             root: root,
-            scratchPath: Self.scratchPath(for: root),
+            scratchPath: runScratch(for: root),
             runner: runner,
             toolchain: toolchain,
         )
@@ -324,7 +348,7 @@ public struct Pipeline {
             var typesPhase = TypesPhase(
                 package: package,
                 files: fileSet.owned,
-                scratchPath: Self.scratchPath(for: root),
+                scratchPath: runScratch(for: root),
                 resolutionAllowed: !options.noFix,
                 toolchain: toolchain,
                 runner: runner,
@@ -375,7 +399,7 @@ public struct Pipeline {
                 RuleRegistry.typedRules.contains { configuration.severity(of: $0.name) != .off && $0.applies(to: file) }
             }
             var symbolProvider = SymbolProvider(
-                scratchPaths: Self.symbolScratchPaths(package: package, root: root),
+                scratchPaths: Self.symbolScratchPaths(package: package, scratch: runScratch(for: root)),
                 runner: runner,
             )
             symbolProvider.ownedModules = Self.ownedModules(of: package)
@@ -447,7 +471,7 @@ public struct Pipeline {
         let demangler: SwiftDemangler
         do {
             let library = try IndexStore.toolchainLibraryPath(runner: runner)
-            stores = Self.symbolScratchPaths(package: package, root: root).compactMap {
+            stores = Self.symbolScratchPaths(package: package, scratch: runScratch(for: root)).compactMap {
                 try? IndexStore(libraryPath: library, storePath: IndexStore.storePath(scratchPath: $0))
             }
             demangler = try SwiftDemangler.shared(runner: runner)
@@ -616,9 +640,8 @@ public struct Pipeline {
     }
 
     /* Every scratch a build of this package writes an index store into: the root's, and each local package's that the types phase builds for its tests. */
-    static func symbolScratchPaths(package: PackageModel, root: URL) -> [URL] {
-        let scratch = Self.scratchPath(for: root)
-        return [scratch]
+    static func symbolScratchPaths(package: PackageModel, scratch: URL) -> [URL] {
+        [scratch]
             + package.localPackages.map {
                 scratch.appendingPathComponent("local/\($0.root.lastPathComponent)", isDirectory: true)
             }
@@ -645,6 +668,11 @@ public struct Pipeline {
      never `.build`, so a run never takes the developer's lock, and SwiftPM and the engine's walks skip hidden
      directories, so nothing here is ever read as source. `--no-fix` writes no source file; this cache is cohere's.
      */
+    /* This run's scratch: its own under `--no-cache`, the package's otherwise. */
+    private func runScratch(for root: URL) -> URL {
+        freshScratch ?? Self.scratchPath(for: root)
+    }
+
     public static func scratchPath(for root: URL) -> URL {
         root.appendingPathComponent(".cache/cohere/swift", isDirectory: true)
     }

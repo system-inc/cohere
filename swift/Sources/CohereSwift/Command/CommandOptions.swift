@@ -29,6 +29,8 @@ public struct CommandOptions: Equatable, Sendable {
     public var formatOnly = false
     /* Formatting left out of a bare run, `--fix` or `--no-fix`: fix, type-check and lint only, as TypeScript's `--no-format`. */
     public var noFormat = false
+    /* Every phase from source: nothing read from or written to the engine's caches, as TypeScript's `--no-cache`. */
+    public var noCache = false
     public var lintConfiguration: URL?
     public var fixPasses = 10
     public var singleThreaded = false
@@ -86,6 +88,7 @@ public struct CommandOptions: Equatable, Sendable {
                 case "--format-all": options.formatAll = true
                 case "--format-only": options.formatOnly = true
                 case "--no-format": options.noFormat = true
+                case "--no-cache": options.noCache = true
                 case "--lint-config":
                     options.lintConfiguration =
                         URL(fileURLWithPath: try value(for: flag), relativeTo: workingDirectory).standardizedFileURL
