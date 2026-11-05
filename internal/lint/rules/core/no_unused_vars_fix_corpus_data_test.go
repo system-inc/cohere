@@ -1,6 +1,7 @@
+// Code generated from typescript-eslint v8.71.0's tests/rules/no-unused-vars/*.test.ts and edge rows. DO NOT EDIT.
+
 package core
 
-// Code generated from typescript-eslint v8.71.0's tests/rules/no-unused-vars/*.test.ts and edge rows. DO NOT EDIT BY HAND.
 //
 // The 41 upstream rows are every row that sets enableAutofixRemoval and every row whose errors assert
 // suggestions, extracted by loading the three test files with RuleTester stubbed. 15 edge rows were added for

@@ -76,13 +76,13 @@ var allowedUppercaseTokens = map[string]bool{
 	"RIFF": true, "RLE": true, "RLI": true, "RLM": true, "RLO": true, "ROAS": true, "ROI": true,
 	"RPC": true, "RSA": true, "S3": true, "SAAS": true, "SAFE": true, "SDK": true, "SEO": true, "SES": true,
 	"SGR": true, "SHA": true, "SID": true, "SKU": true, "SLA": true, "SNS": true, "SOI": true, "SPA": true,
-	"SPKI": true, "SQL": true, "SRE": true, "SSD": true, "SSE": true, "SSH": true, "SSL": true, "SSN": true,
-	"SSO": true, "STS": true, "SVG": true, "TIFF": true, "TL": true, "TLS": true, "TODO": true,
+	"SPKI": true, "SQL": true, "SRE": true, "SSA": true, "SSD": true, "SSE": true, "SSH": true, "SSL": true,
+	"SSN": true, "SSO": true, "STS": true, "SVG": true, "TIFF": true, "TL": true, "TLS": true, "TODO": true,
 	"TOML": true, "TS": true, "TSX": true, "TTL": true, "TTY": true, "TUI": true, "UDID": true,
 	"UGC": true, "UI": true,
 	"UPC": true, "UPS": true, "URI": true, "URL": true, "URN": true, "US": true, "USPS": true, "UTC": true,
 	"UTF": true, "UTM": true, "UUID": true, "UX": true, "VINT": true, "WAL": true, "WASM": true,
-	"WCAG": true, "WEBM": true, "WEBP": true, "WEBVTT": true, "WIP": true, "XML": true, "YAML": true,
+	"WCAG": true, "WEBM": true, "WEBP": true, "WEBVTT": true, "WHATWG": true, "WIP": true, "XML": true, "YAML": true,
 	"YTD": true, "YUV": true, "YYYY": true,
 }
 
