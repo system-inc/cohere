@@ -148,6 +148,10 @@ func (found discovery) notes() []string {
 	for _, label := range found.Ownership.Yielding {
 		lines = append(lines, fmt.Sprintf("%s not run: every file it includes belongs to a nearer tsconfig", label))
 	}
+	for _, workspace := range found.BrokenWorkspaces {
+		lines = append(lines, fmt.Sprintf("%s claims no module, so each module below it runs on its own: %s",
+			path.Join(workspace.Directory, goWorkspaceMarker), workspace.Reason))
+	}
 	for _, module := range found.UnusedModules {
 		lines = append(lines, fmt.Sprintf("%s runs as its own module: %s does not use it",
 			path.Join(module.Directory, goModuleMarker), path.Join(module.Workspace, goWorkspaceMarker)))

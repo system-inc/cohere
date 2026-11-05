@@ -72,6 +72,10 @@ type discovery struct {
 	// a module of its own, for the notes to say why.
 	UnusedModules []unusedModule
 
+	// BrokenWorkspaces are Go workspaces whose go.work does not parse. Each still runs, and fails on it, while
+	// the modules below it run on their own, so one bad file fails its own project and nothing else.
+	BrokenWorkspaces []brokenWorkspace
+
 	// NestedRepositories are directories holding an independent repository of their own, relative to Root,
 	// not entered, and Submodules counts the submodules, part of the program above them, not entered either.
 	NestedRepositories []string
@@ -97,6 +101,13 @@ type unusedModule struct {
 	// the discovery root and slash-separated.
 	Directory string
 	Workspace string
+}
+
+// brokenWorkspace is a Go workspace whose go.work discovery could not read, and why.
+type brokenWorkspace struct {
+	// Directory is the workspace's, relative to the discovery root and slash-separated.
+	Directory string
+	Reason    string
 }
 
 // ignoreScope is what discovery asks of the gitignore matcher for one directory: internal/gitignore's
@@ -336,9 +347,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	found.sortProjects()
 	sort.Strings(found.Refused)
 	sort.Strings(found.NestedRepositories)
-	if err := found.claimWorkspaceModules(workspaces); err != nil {
-		return discovery{}, err
-	}
+	found.claimWorkspaceModules(workspaces)
 	return found, nil
 }
 
@@ -349,17 +358,25 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 // Each use resolves against its workspace's directory. One outside the root names nothing discovery found,
 // and so does one inside a submodule or a nested repository, since the walk never enters them, so neither
 // claims anything. A use naming another workspace claims nothing either: go builds that one by its own go.work.
-func (found *discovery) claimWorkspaceModules(workspaces []string) error {
+// A go.work that does not parse claims nothing and is kept in BrokenWorkspaces, so it fails its own project's
+// run rather than the discovery every other project depends on.
+func (found *discovery) claimWorkspaceModules(workspaces []string) {
 	if len(workspaces) == 0 {
-		return nil
+		return
 	}
 	isWorkspace := map[string]bool{}
 	claimed := map[string]bool{}
+	broken := map[string]bool{}
 	for _, workspace := range workspaces {
 		isWorkspace[workspace] = true
-		uses, err := workspaceUses(filepath.Join(found.Root, filepath.FromSlash(workspace)))
-		if err != nil {
-			return err
+		uses, readError := workspaceUses(filepath.Join(found.Root, filepath.FromSlash(workspace)))
+		if readError != nil {
+			// Not a failure of discovery: a TypeScript or Swift project beside it has nothing to do with it. The
+			// workspace's own run fails on the file, and it claims nothing, so its modules are still checked.
+			found.BrokenWorkspaces = append(found.BrokenWorkspaces,
+				brokenWorkspace{Directory: workspace, Reason: readError.Error()})
+			broken[workspace] = true
+			continue
 		}
 		for _, use := range uses {
 			module := path.Join(workspace, use)
@@ -379,7 +396,8 @@ func (found *discovery) claimWorkspaceModules(workspaces []string) error {
 			if claimed[project.Directory] {
 				continue
 			}
-			if workspace, below := nearestWorkspace(project.Directory, workspaces); below {
+			// A module below a workspace that could not be read is named by that workspace's note instead.
+			if workspace, below := nearestWorkspace(project.Directory, workspaces); below && !broken[workspace] {
 				found.UnusedModules = append(found.UnusedModules,
 					unusedModule{Directory: project.Directory, Workspace: workspace})
 			}
@@ -387,7 +405,6 @@ func (found *discovery) claimWorkspaceModules(workspaces []string) error {
 		running = append(running, project)
 	}
 	found.Projects = running
-	return nil
 }
 
 // nearestWorkspace is the deepest of the workspaces' directories that holds a directory, and whether there is

@@ -103,21 +103,36 @@ func TestDiscoveryLetsAGoWorkspaceClaimTheModulesItUses(test *testing.T) {
 	}
 }
 
-// A go.work discovery reads and cannot parse stops discovery naming it, rather than reading as a workspace
-// that uses nothing and running its modules apart.
-func TestDiscoveryRefusesAMalformedGoWork(test *testing.T) {
+// A go.work that does not parse fails its own project and nothing else: discovery still finds the
+// TypeScript program beside it, keeps the workspace as a project whose run will fail on the file, runs the
+// module below it on its own so it is still checked, and names the file and why in a note.
+func TestDiscoveryKeepsAMalformedGoWorkToItsOwnProject(test *testing.T) {
 	test.Parallel()
 	root := newRepository(test, map[string]string{
+		"tsconfig.json":            discoveryTsconfig,
 		"workspace/go.work":        "go 1.24\n\nuse (\n\t./module\n",
 		"workspace/module/go.mod":  "module example.com/module\n",
 		"workspace/module/code.go": "package module\n",
 	})
-	_, err := discoverProjects(root, nil)
-	if err == nil {
-		test.Fatal("a go.work that does not parse was read as a workspace")
+	found, discoveryError := discoverProjects(root, nil)
+	if discoveryError != nil {
+		test.Fatalf("one malformed go.work stopped discovery for every project: %v", discoveryError)
 	}
-	if want := filepath.Join(root, "workspace", "go.work"); !strings.Contains(err.Error(), want) {
-		test.Errorf("the error does not name %s: %v", want, err)
+	want := []discoveredProject{
+		{Directory: ".", Engine: engineTypeScript},
+		{Directory: "workspace", Engine: engineGo},
+		{Directory: "workspace/module", Engine: engineGo},
+	}
+	if !reflect.DeepEqual(found.Projects, want) {
+		test.Errorf("found %+v, want %+v", found.Projects, want)
+	}
+	notes := strings.Join(found.notes(), "\n")
+	wantFile := filepath.Join(root, "workspace", "go.work")
+	if !strings.Contains(notes, "workspace/go.work claims no module") || !strings.Contains(notes, wantFile) {
+		test.Errorf("the notes do not name the malformed %s and why:\n%s", wantFile, notes)
+	}
+	if strings.Contains(notes, "does not use it") {
+		test.Errorf("the module below a workspace that could not be read was called unused:\n%s", notes)
 	}
 }
 
@@ -171,10 +186,16 @@ func TestDiscoveryNeverEntersWhatItMustNot(t *testing.T) {
 		"Package.swift":                         discoveryPackage,
 		".gitignore":                            "generated/\n",
 		"node_modules/dependency/tsconfig.json": discoveryTsconfig,
+		"node_modules/gotool/go.mod":            "module example.com/gotool\n",
 		".build/checkouts/dep/Package.swift":    discoveryPackage,
 		".cache/cohere/tsconfig.json":           discoveryTsconfig,
+		".cache/gomodule/go.work":               "go 1.27\n",
 		"internal/testdata/tsconfig.json":       discoveryTsconfig,
+		"internal/testdata/fixture/go.mod":      "module example.com/fixture\n",
 		"generated/tsconfig.json":               discoveryTsconfig,
+		"generated/gocode/go.mod":               "module example.com/gocode\n",
+		"clone/go.mod":                          "module example.com/clone\n",
+		"submodule/go.mod":                      "module example.com/submodule\n",
 		"apps/.gitignore":                       "legacy/\n",
 		"apps/legacy/tsconfig.json":             discoveryTsconfig,
 		"clone/Package.swift":                   discoveryPackage,
@@ -217,7 +238,11 @@ func TestDiscoveryNeverEntersWhatItMustNot(t *testing.T) {
 	for _, project := range lifted.Projects {
 		directories[project.Directory] = true
 	}
-	for _, planted := range []string{"node_modules/dependency", ".build/checkouts/dep", ".cache/cohere", "internal/testdata", "generated", "apps/legacy", "refused"} {
+	for _, planted := range []string{
+		"node_modules/dependency", ".build/checkouts/dep", ".cache/cohere", "internal/testdata", "generated",
+		"apps/legacy", "refused", "node_modules/gotool", ".cache/gomodule", "internal/testdata/fixture",
+		"generated/gocode",
+	} {
 		if !directories[planted] {
 			t.Errorf("with the refusals lifted, %s was still not found, so its refusal above proves nothing", planted)
 		}
