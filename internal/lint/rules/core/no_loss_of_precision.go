@@ -135,8 +135,8 @@ func nonBaseTenLiteralLosesPrecision(raw string) bool {
 
 	digits := stripNumericSeparators(raw)
 	radix, withoutPrefix := nonBaseTenRadixAndDigits(digits)
-	value, err := strconv.ParseUint(withoutPrefix, radix, 64)
-	if err != nil {
+	value, parseError := strconv.ParseUint(withoutPrefix, radix, 64)
+	if parseError != nil {
 		// Wider than 64 bits, so the exactness check above has already established it does not
 		// fit in 53 and this is unreachable for a literal the parser accepted. Reported rather
 		// than ignored, because a literal this rule cannot evaluate is not a literal it has
@@ -275,12 +275,12 @@ func bitsPerDigit(radix int) int {
 func baseTenLiteralLosesPrecision(raw string) bool {
 	withoutSeparators := stripNumericSeparators(raw)
 
-	value, err := strconv.ParseFloat(withoutSeparators, 64)
-	if err != nil {
+	value, parseError := strconv.ParseFloat(withoutSeparators, 64)
+	if parseError != nil {
 		// `ParseFloat` reports a range error for `2e999` while still returning the infinity, and
 		// that is a real finding rather than a parse failure: the literal names a value the format
 		// cannot hold at all. Any other error is a literal this rule cannot evaluate.
-		if !isRangeError(err) {
+		if !isRangeError(parseError) {
 			return false
 		}
 	}
@@ -339,8 +339,8 @@ func scientificFormOfDecimal(raw string, keepTrailingZeros bool) (string, int, b
 	significand := raw
 	exponent := 0
 	if index := strings.IndexAny(significand, "eE"); index >= 0 {
-		parsed, err := strconv.Atoi(significand[index+1:])
-		if err != nil {
+		parsed, parseError := strconv.Atoi(significand[index+1:])
+		if parseError != nil {
 			return "", 0, false
 		}
 		exponent = parsed

@@ -186,7 +186,7 @@ func trim(line string) string {
 }
 
 func rel(root string, file string) string {
-	if relative, err := filepath.Rel(root, file); err == nil {
+	if relative, relativePathError := filepath.Rel(root, file); relativePathError == nil {
 		return relative
 	}
 	return file
@@ -197,9 +197,9 @@ func rel(root string, file string) string {
 // and Structure's defaults, and a corpus that includes ignored files measures a formatter against
 // text nobody formats, producing a real-looking number about the wrong question.
 func readList(root string, listPath string, limit int) ([]string, error) {
-	raw, err := os.ReadFile(listPath)
-	if err != nil {
-		return nil, err
+	raw, readError := os.ReadFile(listPath)
+	if readError != nil {
+		return nil, readError
 	}
 	var files []string
 	for _, line := range strings.Split(string(raw), "\n") {
@@ -230,7 +230,7 @@ func collect(root string, limit int) ([]string, error) {
 		"dist": true, "build": true, "out": true,
 	}
 
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	walkError := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -252,5 +252,5 @@ func collect(root string, limit int) ([]string, error) {
 		}
 		return nil
 	})
-	return files, err
+	return files, walkError
 }

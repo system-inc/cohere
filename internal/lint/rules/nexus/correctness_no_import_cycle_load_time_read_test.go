@@ -420,8 +420,8 @@ func correctnessNoImportCycleLoadTimeReadJsxPair(test *testing.T, element string
 		}, "\n"),
 	}, "/repository/source/A.tsx", func(directory string) {
 		config := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], "jsx": "preserve", "moduleDetection": "force", "types": []}, "include": ["**/*.tsx"]}`
-		if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); err != nil {
-			test.Fatalf("writing the JSX tsconfig: %v", err)
+		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); writeError != nil {
+			test.Fatalf("writing the JSX tsconfig: %v", writeError)
 		}
 	})
 }

@@ -20,22 +20,22 @@ func buildNarrowFixtureGraph(test *testing.T, files map[string]string) (*program
 
 	for name, contents := range files {
 		path := filepath.Join(directory, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 
 	configuration := `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler"},"include":["**/*.ts"]}`
-	if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building the fixture graph: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building the fixture graph: %v", buildError)
 	}
 	return graph, directory
 }

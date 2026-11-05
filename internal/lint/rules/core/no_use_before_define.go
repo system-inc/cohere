@@ -124,7 +124,7 @@ func DecodeNoUseBeforeDefineOptions(raw []byte) (any, error) {
 	// unmarshal, which the config layer would surface as a configuration error rather than as the
 	// legal spelling it is.
 	var asString string
-	if err := json.Unmarshal(raw, &asString); err == nil {
+	if decodeError := json.Unmarshal(raw, &asString); decodeError == nil {
 		if asString == "nofunc" {
 			functionsOff := false
 			options.Functions = &functionsOff
@@ -132,8 +132,8 @@ func DecodeNoUseBeforeDefineOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }

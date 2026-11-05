@@ -45,9 +45,9 @@ func TestWalkReportsADirectiveNamingAnUnknownRule(test *testing.T) {
 	}
 
 	walk := func() []string {
-		result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{listening})
-		if err != nil {
-			test.Fatalf("walking: %v", err)
+		result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{listening})
+		if walkError != nil {
+			test.Fatalf("walking: %v", walkError)
 		}
 		described := []string{}
 		for _, diagnostic := range result.Diagnostics {

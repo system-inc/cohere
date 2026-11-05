@@ -16,9 +16,9 @@ import (
 // second non-zero default found in two batches, and both were invisible from the shape of the code.
 func TestPreferNullishCoalescingDefaultsMatchUpstream(test *testing.T) {
 	test.Parallel()
-	decoded, err := DecodePreferNullishCoalescingOptions(nil)
-	if err != nil {
-		test.Fatalf("the decoder refused absent options: %v", err)
+	decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(nil)
+	if decodePreferNullishCoalescingOptionsError != nil {
+		test.Fatalf("the decoder refused absent options: %v", decodePreferNullishCoalescingOptionsError)
 	}
 	options, ok := decoded.(PreferNullishCoalescingOptions)
 	if !ok {
@@ -100,15 +100,15 @@ func TestPreferNullishCoalescingIgnorePrimitivesBothSpellings(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodePreferNullishCoalescingOptions(json.RawMessage(testCase.raw))
+			decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(json.RawMessage(testCase.raw))
 			if testCase.wantErr {
-				if err == nil {
+				if decodePreferNullishCoalescingOptionsError == nil {
 					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
 				}
 				return
 			}
-			if err != nil {
-				test.Fatalf("the decoder refused %s: %v", testCase.raw, err)
+			if decodePreferNullishCoalescingOptionsError != nil {
+				test.Fatalf("the decoder refused %s: %v", testCase.raw, decodePreferNullishCoalescingOptionsError)
 			}
 			options := decoded.(PreferNullishCoalescingOptions)
 			if options.IgnorePrimitives != testCase.want {
@@ -167,15 +167,15 @@ func TestPreferNullishCoalescingDecoderAcceptsTheShapesTheConfigLayerDelivers(te
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodePreferNullishCoalescingOptions(json.RawMessage(testCase.raw))
+			decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(json.RawMessage(testCase.raw))
 			if testCase.wantErr {
-				if err == nil {
+				if decodePreferNullishCoalescingOptionsError == nil {
 					test.Fatalf("expected a refusal, got %#v", decoded)
 				}
 				return
 			}
-			if err != nil {
-				test.Fatalf("the decoder refused %s: %v", testCase.raw, err)
+			if decodePreferNullishCoalescingOptionsError != nil {
+				test.Fatalf("the decoder refused %s: %v", testCase.raw, decodePreferNullishCoalescingOptionsError)
 			}
 			if testCase.check != nil {
 				testCase.check(test, decoded.(PreferNullishCoalescingOptions))
@@ -199,18 +199,18 @@ func runPreferNullishCoalescing(test *testing.T, testCase preferNullishCoalescin
 	test.Helper()
 	var options any
 	if testCase.optionsJson != "" {
-		decoded, err := DecodePreferNullishCoalescingOptions(json.RawMessage(testCase.optionsJson))
-		if err != nil {
-			test.Fatalf("the decoder refused %s: %v", testCase.optionsJson, err)
+		decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(json.RawMessage(testCase.optionsJson))
+		if decodePreferNullishCoalescingOptionsError != nil {
+			test.Fatalf("the decoder refused %s: %v", testCase.optionsJson, decodePreferNullishCoalescingOptionsError)
 		}
 		options = decoded
 	} else {
 		// A rule configured as a bare "error" is handed nil, and this rule's ignoreConditionalTests
 		// default is TRUE, so routing the empty case through the decoder is what proves the rule
 		// gets that default rather than Go's zero value.
-		decoded, err := DecodePreferNullishCoalescingOptions(nil)
-		if err != nil {
-			test.Fatalf("the decoder refused absent options: %v", err)
+		decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(nil)
+		if decodePreferNullishCoalescingOptionsError != nil {
+			test.Fatalf("the decoder refused absent options: %v", decodePreferNullishCoalescingOptionsError)
 		}
 		options = decoded
 	}

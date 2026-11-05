@@ -42,13 +42,13 @@ func newRunCacheTree(test *testing.T) *runCacheTree {
 	// Absent inputs sit in their own directory, which no recorded file shares, so the absence check is
 	// the only thing that can notice one appearing. See the "absent now exists" case.
 	tree.absent = []string{filepath.Join(root, "unwatched", ".cohererc")}
-	if err := os.MkdirAll(filepath.Join(root, "unwatched"), 0o755); err != nil {
-		test.Fatalf("mkdir: %v", err)
+	if createDirectoryError := os.MkdirAll(filepath.Join(root, "unwatched"), 0o755); createDirectoryError != nil {
+		test.Fatalf("mkdir: %v", createDirectoryError)
 	}
 
-	key, err := program.RunCacheKey([]string{"--lint"}, root)
-	if err != nil {
-		test.Fatalf("key: %v", err)
+	key, runCacheKeyError := program.RunCacheKey([]string{"--lint"}, root)
+	if runCacheKeyError != nil {
+		test.Fatalf("key: %v", runCacheKeyError)
 	}
 	tree.key = key
 	return tree
@@ -56,20 +56,20 @@ func newRunCacheTree(test *testing.T) *runCacheTree {
 
 func writeFile(test *testing.T, path string, contents string) {
 	test.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		test.Fatalf("mkdir: %v", err)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+		test.Fatalf("mkdir: %v", createDirectoryError)
 	}
-	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		test.Fatalf("write %s: %v", path, err)
+	if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+		test.Fatalf("write %s: %v", path, writeError)
 	}
 }
 
 // record captures the tree as a run that printed one finding and exited 1.
 func (tree *runCacheTree) record(test *testing.T) *program.RunCache {
 	test.Helper()
-	cache, err := program.RecordRunCache(tree.key, tree.files, nil, tree.absent, nil, []byte("a.ts:1 finding\n"), 1, time.Time{})
-	if err != nil {
-		test.Fatalf("record: %v", err)
+	cache, recordRunCacheError := program.RecordRunCache(tree.key, tree.files, nil, tree.absent, nil, []byte("a.ts:1 finding\n"), 1, time.Time{})
+	if recordRunCacheError != nil {
+		test.Fatalf("record: %v", recordRunCacheError)
 	}
 	return cache
 }
@@ -82,8 +82,8 @@ func (tree *runCacheTree) record(test *testing.T) *program.RunCache {
 // suite is guarding against, so it is made impossible here rather than left to luck.
 func waitForClock(test *testing.T, path string) {
 	test.Helper()
-	before, err := os.Stat(path)
-	if err != nil {
+	before, statError := os.Stat(path)
+	if statError != nil {
 		return
 	}
 	deadline := time.Now().Add(2 * time.Second)
@@ -91,7 +91,7 @@ func waitForClock(test *testing.T, path string) {
 		time.Sleep(5 * time.Millisecond)
 		probe := filepath.Join(test.TempDir(), "clock")
 		os.WriteFile(probe, nil, 0o644)
-		if info, err := os.Stat(probe); err == nil && info.ModTime().After(before.ModTime()) {
+		if info, statError := os.Stat(probe); statError == nil && info.ModTime().After(before.ModTime()) {
 			return
 		}
 	}
@@ -103,8 +103,8 @@ func TestRunCacheHitsWhenNothingChanged(test *testing.T) {
 	test.Parallel()
 	tree := newRunCacheTree(test)
 	cache := tree.record(test)
-	if err := cache.Check(tree.key); err != nil {
-		test.Fatalf("an untouched tree missed, so every invalidation test below is vacuous: %v", err)
+	if checkError := cache.Check(tree.key); checkError != nil {
+		test.Fatalf("an untouched tree missed, so every invalidation test below is vacuous: %v", checkError)
 	}
 }
 
@@ -157,18 +157,18 @@ func TestRunCacheInvalidatesOnEveryInputCategory(test *testing.T) {
 			test.Parallel()
 			tree := newRunCacheTree(test)
 			cache := tree.record(test)
-			if err := cache.Check(tree.key); err != nil {
-				test.Fatalf("the control missed before the change, so this case proves nothing: %v", err)
+			if checkError := cache.Check(tree.key); checkError != nil {
+				test.Fatalf("the control missed before the change, so this case proves nothing: %v", checkError)
 			}
 
 			testCase.change(test, tree)
 
-			err := cache.Check(tree.key)
-			if err == nil {
+			checkError := cache.Check(tree.key)
+			if checkError == nil {
 				test.Fatal("the change was not noticed: a stale run would be replayed as current")
 			}
-			if !errors.Is(err, program.ErrRunCacheMiss) {
-				test.Fatalf("a change produced an unexpected error rather than a clean miss: %v", err)
+			if !errors.Is(checkError, program.ErrRunCacheMiss) {
+				test.Fatalf("a change produced an unexpected error rather than a clean miss: %v", checkError)
 			}
 		})
 	}
@@ -179,9 +179,9 @@ func TestRunCacheInvalidatesOnEveryInputCategory(test *testing.T) {
 func TestRunCacheKeySeparatesRuns(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
-	lint, err := program.RunCacheKey([]string{"--lint"}, root)
-	if err != nil {
-		test.Fatalf("key: %v", err)
+	lint, runCacheKeyError := program.RunCacheKey([]string{"--lint"}, root)
+	if runCacheKeyError != nil {
+		test.Fatalf("key: %v", runCacheKeyError)
 	}
 	same, _ := program.RunCacheKey([]string{"--lint"}, root)
 	if lint != same {
@@ -210,8 +210,8 @@ func TestRunCacheMissesOnADifferentKey(test *testing.T) {
 	test.Parallel()
 	tree := newRunCacheTree(test)
 	cache := tree.record(test)
-	if err := cache.Check(tree.key + "x"); !errors.Is(err, program.ErrRunCacheMiss) {
-		test.Fatalf("a different key was accepted: %v", err)
+	if checkError := cache.Check(tree.key + "x"); !errors.Is(checkError, program.ErrRunCacheMiss) {
+		test.Fatalf("a different key was accepted: %v", checkError)
 	}
 }
 
@@ -223,16 +223,16 @@ func TestRunCacheDoubtIsAMiss(test *testing.T) {
 	test.Run("no cache", func(test *testing.T) {
 		test.Parallel()
 		var cache *program.RunCache
-		if err := cache.Check(tree.key); !errors.Is(err, program.ErrRunCacheMiss) {
-			test.Fatalf("a nil cache did not miss: %v", err)
+		if checkError := cache.Check(tree.key); !errors.Is(checkError, program.ErrRunCacheMiss) {
+			test.Fatalf("a nil cache did not miss: %v", checkError)
 		}
 	})
 	test.Run("a different format version", func(test *testing.T) {
 		test.Parallel()
 		cache := tree.record(test)
 		cache.Version++
-		if err := cache.Check(tree.key); !errors.Is(err, program.ErrRunCacheMiss) {
-			test.Fatalf("an unknown version was read: %v", err)
+		if checkError := cache.Check(tree.key); !errors.Is(checkError, program.ErrRunCacheMiss) {
+			test.Fatalf("an unknown version was read: %v", checkError)
 		}
 	})
 	// A manifest with no inputs matches every tree, so it would replay forever. It can only come
@@ -241,16 +241,16 @@ func TestRunCacheDoubtIsAMiss(test *testing.T) {
 		test.Parallel()
 		cache := tree.record(test)
 		cache.Inputs = nil
-		if err := cache.Check(tree.key); !errors.Is(err, program.ErrRunCacheMiss) {
-			test.Fatalf("an empty manifest hit, so it would match any tree: %v", err)
+		if checkError := cache.Check(tree.key); !errors.Is(checkError, program.ErrRunCacheMiss) {
+			test.Fatalf("an empty manifest hit, so it would match any tree: %v", checkError)
 		}
 	})
 	// What a table holds when no run was recorded under an invocation, so the caller's lookup must miss.
 	test.Run("no recorded run", func(test *testing.T) {
 		test.Parallel()
 		var absent *program.RunCache
-		if err := absent.Check(tree.key); !errors.Is(err, program.ErrRunCacheMiss) {
-			test.Fatalf("a missing record was not a miss: %v", err)
+		if checkError := absent.Check(tree.key); !errors.Is(checkError, program.ErrRunCacheMiss) {
+			test.Fatalf("a missing record was not a miss: %v", checkError)
 		}
 	})
 }
@@ -289,16 +289,16 @@ func TestRunCacheReplaysOutputAndExitCodeThroughDisk(test *testing.T) {
 	table := program.NewCacheTable()
 	table.Runs["--no-fix"] = tree.record(test)
 	sections := program.CacheTableSections{Runs: []string{"--no-fix"}}
-	if err := program.WriteCacheTable(directory, table, testIdentity, sections, program.PathAnchor{}); err != nil {
-		test.Fatalf("write: %v", err)
+	if writeCacheTableError := program.WriteCacheTable(directory, table, testIdentity, sections, program.PathAnchor{}); writeCacheTableError != nil {
+		test.Fatalf("write: %v", writeCacheTableError)
 	}
-	read, err := program.ReadCacheTable(directory, testIdentity, sections, program.PathAnchor{})
-	if err != nil {
-		test.Fatalf("read: %v", err)
+	read, readCacheTableError := program.ReadCacheTable(directory, testIdentity, sections, program.PathAnchor{})
+	if readCacheTableError != nil {
+		test.Fatalf("read: %v", readCacheTableError)
 	}
 	loaded := read.Runs["--no-fix"]
-	if err := loaded.Check(tree.key); err != nil {
-		test.Fatalf("a cache read back from disk did not hit: %v", err)
+	if checkError := loaded.Check(tree.key); checkError != nil {
+		test.Fatalf("a cache read back from disk did not hit: %v", checkError)
 	}
 	if string(loaded.Output) != "a.ts:1 finding\n" {
 		test.Errorf("output: %q", loaded.Output)
@@ -324,12 +324,12 @@ func TestRunCacheRecordsADirectoryAmongTheFilesAsADirectory(test *testing.T) {
 	test.Parallel()
 	tree := newRunCacheTree(test)
 	withDirectory := append(append([]string(nil), tree.files...), tree.subdir, tree.root)
-	cache, err := program.RecordRunCache(tree.key, withDirectory, nil, tree.absent, nil, []byte("x"), 0, time.Time{})
-	if err != nil {
-		test.Fatalf("record: %v", err)
+	cache, recordRunCacheError := program.RecordRunCache(tree.key, withDirectory, nil, tree.absent, nil, []byte("x"), 0, time.Time{})
+	if recordRunCacheError != nil {
+		test.Fatalf("record: %v", recordRunCacheError)
 	}
-	if err := cache.Check(tree.key); err != nil {
-		test.Fatalf("an untouched tree missed because a directory was recorded as a file: %v", err)
+	if checkError := cache.Check(tree.key); checkError != nil {
+		test.Fatalf("an untouched tree missed because a directory was recorded as a file: %v", checkError)
 	}
 	seen := map[string]int{}
 	for _, input := range cache.Inputs {
@@ -348,9 +348,9 @@ func TestRunCacheRecordsADirectoryAmongTheFilesAsADirectory(test *testing.T) {
 func TestRunCacheKeyCoversEveryFact(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
-	base, err := program.RunCacheKey(nil, root, "root=/a", "scope=x")
-	if err != nil {
-		test.Fatalf("key: %v", err)
+	base, runCacheKeyError := program.RunCacheKey(nil, root, "root=/a", "scope=x")
+	if runCacheKeyError != nil {
+		test.Fatalf("key: %v", runCacheKeyError)
 	}
 	for name, facts := range map[string][]string{
 		"a fact changed":            {"root=/a", "scope=y"},
@@ -359,9 +359,9 @@ func TestRunCacheKeyCoversEveryFact(test *testing.T) {
 		"facts reordered":           {"scope=x", "root=/a"},
 		"two facts joined into one": {"root=/ascope=x"},
 	} {
-		key, err := program.RunCacheKey(nil, root, facts...)
-		if err != nil {
-			test.Fatalf("%s: %v", name, err)
+		key, runCacheKeyError := program.RunCacheKey(nil, root, facts...)
+		if runCacheKeyError != nil {
+			test.Fatalf("%s: %v", name, runCacheKeyError)
 		}
 		if key == base {
 			test.Errorf("%s left the key unchanged, so that change would replay a stale run", name)
@@ -379,11 +379,11 @@ func TestRunCacheRecordsInParallelInTheSerialOrder(test *testing.T) {
 	for directory := range 12 {
 		for file := range 60 {
 			path := filepath.Join(root, fmt.Sprintf("d%02d", directory), fmt.Sprintf("f%02d.ts", file))
-			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-				test.Fatal(err)
+			if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+				test.Fatal(createDirectoryError)
 			}
-			if err := os.WriteFile(path, []byte(strings.Repeat("x", directory*60+file)), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(path, []byte(strings.Repeat("x", directory*60+file)), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			files = append(files, path)
 		}
@@ -394,9 +394,9 @@ func TestRunCacheRecordsInParallelInTheSerialOrder(test *testing.T) {
 		shuffled[index], shuffled[other] = shuffled[other], shuffled[index]
 	}
 	absent := []string{filepath.Join(root, "missing.ts")}
-	cache, err := program.RecordRunCache("key", shuffled, nil, absent, nil, nil, 0, time.Time{})
-	if err != nil {
-		test.Fatal(err)
+	cache, recordRunCacheError := program.RecordRunCache("key", shuffled, nil, absent, nil, nil, 0, time.Time{})
+	if recordRunCacheError != nil {
+		test.Fatal(recordRunCacheError)
 	}
 
 	var want []string
@@ -414,22 +414,22 @@ func TestRunCacheRecordsInParallelInTheSerialOrder(test *testing.T) {
 		if input.Path != want[index] {
 			test.Fatalf("input %d is %s, want %s: the order is not the serial one", index, input.Path, want[index])
 		}
-		information, err := os.Stat(input.Path)
+		information, statError := os.Stat(input.Path)
 		switch {
 		case input.Path == absent[0]:
 			if input.Exists {
 				test.Errorf("%s is recorded present", input.Path)
 			}
-		case err != nil || !input.Exists || input.Size != information.Size() || input.Directory != information.IsDir() ||
+		case statError != nil || !input.Exists || input.Size != information.Size() || input.Directory != information.IsDir() ||
 			input.ModifiedNanoseconds != information.ModTime().UnixNano():
 			test.Errorf("%s is recorded with another file's signature: %+v", input.Path, input)
 		}
 	}
 
-	if err := os.Remove(files[len(files)/2]); err != nil {
-		test.Fatal(err)
+	if removeError := os.Remove(files[len(files)/2]); removeError != nil {
+		test.Fatal(removeError)
 	}
-	if _, err := program.RecordRunCache("key", shuffled, nil, absent, nil, nil, 0, time.Time{}); err == nil {
+	if _, recordRunCacheError := program.RecordRunCache("key", shuffled, nil, absent, nil, nil, 0, time.Time{}); recordRunCacheError == nil {
 		test.Error("a file that vanished before the record was recorded anyway")
 	}
 }

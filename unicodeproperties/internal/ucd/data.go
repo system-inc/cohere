@@ -89,9 +89,9 @@ func Complement(rs []Range) []Range {
 }
 
 func Build() (Tables, error) {
-	z, err := zip.NewReader(bytes.NewReader(source), int64(len(source)))
-	if err != nil {
-		return Tables{}, err
+	z, newReaderError := zip.NewReader(bytes.NewReader(source), int64(len(source)))
+	if newReaderError != nil {
+		return Tables{}, newReaderError
 	}
 	files := map[string][]byte{}
 	for _, f := range z.File {

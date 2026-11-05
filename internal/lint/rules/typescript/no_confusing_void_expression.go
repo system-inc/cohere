@@ -41,8 +41,8 @@ func DecodeNoConfusingVoidExpressionOptions(raw []byte) (any, error) {
 		return settings, nil
 	}
 	var wire noConfusingVoidExpressionWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 	if wire.IgnoreArrowShorthand != nil {
 		settings.IgnoreArrowShorthand = *wire.IgnoreArrowShorthand

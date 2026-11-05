@@ -256,15 +256,15 @@ func TestDecodeSelfClosingCompOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeSelfClosingCompOptions([]byte(testCase.raw))
+			decoded, decodeSelfClosingCompOptionsError := DecodeSelfClosingCompOptions([]byte(testCase.raw))
 			if testCase.wantErr {
-				if err == nil {
+				if decodeSelfClosingCompOptionsError == nil {
 					test.Fatalf("want an error, got %#v", decoded)
 				}
 				return
 			}
-			if err != nil {
-				test.Fatalf("unexpected error: %v", err)
+			if decodeSelfClosingCompOptionsError != nil {
+				test.Fatalf("unexpected error: %v", decodeSelfClosingCompOptionsError)
 			}
 			options, isOptions := decoded.(SelfClosingCompOptions)
 			if !isOptions {

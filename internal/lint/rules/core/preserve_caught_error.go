@@ -87,7 +87,7 @@ type PreserveCaughtErrorClassName struct {
 // and ESLint's schema sets `minimum: 1` for the same reason.
 func (entry *PreserveCaughtErrorClassName) UnmarshalJSON(raw []byte) error {
 	var name string
-	if err := rule.UnmarshalOptions(raw, &name); err == nil {
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &name); unmarshalOptionsError == nil {
 		entry.Name = name
 		entry.ArgumentPosition = 2
 		return nil
@@ -96,8 +96,8 @@ func (entry *PreserveCaughtErrorClassName) UnmarshalJSON(raw []byte) error {
 		Name             *string `json:"name"`
 		ArgumentPosition *int    `json:"argumentPosition"`
 	}
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return unmarshalOptionsError
 	}
 	if object.Name == nil || object.ArgumentPosition == nil {
 		return fmt.Errorf("an errorClassNames object needs both name and argumentPosition")

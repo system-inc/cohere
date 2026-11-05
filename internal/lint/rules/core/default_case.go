@@ -100,7 +100,7 @@ var DefaultCase = rule.Rule{
 			// enforcing rather than crashing, and a crash costs every OTHER rule its verdict on that
 			// file because the walk recovers per file. Same drop `core/no-param-reassign` takes for
 			// the same reason.
-			if compiled, err := esregexp.Compile(resolved.CommentPattern, "u"); err == nil {
+			if compiled, compileError := esregexp.Compile(resolved.CommentPattern, "u"); compileError == nil {
 				pattern = compiled
 			}
 		}
@@ -217,8 +217,8 @@ func DecodeDefaultCaseOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }

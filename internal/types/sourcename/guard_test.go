@@ -74,8 +74,8 @@ func stringLiteral(expression ast.Expr) (string, bool) {
 	if !isLiteral || literal.Kind != token.STRING {
 		return "", false
 	}
-	value, err := strconv.Unquote(literal.Value)
-	return value, err == nil
+	value, unquoteError := strconv.Unquote(literal.Value)
+	return value, unquoteError == nil
 }
 
 // callsSelector reports whether an expression is a call of package.function, by the names written.
@@ -211,9 +211,9 @@ func tsDecisions(test *testing.T) []tsDecision {
 			continue
 		}
 		for index, file := range loadedPackage.Syntax {
-			relative, err := filepath.Rel(moduleRoot, loadedPackage.Files[index])
-			if err != nil {
-				test.Fatal(err)
+			relative, relativePathError := filepath.Rel(moduleRoot, loadedPackage.Files[index])
+			if relativePathError != nil {
+				test.Fatal(relativePathError)
 			}
 			found = append(found, tsDecisionsIn(loadedPackage.Fset, file, filepath.ToSlash(relative))...)
 		}
@@ -270,9 +270,9 @@ func probe(name, extension string) {
 	_ = core.GetScriptKindFromFileName(sourcename.TreatedAs(name))
 }`
 	fileSet := token.NewFileSet()
-	file, err := parser.ParseFile(fileSet, "probe.go", source, 0)
-	if err != nil {
-		test.Fatal(err)
+	file, parseFileError := parser.ParseFile(fileSet, "probe.go", source, 0)
+	if parseFileError != nil {
+		test.Fatal(parseFileError)
 	}
 	var lines []string
 	for _, decision := range tsDecisionsIn(fileSet, file, "probe.go") {

@@ -25,8 +25,8 @@ func TestAReplaysFooterIsTheReplays(test *testing.T) {
 	if got != want {
 		test.Errorf("the replay's footer:\n got  %s\n want %s", got, want)
 	}
-	if err := isTheReplaysFooter(got, recorded); err != nil {
-		test.Error(err)
+	if isTheReplaysFooterError := isTheReplaysFooter(got, recorded); isTheReplaysFooterError != nil {
+		test.Error(isTheReplaysFooterError)
 	}
 	if verbose := footer(replayed, plain, footerOptions{Verbose: true}); !strings.Contains(verbose, "• replayed") {
 		test.Errorf("--verbose's replay footer does not say it was replayed: %s", verbose)
@@ -68,8 +68,8 @@ func TestARunWithNoSummaryIsNotRecorded(test *testing.T) {
 	if recorded := session.record(0); recorded != nil {
 		test.Fatalf("a run with no summary was recorded: %+v", recorded)
 	}
-	notes, err := os.ReadFile(previousNotesPath(directory))
-	if err != nil || !strings.Contains(string(notes), "recorded no summary") {
-		test.Errorf("refusing the record said nothing (%v): %q", err, notes)
+	notes, readError := os.ReadFile(previousNotesPath(directory))
+	if readError != nil || !strings.Contains(string(notes), "recorded no summary") {
+		test.Errorf("refusing the record said nothing (%v): %q", readError, notes)
 	}
 }

@@ -151,18 +151,18 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 		if slash := strings.LastIndex(name, "/"); slash >= 0 {
 			row.Namespace = name[:slash]
 		}
-		origin, err := originOf(row.Namespace, registeringPackage(registration.Rule))
-		if err != nil {
-			return Rules{}, fmt.Errorf("docsdata: %s: %w", name, err)
+		origin, originOfError := originOf(row.Namespace, registeringPackage(registration.Rule))
+		if originOfError != nil {
+			return Rules{}, fmt.Errorf("docsdata: %s: %w", name, originOfError)
 		}
 		row.Origin = origin
 		if origin != houseOrigin {
 			row.UpstreamName = name
 		} else {
 			// A house rule whose name does not fit the scheme refuses the build, so it cannot publish.
-			parsed, err := policy.Naming.ParseRuleName(row.Namespace, name[strings.LastIndex(name, "/")+1:])
-			if err != nil {
-				return Rules{}, fmt.Errorf("docsdata: %s: %w", name, err)
+			parsed, parseRuleNameError := policy.Naming.ParseRuleName(row.Namespace, name[strings.LastIndex(name, "/")+1:])
+			if parseRuleNameError != nil {
+				return Rules{}, fmt.Errorf("docsdata: %s: %w", name, parseRuleNameError)
 			}
 			row.Category = parsed.Category
 		}
@@ -199,8 +199,8 @@ func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRo
 		UpstreamName string `json:"upstreamName"`
 		TypeAware    bool   `json:"typeAware"`
 	}
-	if err := rule.UnmarshalOptions(registry, &entries); err != nil {
-		return nil, fmt.Errorf("docsdata: reading swift/Rules.json: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(registry, &entries); unmarshalOptionsError != nil {
+		return nil, fmt.Errorf("docsdata: reading swift/Rules.json: %w", unmarshalOptionsError)
 	}
 	carries := map[string][]string{}
 	for typeScriptRule, verdict := range verdicts {
@@ -227,9 +227,9 @@ func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRo
 			TypeAware:    entry.TypeAware,
 		}
 		if entry.Origin == houseOrigin {
-			parsed, err := policy.Naming.ParseRuleName(swiftNamespace, leaf)
-			if err != nil {
-				return nil, fmt.Errorf("docsdata: %s: %w", entry.Name, err)
+			parsed, parseRuleNameError := policy.Naming.ParseRuleName(swiftNamespace, leaf)
+			if parseRuleNameError != nil {
+				return nil, fmt.Errorf("docsdata: %s: %w", entry.Name, parseRuleNameError)
 			}
 			row.Category = parsed.Category
 		}
@@ -333,8 +333,8 @@ func swiftVerdicts(catalog []byte) (map[string]SwiftVerdict, error) {
 		Verdict        string  `json:"verdict"`
 		SwiftRule      *string `json:"swiftRule"`
 	}
-	if err := json.Unmarshal(catalog, &entries); err != nil {
-		return nil, fmt.Errorf("docsdata: reading the Swift verdict catalog: %w", err)
+	if decodeError := json.Unmarshal(catalog, &entries); decodeError != nil {
+		return nil, fmt.Errorf("docsdata: reading the Swift verdict catalog: %w", decodeError)
 	}
 	verdicts := make(map[string]SwiftVerdict, len(entries))
 	for _, entry := range entries {

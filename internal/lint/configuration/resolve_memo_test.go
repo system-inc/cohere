@@ -59,12 +59,12 @@ func TestHouseVariantsNeverShareAResolution(test *testing.T) {
 	root := test.TempDir()
 	component := filepath.Join(root, "source", "Button.tsx")
 	server := filepath.Join(root, "server", "index.ts")
-	loaded, err := LoadHouse(filepath.Join(root, "CohereSettings.json"), nil, HouseDetection{
+	loaded, loadHouseError := LoadHouse(filepath.Join(root, "CohereSettings.json"), nil, HouseDetection{
 		ReactFiles:      map[string]bool{component: true},
 		TailwindSkipped: "no Tailwind stylesheet",
 	})
-	if err != nil {
-		test.Fatal(err)
+	if loadHouseError != nil {
+		test.Fatal(loadHouseError)
 	}
 
 	// Resolved twice each, so a memo shared across variants would hand the second ask the first's answer.

@@ -112,9 +112,9 @@ func Bundles() (BundleSource, error) {
 func embeddedBundles() (BundleSource, error) {
 	files := make(map[string][]byte, len(BundleFiles))
 	for _, name := range BundleFiles {
-		content, err := fs.ReadFile(bundleFS, "bundles/"+name)
-		if err != nil {
-			return BundleSource{}, fmt.Errorf("the embedded prettier bundle %s is missing: %w", name, err)
+		content, readFileError := fs.ReadFile(bundleFS, "bundles/"+name)
+		if readFileError != nil {
+			return BundleSource{}, fmt.Errorf("the embedded prettier bundle %s is missing: %w", name, readFileError)
 		}
 		files[name] = content
 	}
@@ -129,11 +129,11 @@ func embeddedBundles() (BundleSource, error) {
 func diskBundles(directory string) (BundleSource, error) {
 	files := make(map[string][]byte, len(BundleFiles))
 	for _, name := range BundleFiles {
-		content, err := os.ReadFile(filepath.Join(directory, filepath.FromSlash(name)))
-		if err != nil {
+		content, readError := os.ReadFile(filepath.Join(directory, filepath.FromSlash(name)))
+		if readError != nil {
 			return BundleSource{}, fmt.Errorf(
 				"reading prettier bundle %s from %s: %w\nUnset %s to use the embedded bundles",
-				name, directory, err, ForkPathVariable,
+				name, directory, readError, ForkPathVariable,
 			)
 		}
 		files[name] = content

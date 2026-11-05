@@ -124,17 +124,17 @@ var Messages = mustLoadEmbeddedMessages()
 
 // MessageFiles is the embedded messages directory, its files at the root, for a test that edits one.
 func MessageFiles() fs.FS {
-	files, err := fs.Sub(messageFiles, "messages")
-	if err != nil {
-		panic(fmt.Sprintf("policy/messages: %v", err))
+	files, subError := fs.Sub(messageFiles, "messages")
+	if subError != nil {
+		panic(fmt.Sprintf("policy/messages: %v", subError))
 	}
 	return files
 }
 
 func mustLoadEmbeddedMessages() *MessageCatalog {
-	catalog, err := LoadMessages(MessageFiles())
-	if err != nil {
-		panic(fmt.Sprintf("policy/messages: %v", err))
+	catalog, loadMessagesError := LoadMessages(MessageFiles())
+	if loadMessagesError != nil {
+		panic(fmt.Sprintf("policy/messages: %v", loadMessagesError))
 	}
 	currentMessages.Store(catalog)
 	return catalog
@@ -145,9 +145,9 @@ func mustLoadEmbeddedMessages() *MessageCatalog {
 // an id that is not camelCase, a placeholder that is malformed or names nothing, a term missing a
 // language or given one the file does not speak for, a term no text uses, and a term on a lone rule.
 func LoadMessages(files fs.FS) (*MessageCatalog, error) {
-	names, err := fs.Glob(files, "*.json")
-	if err != nil {
-		return nil, err
+	names, globError := fs.Glob(files, "*.json")
+	if globError != nil {
+		return nil, globError
 	}
 	if len(names) == 0 {
 		return nil, fmt.Errorf("no message files, so no house rule could render a finding")
@@ -157,12 +157,12 @@ func LoadMessages(files fs.FS) (*MessageCatalog, error) {
 		languages: map[string]string{},
 	}
 	for _, name := range names {
-		data, err := fs.ReadFile(files, name)
-		if err != nil {
-			return nil, err
+		data, readFileError := fs.ReadFile(files, name)
+		if readFileError != nil {
+			return nil, readFileError
 		}
-		if err := catalog.add(strings.TrimSuffix(path.Base(name), ".json"), data); err != nil {
-			return nil, fmt.Errorf("%s: %w", name, err)
+		if addError := catalog.add(strings.TrimSuffix(path.Base(name), ".json"), data); addError != nil {
+			return nil, fmt.Errorf("%s: %w", name, addError)
 		}
 	}
 	return catalog, nil
@@ -173,8 +173,8 @@ func (catalog *MessageCatalog) add(idea string, data []byte) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var file messageFile
-	if err := decoder.Decode(&file); err != nil {
-		return err
+	if decodeError := decoder.Decode(&file); decodeError != nil {
+		return decodeError
 	}
 	if len(file.Rules) == 0 {
 		return fmt.Errorf("names no rule, so nothing renders its messages")
@@ -206,9 +206,9 @@ func (catalog *MessageCatalog) add(idea string, data []byte) error {
 		return fmt.Errorf("is named %q, and its idea is %q", idea, leaf)
 	}
 
-	stringPhrases, objectPhrases, err := readPhrases(file.Phrases, file.Rules)
-	if err != nil {
-		return err
+	stringPhrases, objectPhrases, readPhrasesError := readPhrases(file.Phrases, file.Rules)
+	if readPhrasesError != nil {
+		return readPhrasesError
 	}
 	// The messages naming each phrase, so a phrase no message names, and a string phrase only one
 	// message names, are refused once every message is read.
@@ -221,9 +221,9 @@ func (catalog *MessageCatalog) add(idea string, data []byte) error {
 		if strings.TrimSpace(message.Text) == "" {
 			return fmt.Errorf("message %q has no text", id)
 		}
-		languages, err := messageLanguagesOf(message, file.Rules)
-		if err != nil {
-			return fmt.Errorf("message %q: %w", id, err)
+		languages, messageLanguagesOfError := messageLanguagesOf(message, file.Rules)
+		if messageLanguagesOfError != nil {
+			return fmt.Errorf("message %q: %w", id, messageLanguagesOfError)
 		}
 		if len(message.Terms) > 0 && len(languages) == 1 {
 			return fmt.Errorf("message %q: one language has nothing to vary, so it carries no terms", id)
@@ -239,8 +239,8 @@ func (catalog *MessageCatalog) add(idea string, data []byte) error {
 			if err != nil {
 				return fmt.Errorf("message %q, %s: %w", id, language, err)
 			}
-			if _, err := placeholderNames(template.text, "{{", "}}"); err != nil {
-				return fmt.Errorf("message %q, %s: %w", id, language, err)
+			if _, placeholderNamesError := placeholderNames(template.text, "{{", "}}"); placeholderNamesError != nil {
+				return fmt.Errorf("message %q, %s: %w", id, language, placeholderNamesError)
 			}
 			names, _ := placeholderNames(text, "<<", ">>")
 			for _, name := range names {
@@ -325,12 +325,12 @@ func readPhrases(raw map[string]json.RawMessage, rules map[string]string) (map[s
 		}
 		var text string
 		var texts []string
-		if err := strictUnmarshal(value, &text); err == nil {
+		if strictUnmarshalError := strictUnmarshal(value, &text); strictUnmarshalError == nil {
 			stringPhrases[name] = text
 			texts = append(texts, text)
 		} else {
 			var options map[string]json.RawMessage
-			if err := strictUnmarshal(value, &options); err != nil {
+			if strictUnmarshalError := strictUnmarshal(value, &options); strictUnmarshalError != nil {
 				return nil, nil, fmt.Errorf("phrase %q is neither text nor named options of text", name)
 			}
 			if len(options) == 0 {
@@ -341,9 +341,9 @@ func readPhrases(raw map[string]json.RawMessage, rules map[string]string) (map[s
 				if !isCamelCaseName(option) {
 					return nil, nil, fmt.Errorf("phrase %q: the option %q is not camelCase", name, option)
 				}
-				byLanguage, err := readOptionText(optionValue, rules)
-				if err != nil {
-					return nil, nil, fmt.Errorf("phrase %q, option %q: %w", name, option, err)
+				byLanguage, readOptionTextError := readOptionText(optionValue, rules)
+				if readOptionTextError != nil {
+					return nil, nil, fmt.Errorf("phrase %q, option %q: %w", name, option, readOptionTextError)
 				}
 				for _, optionText := range byLanguage {
 					texts = append(texts, optionText)
@@ -356,8 +356,8 @@ func readPhrases(raw map[string]json.RawMessage, rules map[string]string) (map[s
 			if strings.Contains(text, "<<") || strings.Contains(text, ">>") || strings.Contains(text, "[[") || strings.Contains(text, "]]") {
 				return nil, nil, fmt.Errorf("phrase %q holds a phrase or a term, and nothing nests", name)
 			}
-			if _, err := placeholderNames(text, "{{", "}}"); err != nil {
-				return nil, nil, fmt.Errorf("phrase %q: %w", name, err)
+			if _, placeholderNamesError := placeholderNames(text, "{{", "}}"); placeholderNamesError != nil {
+				return nil, nil, fmt.Errorf("phrase %q: %w", name, placeholderNamesError)
 			}
 		}
 	}
@@ -368,11 +368,11 @@ func readPhrases(raw map[string]json.RawMessage, rules map[string]string) (map[s
 // text by language, which only the languages it names render.
 func readOptionText(value json.RawMessage, rules map[string]string) (map[string]string, error) {
 	var text string
-	if err := strictUnmarshal(value, &text); err == nil {
+	if strictUnmarshalError := strictUnmarshal(value, &text); strictUnmarshalError == nil {
 		return map[string]string{"": text}, nil
 	}
 	var byLanguage map[string]string
-	if err := strictUnmarshal(value, &byLanguage); err != nil {
+	if strictUnmarshalError := strictUnmarshal(value, &byLanguage); strictUnmarshalError != nil {
 		return nil, fmt.Errorf("is neither text nor text by language")
 	}
 	if len(byLanguage) == 0 {
@@ -397,9 +397,9 @@ func strictUnmarshal(data []byte, target any) error {
 // options that have text for language, refusing a `<<name>>` the file does not define and an object
 // phrase with no option for the language the text is rendered in.
 func resolvePhrases(text string, stringPhrases map[string]string, objectPhrases map[string]objectPhrase, language string) (messageTemplate, error) {
-	names, err := placeholderNames(text, "<<", ">>")
-	if err != nil {
-		return messageTemplate{}, err
+	names, placeholderNamesError := placeholderNames(text, "<<", ">>")
+	if placeholderNamesError != nil {
+		return messageTemplate{}, placeholderNamesError
 	}
 	template := messageTemplate{text: text}
 	for _, name := range names {
@@ -432,9 +432,9 @@ func resolvePhrases(text string, stringPhrases map[string]string, objectPhrases 
 
 // resolveTerms puts each `[[term]]` in text in its words for language, recording the terms it used.
 func resolveTerms(text string, terms map[string]map[string]string, language string, used map[string]bool) (string, error) {
-	names, err := placeholderNames(text, "[[", "]]")
-	if err != nil {
-		return "", err
+	names, placeholderNamesError := placeholderNames(text, "[[", "]]")
+	if placeholderNamesError != nil {
+		return "", placeholderNamesError
 	}
 	for _, name := range names {
 		words, defined := terms[name][language]

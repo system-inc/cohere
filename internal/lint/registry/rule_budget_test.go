@@ -116,16 +116,16 @@ func buildBudgetGraph(test *testing.T, files map[string]string) *program.Graph {
 	test.Helper()
 	directory := test.TempDir()
 	for name, source := range files {
-		if err := os.WriteFile(filepath.Join(directory, name), []byte(source), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(directory, name), []byte(source), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(typedCorpusConfig), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(typedCorpusConfig), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
-	if err != nil {
-		test.Fatal(err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	if len(graph.ProjectFiles()) != len(files) {
 		test.Fatalf("built %d files, want %d", len(graph.ProjectFiles()), len(files))
@@ -150,8 +150,8 @@ func measureOne(graph *program.Graph, subject rule.Rule, deadline time.Duration)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
-		result, err := graph.Walk(ctx, graph.ProjectFiles(), []rule.Rule{subject})
-		done <- answer{result, err}
+		result, walkError := graph.Walk(ctx, graph.ProjectFiles(), []rule.Rule{subject})
+		done <- answer{result, walkError}
 	}()
 	timer := time.NewTimer(deadline)
 	defer timer.Stop()
@@ -181,9 +181,9 @@ func checkRuleBudget(test *testing.T, graph *program.Graph, rules []rule.Rule, b
 		test.Logf("rule CPU coverage: rules run=%d registered=%d corpus nodes=%d files=%d wall=%s", len(rows), len(rules), nodes, len(graph.ProjectFiles()), time.Since(started))
 	}()
 	for _, subject := range rules {
-		result, err := measureOne(graph, subject, budget*3)
-		if err != nil {
-			return rows, err
+		result, measureOneError := measureOne(graph, subject, budget*3)
+		if measureOneError != nil {
+			return rows, measureOneError
 		}
 		if result.Timings == nil || result.Timings.Account.Unavailable != "" {
 			return rows, fmt.Errorf("%s: no thread CPU measurement", subject.Name)
@@ -213,9 +213,9 @@ func TestRegisteredRuleCPUBudget(test *testing.T) {
 		test.Fatal("empty registry")
 	}
 	graph := buildBudgetGraph(test, ruleBudgetCorpus())
-	rows, err := checkRuleBudget(test, graph, rules, ruleCPUBudget)
-	if err != nil {
-		test.Fatal(err)
+	rows, checkRuleBudgetError := checkRuleBudget(test, graph, rules, ruleCPUBudget)
+	if checkRuleBudgetError != nil {
+		test.Fatal(checkRuleBudgetError)
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].TotalCPU() > rows[j].TotalCPU() })
 	for i, row := range rows {

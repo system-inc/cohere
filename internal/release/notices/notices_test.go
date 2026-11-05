@@ -14,18 +14,18 @@ import (
 
 func moduleRoot(test *testing.T) string {
 	test.Helper()
-	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	root, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	return root
 }
 
 func committed(test *testing.T, name string) string {
 	test.Helper()
-	contents, err := os.ReadFile(filepath.Join(moduleRoot(test), name))
-	if err != nil {
-		test.Fatalf("%s is not at the module root: %v", name, err)
+	contents, readError := os.ReadFile(filepath.Join(moduleRoot(test), name))
+	if readError != nil {
+		test.Fatalf("%s is not at the module root: %v", name, readError)
 	}
 	return string(contents)
 }
@@ -36,9 +36,9 @@ func committed(test *testing.T, name string) string {
 func TestTheCommittedNoticesAreCurrent(test *testing.T) {
 	test.Parallel()
 
-	files, err := Generate(moduleRoot(test))
-	if err != nil {
-		test.Fatal(err)
+	files, generateError := Generate(moduleRoot(test))
+	if generateError != nil {
+		test.Fatal(generateError)
 	}
 	for name, generated := range files {
 		if committed(test, name) != string(generated) {
@@ -59,13 +59,13 @@ func TestEveryGoModRequirementIsCredited(test *testing.T) {
 
 	command := exec.Command("go", "mod", "edit", "-json")
 	command.Dir = moduleRoot(test)
-	output, err := command.Output()
-	if err != nil {
-		test.Fatal(err)
+	output, outputError := command.Output()
+	if outputError != nil {
+		test.Fatal(outputError)
 	}
 	var goMod struct{ Require []struct{ Path string } }
-	if err := json.Unmarshal(output, &goMod); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(output, &goMod); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	notices := committed(test, ThirdPartyNoticesFileName)
 	credited := 0
@@ -86,9 +86,9 @@ func TestEveryGoModRequirementIsCredited(test *testing.T) {
 func TestEverySwiftPackageIsCredited(test *testing.T) {
 	test.Parallel()
 
-	pins, err := readSwiftPins(moduleRoot(test))
-	if err != nil {
-		test.Fatal(err)
+	pins, readSwiftPinsError := readSwiftPins(moduleRoot(test))
+	if readSwiftPinsError != nil {
+		test.Fatal(readSwiftPinsError)
 	}
 	if len(pins) == 0 {
 		test.Fatalf("swift/Package.resolved pins nothing, so this test checked nothing")
@@ -105,14 +105,14 @@ func TestTheGeneratorRefusesAModuleWithNoRecordedLicense(test *testing.T) {
 	test.Parallel()
 
 	var builder strings.Builder
-	err := writeModule(&builder, Module{Path: "example.com/uncredited", Version: "v1.0.0", Directory: test.TempDir()}, "carries")
-	if err == nil || !strings.Contains(err.Error(), "example.com/uncredited") {
-		test.Fatalf("a module with no recorded license was written rather than refused: %v", err)
+	writeModuleError := writeModule(&builder, Module{Path: "example.com/uncredited", Version: "v1.0.0", Directory: test.TempDir()}, "carries")
+	if writeModuleError == nil || !strings.Contains(writeModuleError.Error(), "example.com/uncredited") {
+		test.Fatalf("a module with no recorded license was written rather than refused: %v", writeModuleError)
 	}
 
 	// Recorded but with no license file on disk: refused too, rather than credited with nothing.
 	module := Module{Path: "golang.org/x/sync", Version: "v0.0.0", Directory: test.TempDir()}
-	if err := writeModule(&builder, module, "carries"); err == nil {
+	if writeModuleError := writeModule(&builder, module, "carries"); writeModuleError == nil {
 		test.Fatalf("a module whose license file is missing was credited")
 	}
 }
@@ -192,7 +192,7 @@ func TestEveryLicenseTextIsUsedAndEveryReferenceExists(test *testing.T) {
 		named[license.File] = true
 	}
 	present := map[string]bool{}
-	err := fs.WalkDir(licenseTexts, "licenses", func(path string, entry fs.DirEntry, err error) error {
+	walkDirectoryError := fs.WalkDir(licenseTexts, "licenses", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil || entry.IsDir() {
 			return err
 		}
@@ -203,8 +203,8 @@ func TestEveryLicenseTextIsUsedAndEveryReferenceExists(test *testing.T) {
 		}
 		return err
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkDirectoryError != nil {
+		test.Fatal(walkDirectoryError)
 	}
 	for name := range named {
 		if !present[name] {
@@ -238,10 +238,10 @@ func TestNoGPLFileIsTracked(test *testing.T) {
 	}
 	command := exec.Command("git", arguments...)
 	command.Dir = moduleRoot(test)
-	output, err := command.Output()
+	output, outputError := command.Output()
 	var exitError *exec.ExitError
-	if err != nil && !(errors.As(err, &exitError) && exitError.ExitCode() == 1) {
-		test.Fatalf("git grep could not search the tracked files: %v", err)
+	if outputError != nil && !(errors.As(outputError, &exitError) && exitError.ExitCode() == 1) {
+		test.Fatalf("git grep could not search the tracked files: %v", outputError)
 	}
 	for _, path := range strings.Fields(string(output)) {
 		// Microsoft's notice mentions the LGPL in a sentence and carries no GPL code.
@@ -255,12 +255,12 @@ func TestNoGPLFileIsTracked(test *testing.T) {
 	probe := test.TempDir()
 	for _, step := range [][]string{{"init", "--quiet"}, {"add", "COPYING"}} {
 		if step[0] == "add" {
-			if err := os.WriteFile(filepath.Join(probe, "COPYING"), []byte("                    "+titles[0]+"\n"), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(probe, "COPYING"), []byte("                    "+titles[0]+"\n"), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 		}
-		if output, err := exec.Command("git", append([]string{"-C", probe}, step...)...).CombinedOutput(); err != nil {
-			test.Fatalf("git %v: %v\n%s", step, err, output)
+		if output, outputError := exec.Command("git", append([]string{"-C", probe}, step...)...).CombinedOutput(); outputError != nil {
+			test.Fatalf("git %v: %v\n%s", step, outputError, output)
 		}
 	}
 	probeCommand := exec.Command("git", arguments...)

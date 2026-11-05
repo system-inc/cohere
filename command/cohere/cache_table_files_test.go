@@ -9,9 +9,9 @@ import (
 // cacheTableFiles lists a project's cache table files, one per section and per recorded run, sorted.
 func cacheTableFiles(test *testing.T, root string) []string {
 	test.Helper()
-	files, err := filepath.Glob(filepath.Join(cacheDirectory(root), "*.gob"))
-	if err != nil {
-		test.Fatal(err)
+	files, globError := filepath.Glob(filepath.Join(cacheDirectory(root), "*.gob"))
+	if globError != nil {
+		test.Fatal(globError)
 	}
 	return files
 }
@@ -25,8 +25,8 @@ func removeCacheTable(test *testing.T, root string) {
 		test.Fatalf("no cache table in %s to remove", cacheDirectory(root))
 	}
 	for _, file := range files {
-		if err := os.Remove(file); err != nil {
-			test.Fatal(err)
+		if removeError := os.Remove(file); removeError != nil {
+			test.Fatal(removeError)
 		}
 	}
 }

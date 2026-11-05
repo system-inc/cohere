@@ -109,11 +109,11 @@ func stdinTransform(formatter formatEngine, location projectLocation, path strin
 		Description:        "1 named path",
 		RequestDescription: path,
 	}
-	enumeration, err := formatter.Enumerate(location.Root)
-	if err != nil {
+	enumeration, enumerateError := formatter.Enumerate(location.Root)
+	if enumerateError != nil {
 		// The gate withholds formatting when the walk fails; a save fails loudly instead, because a
 		// hook that silently stopped formatting would read as files that need none.
-		return nil, fmt.Errorf("enumerating what the formatter handles under %s: %w", location.Root, err)
+		return nil, fmt.Errorf("enumerating what the formatter handles under %s: %w", location.Root, enumerateError)
 	}
 	scope, _ = scope.narrowToEnumeration(enumeration).claimAdamic(held)
 	return scopedTransform(formatTransform(formatter), scope), nil
@@ -153,8 +153,8 @@ func stdinProposals(ctx context.Context, request stdinRequest, path string, text
 		return none, held, nil
 	}
 
-	if _, err := configureLint(graph, request.Location, nil); err != nil {
-		return nil, nil, err
+	if _, configureLintError := configureLint(graph, request.Location, nil); configureLintError != nil {
+		return nil, nil, configureLintError
 	}
 	rules := registry.All()
 	walk, err := graph.Walk(ctx, []*ast.SourceFile{sourceFile}, rules)

@@ -674,7 +674,7 @@ type noFloatingPromisesRawSpecifier struct {
 // of failing the run.
 func (s *noFloatingPromisesRawSpecifier) UnmarshalJSON(raw []byte) error {
 	var asString string
-	if err := json.Unmarshal(raw, &asString); err == nil {
+	if decodeError := json.Unmarshal(raw, &asString); decodeError == nil {
 		*s = noFloatingPromisesRawSpecifier{inline: asString}
 		return nil
 	}
@@ -685,20 +685,20 @@ func (s *noFloatingPromisesRawSpecifier) UnmarshalJSON(raw []byte) error {
 		Path    string          `json:"path"`
 		Package string          `json:"package"`
 	}
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return unmarshalOptionsError
 	}
 
 	*s = noFloatingPromisesRawSpecifier{From: object.From, Path: object.Path, Package: object.Package}
 
 	var names []string
-	if err := json.Unmarshal(object.Name, &names); err == nil {
+	if decodeError := json.Unmarshal(object.Name, &names); decodeError == nil {
 		s.Name = names
 		return nil
 	}
 	var name string
-	if err := json.Unmarshal(object.Name, &name); err != nil {
-		return err
+	if decodeError := json.Unmarshal(object.Name, &name); decodeError != nil {
+		return decodeError
 	}
 	s.Name = []string{name}
 	return nil

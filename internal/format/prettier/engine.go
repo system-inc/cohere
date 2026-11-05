@@ -75,9 +75,9 @@ var BundleFiles = []string{
 // through to no parser at all, and the failure would look like a file type nobody formats rather
 // than a broken build.
 func loadBundles() ([]namedSource, error) {
-	bundles, err := Bundles()
-	if err != nil {
-		return nil, err
+	bundles, bundlesError := Bundles()
+	if bundlesError != nil {
+		return nil, bundlesError
 	}
 	sources := make([]namedSource, 0, len(BundleFiles))
 	for _, name := range BundleFiles {
@@ -115,8 +115,8 @@ func drainPromise(vm *goja.Runtime, value goja.Value) (string, error) {
 
 	const maxPumps = 100000
 	for pump := 0; pump < maxPumps && promise.State() == goja.PromiseStatePending; pump++ {
-		if _, err := vm.RunString("0"); err != nil {
-			return "", fmt.Errorf("pumping the job queue: %w", err)
+		if _, runStringError := vm.RunString("0"); runStringError != nil {
+			return "", fmt.Errorf("pumping the job queue: %w", runStringError)
 		}
 	}
 

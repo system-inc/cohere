@@ -167,7 +167,7 @@ func changedFilesFrom(files []edit.ChangedFile, root string) []changedFile {
 	changed := make([]changedFile, 0, len(files))
 	for _, file := range files {
 		path := file.FileName
-		if relative, err := filepath.Rel(root, file.FileName); err == nil && !strings.HasPrefix(relative, "..") {
+		if relative, relativePathError := filepath.Rel(root, file.FileName); relativePathError == nil && !strings.HasPrefix(relative, "..") {
 			path = relative
 		}
 		entry := changedFile{Path: path, FixedBy: file.FixesByRule}

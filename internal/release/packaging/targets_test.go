@@ -78,9 +78,9 @@ func TestTargetsHasNoDuplicates(test *testing.T) {
 func supportedPlatforms(test *testing.T) map[string]bool {
 	test.Helper()
 
-	output, err := exec.Command("go", "tool", "dist", "list").Output()
-	if err != nil {
-		test.Fatalf("asking the toolchain which platforms it supports: %v", err)
+	output, outputError := exec.Command("go", "tool", "dist", "list").Output()
+	if outputError != nil {
+		test.Fatalf("asking the toolchain which platforms it supports: %v", outputError)
 	}
 
 	supported := map[string]bool{}

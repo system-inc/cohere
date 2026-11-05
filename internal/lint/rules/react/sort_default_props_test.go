@@ -29,9 +29,9 @@ func sortDefaultPropsDecode(test *testing.T, raw string) any {
 	if raw == `""` {
 		raw = ""
 	}
-	decoded, err := DecodeSortDefaultPropsOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding %s returned %v", raw, err)
+	decoded, decodeSortDefaultPropertiesOptionsError := DecodeSortDefaultPropsOptions([]byte(raw))
+	if decodeSortDefaultPropertiesOptionsError != nil {
+		test.Fatalf("decoding %s returned %v", raw, decodeSortDefaultPropertiesOptionsError)
 	}
 	return decoded
 }
@@ -399,9 +399,9 @@ func TestDecodeSortDefaultPropsOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeSortDefaultPropsOptions([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("decode returned %v", err)
+			decoded, decodeSortDefaultPropertiesOptionsError := DecodeSortDefaultPropsOptions([]byte(testCase.raw))
+			if decodeSortDefaultPropertiesOptionsError != nil {
+				test.Fatalf("decode returned %v", decodeSortDefaultPropertiesOptionsError)
 			}
 			options, isOptions := decoded.(SortDefaultPropsOptions)
 			if !isOptions {

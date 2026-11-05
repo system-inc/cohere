@@ -66,9 +66,9 @@ func declaredRules(test *testing.T) []ruleDeclaration {
 	test.Helper()
 
 	var declarations []ruleDeclaration
-	matches, err := filepath.Glob("../rules/*/*.go")
-	if err != nil {
-		test.Fatalf("globbing rule files: %v", err)
+	matches, globError := filepath.Glob("../rules/*/*.go")
+	if globError != nil {
+		test.Fatalf("globbing rule files: %v", globError)
 	}
 
 	for _, path := range matches {

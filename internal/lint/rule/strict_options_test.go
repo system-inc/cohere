@@ -36,8 +36,8 @@ func TestUnmarshalOptionsRefusesWhatUpstreamRefuses(test *testing.T) {
 	test.Parallel()
 	var decoded strictOptions
 	valid := `{"shared": true, "enforceForTSTypes": true, "paths": [{"pattern": "x"}], "ignore": ["a"], "custom": {"Anything": 1}}`
-	if err := UnmarshalOptions([]byte(valid), &decoded); err != nil {
-		test.Fatalf("baseline: a valid config was refused: %v", err)
+	if unmarshalOptionsError := UnmarshalOptions([]byte(valid), &decoded); unmarshalOptionsError != nil {
+		test.Fatalf("baseline: a valid config was refused: %v", unmarshalOptionsError)
 	}
 	if !decoded.Shared || !decoded.EnforceForTSTypes || len(decoded.Paths) != 1 || decoded.Paths[0].Pattern != "x" ||
 		len(decoded.Ignore) != 1 || decoded.Custom.value == "" {
@@ -59,9 +59,9 @@ func TestUnmarshalOptionsRefusesWhatUpstreamRefuses(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			var target strictOptions
-			err := UnmarshalOptions([]byte(testCase.raw), &target)
-			if err == nil || !strings.Contains(err.Error(), testCase.mention) {
-				test.Fatalf("want a refusal naming %q, got %v", testCase.mention, err)
+			unmarshalOptionsError := UnmarshalOptions([]byte(testCase.raw), &target)
+			if unmarshalOptionsError == nil || !strings.Contains(unmarshalOptionsError.Error(), testCase.mention) {
+				test.Fatalf("want a refusal naming %q, got %v", testCase.mention, unmarshalOptionsError)
 			}
 		})
 	}
@@ -71,12 +71,12 @@ func TestUnmarshalOptionsRefusesWhatUpstreamRefuses(test *testing.T) {
 	accepted := []string{`{"Ignore": ["a"]}`, `{"IGNORE": ["a"]}`, `{"custom": {"whatever": true}}`}
 	for _, raw := range accepted {
 		var target strictOptions
-		if err := UnmarshalOptions([]byte(raw), &target); err != nil {
-			test.Errorf("%s was refused: %v", raw, err)
+		if unmarshalOptionsError := UnmarshalOptions([]byte(raw), &target); unmarshalOptionsError != nil {
+			test.Errorf("%s was refused: %v", raw, unmarshalOptionsError)
 		}
 		var plain strictOptions
-		if err := json.Unmarshal([]byte(raw), &plain); err != nil {
-			test.Errorf("control: plain json refused %s: %v", raw, err)
+		if decodeError := json.Unmarshal([]byte(raw), &plain); decodeError != nil {
+			test.Errorf("control: plain json refused %s: %v", raw, decodeError)
 		}
 	}
 }

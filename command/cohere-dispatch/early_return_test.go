@@ -53,10 +53,10 @@ func TestReturningEarlyChangesNothingTheCallerSees(test *testing.T) {
 				var stdout, stderr bytes.Buffer
 				command.Stdout, command.Stderr = &stdout, &stderr
 				code := 0
-				if err := command.Run(); err != nil {
-					exitError, isExit := err.(*exec.ExitError)
+				if runError := command.Run(); runError != nil {
+					exitError, isExit := runError.(*exec.ExitError)
 					if !isExit {
-						test.Fatalf("running the dispatcher: %v", err)
+						test.Fatalf("running the dispatcher: %v", runError)
 					}
 					code = exitError.ExitCode()
 				}
@@ -90,7 +90,7 @@ func TestReturningEarlyChangesNothingTheCallerSees(test *testing.T) {
 				}
 				time.Sleep(20 * time.Millisecond)
 			}
-			if _, err := os.Stat(filepath.Join(early.root, ".cache", "cohere", "notes-after-return.txt")); err == nil {
+			if _, statError := os.Stat(filepath.Join(early.root, ".cache", "cohere", "notes-after-return.txt")); statError == nil {
 				test.Error("the engine left a note after returning, so something it did in the background failed")
 			}
 		})
@@ -102,8 +102,8 @@ func buildDispatcherAndEngine(test *testing.T) (dispatcher string, engine string
 	binaries := test.TempDir()
 	build := func(output string, packagePath string) string {
 		binary := filepath.Join(binaries, output)
-		if combined, err := exec.Command("go", "build", "-o", binary, packagePath).CombinedOutput(); err != nil {
-			test.Fatalf("building %s: %v\n%s", packagePath, err, combined)
+		if combined, outputError := exec.Command("go", "build", "-o", binary, packagePath).CombinedOutput(); outputError != nil {
+			test.Fatalf("building %s: %v\n%s", packagePath, outputError, combined)
 		}
 		return binary
 	}
@@ -135,8 +135,8 @@ func writeEarlyReturnProject(test *testing.T, extra map[string]string) string {
 		files[name] = contents
 	}
 	for name, contents := range files {
-		if err := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	return root
@@ -198,8 +198,8 @@ func writeRepositoryProject(test *testing.T) string {
 	for _, arguments := range [][]string{{"init", "--quiet"}, {"add", "-A"}, {"-c", "user.email=fixture@example.com", "-c", "user.name=fixture", "commit", "--quiet", "-m", "initial"}} {
 		git := exec.Command("git", arguments...)
 		git.Dir = root
-		if output, err := git.CombinedOutput(); err != nil {
-			test.Fatalf("git %v: %v\n%s", arguments, err, output)
+		if output, outputError := git.CombinedOutput(); outputError != nil {
+			test.Fatalf("git %v: %v\n%s", arguments, outputError, output)
 		}
 	}
 	return root
@@ -218,25 +218,25 @@ func TestARunWaitsForAWriterStillHoldingTheTable(test *testing.T) {
 	test.Parallel()
 	dispatcher, engine := buildDispatcherAndEngine(test)
 	root := writeRepositoryProject(test)
-	if output, err := earlyReturnCommand(dispatcher, engine, root, "--no-fix").CombinedOutput(); err != nil {
-		test.Fatalf("the first run failed: %v\n%s", err, output)
+	if output, outputError := earlyReturnCommand(dispatcher, engine, root, "--no-fix").CombinedOutput(); outputError != nil {
+		test.Fatalf("the first run failed: %v\n%s", outputError, output)
 	}
 
 	// The first run's engine may still be finishing; taking the lock waits for it.
-	lock, err := os.OpenFile(filepath.Join(root, ".cache", "cohere", "table.lock"), os.O_RDWR, 0)
-	if err != nil {
-		test.Fatalf("the first run left no table lock: %v", err)
+	lock, openError := os.OpenFile(filepath.Join(root, ".cache", "cohere", "table.lock"), os.O_RDWR, 0)
+	if openError != nil {
+		test.Fatalf("the first run left no table lock: %v", openError)
 	}
 	defer lock.Close()
-	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
-		test.Fatal(err)
+	if flockError := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); flockError != nil {
+		test.Fatal(flockError)
 	}
 
 	second := earlyReturnCommand(dispatcher, engine, root, "--no-fix")
 	var output bytes.Buffer
 	second.Stdout, second.Stderr = &output, &output
-	if err := second.Start(); err != nil {
-		test.Fatal(err)
+	if startError := second.Start(); startError != nil {
+		test.Fatal(startError)
 	}
 	finished := make(chan error, 1)
 	go func() { finished <- second.Wait() }()

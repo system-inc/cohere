@@ -79,8 +79,8 @@ func DecodeBooleanPropNamingOptions(raw []byte) (any, error) {
 	// reads `config.propTypeNames || ['bool']`, so an explicitly empty array ALSO falls back, which
 	// this reproduces by testing length rather than nil.
 	var wire BooleanPropNamingOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	if wire.Rule != "" {
 		options.Rule = wire.Rule
@@ -93,8 +93,8 @@ func DecodeBooleanPropNamingOptions(raw []byte) (any, error) {
 
 	// Upstream's `new RegExp(config.rule)`, with no flags, read as JavaScript reads it: RE2 refuses a
 	// lookaround or a backreference its user wrote, and reads `\s` and `\b` differently (#7mztrdd).
-	if _, err := esregexp.Compile(options.Rule, ""); err != nil {
-		return options, err
+	if _, compileError := esregexp.Compile(options.Rule, ""); compileError != nil {
+		return options, compileError
 	}
 	return options, nil
 }
@@ -183,8 +183,8 @@ var BooleanPropNaming = rule.Rule{
 			return nil
 		}
 		// Compiled as the decoder validated it, `new RegExp(config.rule)` with no flags (#7mztrdd).
-		pattern, err := esregexp.Compile(settings.Rule, "")
-		if err != nil {
+		pattern, compileError := esregexp.Compile(settings.Rule, "")
+		if compileError != nil {
 			return nil
 		}
 

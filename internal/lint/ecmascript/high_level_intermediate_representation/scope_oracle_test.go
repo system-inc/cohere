@@ -148,9 +148,9 @@ func countScopeStages(function *Function, checker *shimchecker.Checker) scopeSta
 func TestScopeStructureAgainstUpstreamGuards(test *testing.T) {
 	test.Parallel()
 
-	fixtures, err := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
-	if err != nil {
-		test.Fatalf("loading the vendored corpus: %v", err)
+	fixtures, loadError := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
+	if loadError != nil {
+		test.Fatalf("loading the vendored corpus: %v", loadError)
 	}
 
 	var lines []string

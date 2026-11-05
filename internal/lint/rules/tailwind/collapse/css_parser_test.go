@@ -79,14 +79,14 @@ func loadCSSParserCorpus(test *testing.T) cssParserCorpus {
 	test.Helper()
 
 	path := filepath.Join("testdata", "cssparser_fixtures.json")
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		test.Fatalf("read %s: %v", path, err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatalf("read %s: %v", path, readError)
 	}
 
 	var corpus cssParserCorpus
-	if err := json.Unmarshal(contents, &corpus); err != nil {
-		test.Fatalf("parse %s: %v", path, err)
+	if decodeError := json.Unmarshal(contents, &corpus); decodeError != nil {
+		test.Fatalf("parse %s: %v", path, decodeError)
 	}
 	if len(corpus.Cases) == 0 {
 		test.Fatalf("%s holds no cases", path)
@@ -197,9 +197,9 @@ func TestParseCSSMatchesEngine(test *testing.T) {
 	for _, testCase := range corpus.Cases {
 		test.Run(testCase.Name, func(test *testing.T) {
 			test.Parallel()
-			parsed, err := ParseCSS(testCase.Input)
-			if err != nil {
-				test.Fatalf("ParseCSS returned %v; the engine parsed this input successfully", err)
+			parsed, parseCSSError := ParseCSS(testCase.Input)
+			if parseCSSError != nil {
+				test.Fatalf("ParseCSS returned %v; the engine parsed this input successfully", parseCSSError)
 			}
 
 			expected := nodesFromFixture(testCase.Nodes)
@@ -238,14 +238,14 @@ func TestParseCSSRejectsWhatTheEngineRejects(test *testing.T) {
 				test.Skipf("the engine accepted this input, so it pins nothing about rejection")
 			}
 
-			_, err := ParseCSS(testCase.Input)
-			if err == nil {
+			_, parseCSSError := ParseCSS(testCase.Input)
+			if parseCSSError == nil {
 				test.Fatalf("ParseCSS accepted %q; the engine rejected it with %q", testCase.Input, *testCase.Message)
 			}
 
 			var syntaxError *CSSSyntaxError
-			if !errors.As(err, &syntaxError) {
-				test.Fatalf("ParseCSS returned %T, want *CSSSyntaxError", err)
+			if !errors.As(parseCSSError, &syntaxError) {
+				test.Fatalf("ParseCSS returned %T, want *CSSSyntaxError", parseCSSError)
 			}
 			rejected++
 		})
@@ -265,9 +265,9 @@ func TestParseCSSCustomPropertyWhitespaceIsRaw(test *testing.T) {
 	test.Parallel()
 	input := ":root {\n  --font-sans:\n        var(--f), -apple-system,\n        sans-serif;\n  font-family:\n        var(--f),\n        sans-serif;\n}"
 
-	nodes, err := ParseCSS(input)
-	if err != nil {
-		test.Fatalf("ParseCSS: %v", err)
+	nodes, parseCSSError := ParseCSS(input)
+	if parseCSSError != nil {
+		test.Fatalf("ParseCSS: %v", parseCSSError)
 	}
 	if len(nodes) != 1 || len(nodes[0].Nodes) != 2 {
 		test.Fatalf("expected one rule holding two declarations, got:\n%s", describeNodes(nodes, ""))
@@ -304,9 +304,9 @@ func TestParseCSSReadsRealStylesheets(test *testing.T) {
 		}
 		stylesheets++
 
-		nodes, err := ParseCSS(testCase.Input)
-		if err != nil {
-			test.Fatalf("ParseCSS(%s): %v", testCase.Name, err)
+		nodes, parseCSSError := ParseCSS(testCase.Input)
+		if parseCSSError != nil {
+			test.Fatalf("ParseCSS(%s): %v", testCase.Name, parseCSSError)
 		}
 
 		Walk(nodes, func(node *Node) WalkAction {

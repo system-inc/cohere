@@ -104,7 +104,7 @@ func DecodeNoInvalidHtmlAttributeOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var attributes []string
-	if err := json.Unmarshal(raw, &attributes); err != nil || attributes == nil {
+	if decodeError := json.Unmarshal(raw, &attributes); decodeError != nil || attributes == nil {
 		return options, fmt.Errorf(`expected a list of attributes, [] or ["rel"], got %s`, raw)
 	}
 	seen := map[string]bool{}

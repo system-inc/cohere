@@ -22,8 +22,8 @@ func TestVerifySignaturePassesARealSignature(test *testing.T) {
 		test.Skip("codesign exists only on macOS")
 	}
 
-	if err := VerifySignature("/usr/bin/true"); err != nil {
-		test.Fatalf("an Apple signed binary was refused: %v", err)
+	if verifySignatureError := VerifySignature("/usr/bin/true"); verifySignatureError != nil {
+		test.Fatalf("an Apple signed binary was refused: %v", verifySignatureError)
 	}
 }
 
@@ -38,13 +38,13 @@ func TestVerifySignatureRefusesAnAdHocSignature(test *testing.T) {
 		test.Fatal(err)
 	}
 	binaryPath := filepath.Join(test.TempDir(), "true")
-	if err := os.WriteFile(binaryPath, original, 0o755); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(binaryPath, original, 0o755); writeError != nil {
+		test.Fatal(writeError)
 	}
 	// Ad hoc is what Go's linker leaves on every arm64 binary, so it is what a signing step that did
 	// nothing looks like.
-	if output, err := exec.Command("codesign", "--force", "--sign", "-", binaryPath).CombinedOutput(); err != nil {
-		test.Fatalf("signing the copy ad hoc: %v\n%s", err, output)
+	if output, outputError := exec.Command("codesign", "--force", "--sign", "-", binaryPath).CombinedOutput(); outputError != nil {
+		test.Fatalf("signing the copy ad hoc: %v\n%s", outputError, output)
 	}
 
 	err = VerifySignature(binaryPath)
@@ -73,7 +73,7 @@ func TestReadNotaryVerdictReadsTheStatus(test *testing.T) {
 	}
 
 	for _, output := range []string{``, `not json`, `{"id":"8f1c2c55-0f5b-4a4e-9a9d-3d1f2b6a7e10"}`} {
-		if _, err := readNotaryVerdict([]byte(output)); err == nil {
+		if _, readNotaryVerdictError := readNotaryVerdict([]byte(output)); readNotaryVerdictError == nil {
 			test.Errorf("%q was read as a verdict", output)
 		}
 	}

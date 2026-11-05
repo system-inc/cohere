@@ -101,8 +101,8 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 		ChecksSpreads      *bool           `json:"checksSpreads"`
 		ChecksVoidReturn   json.RawMessage `json:"checksVoidReturn"`
 	}
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return unmarshalOptionsError
 	}
 	*options = NoMisusedPromisesOptions{ChecksSpreads: wire.ChecksSpreads}
 	// An object turns the check on, as upstream's truthy test reads it, and a missing flagUnions is
@@ -117,8 +117,8 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 		var each struct {
 			FlagUnions *string `json:"flagUnions"`
 		}
-		if err := rule.UnmarshalOptions(wire.ChecksConditionals, &each); err != nil {
-			return fmt.Errorf("checksConditionals: %w", err)
+		if unmarshalOptionsError := rule.UnmarshalOptions(wire.ChecksConditionals, &each); unmarshalOptionsError != nil {
+			return fmt.Errorf("checksConditionals: %w", unmarshalOptionsError)
 		}
 		options.ChecksConditionals = type_checking.Ref(true)
 		options.ChecksConditionalsFlagUnions = "none"
@@ -143,8 +143,8 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 		return nil
 	case strings.HasPrefix(trimmed, "{"):
 		var each NoMisusedPromisesChecksVoidReturnOptions
-		if err := rule.UnmarshalOptions(wire.ChecksVoidReturn, &each); err != nil {
-			return fmt.Errorf("checksVoidReturn: %w", err)
+		if unmarshalOptionsError := rule.UnmarshalOptions(wire.ChecksVoidReturn, &each); unmarshalOptionsError != nil {
+			return fmt.Errorf("checksVoidReturn: %w", unmarshalOptionsError)
 		}
 		options.ChecksVoidReturn = type_checking.Ref(true)
 		options.ChecksVoidReturnOpts = &each

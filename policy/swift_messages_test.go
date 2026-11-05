@@ -60,16 +60,16 @@ func TestSwiftMessagesTypeTheValuesAndTheOptions(test *testing.T) {
 // would be two parameters for one name, so generation stops and names it.
 func TestSwiftMessagesRefuseAValueWithTwoPlaces(test *testing.T) {
 	test.Parallel()
-	catalog, err := LoadMessages(fstest.MapFS{"consistency-no-thing.json": {Data: []byte(`{
+	catalog, loadMessagesError := LoadMessages(fstest.MapFS{"consistency-no-thing.json": {Data: []byte(`{
   "rules": { "Swift": "cohere-swift/consistency-no-thing" },
   "phrases": { "exitCount": { "one": "", "several": " of {{count}}" } },
   "messages": { "thing": { "text": "{{count}} things<<exitCount>>." } }
 }`)}})
-	if err != nil {
-		test.Fatal(err)
+	if loadMessagesError != nil {
+		test.Fatal(loadMessagesError)
 	}
-	if _, err := swiftMessagesSource(catalog, "digest"); err == nil || !strings.Contains(err.Error(), `"count"`) {
-		test.Errorf("a value with two places was generated (%v)", err)
+	if _, swiftMessagesSourceError := swiftMessagesSource(catalog, "digest"); swiftMessagesSourceError == nil || !strings.Contains(swiftMessagesSourceError.Error(), `"count"`) {
+		test.Errorf("a value with two places was generated (%v)", swiftMessagesSourceError)
 	}
 }
 
@@ -77,9 +77,9 @@ func TestSwiftMessagesRefuseAValueWithTwoPlaces(test *testing.T) {
 // and a value interpolates through the same delimiter.
 func TestSwiftLiteralsOutrunTheText(test *testing.T) {
 	test.Parallel()
-	literal, err := swiftInterpolatedLiteral("a \"# b\n{{name}}")
-	if err != nil {
-		test.Fatal(err)
+	literal, swiftInterpolatedLiteralError := swiftInterpolatedLiteral("a \"# b\n{{name}}")
+	if swiftInterpolatedLiteralError != nil {
+		test.Fatal(swiftInterpolatedLiteralError)
 	}
 	if want := `##"a "# b\##n\##(name)"##`; literal != want {
 		test.Errorf("got %s, expected %s", literal, want)
@@ -96,9 +96,9 @@ func TestOneEditReachesBothEngines(test *testing.T) {
 		if walkError != nil || entry.IsDir() {
 			return walkError
 		}
-		data, err := fs.ReadFile(MessageFiles(), name)
+		data, readFileError := fs.ReadFile(MessageFiles(), name)
 		edited[name] = &fstest.MapFile{Data: data}
-		return err
+		return readFileError
 	})
 	if err != nil {
 		test.Fatal(err)

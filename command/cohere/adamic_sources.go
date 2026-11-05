@@ -32,9 +32,9 @@ func adamicHeld(graph *program.Graph) map[string]struct{} {
 // tsconfig claims ".a". ReadProjectConfig cleans each name to the platform's separator, the form the walk's
 // names and adamicHeld's are in, so a tsconfig's `/` names match a walk's `\` ones on Windows.
 func adamicIncluded(configFileName string) (map[string]struct{}, error) {
-	config, err := program.ReadProjectConfig(configFileName)
-	if err != nil {
-		return nil, err
+	config, readProjectConfigurationError := program.ReadProjectConfig(configFileName)
+	if readProjectConfigurationError != nil {
+		return nil, readProjectConfigurationError
 	}
 	held := map[string]struct{}{}
 	for _, fileName := range config.FileNames {
@@ -65,7 +65,7 @@ func reportIgnoredAdamic(out io.Writer, root string, held map[string]struct{}) i
 		}
 		ignored++
 		shown := fileName
-		if relative, err := filepath.Rel(root, fileName); err == nil {
+		if relative, relativePathError := filepath.Rel(root, fileName); relativePathError == nil {
 			shown = relative
 		}
 		fmt.Fprintf(out, "⚠ %s is in the program, but git's ignore rules leave it out of the format walk (%s): checked, not formatted\n",

@@ -317,9 +317,9 @@ func TestPreferStatelessFunctionDecodesOptions(test *testing.T) {
 
 	test.Run("absent options give the documented default", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodePreferStatelessFunctionOptions(nil)
-		if err != nil {
-			test.Fatalf("decoding nil: %v", err)
+		decoded, decodePreferStatelessFunctionOptionsError := DecodePreferStatelessFunctionOptions(nil)
+		if decodePreferStatelessFunctionOptionsError != nil {
+			test.Fatalf("decoding nil: %v", decodePreferStatelessFunctionOptionsError)
 		}
 		if decoded.(PreferStatelessFunctionOptions).IgnorePureComponents {
 			test.Fatal("ignorePureComponents defaulted to true, upstream defaults it to false")
@@ -328,9 +328,9 @@ func TestPreferStatelessFunctionDecodesOptions(test *testing.T) {
 
 	test.Run("the wire name is ignorePureComponents", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodePreferStatelessFunctionOptions(json.RawMessage(`{"ignorePureComponents":true}`))
-		if err != nil {
-			test.Fatalf("decoding: %v", err)
+		decoded, decodePreferStatelessFunctionOptionsError := DecodePreferStatelessFunctionOptions(json.RawMessage(`{"ignorePureComponents":true}`))
+		if decodePreferStatelessFunctionOptionsError != nil {
+			test.Fatalf("decoding: %v", decodePreferStatelessFunctionOptionsError)
 		}
 		if !decoded.(PreferStatelessFunctionOptions).IgnorePureComponents {
 			test.Fatal("the option did not decode")
@@ -432,9 +432,9 @@ func TestPreferStatelessFunctionHasNoFileSuffixGate(test *testing.T) {
 	} {
 		test.Run(fileName, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodePreferStatelessFunctionOptions(nil)
-			if err != nil {
-				test.Fatalf("decoding: %v", err)
+			decoded, decodePreferStatelessFunctionOptionsError := DecodePreferStatelessFunctionOptions(nil)
+			if decodePreferStatelessFunctionOptionsError != nil {
+				test.Fatalf("decoding: %v", decodePreferStatelessFunctionOptionsError)
 			}
 			result := rule_testing.RunWithOptions(test, PreferStatelessFunction, fileName, sourceText, decoded)
 			rule_testing.ExpectFindings(test, result, "componentShouldBePure")

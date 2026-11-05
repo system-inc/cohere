@@ -116,8 +116,8 @@ func DecodeDotNotationOptions(raw []byte) (any, error) {
 	// Decode into a fresh value rather than over the default, so an explicit `false` is
 	// distinguishable from an absent field by the pointer being non-nil.
 	var decoded DotNotationOptions
-	if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	if decoded.AllowKeywords == nil {
 		decoded.AllowKeywords = options.AllowKeywords

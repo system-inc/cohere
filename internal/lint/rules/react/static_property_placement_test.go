@@ -22,9 +22,9 @@ const staticPropertyPlacementFile = "/repository/source/StaticPropertyPlacement.
 // staticPropertyPlacementDecode routes a fixture's raw options through the exported decoder.
 func staticPropertyPlacementDecode(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeStaticPropertyPlacementOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding %s returned %v", raw, err)
+	decoded, decodeStaticPropertyPlacementOptionsError := DecodeStaticPropertyPlacementOptions([]byte(raw))
+	if decodeStaticPropertyPlacementOptionsError != nil {
+		test.Fatalf("decoding %s returned %v", raw, decodeStaticPropertyPlacementOptionsError)
 	}
 	return decoded
 }
@@ -445,9 +445,9 @@ func TestDecodeStaticPropertyPlacementOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeStaticPropertyPlacementOptions([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("decode returned %v", err)
+			decoded, decodeStaticPropertyPlacementOptionsError := DecodeStaticPropertyPlacementOptions([]byte(testCase.raw))
+			if decodeStaticPropertyPlacementOptionsError != nil {
+				test.Fatalf("decode returned %v", decodeStaticPropertyPlacementOptionsError)
 			}
 			options, isOptions := decoded.(StaticPropertyPlacementOptions)
 			if !isOptions {
@@ -481,7 +481,7 @@ func TestDecodeStaticPropertyPlacementOptionsRefusesWhatUpstreamRefuses(test *te
 		// A bare string, which the config layer never delivers to a list rule.
 		`"static getter"`,
 	} {
-		if decoded, err := DecodeStaticPropertyPlacementOptions([]byte(raw)); err == nil {
+		if decoded, decodeStaticPropertyPlacementOptionsError := DecodeStaticPropertyPlacementOptions([]byte(raw)); decodeStaticPropertyPlacementOptionsError == nil {
 			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}

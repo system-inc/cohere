@@ -109,21 +109,21 @@ func TestTextAgreesWithUpstream(test *testing.T) {
 		originals = append(originals, pending{text: text, byteStart: start})
 	}
 
-	encoded, err := json.Marshal(cases)
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(cases)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	command := exec.Command("node", "--input-type=module", "-e", textUpstreamScript)
 	command.Dir = root
 	command.Stdin = bytes.NewReader(encoded)
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		test.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 	var upstream []textAnswers
-	if err := json.Unmarshal(stdout.Bytes(), &upstream); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(stdout.Bytes(), &upstream); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 
 	mismatches, unmapped, nonASCII := 0, 0, 0

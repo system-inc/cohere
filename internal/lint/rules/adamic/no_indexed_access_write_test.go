@@ -96,9 +96,9 @@ func TestIndexedAccessWriteEdges(test *testing.T) {
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			bytes, err := os.ReadFile("testdata/indexed-access/" + name + ".ts")
-			if err != nil {
-				test.Fatal(err)
+			bytes, readError := os.ReadFile("testdata/indexed-access/" + name + ".ts")
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			source := string(bytes)
 			if count := typeErrorCount(test, source); count != 0 {
@@ -114,9 +114,9 @@ func TestIndexedAccessWriteEdges(test *testing.T) {
 func TestIndexedAccessWriteEdgesStayClean(test *testing.T) {
 	test.Parallel()
 	read := func(name string) string {
-		bytes, err := os.ReadFile("testdata/indexed-access/" + name + ".ts")
-		if err != nil {
-			test.Fatal(err)
+		bytes, readError := os.ReadFile("testdata/indexed-access/" + name + ".ts")
+		if readError != nil {
+			test.Fatal(readError)
 		}
 		return string(bytes)
 	}

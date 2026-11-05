@@ -27,13 +27,13 @@ func TestZeroConfigAppliesEachPerFileSetOnlyWhereItFits(test *testing.T) {
 	component := filepath.Join(root, "source", "Button.tsx")
 	route := filepath.Join(root, "app", "page.tsx")
 	server := filepath.Join(root, "server", "index.ts")
-	loaded, err := LoadHouse(filepath.Join(root, "CohereSettings.json"), nil, HouseDetection{
+	loaded, loadHouseError := LoadHouse(filepath.Join(root, "CohereSettings.json"), nil, HouseDetection{
 		ReactFiles:      map[string]bool{component: true, route: true},
 		NextFiles:       map[string]bool{route: true},
 		TailwindSkipped: "no Tailwind stylesheet",
 	})
-	if err != nil {
-		test.Fatal(err)
+	if loadHouseError != nil {
+		test.Fatal(loadHouseError)
 	}
 
 	cases := []struct {
@@ -92,9 +92,9 @@ func TestZeroConfigAppliesEachPerFileSetOnlyWhereItFits(test *testing.T) {
 func TestZeroConfigWithNoReactFileAppliesNoReactRule(test *testing.T) {
 	withHouseSetsForTest(test)
 	root := test.TempDir()
-	loaded, err := LoadHouse(filepath.Join(root, "CohereSettings.json"), nil, HouseDetection{TailwindSkipped: "none"})
-	if err != nil {
-		test.Fatal(err)
+	loaded, loadHouseError := LoadHouse(filepath.Join(root, "CohereSettings.json"), nil, HouseDetection{TailwindSkipped: "none"})
+	if loadHouseError != nil {
+		test.Fatal(loadHouseError)
 	}
 	if loaded.Resolve(filepath.Join(root, "View.tsx")).Enabled("react/no-danger") {
 		test.Error("react rules ran with no file importing react")
@@ -110,9 +110,9 @@ func TestZeroConfigWithNoReactFileAppliesNoReactRule(test *testing.T) {
 func TestZeroConfigAppliesTailwindEverywhereWhenTheStylesheetIsTailwinds(test *testing.T) {
 	withHouseSetsForTest(test)
 	root := test.TempDir()
-	loaded, err := LoadHouse(filepath.Join(root, "CohereSettings.json"), nil, HouseDetection{TailwindEntryPoint: filepath.Join(root, "app", "globals.css")})
-	if err != nil {
-		test.Fatal(err)
+	loaded, loadHouseError := LoadHouse(filepath.Join(root, "CohereSettings.json"), nil, HouseDetection{TailwindEntryPoint: filepath.Join(root, "app", "globals.css")})
+	if loadHouseError != nil {
+		test.Fatal(loadHouseError)
 	}
 	if !loaded.Resolve(filepath.Join(root, "server", "index.ts")).Enabled("better-tailwindcss/no-unknown-classes") {
 		test.Error("tailwind rules must run on every file once the stylesheet is Tailwind's")
@@ -132,13 +132,13 @@ func TestZeroConfigPutsTheProjectsOwnFileOnTop(test *testing.T) {
 		"CohereSettings.json": `{"rules": {"no-var": "off", "eqeqeq": ["error", "smart"], "react/no-danger": "warn"}}`,
 	})
 	path := filepath.Join(directory, "CohereSettings.json")
-	if zero, err := IsZeroConfig(path); err != nil || !zero {
-		test.Fatalf("a file that names no set is zero config: %v %v", zero, err)
+	if zero, isZeroConfigurationError := IsZeroConfig(path); isZeroConfigurationError != nil || !zero {
+		test.Fatalf("a file that names no set is zero config: %v %v", zero, isZeroConfigurationError)
 	}
 	component := filepath.Join(directory, "View.tsx")
-	loaded, err := LoadHouse(path, nil, HouseDetection{ReactFiles: map[string]bool{component: true}})
-	if err != nil {
-		test.Fatal(err)
+	loaded, loadHouseError := LoadHouse(path, nil, HouseDetection{ReactFiles: map[string]bool{component: true}})
+	if loadHouseError != nil {
+		test.Fatal(loadHouseError)
 	}
 	resolved := loaded.Resolve(component)
 	if resolved.Enabled("no-var") {
@@ -163,11 +163,11 @@ func TestAChainThatNamesASetIsNotZeroConfig(test *testing.T) {
 		"base.json":           `{"extends": "cohere:react"}`,
 		"CohereSettings.json": `{"extends": "./base.json"}`,
 	})
-	if zero, err := IsZeroConfig(filepath.Join(directory, "CohereSettings.json")); err != nil || zero {
-		test.Fatalf("a chain naming a set chose its sets: zero=%v err=%v", zero, err)
+	if zero, isZeroConfigurationError := IsZeroConfig(filepath.Join(directory, "CohereSettings.json")); isZeroConfigurationError != nil || zero {
+		test.Fatalf("a chain naming a set chose its sets: zero=%v err=%v", zero, isZeroConfigurationError)
 	}
-	if zero, err := IsZeroConfig(filepath.Join(directory, "Missing.json")); err != nil || !zero {
-		test.Fatalf("no settings file is zero config: zero=%v err=%v", zero, err)
+	if zero, isZeroConfigurationError := IsZeroConfig(filepath.Join(directory, "Missing.json")); isZeroConfigurationError != nil || !zero {
+		test.Fatalf("no settings file is zero config: zero=%v err=%v", zero, isZeroConfigurationError)
 	}
 }
 

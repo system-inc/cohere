@@ -47,18 +47,18 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(test *testing.T
 	unchanged := filepath.Join(directory, "Unchanged.ts")
 	edited := filepath.Join(directory, "Edited.ts")
 	for _, fileName := range []string{unchanged, edited} {
-		if err := os.WriteFile(fileName, []byte("export const alpha = 1;\n"), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(fileName, []byte("export const alpha = 1;\n"), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	// Unchanged too, but behind a UTF-8 byte order mark, which the program's copy has dropped (#hkv1hgp).
 	marked := filepath.Join(directory, "Marked.ts")
-	if err := os.WriteFile(marked, append([]byte{0xEF, 0xBB, 0xBF}, "export const beta = 1;\n"...), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(marked, append([]byte{0xEF, 0xBB, 0xBF}, "export const beta = 1;\n"...), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	configuration := `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler"},"include":["**/*.ts"]}`
-	if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	var pack *program.ContentPack
 	if withPack {
@@ -78,12 +78,12 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(test *testing.T
 	// The edit lands after the program's read: new bytes, and an mtime a second later, so no clock tick can
 	// leave its stat equal to the one the pack recorded.
 	editedText := "export const alpha = 2;\n"
-	if err := os.WriteFile(edited, []byte(editedText), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(edited, []byte(editedText), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	later := time.Now().Add(time.Second)
-	if err := os.Chtimes(edited, later, later); err != nil {
-		test.Fatal(err)
+	if changeTimesError := os.Chtimes(edited, later, later); changeTimesError != nil {
+		test.Fatal(changeTimesError)
 	}
 
 	var programs programOffer

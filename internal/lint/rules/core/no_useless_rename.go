@@ -42,8 +42,8 @@ func DecodeNoUselessRenameOptions(raw []byte) (any, error) {
 	}
 
 	var wire noUselessRenameWireShape
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return DefaultNoUselessRenameSettings(), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return DefaultNoUselessRenameSettings(), unmarshalOptionsError
 	}
 
 	settings := DefaultNoUselessRenameSettings()

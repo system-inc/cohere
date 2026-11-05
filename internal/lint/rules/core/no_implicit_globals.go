@@ -54,8 +54,8 @@ func DecodeNoImplicitGlobalsOptions(raw []byte) (any, error) {
 	}
 
 	var wire noImplicitGlobalsWireShape
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return DefaultNoImplicitGlobalsSettings(), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return DefaultNoImplicitGlobalsSettings(), unmarshalOptionsError
 	}
 
 	settings := DefaultNoImplicitGlobalsSettings()

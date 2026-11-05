@@ -16,9 +16,9 @@ func (fixture *runCacheFixture) runFrom(dir string) string {
 	command := exec.Command(fixture.binary, verboseArguments([]string{"--no-format"})...)
 	command.Dir = dir
 	command.Env = append([]string{"HOME=" + fixture.home, "PWD=" + dir}, withoutVariables(os.Environ(), "HOME", "PWD")...)
-	output, err := command.CombinedOutput()
-	if _, isExit := err.(*exec.ExitError); err != nil && !isExit {
-		fixture.t.Fatalf("running cohere in %s: %v\n%s", dir, err, output)
+	output, outputError := command.CombinedOutput()
+	if _, isExit := outputError.(*exec.ExitError); outputError != nil && !isExit {
+		fixture.t.Fatalf("running cohere in %s: %v\n%s", dir, outputError, output)
 	}
 	return string(output)
 }
@@ -60,11 +60,11 @@ func TestEverySpellingOfTheRootIsOneCache(test *testing.T) {
 	fixture.commit("a finding, so a replay prints a path")
 
 	link := filepath.Join(test.TempDir(), "linked-project")
-	if err := os.Symlink(fixture.root, link); err != nil {
-		test.Skipf("this filesystem cannot make symbolic links: %v", err)
+	if symlinkError := os.Symlink(fixture.root, link); symlinkError != nil {
+		test.Skipf("this filesystem cannot make symbolic links: %v", symlinkError)
 	}
 	spellings := []string{fixture.root, link}
-	if resolved, err := filepath.EvalSymlinks(fixture.root); err == nil && resolved != fixture.root {
+	if resolved, resolveSymlinksError := filepath.EvalSymlinks(fixture.root); resolveSymlinksError == nil && resolved != fixture.root {
 		spellings = append(spellings, resolved)
 	}
 
@@ -138,12 +138,12 @@ func TestARunThatMissesTheCacheSaysWhy(test *testing.T) {
 	}
 
 	copied := filepath.Join(test.TempDir(), "cohere")
-	contents, err := os.ReadFile(fixture.binary)
-	if err != nil {
-		test.Fatal(err)
+	contents, readError := os.ReadFile(fixture.binary)
+	if readError != nil {
+		test.Fatal(readError)
 	}
-	if err := os.WriteFile(copied, contents, 0o755); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(copied, contents, 0o755); writeError != nil {
+		test.Fatal(writeError)
 	}
 	other := *fixture
 	other.binary = copied

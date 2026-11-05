@@ -280,8 +280,8 @@ func (r *engineRun) accept(line []byte) error {
 	var envelope struct {
 		Kind string `json:"kind"`
 	}
-	if err := json.Unmarshal(line, &envelope); err != nil {
-		return fmt.Errorf("a line that is not a record: %q (%v)", truncateForError(line), err)
+	if decodeError := json.Unmarshal(line, &envelope); decodeError != nil {
+		return fmt.Errorf("a line that is not a record: %q (%v)", truncateForError(line), decodeError)
 	}
 
 	if r.summary != nil {
@@ -325,8 +325,8 @@ func (r *engineRun) accept(line []byte) error {
 
 // decodeRecord decodes a line into its record type and hands it on.
 func decodeRecord[Record any](line []byte, record *Record, accept func(*Record) error) error {
-	if err := json.Unmarshal(line, record); err != nil {
-		return fmt.Errorf("a record that does not decode: %q (%v)", truncateForError(line), err)
+	if decodeError := json.Unmarshal(line, record); decodeError != nil {
+		return fmt.Errorf("a record that does not decode: %q (%v)", truncateForError(line), decodeError)
 	}
 	return accept(record)
 }
@@ -459,8 +459,8 @@ func (r *engineRun) unusedPlace(kind string) error {
 }
 
 func (r *engineRun) acceptUnused(record *engineUnusedRecord) error {
-	if err := r.unusedPlace("unused"); err != nil {
-		return err
+	if unusedPlaceError := r.unusedPlace("unused"); unusedPlaceError != nil {
+		return unusedPlaceError
 	}
 	if record.File == "" || record.Line < 1 || record.Column < 1 || record.Rule == "" || record.Subject == "" {
 		return fmt.Errorf("an unused record missing its file, position, rule or subject (file %q, line %d, column %d, rule %q)",
@@ -473,8 +473,8 @@ func (r *engineRun) acceptUnused(record *engineUnusedRecord) error {
 // acceptUnusedCoverage prints one rule's section of the report: its items, counted and sorted, then what
 // it looked at and what it could not.
 func (r *engineRun) acceptUnusedCoverage(record *engineUnusedCoverageRecord) error {
-	if err := r.unusedPlace("unusedCoverage"); err != nil {
-		return err
+	if unusedPlaceError := r.unusedPlace("unusedCoverage"); unusedPlaceError != nil {
+		return unusedPlaceError
 	}
 	if record.Rule == "" || record.Found == nil {
 		return fmt.Errorf("an unusedCoverage record missing its rule or found count")
@@ -582,9 +582,9 @@ func (r *engineRun) acceptFix(record *engineFixRecord) error {
 	if record.ChangedFiles == nil {
 		return nil
 	}
-	changed, err := r.changedFiles(*record.ChangedFiles, record.FilesRewritten)
-	if err != nil {
-		return err
+	changed, changedFilesError := r.changedFiles(*record.ChangedFiles, record.FilesRewritten)
+	if changedFilesError != nil {
+		return changedFilesError
 	}
 	activeSummary.Changed = changed
 	printChangedFiles(r.out, changed)
@@ -613,7 +613,7 @@ func (r *engineRun) changedFiles(files []engineChangedFile, rewritten int) ([]ch
 			return nil, fmt.Errorf("the fix record lists %s as rewritten by no fix and not by the formatter", file.File)
 		}
 		path := file.File
-		if relative, err := filepath.Rel(root, file.File); root != "" && err == nil && !strings.HasPrefix(relative, "..") {
+		if relative, relativePathError := filepath.Rel(root, file.File); root != "" && relativePathError == nil && !strings.HasPrefix(relative, "..") {
 			path = relative
 		}
 		changed = append(changed, changedFile{
@@ -671,9 +671,9 @@ func (r *engineRun) acceptLint(record *engineLintRecord) error {
 	// The same coverage block a TypeScript run prints, from the same writer, so one fact reads the same
 	// whichever engine states it: one counted line whose terms add up, crashes in full, and each rule
 	// named once behind --coverage.
-	summary, err := classifyEngineCoverage(record)
-	if err != nil {
-		return err
+	summary, classifyEngineCoverageError := classifyEngineCoverage(record)
+	if classifyEngineCoverageError != nil {
+		return classifyEngineCoverageError
 	}
 	writeCoverage(accountOutput(r.out), summary, r.details)
 	r.crashes += len(record.Crashes)

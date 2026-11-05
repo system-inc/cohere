@@ -99,8 +99,8 @@ func (layer ignoreLayer) covers(root string, relative string, directory bool) bo
 		return ignored
 	}
 
-	fromSettings, err := filepath.Rel(layer.globsFrom, filepath.Join(root, relative))
-	if err != nil || fromSettings == ".." || strings.HasPrefix(fromSettings, ".."+string(filepath.Separator)) {
+	fromSettings, relativePathError := filepath.Rel(layer.globsFrom, filepath.Join(root, relative))
+	if relativePathError != nil || fromSettings == ".." || strings.HasPrefix(fromSettings, ".."+string(filepath.Separator)) {
 		return false
 	}
 	fromSettings = filepath.ToSlash(fromSettings)
@@ -185,9 +185,9 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 	enumeration.IgnoredByLayer[GitignoreLayer] = 0
 	var layers []ignoreLayer
 	if resolution.HouseIgnoreDeclared {
-		house, err := gitignore.CompilePatterns(resolution.HouseIgnore, HouseIgnoreLayer)
-		if err != nil {
-			return enumeration, err
+		house, compilePatternsError := gitignore.CompilePatterns(resolution.HouseIgnore, HouseIgnoreLayer)
+		if compilePatternsError != nil {
+			return enumeration, compilePatternsError
 		}
 		layers = append(layers, ignoreLayer{name: HouseIgnoreLayer, lines: house})
 	}
@@ -256,9 +256,9 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 					return filepath.SkipDir
 				}
 			}
-			entered, err := scope.Enter(relative)
-			if err != nil {
-				return err
+			entered, enterError := scope.Enter(relative)
+			if enterError != nil {
+				return enterError
 			}
 			scopes[relative] = entered
 			enumeration.Directories = append(enumeration.Directories, path)
@@ -348,9 +348,9 @@ func walkListedFrom(path string, information os.FileInfo, listing gitignore.List
 		if entry == nil {
 			continue
 		}
-		if err := walkListedFrom(filepath.Join(path, entry.Name()), entry, listing, walkFn); err != nil {
-			if !entry.IsDir() || err != filepath.SkipDir {
-				return err
+		if walkListedFromError := walkListedFrom(filepath.Join(path, entry.Name()), entry, listing, walkFn); walkListedFromError != nil {
+			if !entry.IsDir() || walkListedFromError != filepath.SkipDir {
+				return walkListedFromError
 			}
 		}
 	}
@@ -461,9 +461,9 @@ func repositoryBoundaryBetween(root string, settingsDirectory string) bool {
 // can be measured on. Reading them is how ahra's `projects/**` hid five repositories from the
 // differential (#k6vebep).
 func NestedRepositoriesBelow(root string) ([]string, error) {
-	matcher, err := gitignore.New(root)
-	if err != nil {
-		return nil, err
+	matcher, newGitignoreError := gitignore.New(root)
+	if newGitignoreError != nil {
+		return nil, newGitignoreError
 	}
 	scopes := map[string]*gitignore.Matcher{"": matcher}
 	var nested []string
@@ -507,8 +507,8 @@ func NestedRepositoriesBelow(root string) ([]string, error) {
 // fix phase refuses to write past it on a whole-tree run, so neither edits a repository nobody asked
 // it to touch.
 func HasOwnRepository(directory string) bool {
-	_, err := os.Stat(filepath.Join(directory, ".git"))
-	return err == nil
+	_, statError := os.Stat(filepath.Join(directory, ".git"))
+	return statError == nil
 }
 
 // NestedRepositoryContaining returns the outermost repository of its own that holds fileName below
@@ -521,8 +521,8 @@ func NestedRepositoryContaining(root string, fileName string) string {
 	root = filepath.Clean(root)
 	nested := ""
 	for directory := filepath.Dir(filepath.Clean(fileName)); ; directory = filepath.Dir(directory) {
-		relative, err := filepath.Rel(root, directory)
-		if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		relative, relativePathError := filepath.Rel(root, directory)
+		if relativePathError != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 			return nested
 		}
 		if HasOwnRepository(directory) {

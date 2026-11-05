@@ -78,12 +78,12 @@ type houseSets struct {
 //
 // A chain that names any `cohere:` set chose its sets, and is loaded as written.
 func IsZeroConfig(path string) (bool, error) {
-	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+	if _, statError := os.Stat(path); errors.Is(statError, fs.ErrNotExist) {
 		return true, nil
 	}
-	sources, err := SourcesOf(path)
-	if err != nil {
-		return false, err
+	sources, sourcesOfError := SourcesOf(path)
+	if sourcesOfError != nil {
+		return false, sourcesOfError
 	}
 	for _, source := range sources {
 		if IsSet(source) {
@@ -98,10 +98,10 @@ func IsZeroConfig(path string) (bool, error) {
 // reads these, so an edit to the project's file still changes the key.
 func HouseSources(path string) ([]string, error) {
 	sources := []string{}
-	if _, err := os.Stat(path); err == nil {
-		own, err := SourcesOf(path)
-		if err != nil {
-			return nil, err
+	if _, statError := os.Stat(path); statError == nil {
+		own, sourcesOfError := SourcesOf(path)
+		if sourcesOfError != nil {
+			return nil, sourcesOfError
 		}
 		sources = append(sources, own...)
 	}
@@ -111,12 +111,12 @@ func HouseSources(path string) ([]string, error) {
 // OwnSettingsOf returns the `settings` the project's own file at path writes, which zero config's
 // detection reads before LoadHouse runs, or nil when there is no file or it writes none.
 func OwnSettingsOf(path string) (map[string]json.RawMessage, error) {
-	if _, err := os.Stat(path); err != nil {
+	if _, statError := os.Stat(path); statError != nil {
 		return nil, nil
 	}
-	layers, err := readConfigLayers(path, nil)
-	if err != nil {
-		return nil, err
+	layers, readConfigurationLayersError := readConfigLayers(path, nil)
+	if readConfigurationLayersError != nil {
+		return nil, readConfigurationLayersError
 	}
 	return layers[len(layers)-1].raw.Settings, nil
 }
@@ -151,9 +151,9 @@ func LoadHouse(path string, registeredNames []string, detection HouseDetection) 
 		gatedReasons: map[string]OffReason{},
 	}
 	for _, variant := range []houseVariant{{}, {react: true}, {next: true}, {react: true, next: true}} {
-		loaded, err := loadHouseVariant(ownLayers, root, registeredNames, variant, tailwind)
-		if err != nil {
-			return nil, err
+		loaded, loadHouseVariantError := loadHouseVariant(ownLayers, root, registeredNames, variant, tailwind)
+		if loadHouseVariantError != nil {
+			return nil, loadHouseVariantError
 		}
 		// The house ignores what it ignores for every file, whichever set wrote the pattern.
 		loaded.IgnorePatterns = whole.IgnorePatterns
@@ -219,7 +219,7 @@ func singularVerb(files int, evidence string) string {
 }
 
 func relativeTo(root string, path string) string {
-	if relative, err := filepath.Rel(root, path); err == nil && !strings.HasPrefix(relative, "..") {
+	if relative, relativePathError := filepath.Rel(root, path); relativePathError == nil && !strings.HasPrefix(relative, "..") {
 		return filepath.ToSlash(relative)
 	}
 	return path
@@ -242,9 +242,9 @@ func loadHouseVariant(ownLayers []configLayer, root string, registeredNames []st
 	var layers []configLayer
 	read := map[string]bool{}
 	for _, set := range sets {
-		setLayers, err := readConfigLayers(set, nil)
-		if err != nil {
-			return nil, err
+		setLayers, readConfigurationLayersError := readConfigLayers(set, nil)
+		if readConfigurationLayersError != nil {
+			return nil, readConfigurationLayersError
 		}
 		for _, setLayer := range setLayers {
 			if !read[setLayer.path] {

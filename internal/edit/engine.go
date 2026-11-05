@@ -107,8 +107,8 @@ type Propose func(fileName string, text string) ([]Proposal, error)
 // alone and every proposal in the pass is reported as refused, so the reader learns which file and
 // which rules to look at.
 func FixText(fileName string, text string, propose Propose, maxPasses int) (FileResult, error) {
-	result, _, err := fixText(fileName, text, nil, propose, maxPasses)
-	return result, err
+	result, _, fixTextError := fixText(fileName, text, nil, propose, maxPasses)
+	return result, fixTextError
 }
 
 // fixText is FixText, also returning the guard's tree of the text it settled on: the starting text's, or
@@ -344,9 +344,9 @@ func skipReasonOf(err error) string {
 // formatted. It is guarded exactly as a fix pass is: a transform that errors, or whose output does
 // not parse, is discarded whole and the file is left alone.
 func FixAndTransformFile(fileName string, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
-	result, err := CheckFile(fileName, propose, transform, maxPasses)
-	if err != nil {
-		return result, err
+	result, checkFileError := CheckFile(fileName, propose, transform, maxPasses)
+	if checkFileError != nil {
+		return result, checkFileError
 	}
 
 	// Changed alone is the right condition here, and it is deliberately not joined by Converged.
@@ -360,12 +360,12 @@ func FixAndTransformFile(fileName string, propose Propose, transform Transform, 
 		return result, nil
 	}
 
-	if err := WriteAtomically(fileName, result.Text); err != nil {
+	if writeAtomicallyError := WriteAtomically(fileName, result.Text); writeAtomicallyError != nil {
 		// The file on disk is untouched: the rename is the only step that changes it, and a failure
 		// before it leaves the original intact. Report the fixes as not-applied rather than applied,
 		// so the count matches what a reader would find in the tree.
 		result.Changed = false
-		return result, fmt.Errorf("writing %s: %w", fileName, err)
+		return result, fmt.Errorf("writing %s: %w", fileName, writeAtomicallyError)
 	}
 
 	return result, nil
@@ -386,9 +386,9 @@ func CheckFile(fileName string, propose Propose, transform Transform, maxPasses 
 // the guard would build (seedFor), so a tree of a stale copy, or of another script kind, is parsed past as if
 // it were not there. Taken, it is the starting guard's tree and the transform's (#dk2502g).
 func CheckFileSeeded(fileName string, seed *ast.SourceFile, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
-	text, err := readFile(fileName)
-	if err != nil {
-		return FileResult{FileName: fileName}, err
+	text, readFileError := readFile(fileName)
+	if readFileError != nil {
+		return FileResult{FileName: fileName}, readFileError
 	}
 	return fixAndTransformText(fileName, text, seed, propose, transform, maxPasses)
 }
@@ -422,9 +422,9 @@ func CheckTextSeeded(fileName string, text string, seed *ast.SourceFile, propose
 // fixAndTransformText is FixAndTransformText with a seed for the starting guard (fixText).
 func fixAndTransformText(fileName string, text string, seed *ast.SourceFile, propose Propose, transform Transform,
 	maxPasses int) (FileResult, error) {
-	result, tree, err := fixText(fileName, text, seed, propose, maxPasses)
-	if err != nil || transform == nil {
-		return result, err
+	result, tree, fixTextError := fixText(fileName, text, seed, propose, maxPasses)
+	if fixTextError != nil || transform == nil {
+		return result, fixTextError
 	}
 	if !result.Converged {
 		// The fixes ran out of passes and were discarded, so the transform formats the text as found,

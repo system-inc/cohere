@@ -139,10 +139,10 @@ func fastTest(base []string, arguments []string) int {
 	command.Env = append(environment, fastTierVariable+"=1")
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
 	code := 0
-	if err := command.Run(); err != nil {
-		exited, ok := err.(*exec.ExitError)
+	if runError := command.Run(); runError != nil {
+		exited, ok := runError.(*exec.ExitError)
 		if !ok {
-			fmt.Fprintf(os.Stderr, "cohere-dev: running go test: %v\n", err)
+			fmt.Fprintf(os.Stderr, "cohere-dev: running go test: %v\n", runError)
 			return 1
 		}
 		code = exited.ExitCode()
@@ -177,12 +177,12 @@ func modulePackagesIn(root string, environment []string) (map[string]bool, error
 	command := exec.Command("go", "list", "-f", "{{.ImportPath}} {{.Module.Path}}", "./...")
 	command.Dir = root
 	command.Env = environment
-	output, err := command.Output()
-	if err != nil {
-		if exited, ok := err.(*exec.ExitError); ok && len(exited.Stderr) > 0 {
-			return nil, fmt.Errorf("listing the module's packages: %w\n%s", err, strings.TrimSpace(string(exited.Stderr)))
+	output, outputError := command.Output()
+	if outputError != nil {
+		if exited, ok := outputError.(*exec.ExitError); ok && len(exited.Stderr) > 0 {
+			return nil, fmt.Errorf("listing the module's packages: %w\n%s", outputError, strings.TrimSpace(string(exited.Stderr)))
 		}
-		return nil, fmt.Errorf("listing the module's packages: %w", err)
+		return nil, fmt.Errorf("listing the module's packages: %w", outputError)
 	}
 	packages := map[string]bool{}
 	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
@@ -198,8 +198,8 @@ func modulePackagesIn(root string, environment []string) (map[string]bool, error
 
 // machineLoad is the one-minute load average, or "unknown" where it cannot be read.
 func machineLoad() string {
-	output, err := exec.Command("sysctl", "-n", "vm.loadavg").Output()
-	if err != nil {
+	output, outputError := exec.Command("sysctl", "-n", "vm.loadavg").Output()
+	if outputError != nil {
 		if contents, readError := os.ReadFile("/proc/loadavg"); readError == nil {
 			if fields := strings.Fields(string(contents)); len(fields) > 0 {
 				return fields[0]

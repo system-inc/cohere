@@ -65,8 +65,8 @@ func SourceContents(source string) ([]byte, error) {
 	if !IsSet(source) {
 		return os.ReadFile(source)
 	}
-	contents, err := setFiles.ReadFile(setFilePath(strings.TrimPrefix(source, SetPrefix)))
-	if err != nil {
+	contents, readFileError := setFiles.ReadFile(setFilePath(strings.TrimPrefix(source, SetPrefix)))
+	if readFileError != nil {
 		return nil, fmt.Errorf("%s is not a rule set cohere carries; the sets are %s",
 			source, strings.Join(SetNames(), ", "))
 	}
@@ -115,15 +115,15 @@ type extendsList []string
 
 func (list *extendsList) UnmarshalJSON(data []byte) error {
 	var single string
-	if err := json.Unmarshal(data, &single); err == nil {
+	if decodeError := json.Unmarshal(data, &single); decodeError == nil {
 		if single != "" {
 			*list = extendsList{single}
 		}
 		return nil
 	}
 	var many []string
-	if err := json.Unmarshal(data, &many); err != nil {
-		return fmt.Errorf("\"extends\" names a path or a rule set, or a list of them: %w", err)
+	if decodeError := json.Unmarshal(data, &many); decodeError != nil {
+		return fmt.Errorf("\"extends\" names a path or a rule set, or a list of them: %w", decodeError)
 	}
 	for _, entry := range many {
 		if entry == "" {

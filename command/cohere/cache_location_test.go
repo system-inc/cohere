@@ -98,9 +98,9 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(test *testing.T) {
 	snapshot := func() map[string]string {
 		state := map[string]string{}
 		for _, path := range append(cacheTableFiles(test, first), buildInfo) {
-			information, err := os.Stat(path)
-			if err != nil {
-				test.Fatalf("%s: %v", path, err)
+			information, statError := os.Stat(path)
+			if statError != nil {
+				test.Fatalf("%s: %v", path, statError)
 			}
 			contents, _ := os.ReadFile(path)
 			state[path] = information.ModTime().Format(time.RFC3339Nano) + " " + string(contents)

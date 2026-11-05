@@ -801,14 +801,14 @@ func javaScriptNumberString(text string) string {
 	var value float64
 	switch {
 	case strings.HasPrefix(digits, "0x"), strings.HasPrefix(digits, "0o"), strings.HasPrefix(digits, "0b"):
-		integer, err := strconv.ParseUint(digits, 0, 64)
-		if err != nil {
+		integer, parseError := strconv.ParseUint(digits, 0, 64)
+		if parseError != nil {
 			return text
 		}
 		value = float64(integer)
 	default:
-		parsed, err := strconv.ParseFloat(digits, 64)
-		if err != nil {
+		parsed, parseError := strconv.ParseFloat(digits, 64)
+		if parseError != nil {
 			return text
 		}
 		value = parsed

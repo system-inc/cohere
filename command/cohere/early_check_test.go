@@ -27,11 +27,11 @@ func TestAFixThatRewritesAFileDuringTheEarlyCheckDoesNotCrashTheRun(test *testin
 	write := func(name string, contents string) {
 		test.Helper()
 		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
@@ -58,9 +58,9 @@ func TestAFixThatRewritesAFileDuringTheEarlyCheckDoesNotCrashTheRun(test *testin
 	if !strings.Contains(output, "types: 0 diagnostics over 5 files") {
 		test.Fatalf("the types phase did not report over the rebuilt graph's five files:\n%s", output)
 	}
-	rewritten, err := os.ReadFile(filepath.Join(root, "source/fixable.ts"))
-	if err != nil {
-		test.Fatal(err)
+	rewritten, readError := os.ReadFile(filepath.Join(root, "source/fixable.ts"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if !strings.Contains(string(rewritten), "const unchanged = 1;") {
 		test.Fatalf("prefer-const's fix did not reach disk, so nothing was rewritten during the check:\n%s", rewritten)
@@ -80,11 +80,11 @@ func TestExplainWritesNothing(test *testing.T) {
 	write := func(name string, contents string) {
 		test.Helper()
 		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
@@ -95,9 +95,9 @@ func TestExplainWritesNothing(test *testing.T) {
 	write("source/fixable.ts", fixable)
 
 	output, _ := runCohere(test, binary, root, "--explain", "source/fixable.ts")
-	onDisk, err := os.ReadFile(filepath.Join(root, "source/fixable.ts"))
-	if err != nil {
-		test.Fatal(err)
+	onDisk, readError := os.ReadFile(filepath.Join(root, "source/fixable.ts"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if string(onDisk) != fixable {
 		test.Fatalf("--explain rewrote the file:\n%s\noutput:\n%s", onDisk, output)

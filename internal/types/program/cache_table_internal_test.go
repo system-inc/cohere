@@ -21,11 +21,11 @@ func encodeRaw(test *testing.T, header cacheTableHeader, body any) []byte {
 	test.Helper()
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
-	if err := encoder.Encode(header); err != nil {
-		test.Fatal(err)
+	if encodeError := encoder.Encode(header); encodeError != nil {
+		test.Fatal(encodeError)
 	}
-	if err := encoder.Encode(body); err != nil {
-		test.Fatal(err)
+	if encodeError := encoder.Encode(body); encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	return buffer.Bytes()
 }
@@ -37,8 +37,8 @@ func currentHeader(section string) cacheTableHeader {
 // writeRaw puts a raw file into a table's directory.
 func writeRaw(test *testing.T, directory string, name string, contents []byte) {
 	test.Helper()
-	if err := os.WriteFile(filepath.Join(directory, name), contents, 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(directory, name), contents, 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 }
 
@@ -58,9 +58,9 @@ func TestCacheTableRefusesAnotherFormat(test *testing.T) {
 			test.Parallel()
 			directory := test.TempDir()
 			writeRaw(test, directory, cacheTableFile(cacheTableTypesSection), encodeRaw(test, header, &TypesSection{Version: typesSectionVersion}))
-			table, err := ReadCacheTable(directory, internalTestIdentity, CacheTableSections{Types: true}, PathAnchor{})
-			if !errors.Is(err, ErrCacheTableUnreadable) || table.Types != nil {
-				test.Fatalf("read %s: section %v, error %v", name, table.Types, err)
+			table, readCacheTableError := ReadCacheTable(directory, internalTestIdentity, CacheTableSections{Types: true}, PathAnchor{})
+			if !errors.Is(readCacheTableError, ErrCacheTableUnreadable) || table.Types != nil {
+				test.Fatalf("read %s: section %v, error %v", name, table.Types, readCacheTableError)
 			}
 		})
 	}
@@ -78,9 +78,9 @@ func TestCacheTableRefusesAListIndexPastItsTable(test *testing.T) {
 			wire := &lintCacheWire{Version: lintCacheVersion, Lists: [][]string{{"no-debugger"}}, Entries: []lintCacheWireEntry{entry}}
 			directory := test.TempDir()
 			writeRaw(test, directory, cacheTableFile(cacheTableFindingsSection), encodeRaw(test, currentHeader(cacheTableFindingsSection), wire))
-			table, err := ReadCacheTable(directory, internalTestIdentity, CacheTableSections{Findings: true}, PathAnchor{})
-			if !errors.Is(err, ErrCacheTableUnreadable) || table.Findings != nil {
-				test.Fatalf("an entry whose %s index is past the list table was read: %v", field, err)
+			table, readCacheTableError := ReadCacheTable(directory, internalTestIdentity, CacheTableSections{Findings: true}, PathAnchor{})
+			if !errors.Is(readCacheTableError, ErrCacheTableUnreadable) || table.Findings != nil {
+				test.Fatalf("an entry whose %s index is past the list table was read: %v", field, readCacheTableError)
 			}
 		})
 	}
@@ -96,9 +96,9 @@ func TestCacheTableDropsAFindingsSectionOfAnotherMeaning(test *testing.T) {
 		encodeRaw(test, currentHeader(cacheTableRunSection), cacheTableRunBody{Invocation: "--no-fix", Run: &RunCache{Key: "kept"}}))
 	writeRaw(test, directory, cacheTableFile(cacheTableFindingsSection), encodeRaw(test, currentHeader(cacheTableFindingsSection),
 		&lintCacheWire{Version: lintCacheVersion - 1, Lists: [][]string{{}}, Entries: []lintCacheWireEntry{{Path: "/a.ts"}}}))
-	table, err := ReadCacheTable(directory, internalTestIdentity, CacheTableSections{Runs: []string{"--no-fix"}, Findings: true}, PathAnchor{})
-	if err != nil {
-		test.Fatalf("reading: %v", err)
+	table, readCacheTableError := ReadCacheTable(directory, internalTestIdentity, CacheTableSections{Runs: []string{"--no-fix"}, Findings: true}, PathAnchor{})
+	if readCacheTableError != nil {
+		test.Fatalf("reading: %v", readCacheTableError)
 	}
 	if table.Findings != nil {
 		test.Error("a findings section of another version was used")
@@ -120,8 +120,8 @@ func TestAFileFromAnotherCohereCommitIsDiscardedAlone(test *testing.T) {
 		Signatures: map[string]SignatureEntry{"/a.ts": {Version: "1"}},
 		Types:      &TypesSection{Version: typesSectionVersion},
 	}
-	if err := WriteCacheTable(directory, current, internalTestIdentity, EveryCacheTableSection, PathAnchor{}); err != nil {
-		test.Fatal(err)
+	if writeCacheTableError := WriteCacheTable(directory, current, internalTestIdentity, EveryCacheTableSection, PathAnchor{}); writeCacheTableError != nil {
+		test.Fatal(writeCacheTableError)
 	}
 	other := internalTestIdentity
 	other.SelfCommit = "another"
@@ -150,8 +150,8 @@ func TestAFileFromAnotherCohereCommitIsDiscardedAlone(test *testing.T) {
 	}
 
 	// A run file under the wrong name is refused, whatever it holds.
-	if err := os.Rename(filepath.Join(directory, cacheTableRunFile("")), filepath.Join(directory, cacheTableRunFile("--fix"))); err != nil {
-		test.Fatal(err)
+	if renameError := os.Rename(filepath.Join(directory, cacheTableRunFile("")), filepath.Join(directory, cacheTableRunFile("--fix"))); renameError != nil {
+		test.Fatal(renameError)
 	}
 	table, err = ReadCacheTable(directory, internalTestIdentity, CacheTableSections{Runs: []string{"--fix"}}, PathAnchor{})
 	if !errors.Is(err, ErrCacheTableUnreadable) || table.Runs["--fix"] != nil {
@@ -165,9 +165,9 @@ func TestTheSingleFileTableIsRemovedUnread(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	writeRaw(test, directory, legacyCacheTableFile, []byte("whatever an older cohere wrote"))
-	_, err := ReadCacheTable(directory, internalTestIdentity, EveryCacheTableSection, PathAnchor{})
-	if !errors.Is(err, os.ErrNotExist) {
-		test.Errorf("reading a directory holding only table.gob: %v", err)
+	_, readCacheTableError := ReadCacheTable(directory, internalTestIdentity, EveryCacheTableSection, PathAnchor{})
+	if !errors.Is(readCacheTableError, os.ErrNotExist) {
+		test.Errorf("reading a directory holding only table.gob: %v", readCacheTableError)
 	}
 	if _, statError := os.Stat(filepath.Join(directory, legacyCacheTableFile)); !errors.Is(statError, os.ErrNotExist) {
 		test.Errorf("table.gob is still there: %v", statError)
@@ -274,9 +274,9 @@ func TestInterningKeepsListsThatShareTheirEndsApart(test *testing.T) {
 	if len(wire.Lists) != 4 {
 		test.Errorf("%d distinct lists interned from 4 distinct ones: %v", len(wire.Lists), wire.Lists)
 	}
-	back, err := wire.cache()
-	if err != nil {
-		test.Fatal(err)
+	back, cacheError := wire.cache()
+	if cacheError != nil {
+		test.Fatal(cacheError)
 	}
 	for index, list := range lists {
 		if strings.Join(back.Entries[index].Rules, ",") != strings.Join(list, ",") {

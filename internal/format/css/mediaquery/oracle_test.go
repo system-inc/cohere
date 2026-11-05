@@ -238,7 +238,7 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 			home, _ := os.UserHomeDir()
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		err := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
+		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -259,8 +259,8 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 			corpusFiles++
 			return nil
 		})
-		if err != nil {
-			test.Fatalf("walking %s: %v", corpus, err)
+		if walkError != nil {
+			test.Fatalf("walking %s: %v", corpus, walkError)
 		}
 	}
 	if corpusFiles == 0 {
@@ -275,9 +275,9 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 
 	var stdin bytes.Buffer
 	for _, each := range inputs {
-		encoded, err := json.Marshal(each)
-		if err != nil {
-			test.Fatal(err)
+		encoded, encodeError := json.Marshal(each)
+		if encodeError != nil {
+			test.Fatal(encodeError)
 		}
 		stdin.Write(encoded)
 		stdin.WriteByte('\n')
@@ -287,8 +287,8 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 	command.Stdin = &stdin
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		test.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 
 	var records []map[string]any
@@ -297,8 +297,8 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 			continue
 		}
 		var each map[string]any
-		if err := json.Unmarshal([]byte(line), &each); err != nil {
-			test.Fatal(err)
+		if decodeError := json.Unmarshal([]byte(line), &each); decodeError != nil {
+			test.Fatal(decodeError)
 		}
 		records = append(records, each)
 	}
@@ -324,11 +324,11 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 			fail("%s: the fixture says throws=%v and the library says %v", name, expectThrow, want)
 			continue
 		}
-		got, err := dumpMediaQuery(params)
+		got, dumpMediaQueryError := dumpMediaQuery(params)
 		switch {
-		case oracleRefused && err != nil:
-			if err.Error() != wantError {
-				fail("%s: both refuse, with different messages:\n  library %s\n  Go      %s", name, wantError, err.Error())
+		case oracleRefused && dumpMediaQueryError != nil:
+			if dumpMediaQueryError.Error() != wantError {
+				fail("%s: both refuse, with different messages:\n  library %s\n  Go      %s", name, wantError, dumpMediaQueryError.Error())
 				continue
 			}
 			refusedByBoth++
@@ -337,8 +337,8 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 			}
 		case oracleRefused:
 			fail("%s: the library throws (%s) on %q and Go parsed it", name, wantError, params)
-		case err != nil:
-			fail("%s: the library parses %q and Go refused: %v", name, params, err)
+		case dumpMediaQueryError != nil:
+			fail("%s: the library parses %q and Go refused: %v", name, params, dumpMediaQueryError)
 		default:
 			if difference := firstMediaQueryDifference(want["tree"], got, "tree"); difference != "" {
 				fail("%s (%q): %s", name, params, difference)

@@ -596,8 +596,8 @@ func correctnessNoProcessExitAfterOutputRunWithHelpers(test *testing.T, sourceTe
 	}, correctnessNoProcessExitAfterOutputFile, func(directory string) {
 		tsconfig := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], ` +
 			`"moduleDetection": "auto", "types": []}, "include": ["**/*.ts"]}`
-		if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(tsconfig), 0o644); err != nil {
-			test.Fatalf("writing the tsconfig: %v", err)
+		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(tsconfig), 0o644); writeError != nil {
+			test.Fatalf("writing the tsconfig: %v", writeError)
 		}
 	})
 }

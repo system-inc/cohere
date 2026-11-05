@@ -31,9 +31,9 @@ func TestHomePathsFindsAPlantedHomePath(test *testing.T) {
 		{"a marker with no reason", "// Not a machine path:\nconst root = \"/Users/someone/x\"", 1},
 	}
 	for _, testCase := range cases {
-		found, err := HomePaths("planted_test.go", []byte("package p\n\n"+testCase.source+"\n"))
-		if err != nil {
-			test.Fatalf("%s: %v", testCase.name, err)
+		found, homePathsError := HomePaths("planted_test.go", []byte("package p\n\n"+testCase.source+"\n"))
+		if homePathsError != nil {
+			test.Fatalf("%s: %v", testCase.name, homePathsError)
 		}
 		if len(found) != testCase.want {
 			test.Errorf("%s: found %d, expected %d: %v", testCase.name, len(found), testCase.want, found)
@@ -46,9 +46,9 @@ func TestNoCohereTestNamesAHomeDirectory(test *testing.T) {
 	test.Parallel()
 	found := []HomePath{}
 	root, _ := eachTestFile(test, func(path string, source []byte) error {
-		inFile, err := HomePaths(path, source)
+		inFile, homePathsError := HomePaths(path, source)
 		found = append(found, inFile...)
-		return err
+		return homePathsError
 	})
 	lines := map[string][]string{}
 	for _, homePath := range found {

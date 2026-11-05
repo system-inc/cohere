@@ -29,8 +29,8 @@ func TestCohereRunsNoGit(test *testing.T) {
 	fakeGit := test.TempDir()
 	gitLog := filepath.Join(test.TempDir(), "git-calls.log")
 	script := "#!/bin/sh\necho \"git $*\" >> '" + gitLog + "'\nexit 1\n"
-	if err := os.WriteFile(filepath.Join(fakeGit, "git"), []byte(script), 0o755); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(fakeGit, "git"), []byte(script), 0o755); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	// The two sequences share nothing, each with its own project and home, so they run at once: one after
@@ -42,13 +42,13 @@ func TestCohereRunsNoGit(test *testing.T) {
 		test.Run("without git", func(test *testing.T) {
 			test.Parallel()
 			withoutGit = runNoGitSequence(test, binary, "PATH="+fakeGit)
-			if calls, err := os.ReadFile(gitLog); err == nil && len(calls) > 0 {
+			if calls, readError := os.ReadFile(gitLog); readError == nil && len(calls) > 0 {
 				test.Fatalf("cohere ran git:\n%s", calls)
 			}
 		})
 		test.Run("with git", func(test *testing.T) {
 			test.Parallel()
-			if _, err := exec.LookPath("git"); err != nil {
+			if _, lookPathError := exec.LookPath("git"); lookPathError != nil {
 				test.Skip("no git on this machine to compare against; the no-git sequence still runs")
 			}
 			withGit = runNoGitSequence(test, binary, "PATH="+os.Getenv("PATH"))
@@ -92,9 +92,9 @@ func runNoGitSequence(test *testing.T, binary string, path string) []string {
 
 	// The temporary root reaches the output through a symbolic link on macOS (`/var` is `/private/var`),
 	// so both spellings are normalized, the resolved one first.
-	resolvedRoot, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		test.Fatal(err)
+	resolvedRoot, resolveSymlinksError := filepath.EvalSymlinks(root)
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
 	}
 	// Gigabytes too: the memory line reads available memory live, so two runs a second apart differ there.
 	durations := regexp.MustCompile(`\d+(\.\d+)?(ms|s|µs| GB)\b`)
@@ -112,13 +112,13 @@ func runNoGitSequence(test *testing.T, binary string, path string) []string {
 		// scheduler's, and two runs that printed the same things would compare as different.
 		var stdout, stderr bytes.Buffer
 		command.Stdout, command.Stderr = &stdout, &stderr
-		err := command.Run()
+		runError := command.Run()
 		output := stdout.String() + "\n--- stderr\n" + stderr.String()
 		code := 0
-		if exitError, isExit := err.(*exec.ExitError); isExit {
+		if exitError, isExit := runError.(*exec.ExitError); isExit {
 			code = childExitCode(test, exitError)
-		} else if err != nil {
-			test.Fatalf("running cohere: %v\n%s", err, output)
+		} else if runError != nil {
+			test.Fatalf("running cohere: %v\n%s", runError, output)
 		}
 		normalized := strings.ReplaceAll(output, resolvedRoot, "ROOT")
 		normalized = strings.ReplaceAll(normalized, root, "ROOT")
@@ -201,8 +201,8 @@ func runNoGitSequence(test *testing.T, binary string, path string) []string {
 	expectWouldChange("an edit put back", step("--no-fix", "--format"))
 
 	// A deleted file drops out, and a new file nothing has tracked is seen.
-	if err := os.Remove(filepath.Join(root, "Ugly.ts")); err != nil {
-		test.Fatal(err)
+	if removeError := os.Remove(filepath.Join(root, "Ugly.ts")); removeError != nil {
+		test.Fatal(removeError)
 	}
 	writeTree(test, root, map[string]string{"Fresh.ts": "export const fresh   =   1\n"})
 	output = step("--no-fix", "--format")

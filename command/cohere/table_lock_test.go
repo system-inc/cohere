@@ -95,8 +95,8 @@ func TestAStuckWriterCostsTheNextRunItsBound(test *testing.T) {
 func TestALoneRunPaysAlmostNothingToWait(test *testing.T) {
 	directory := test.TempDir()
 	holdTableLock(directory)()
-	if _, err := os.Stat(tableLockPath(directory)); err != nil {
-		test.Fatalf("the writer left no lock file, so this measures the missing-file path: %v", err)
+	if _, statError := os.Stat(tableLockPath(directory)); statError != nil {
+		test.Fatalf("the writer left no lock file, so this measures the missing-file path: %v", statError)
 	}
 	const rounds = 1000
 	start := time.Now()

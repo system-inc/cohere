@@ -55,8 +55,8 @@ func DecodeRequireDescriptionOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, fmt.Errorf("%s: %w", RequireDescription.Name, err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, fmt.Errorf("%s: %w", RequireDescription.Name, unmarshalOptionsError)
 	}
 	seen := map[string]bool{}
 	for _, kind := range options.Ignore {

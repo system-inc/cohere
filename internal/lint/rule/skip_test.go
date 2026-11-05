@@ -18,7 +18,7 @@ func TestEverySkipSaysWhichKindItIs(test *testing.T) {
 	test.Parallel()
 	covers := map[string]bool{"CoverTypeCheck": true}
 	calls := 0
-	err := filepath.WalkDir("../rules", func(path string, entry fs.DirEntry, err error) error {
+	walkError := filepath.WalkDir("../rules", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return err
 		}
@@ -60,8 +60,8 @@ func TestEverySkipSaysWhichKindItIs(test *testing.T) {
 		})
 		return nil
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	// The walk finding no skip at all would pass every assertion above, so it must find the ones that exist.
 	if calls == 0 {

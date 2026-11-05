@@ -22,8 +22,8 @@ func TestAStoppedSpeculationBeginsNoMoreFiles(test *testing.T) {
 	var candidates []string
 	for index := range 40 {
 		fileName := filepath.Join(directory, fmt.Sprintf("f%02d.md", index))
-		if err := os.WriteFile(fileName, []byte("# Title\n"), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(fileName, []byte("# Title\n"), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		candidates = append(candidates, fileName)
 	}

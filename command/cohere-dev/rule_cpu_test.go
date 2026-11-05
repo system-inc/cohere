@@ -18,11 +18,11 @@ func TestLandRefusesTheRuleCPUBudgetBeforeTests(test *testing.T) {
 	fixture := newLandFixture(test)
 	a := fixture.worktree("a")
 	path := filepath.Join(a, ruleCPUCheck)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.WriteFile(path, []byte("stand-in budget check\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(path, []byte("stand-in budget check\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	fixture.git(a, "add", "internal")
 	fixture.git(a, "commit", "-q", "-m", "a rule CPU check")
@@ -44,23 +44,23 @@ case "$*" in
 esac
 exit 0
 `
-	if err := os.WriteFile(filepath.Join(bin, "go"), []byte(stand), 0o755); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(bin, "go"), []byte(stand), 0o755); writeError != nil {
+		test.Fatal(writeError)
 	}
 	environment := append(fixture.environment, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	land := func() (string, error) {
 		command := exec.Command(fixture.wrapper, "land")
 		command.Dir, command.Env = a, environment
-		output, err := command.CombinedOutput()
-		return string(output), err
+		output, outputError := command.CombinedOutput()
+		return string(output), outputError
 	}
 	before := fixture.git(fixture.repository, "rev-parse", "main")
 	if output, err := land(); err == nil || !strings.Contains(output, "planted-rule 501ms > 500ms") || strings.Contains(output, "landed ") {
 		test.Fatalf("over-budget land was not refused (%v):\n%s", err, output)
 	}
-	commands, err := os.ReadFile(log)
-	if err != nil {
-		test.Fatal(err)
+	commands, readError := os.ReadFile(log)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	lines := strings.Split(strings.TrimSpace(string(commands)), "\n")
 	if len(lines) != 2 || !strings.HasPrefix(lines[0], "vet ") || !strings.Contains(lines[1], "-count=1 -timeout=30s -run=^TestRegisteredRuleCPUBudget$ -v ./internal/lint/registry") {
@@ -69,8 +69,8 @@ exit 0
 	if got := fixture.git(fixture.repository, "rev-parse", "main"); got != before {
 		test.Fatalf("refused land moved main: %s -> %s", before, got)
 	}
-	if err := os.WriteFile(marker, nil, 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(marker, nil, 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	if output, err := land(); err != nil || !strings.Contains(output, "rule CPU budget passed") || !strings.Contains(output, "landed ") {
 		test.Fatalf("under-budget land did not land (%v):\n%s", err, output)
@@ -79,9 +79,9 @@ exit 0
 
 func TestCohereHasTheRuleCPUCheckTheGateRuns(test *testing.T) {
 	test.Parallel()
-	source, err := os.ReadFile(filepath.Join("..", "..", ruleCPUCheck))
-	if err != nil {
-		test.Fatal(err)
+	source, readError := os.ReadFile(filepath.Join("..", "..", ruleCPUCheck))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if !strings.Contains(string(source), "func TestRegisteredRuleCPUBudget(test *testing.T)") {
 		test.Fatal("the gate's named test is missing")

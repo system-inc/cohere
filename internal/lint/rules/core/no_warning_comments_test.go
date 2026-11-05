@@ -340,8 +340,8 @@ func fmtOptions(options any) string {
 	if options == nil {
 		return "default"
 	}
-	encoded, err := json.Marshal(options)
-	if err != nil {
+	encoded, encodeError := json.Marshal(options)
+	if encodeError != nil {
 		return "?"
 	}
 	return string(encoded)
@@ -392,9 +392,9 @@ func TestDecodeNoWarningCommentsOptions(test *testing.T) {
 
 	test.Run("nil input yields the defaults", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoWarningCommentsOptions(nil)
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeNoWarningCommentsOptionsError := DecodeNoWarningCommentsOptions(nil)
+		if decodeNoWarningCommentsOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeNoWarningCommentsOptionsError)
 		}
 		options := decoded.(NoWarningCommentsOptions)
 		if options.Terms != nil || options.Location != "" {
@@ -412,9 +412,9 @@ func TestDecodeNoWarningCommentsOptions(test *testing.T) {
 	} {
 		test.Run("upstream's "+testCase.raw+" is read", func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoWarningCommentsOptions([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("unexpected error: %v", err)
+			decoded, decodeNoWarningCommentsOptionsError := DecodeNoWarningCommentsOptions([]byte(testCase.raw))
+			if decodeNoWarningCommentsOptionsError != nil {
+				test.Fatalf("unexpected error: %v", decodeNoWarningCommentsOptionsError)
 			}
 			if decoded.(NoWarningCommentsOptions).Location != testCase.want {
 				test.Errorf("location = %q, wanted %q", decoded.(NoWarningCommentsOptions).Location, testCase.want)
@@ -433,7 +433,7 @@ func TestDecodeNoWarningCommentsOptions(test *testing.T) {
 	} {
 		test.Run(raw+" is refused", func(test *testing.T) {
 			test.Parallel()
-			if _, err := DecodeNoWarningCommentsOptions([]byte(raw)); err == nil {
+			if _, decodeNoWarningCommentsOptionsError := DecodeNoWarningCommentsOptions([]byte(raw)); decodeNoWarningCommentsOptionsError == nil {
 				test.Errorf("%s decoded; upstream's schema refuses it", raw)
 			}
 		})
@@ -441,14 +441,14 @@ func TestDecodeNoWarningCommentsOptions(test *testing.T) {
 
 	test.Run("a multi-character decoration is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeNoWarningCommentsOptions([]byte(`{"decoration":["**"]}`)); err == nil {
+		if _, decodeNoWarningCommentsOptionsError := DecodeNoWarningCommentsOptions([]byte(`{"decoration":["**"]}`)); decodeNoWarningCommentsOptionsError == nil {
 			test.Error("a two-character decoration decoded, which would widen the class")
 		}
 	})
 
 	test.Run("a whitespace decoration is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeNoWarningCommentsOptions([]byte(`{"decoration":[" "]}`)); err == nil {
+		if _, decodeNoWarningCommentsOptionsError := DecodeNoWarningCommentsOptions([]byte(`{"decoration":[" "]}`)); decodeNoWarningCommentsOptionsError == nil {
 			test.Error("a whitespace decoration decoded")
 		}
 	})

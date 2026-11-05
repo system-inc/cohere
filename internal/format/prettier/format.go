@@ -61,15 +61,15 @@ type Engine struct {
 // Evaluation happens once, here, rather than per format. It costs about 100ms, and paying it per
 // file would dominate the formatting itself.
 func New(options formatoptions.Options) (*Engine, error) {
-	sources, err := loadBundles()
-	if err != nil {
-		return nil, err
+	sources, loadBundlesError := loadBundles()
+	if loadBundlesError != nil {
+		return nil, loadBundlesError
 	}
 
 	runtime := goja.New()
 	for _, source := range sources {
-		if _, err := runtime.RunString(source.text); err != nil {
-			return nil, fmt.Errorf("evaluating prettier bundle %s: %w", source.name, err)
+		if _, runStringError := runtime.RunString(source.text); runStringError != nil {
+			return nil, fmt.Errorf("evaluating prettier bundle %s: %w", source.name, runStringError)
 		}
 	}
 

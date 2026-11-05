@@ -29,9 +29,9 @@ func noExtraneousClassCaseName(index int) string {
 // [severity, options] tuple, so what arrives is the bare object rather than a one-element array.
 func decodeNoExtraneousClassOptionsForTest(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeNoExtraneousClassOptions(json.RawMessage(raw))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	decoded, decodeNoExtraneousClassOptionsError := DecodeNoExtraneousClassOptions(json.RawMessage(raw))
+	if decodeNoExtraneousClassOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeNoExtraneousClassOptionsError)
 	}
 	return decoded
 }

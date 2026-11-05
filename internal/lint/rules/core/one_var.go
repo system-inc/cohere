@@ -158,7 +158,7 @@ func DecodeOneVarOptions(raw []byte) (any, error) {
 	// The string form first, because it is the common one and because a JSON string cannot also
 	// decode as an object, so trying it costs nothing and cannot misfire.
 	var wire string
-	if err := json.Unmarshal(raw, &wire); err == nil {
+	if decodeError := json.Unmarshal(raw, &wire); decodeError == nil {
 		mode, modeErr := oneVarModeFromWire(wire)
 		if modeErr != nil {
 			return DefaultOneVarSettings(), modeErr
@@ -168,9 +168,9 @@ func DecodeOneVarOptions(raw []byte) (any, error) {
 	}
 
 	var object oneVarObjectOptions
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
 		return DefaultOneVarSettings(),
-			fmt.Errorf("one-var takes a string or an object, %q: %w", string(raw), err)
+			fmt.Errorf("one-var takes a string or an object, %q: %w", string(raw), unmarshalOptionsError)
 	}
 
 	// Upstream's two object arms are `additionalProperties: false`, so a config naming a
@@ -197,9 +197,9 @@ func DecodeOneVarOptions(raw []byte) (any, error) {
 		if wire == nil {
 			return nil
 		}
-		mode, err := oneVarModeFromWire(*wire)
-		if err != nil {
-			return err
+		mode, oneVariableModeFromWireError := oneVarModeFromWire(*wire)
+		if oneVariableModeFromWireError != nil {
+			return oneVariableModeFromWireError
 		}
 		group.Uninitialized = &mode
 		group.Initialized = &mode
@@ -224,9 +224,9 @@ func DecodeOneVarOptions(raw []byte) (any, error) {
 	// `Object.hasOwn` blocks. Note it overwrites rather than merges, matching the order upstream
 	// applies them in -- though the mixture is refused above, so the two never meet in practice.
 	if object.Uninitialized != nil {
-		mode, err := oneVarModeFromWire(*object.Uninitialized)
-		if err != nil {
-			return DefaultOneVarSettings(), err
+		mode, oneVariableModeFromWireError := oneVarModeFromWire(*object.Uninitialized)
+		if oneVariableModeFromWireError != nil {
+			return DefaultOneVarSettings(), oneVariableModeFromWireError
 		}
 		settings.Var.Uninitialized = &mode
 		settings.Let.Uninitialized = &mode
@@ -235,9 +235,9 @@ func DecodeOneVarOptions(raw []byte) (any, error) {
 		settings.AwaitUsing.Uninitialized = &mode
 	}
 	if object.Initialized != nil {
-		mode, err := oneVarModeFromWire(*object.Initialized)
-		if err != nil {
-			return DefaultOneVarSettings(), err
+		mode, oneVariableModeFromWireError := oneVarModeFromWire(*object.Initialized)
+		if oneVariableModeFromWireError != nil {
+			return DefaultOneVarSettings(), oneVariableModeFromWireError
 		}
 		settings.Var.Initialized = &mode
 		settings.Let.Initialized = &mode

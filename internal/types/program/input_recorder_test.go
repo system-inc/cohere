@@ -22,11 +22,11 @@ func TestInputRecorderRecordsAFileProbedAsADirectoryAsPresent(test *testing.T) {
 	root := test.TempDir()
 	write := func(path, contents string) {
 		test.Helper()
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	write(filepath.Join(root, "tsconfig.json"), `{"compilerOptions":{"strict":true,"noEmit":true,"module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
@@ -34,8 +34,8 @@ func TestInputRecorderRecordsAFileProbedAsADirectoryAsPresent(test *testing.T) {
 	write(filepath.Join(root, "source", "style.css"), "body {}\n")
 
 	recorder := program.NewInputRecorder()
-	if _, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root, Inputs: recorder}); err != nil {
-		test.Fatalf("build: %v", err)
+	if _, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root, Inputs: recorder}); buildError != nil {
+		test.Fatalf("build: %v", buildError)
 	}
 	present, absent, probed := recorder.Inputs()
 
@@ -44,7 +44,7 @@ func TestInputRecorderRecordsAFileProbedAsADirectoryAsPresent(test *testing.T) {
 		test.Errorf("%s is on disk and was recorded absent, so every check would report it appearing", style)
 	}
 	for _, path := range absent {
-		if _, err := os.Stat(path); err == nil {
+		if _, statError := os.Stat(path); statError == nil {
 			test.Errorf("%s is on disk and was recorded absent", path)
 		}
 	}
@@ -59,12 +59,12 @@ func TestInputRecorderRecordsAFileProbedAsADirectoryAsPresent(test *testing.T) {
 
 	// And the whole recording replays as a hit on the untouched tree, which is the property all of
 	// this serves.
-	cache, err := program.RecordRunCache("k", present, nil, absent, probed, nil, 0, time.Time{})
-	if err != nil {
-		test.Fatalf("record: %v", err)
+	cache, recordRunCacheError := program.RecordRunCache("k", present, nil, absent, probed, nil, 0, time.Time{})
+	if recordRunCacheError != nil {
+		test.Fatalf("record: %v", recordRunCacheError)
 	}
-	if err := cache.Check("k"); err != nil {
-		test.Fatalf("the untouched tree missed: %v", err)
+	if checkError := cache.Check("k"); checkError != nil {
+		test.Fatalf("the untouched tree missed: %v", checkError)
 	}
 }
 
@@ -82,28 +82,28 @@ func TestADirectoryOnlyProbedIsRecordedForItsExistence(test *testing.T) {
 	root := filepath.Join(parent, "project")
 	write := func(path string, contents string) {
 		test.Helper()
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	write(filepath.Join(root, "tsconfig.json"), `{"compilerOptions":{"strict":true,"noEmit":true},"include":["**/*.ts"]}`)
 	write(filepath.Join(root, "index.ts"), "export const a: number = 1;\n")
-	if err := os.Mkdir(filepath.Join(root, "empty"), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.Mkdir(filepath.Join(root, "empty"), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 	record := func() *program.RunCache {
 		test.Helper()
 		recorder := program.NewInputRecorder()
-		if _, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root, Inputs: recorder}); err != nil {
-			test.Fatalf("build: %v", err)
+		if _, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root, Inputs: recorder}); buildError != nil {
+			test.Fatalf("build: %v", buildError)
 		}
 		present, absent, probed := recorder.Inputs()
-		cache, err := program.RecordRunCache("k", present, nil, absent, probed, nil, 0, time.Time{})
-		if err != nil {
-			test.Fatalf("record: %v", err)
+		cache, recordRunCacheError := program.RecordRunCache("k", present, nil, absent, probed, nil, 0, time.Time{})
+		if recordRunCacheError != nil {
+			test.Fatalf("record: %v", recordRunCacheError)
 		}
 		return cache
 	}
@@ -128,26 +128,26 @@ func TestADirectoryOnlyProbedIsRecordedForItsExistence(test *testing.T) {
 		test.Fatal("the project's own directory was not recorded, so nothing below is about what a listing catches")
 	}
 
-	if err := os.Mkdir(filepath.Join(parent, "unrelated"), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.Mkdir(filepath.Join(parent, "unrelated"), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := cache.Check("k"); err != nil {
-		test.Fatalf("a directory created beside the project cost the replay: %v", err)
+	if checkError := cache.Check("k"); checkError != nil {
+		test.Fatalf("a directory created beside the project cost the replay: %v", checkError)
 	}
 
 	write(filepath.Join(parent, "package.json"), "{}\n")
-	if err := cache.Check("k"); err == nil {
+	if checkError := cache.Check("k"); checkError == nil {
 		test.Error("a package.json created above the project, which module resolution reads, still replayed")
 	}
-	if err := os.Remove(filepath.Join(parent, "package.json")); err != nil {
-		test.Fatal(err)
+	if removeError := os.Remove(filepath.Join(parent, "package.json")); removeError != nil {
+		test.Fatal(removeError)
 	}
-	if err := cache.Check("k"); err != nil {
-		test.Fatalf("with the package.json removed again the tree did not hit: %v", err)
+	if checkError := cache.Check("k"); checkError != nil {
+		test.Fatalf("with the package.json removed again the tree did not hit: %v", checkError)
 	}
 
 	write(filepath.Join(root, "empty", "added.ts"), "export const added = 2;\n")
-	if err := cache.Check("k"); err == nil {
+	if checkError := cache.Check("k"); checkError == nil {
 		test.Error("a file added to a directory the include glob lists, holding nothing the build read, still replayed")
 	}
 }
@@ -161,11 +161,11 @@ func TestRemovingAPackageWhoseProbeWasLeftOutStillMisses(test *testing.T) {
 	root := test.TempDir()
 	write := func(path string, contents string) {
 		test.Helper()
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	write(filepath.Join(root, "tsconfig.json"), `{"compilerOptions":{"strict":true,"noEmit":true,"module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
@@ -174,8 +174,8 @@ func TestRemovingAPackageWhoseProbeWasLeftOutStillMisses(test *testing.T) {
 	write(filepath.Join(root, "node_modules", "pkg", "index.d.ts"), "export declare const value: number;\n")
 
 	recorder := program.NewInputRecorder()
-	if _, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root, Inputs: recorder}); err != nil {
-		test.Fatalf("build: %v", err)
+	if _, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root, Inputs: recorder}); buildError != nil {
+		test.Fatalf("build: %v", buildError)
 	}
 	present, absent, probed := recorder.Inputs()
 	pkg := filepath.Join(root, "node_modules", "pkg")
@@ -185,17 +185,17 @@ func TestRemovingAPackageWhoseProbeWasLeftOutStillMisses(test *testing.T) {
 	if slices.Contains(probed, pkg) {
 		test.Errorf("%s has a recorded path beneath it and was still recorded as a probe", pkg)
 	}
-	cache, err := program.RecordRunCache("k", present, nil, absent, probed, nil, 0, time.Time{})
-	if err != nil {
-		test.Fatalf("record: %v", err)
+	cache, recordRunCacheError := program.RecordRunCache("k", present, nil, absent, probed, nil, 0, time.Time{})
+	if recordRunCacheError != nil {
+		test.Fatalf("record: %v", recordRunCacheError)
 	}
-	if err := cache.Check("k"); err != nil {
-		test.Fatalf("the untouched tree missed: %v", err)
+	if checkError := cache.Check("k"); checkError != nil {
+		test.Fatalf("the untouched tree missed: %v", checkError)
 	}
-	if err := os.Rename(pkg, pkg+"-moved"); err != nil {
-		test.Fatal(err)
+	if renameError := os.Rename(pkg, pkg+"-moved"); renameError != nil {
+		test.Fatal(renameError)
 	}
-	if err := cache.Check("k"); err == nil {
+	if checkError := cache.Check("k"); checkError == nil {
 		test.Error("the package's directory was moved away and the record still replayed")
 	}
 }

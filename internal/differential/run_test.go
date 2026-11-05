@@ -105,17 +105,17 @@ func TestPlantingRefusesToOverwriteAnExistingFile(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
 	existing := filepath.Join(root, "Occupied.ts")
-	if err := os.WriteFile(existing, []byte("export const mine = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(existing, []byte("export const mine = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
-	_, cleanup, err := plantControls(RunOptions{
+	_, cleanup, plantControlsError := plantControls(RunOptions{
 		Root:     root,
 		Controls: []Control{{Name: "clobber", RelativePath: "Occupied.ts", Contents: "export enum Bad {}\n"}},
 	})
 	cleanup()
 
-	if err == nil {
+	if plantControlsError == nil {
 		test.Fatal("planting over an existing file must be refused")
 	}
 	contents, readErr := os.ReadFile(existing)
@@ -157,7 +157,7 @@ func TestPlantedControlsAreWrittenThenRemoved(test *testing.T) {
 	}
 
 	cleanup()
-	if _, err := os.Stat(absolutePath); !os.IsNotExist(err) {
+	if _, statError := os.Stat(absolutePath); !os.IsNotExist(statError) {
 		test.Fatal("the planted control was left behind, and the next person to run either gate would lint it")
 	}
 }
@@ -167,30 +167,30 @@ func TestPlantedControlsAreWrittenThenRemoved(test *testing.T) {
 // A process that never started produces empty stdout, which is byte-identical to a clean run.
 func TestAGateThatCannotRunIsAnErrorNotSilence(test *testing.T) {
 	test.Parallel()
-	output, err := runGate(context.Background(), GateCommand{
+	output, runGateError := runGate(context.Background(), GateCommand{
 		Name:      "missing",
 		Program:   filepath.Join(test.TempDir(), "no-such-binary"),
 		Directory: test.TempDir(),
 	})
-	if err == nil {
+	if runGateError == nil {
 		test.Fatalf("a gate that does not exist must be an error, got output %q", output)
 	}
-	if !strings.Contains(err.Error(), "did not run") {
-		test.Fatalf("the error must say the gate never ran, got %v", err)
+	if !strings.Contains(runGateError.Error(), "did not run") {
+		test.Fatalf("the error must say the gate never ran, got %v", runGateError)
 	}
 }
 
 // A gate exiting non-zero is normal: that is what a gate with findings does.
 func TestANonZeroExitIsNotAFailure(test *testing.T) {
 	test.Parallel()
-	output, err := runGate(context.Background(), GateCommand{
+	output, runGateError := runGate(context.Background(), GateCommand{
 		Name:      "finds-something",
 		Program:   "/bin/sh",
 		Arguments: []string{"-c", "echo 'a.ts:1:1: error nexus(consistency-no-enum): found'; exit 1"},
 		Directory: test.TempDir(),
 	})
-	if err != nil {
-		test.Fatalf("a non-zero exit from a gate with findings must not be an error: %v", err)
+	if runGateError != nil {
+		test.Fatalf("a non-zero exit from a gate with findings must not be an error: %v", runGateError)
 	}
 	if !strings.Contains(output, "consistency-no-enum") {
 		test.Fatalf("the gate's stdout must be returned even on a non-zero exit, got %q", output)
@@ -281,28 +281,28 @@ func TestCleanupRemovesTheDirectoriesItCreated(test *testing.T) {
 		Rule:         "consistency-no-enum",
 	}
 
-	_, cleanup, err := plantControls(RunOptions{Root: root, Controls: []Control{control}})
-	if err != nil {
-		test.Fatal(err)
+	_, cleanup, plantControlsError := plantControls(RunOptions{Root: root, Controls: []Control{control}})
+	if plantControlsError != nil {
+		test.Fatal(plantControlsError)
 	}
 
 	nested := filepath.Join(root, "code-quality", "differential-control")
-	if _, err := os.Stat(nested); err != nil {
-		test.Fatalf("the plant should have created %s: %v", nested, err)
+	if _, statError := os.Stat(nested); statError != nil {
+		test.Fatalf("the plant should have created %s: %v", nested, statError)
 	}
 
 	cleanup()
 
 	// Both levels go, because the plant created both.
-	if _, err := os.Stat(nested); !os.IsNotExist(err) {
+	if _, statError := os.Stat(nested); !os.IsNotExist(statError) {
 		test.Fatal("the directory the plant created was left behind")
 	}
-	if _, err := os.Stat(filepath.Join(root, "code-quality")); !os.IsNotExist(err) {
+	if _, statError := os.Stat(filepath.Join(root, "code-quality")); !os.IsNotExist(statError) {
 		test.Fatal("the outer directory the plant created was left behind")
 	}
 	// The tree root is never removed, however far the unwind walks.
-	if _, err := os.Stat(root); err != nil {
-		test.Fatalf("the tree root must survive cleanup: %v", err)
+	if _, statError := os.Stat(root); statError != nil {
+		test.Fatalf("the tree root must survive cleanup: %v", statError)
 	}
 }
 
@@ -315,8 +315,8 @@ func TestCleanupLeavesDirectoriesItDidNotCreate(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
 	preexisting := filepath.Join(root, "code-quality")
-	if err := os.MkdirAll(preexisting, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(preexisting, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 
 	control := Control{
@@ -325,24 +325,24 @@ func TestCleanupLeavesDirectoriesItDidNotCreate(test *testing.T) {
 		Contents:     "export enum Planted { A = 'A' }\n",
 		Rule:         "consistency-no-enum",
 	}
-	_, cleanup, err := plantControls(RunOptions{Root: root, Controls: []Control{control}})
-	if err != nil {
-		test.Fatal(err)
+	_, cleanup, plantControlsError := plantControls(RunOptions{Root: root, Controls: []Control{control}})
+	if plantControlsError != nil {
+		test.Fatal(plantControlsError)
 	}
 
 	// A sibling writes into the directory the plant created, while the gates would be running.
 	sibling := filepath.Join(root, "code-quality", "differential-control", "SomebodyElse.ts")
-	if err := os.WriteFile(sibling, []byte("export const theirs = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(sibling, []byte("export const theirs = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	cleanup()
 
-	if _, err := os.Stat(sibling); err != nil {
-		test.Fatalf("a sibling's file inside the planted directory must survive cleanup: %v", err)
+	if _, statError := os.Stat(sibling); statError != nil {
+		test.Fatalf("a sibling's file inside the planted directory must survive cleanup: %v", statError)
 	}
-	if _, err := os.Stat(preexisting); err != nil {
-		test.Fatalf("a directory that existed before the plant must survive cleanup: %v", err)
+	if _, statError := os.Stat(preexisting); statError != nil {
+		test.Fatalf("a directory that existed before the plant must survive cleanup: %v", statError)
 	}
 }
 
@@ -397,16 +397,16 @@ func TestAGateThatFailedWithNoOutputIsNotAnEmptyResult(test *testing.T) {
 // A gate that could not be launched surfaces its stderr too.
 func TestAGateThatCannotLaunchSurfacesWhatItSaid(test *testing.T) {
 	test.Parallel()
-	_, err := runGate(context.Background(), GateCommand{
+	_, runGateError := runGate(context.Background(), GateCommand{
 		Name:      "missing",
 		Program:   filepath.Join(test.TempDir(), "no-such-binary"),
 		Directory: test.TempDir(),
 	})
-	if err == nil {
+	if runGateError == nil {
 		test.Fatal("a gate that does not exist must be an error")
 	}
-	if !strings.Contains(err.Error(), "did not run") {
-		test.Fatalf("the error must say the gate never ran, got %v", err)
+	if !strings.Contains(runGateError.Error(), "did not run") {
+		test.Fatalf("the error must say the gate never ran, got %v", runGateError)
 	}
 }
 
@@ -700,9 +700,9 @@ func TestALocalBuildCarriesItsOwnDisclaimer(test *testing.T) {
 func TestTheRulesContractIsBareNamesOnly(test *testing.T) {
 	test.Parallel()
 	bare := "consistency-no-enum\nreact-component-no-multiple-primary\n"
-	names, err := namesFromRuleLines(bare)
-	if err != nil {
-		test.Fatalf("bare names must parse: %v", err)
+	names, namesFromRuleLinesError := namesFromRuleLines(bare)
+	if namesFromRuleLinesError != nil {
+		test.Fatalf("bare names must parse: %v", namesFromRuleLinesError)
 	}
 	if len(names) != 2 {
 		test.Fatalf("expected 2 names, got %d", len(names))
@@ -711,11 +711,11 @@ func TestTheRulesContractIsBareNamesOnly(test *testing.T) {
 	// The exact note `cohere -rules` emits, which lives on stderr today. If it ever reaches stdout
 	// this must fail loudly rather than be absorbed.
 	withNote := bare + "note: 39 rules from a local build, so this is whatever was on disk when it was compiled\n"
-	if _, err := namesFromRuleLines(withNote); err == nil {
+	if _, namesFromRuleLinesError := namesFromRuleLines(withNote); namesFromRuleLinesError == nil {
 		test.Fatal("a line carrying prose must be rejected: the contract is bare names, and absorbing prose hides a format change")
 	}
 
-	if _, err := namesFromRuleLines("   \n\n"); err == nil {
+	if _, namesFromRuleLinesError := namesFromRuleLines("   \n\n"); namesFromRuleLinesError == nil {
 		test.Fatal("an empty list must be rejected: a harness believing cohere implements nothing excuses every disagreement")
 	}
 }

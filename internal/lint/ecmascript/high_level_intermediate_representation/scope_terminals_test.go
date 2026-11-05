@@ -574,9 +574,9 @@ func TestScopeTerminalsGapsAreDeclared(test *testing.T) {
 func TestPrunedScopeIsNotDeclared(test *testing.T) {
 	test.Parallel()
 
-	contents, err := os.ReadFile("terminal.go")
-	if err != nil {
-		test.Fatalf("reading terminal.go: %v", err)
+	contents, readError := os.ReadFile("terminal.go")
+	if readError != nil {
+		test.Fatalf("reading terminal.go: %v", readError)
 	}
 	if strings.Contains(string(contents), "type PrunedScope struct") {
 		test.Error("PrunedScope is declared but nothing in this tree constructs it, which is the " +
@@ -606,7 +606,7 @@ func TestScopeTerminalsRecoverEveryScopeFromTheGraph(test *testing.T) {
 	skipWithoutCorpus(test)
 
 	var files []string
-	err := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
+	walkError := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
@@ -615,8 +615,8 @@ func TestScopeTerminalsRecoverEveryScopeFromTheGraph(test *testing.T) {
 		}
 		return nil
 	})
-	if err != nil {
-		test.Fatalf("walking the corpus: %v", err)
+	if walkError != nil {
+		test.Fatalf("walking the corpus: %v", walkError)
 	}
 	sort.Strings(files)
 	if len(files) > 400 {

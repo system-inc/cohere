@@ -20,20 +20,20 @@ func TestARunIsNotRecordedOverAFileChangedWhileItRan(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	file := filepath.Join(directory, "a.ts")
-	if err := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	readSince := time.Now()
 	time.Sleep(10 * time.Millisecond)
-	if err := os.WriteFile(file, []byte("export const a = 2;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(file, []byte("export const a = 2;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	if _, err := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, readSince); err == nil ||
-		!strings.Contains(err.Error(), "a.ts changed after the run began reading") {
-		test.Fatalf("a run that began reading before a.ts was saved was recorded (%v)", err)
+	if _, recordRunCacheError := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, readSince); recordRunCacheError == nil ||
+		!strings.Contains(recordRunCacheError.Error(), "a.ts changed after the run began reading") {
+		test.Fatalf("a run that began reading before a.ts was saved was recorded (%v)", recordRunCacheError)
 	}
-	if _, err := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, time.Now()); err != nil {
-		test.Fatalf("a run that began reading after the save was refused: %v", err)
+	if _, recordRunCacheError := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, time.Now()); recordRunCacheError != nil {
+		test.Fatalf("a run that began reading after the save was refused: %v", recordRunCacheError)
 	}
 }
 
@@ -43,29 +43,29 @@ func TestASameSizeEditUnderARestoredModificationTimeIsAMiss(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	file := filepath.Join(directory, "a.ts")
-	if err := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	cache, err := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, time.Time{})
 	if err != nil {
 		test.Fatal(err)
 	}
-	if err := cache.Check("key"); err != nil {
-		test.Fatalf("an untouched file missed, so the miss below proves nothing: %v", err)
+	if checkError := cache.Check("key"); checkError != nil {
+		test.Fatalf("an untouched file missed, so the miss below proves nothing: %v", checkError)
 	}
 	information, err := os.Stat(file)
 	if err != nil {
 		test.Fatal(err)
 	}
 	time.Sleep(10 * time.Millisecond)
-	if err := os.WriteFile(file, []byte("export const a = 9;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(file, []byte("export const a = 9;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	if err := os.Chtimes(file, information.ModTime(), information.ModTime()); err != nil {
-		test.Fatal(err)
+	if changeTimesError := os.Chtimes(file, information.ModTime(), information.ModTime()); changeTimesError != nil {
+		test.Fatal(changeTimesError)
 	}
-	if err := cache.Check("key"); !errors.Is(err, program.ErrRunCacheMiss) {
-		test.Fatalf("a same-size edit under the restored modification time was a hit (%v)", err)
+	if checkError := cache.Check("key"); !errors.Is(checkError, program.ErrRunCacheMiss) {
+		test.Fatalf("a same-size edit under the restored modification time was a hit (%v)", checkError)
 	}
 }
 
@@ -78,16 +78,16 @@ func TestADirectoryInputDoesNotMakeItsParentOne(test *testing.T) {
 	test.Parallel()
 	parent := test.TempDir()
 	project := filepath.Join(parent, "project")
-	if err := os.MkdirAll(filepath.Join(project, "source"), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(filepath.Join(project, "source"), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 	file := filepath.Join(project, "source", "a.ts")
-	if err := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	cache, err := program.RecordRunCache("key", []string{project, file}, nil, nil, nil, nil, 0, time.Time{})
-	if err != nil {
-		test.Fatal(err)
+	cache, recordRunCacheError := program.RecordRunCache("key", []string{project, file}, nil, nil, nil, nil, 0, time.Time{})
+	if recordRunCacheError != nil {
+		test.Fatal(recordRunCacheError)
 	}
 	recorded := map[string]bool{}
 	for _, input := range cache.Inputs {
@@ -101,11 +101,11 @@ func TestADirectoryInputDoesNotMakeItsParentOne(test *testing.T) {
 	if recorded[parent] {
 		test.Errorf("the directory holding the project, %s, is recorded because the project directory is", parent)
 	}
-	if err := os.WriteFile(filepath.Join(parent, "beside.txt"), []byte("beside\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(parent, "beside.txt"), []byte("beside\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	if err := cache.Check("key"); err != nil {
-		test.Fatalf("a file created beside the project made the run miss: %v", err)
+	if checkError := cache.Check("key"); checkError != nil {
+		test.Fatalf("a file created beside the project made the run miss: %v", checkError)
 	}
 }
 
@@ -115,12 +115,12 @@ func TestTheCacheDumpNamesTheInputThatKeepsARunFromReplaying(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	file := filepath.Join(directory, "a.ts")
-	if err := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	cache, err := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, time.Time{})
-	if err != nil {
-		test.Fatal(err)
+	cache, recordRunCacheError := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, time.Time{})
+	if recordRunCacheError != nil {
+		test.Fatal(recordRunCacheError)
 	}
 	table := program.NewCacheTable()
 	table.Runs["--no-fix"] = cache
@@ -133,8 +133,8 @@ func TestTheCacheDumpNamesTheInputThatKeepsARunFromReplaying(test *testing.T) {
 		test.Fatalf("an unchanged run is not reported as replayable:\n%s", got)
 	}
 	time.Sleep(10 * time.Millisecond)
-	if err := os.WriteFile(file, []byte("export const a = 22;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(file, []byte("export const a = 22;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	if got := dump(); !strings.Contains(got, "now: would not replay") || !strings.Contains(got, "a.ts changed size") {
 		test.Fatalf("the dump does not name the input that changed:\n%s", got)

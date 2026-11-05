@@ -44,9 +44,9 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(test *testing.T) {
 	}
 	directory := writeProject(test, files)
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	declarationName := func(node *ast.Node) string {
@@ -113,9 +113,9 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(test *testing.T) {
 
 	var first []string
 	for run := range 5 {
-		result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{forward, reverse})
-		if err != nil {
-			test.Fatalf("walking: %v", err)
+		result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{forward, reverse})
+		if walkError != nil {
+			test.Fatalf("walking: %v", walkError)
 		}
 		got := describe(result)
 

@@ -13,9 +13,9 @@ func noMethodSetStateOptions(test *testing.T, option string) any {
 	if option != "" {
 		raw = []byte(`"` + option + `"`)
 	}
-	decoded, err := DecodeNoMethodSetStateOptions(raw)
-	if err != nil {
-		test.Fatalf("decoding option %q: %v", option, err)
+	decoded, decodeNoMethodSetStateOptionsError := DecodeNoMethodSetStateOptions(raw)
+	if decodeNoMethodSetStateOptionsError != nil {
+		test.Fatalf("decoding option %q: %v", option, decodeNoMethodSetStateOptionsError)
 	}
 	return decoded
 }
@@ -36,9 +36,9 @@ func TestDecodeNoMethodSetStateOptions(test *testing.T) {
 	for _, testCase := range accepted {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoMethodSetStateOptions([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("unexpected error: %v", err)
+			decoded, decodeNoMethodSetStateOptionsError := DecodeNoMethodSetStateOptions([]byte(testCase.raw))
+			if decodeNoMethodSetStateOptionsError != nil {
+				test.Fatalf("unexpected error: %v", decodeNoMethodSetStateOptionsError)
 			}
 			if decoded.(NoMethodSetStateOptions).DisallowInFunc != testCase.want {
 				test.Errorf("DisallowInFunc = %v, wanted %v", decoded.(NoMethodSetStateOptions).DisallowInFunc, testCase.want)
@@ -64,7 +64,7 @@ func TestDecodeNoMethodSetStateOptions(test *testing.T) {
 	for _, testCase := range refused {
 		test.Run(testCase.name+" is refused", func(test *testing.T) {
 			test.Parallel()
-			if _, err := DecodeNoMethodSetStateOptions([]byte(testCase.raw)); err == nil {
+			if _, decodeNoMethodSetStateOptionsError := DecodeNoMethodSetStateOptions([]byte(testCase.raw)); decodeNoMethodSetStateOptionsError == nil {
 				test.Errorf("%s decoded; upstream's schema refuses it", testCase.raw)
 			}
 		})

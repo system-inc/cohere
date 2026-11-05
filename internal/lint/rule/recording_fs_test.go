@@ -20,11 +20,11 @@ func TestARecordingFileSystemNotesEveryPathAndRefusesWrites(test *testing.T) {
 		test.Fatal(err)
 	}
 	project := filepath.ToSlash(filepath.Join(root, "project"))
-	if err := os.MkdirAll(project+"/source", 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(project+"/source", 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.WriteFile(project+"/source/theme.css", []byte("@import 'tailwindcss';"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(project+"/source/theme.css", []byte("@import 'tailwindcss';"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	recording := NewRecordingFS(osvfs.FS())
 

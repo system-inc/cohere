@@ -39,8 +39,8 @@ func TestAFusedCheckReportsWhatTheWholeProgramCheckReports(test *testing.T) {
 
 	fused := buildProgram(test, files)
 	fused.FusedCheck = program.NewFusedCheck()
-	if _, err := fused.Walk(context.Background(), fused.ProjectFiles(), []rule.Rule{typeAwareRule(test)}); err != nil {
-		test.Fatalf("walk: %v", err)
+	if _, walkError := fused.Walk(context.Background(), fused.ProjectFiles(), []rule.Rule{typeAwareRule(test)}); walkError != nil {
+		test.Fatalf("walk: %v", walkError)
 	}
 	if checked := fused.FusedCheck.Checked(); checked != len(fused.ProjectFiles()) {
 		test.Fatalf("the walk checked %d of %d project files, so the parts below came from the remainder, not the walk",
@@ -77,8 +77,8 @@ func TestAFusedCheckStopsAtASyntaxErrorAsTheWholeCheckDoes(test *testing.T) {
 	expected := buildProgram(test, files).AllDiagnosticParts(context.Background())
 	fused := buildProgram(test, files)
 	fused.FusedCheck = program.NewFusedCheck()
-	if _, err := fused.Walk(context.Background(), fused.ProjectFiles(), []rule.Rule{typeAwareRule(test)}); err != nil {
-		test.Fatalf("walk: %v", err)
+	if _, walkError := fused.Walk(context.Background(), fused.ProjectFiles(), []rule.Rule{typeAwareRule(test)}); walkError != nil {
+		test.Fatalf("walk: %v", walkError)
 	}
 	actual := fused.FusedCheck.DiagnosticParts(context.Background(), fused)
 	if len(expected.Syntactic) == 0 {
@@ -92,9 +92,9 @@ func TestAFusedCheckStopsAtASyntaxErrorAsTheWholeCheckDoes(test *testing.T) {
 func buildProgram(test *testing.T, files map[string]string) *program.Graph {
 	test.Helper()
 	root := writeProject(test, files)
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-	if err != nil {
-		test.Fatalf("build: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatalf("build: %v", buildError)
 	}
 	return graph
 }

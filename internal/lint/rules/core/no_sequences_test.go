@@ -19,9 +19,9 @@ const sequencesFile = "/repository/source/Sequences.ts"
 // fixture states its own answer and cannot see that.
 func decodedSequenceOptions(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeNoSequencesOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", raw, err)
+	decoded, decodeNoSequencesOptionsError := DecodeNoSequencesOptions([]byte(raw))
+	if decodeNoSequencesOptionsError != nil {
+		test.Fatalf("decoding %s: %v", raw, decodeNoSequencesOptionsError)
 	}
 	return decoded
 }
@@ -340,9 +340,9 @@ func TestNoSequencesOptionDefaultsToAllowingParentheses(test *testing.T) {
 
 	test.Run("empty input decodes to the default rather than erroring", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoSequencesOptions(nil)
-		if err != nil {
-			test.Fatalf("decoding empty input: %v", err)
+		decoded, decodeNoSequencesOptionsError := DecodeNoSequencesOptions(nil)
+		if decodeNoSequencesOptionsError != nil {
+			test.Fatalf("decoding empty input: %v", decodeNoSequencesOptionsError)
 		}
 		options, ok := decoded.(NoSequencesOptions)
 		if !ok {
@@ -355,7 +355,7 @@ func TestNoSequencesOptionDefaultsToAllowingParentheses(test *testing.T) {
 
 	test.Run("malformed input is an error rather than a silent default", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeNoSequencesOptions([]byte("[")); err == nil {
+		if _, decodeNoSequencesOptionsError := DecodeNoSequencesOptions([]byte("[")); decodeNoSequencesOptionsError == nil {
 			test.Error("malformed options decoded without an error")
 		}
 	})
@@ -381,11 +381,11 @@ func TestNoSequencesMessage(test *testing.T) {
 func TestNoSequencesDecoderRefusesAMisspelledKey(test *testing.T) {
 	test.Parallel()
 
-	if _, err := DecodeNoSequencesOptions([]byte(`{"allowInParentheses": false}`)); err != nil {
-		test.Fatalf("baseline: upstream's spelling was refused: %v", err)
+	if _, decodeNoSequencesOptionsError := DecodeNoSequencesOptions([]byte(`{"allowInParentheses": false}`)); decodeNoSequencesOptionsError != nil {
+		test.Fatalf("baseline: upstream's spelling was refused: %v", decodeNoSequencesOptionsError)
 	}
-	_, err := DecodeNoSequencesOptions([]byte(`{"allowInParenthesis": false}`))
-	if err == nil || !strings.Contains(err.Error(), "allowInParenthesis") {
-		test.Fatalf("want a refusal naming the misspelled key, got %v", err)
+	_, decodeNoSequencesOptionsError := DecodeNoSequencesOptions([]byte(`{"allowInParenthesis": false}`))
+	if decodeNoSequencesOptionsError == nil || !strings.Contains(decodeNoSequencesOptionsError.Error(), "allowInParenthesis") {
+		test.Fatalf("want a refusal naming the misspelled key, got %v", decodeNoSequencesOptionsError)
 	}
 }

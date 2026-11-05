@@ -17,9 +17,9 @@ const complexityFile = "/repository/source/Complexity.ts"
 // The argument is the option as JSON TEXT, exactly the bytes the config layer hands the decoder, so
 // a fixture cannot bypass the decoder or test a shape a config could not deliver.
 func complexityOf(optionJson string) any {
-	settings, err := DecodeComplexityOptions([]byte(optionJson))
-	if err != nil {
-		panic(err)
+	settings, decodeComplexityOptionsError := DecodeComplexityOptions([]byte(optionJson))
+	if decodeComplexityOptionsError != nil {
+		panic(decodeComplexityOptionsError)
 	}
 	return settings
 }
@@ -513,9 +513,9 @@ func TestComplexityDecoderReadsEveryOptionShape(test *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		decoded, err := DecodeComplexityOptions([]byte(testCase.optionJson))
-		if err != nil {
-			test.Errorf("decoding %s: %v", testCase.optionJson, err)
+		decoded, decodeComplexityOptionsError := DecodeComplexityOptions([]byte(testCase.optionJson))
+		if decodeComplexityOptionsError != nil {
+			test.Errorf("decoding %s: %v", testCase.optionJson, decodeComplexityOptionsError)
 			continue
 		}
 		settings, ok := decoded.(ComplexitySettings)

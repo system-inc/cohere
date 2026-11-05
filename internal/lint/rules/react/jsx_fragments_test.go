@@ -243,9 +243,9 @@ func TestDecodeJsxFragmentsOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeJsxFragmentsOptions([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("decode returned %v", err)
+			decoded, decodeJsxFragmentsOptionsError := DecodeJsxFragmentsOptions([]byte(testCase.raw))
+			if decodeJsxFragmentsOptionsError != nil {
+				test.Fatalf("decode returned %v", decodeJsxFragmentsOptionsError)
 			}
 			options, isOptions := decoded.(JsxFragmentsOptions)
 			if !isOptions {
@@ -542,9 +542,9 @@ func TestJsxFragmentsDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
 		{`"syntax"`, JsxFragmentsSyntax},
 		{`"element"`, JsxFragmentsElement},
 	} {
-		decoded, err := DecodeJsxFragmentsOptions([]byte(accepted.wire))
-		if err != nil {
-			test.Errorf("%s was refused: %v", accepted.wire, err)
+		decoded, decodeJsxFragmentsOptionsError := DecodeJsxFragmentsOptions([]byte(accepted.wire))
+		if decodeJsxFragmentsOptionsError != nil {
+			test.Errorf("%s was refused: %v", accepted.wire, decodeJsxFragmentsOptionsError)
 			continue
 		}
 		if got := decoded.(JsxFragmentsOptions).Mode; got != accepted.want {
@@ -558,13 +558,13 @@ func TestJsxFragmentsDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
 		{`{"mode": "element"}`, "mode"},
 		{`true`, "true"},
 	} {
-		_, err := DecodeJsxFragmentsOptions([]byte(refused.wire))
-		if err == nil {
+		_, decodeJsxFragmentsOptionsError := DecodeJsxFragmentsOptions([]byte(refused.wire))
+		if decodeJsxFragmentsOptionsError == nil {
 			test.Errorf("%s decoded; it must be refused", refused.wire)
 			continue
 		}
-		if !strings.Contains(err.Error(), refused.named) {
-			test.Errorf("%s was refused without naming %s: %v", refused.wire, refused.named, err)
+		if !strings.Contains(decodeJsxFragmentsOptionsError.Error(), refused.named) {
+			test.Errorf("%s was refused without naming %s: %v", refused.wire, refused.named, decodeJsxFragmentsOptionsError)
 		}
 	}
 }

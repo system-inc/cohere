@@ -77,9 +77,9 @@ func TestGlobFollowsTheDocumentedRules(test *testing.T) {
 func TestGitWildmatchCorpus(test *testing.T) {
 	test.Parallel()
 	source := gitSource(test)
-	contents, err := os.ReadFile(filepath.Join(source, "t", "t3070-wildmatch.sh"))
-	if err != nil {
-		test.Fatal(err)
+	contents, readError := os.ReadFile(filepath.Join(source, "t", "t3070-wildmatch.sh"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 
 	asserted, cases := 0, 0
@@ -120,9 +120,9 @@ func gitSource(test *testing.T) string {
 // gitCommit names the commit a git checkout is at, so a run says which corpus it measured.
 func gitCommit(test *testing.T, repository string) string {
 	test.Helper()
-	output, err := exec.Command("git", "-C", repository, "rev-parse", "HEAD").Output()
-	if err != nil {
-		test.Fatalf("reading the commit of %s: %v", repository, err)
+	output, outputError := exec.Command("git", "-C", repository, "rev-parse", "HEAD").Output()
+	if outputError != nil {
+		test.Fatalf("reading the commit of %s: %v", repository, outputError)
 	}
 	return strings.TrimSpace(string(output))
 }

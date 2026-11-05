@@ -109,9 +109,9 @@ func TestRequireOptimizationStaysSilent(test *testing.T) {
 // harnesses, so a later reader adding `NeedsTypeChecker` has to justify it.
 func runRequireOptimization(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
 	test.Helper()
-	decoded, err := DecodeRequireOptimizationOptions([]byte(rawOptions))
-	if err != nil {
-		test.Fatalf("decoding %q: %v", rawOptions, err)
+	decoded, decodeRequireOptimizationOptionsError := DecodeRequireOptimizationOptions([]byte(rawOptions))
+	if decodeRequireOptimizationOptionsError != nil {
+		test.Fatalf("decoding %q: %v", rawOptions, decodeRequireOptimizationOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, RequireOptimization, requireOptimizationFile, sourceText, decoded)
 }
@@ -425,9 +425,9 @@ func TestRequireOptimizationDecodesItsOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeRequireOptimizationOptions([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", testCase.raw, err)
+			decoded, decodeRequireOptimizationOptionsError := DecodeRequireOptimizationOptions([]byte(testCase.raw))
+			if decodeRequireOptimizationOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.raw, decodeRequireOptimizationOptionsError)
 			}
 			settings, ok := decoded.(RequireOptimizationOptions)
 			if !ok {
@@ -449,10 +449,10 @@ func TestRequireOptimizationDecodesItsOptions(test *testing.T) {
 func TestRequireOptimizationRejectsMalformedOptions(test *testing.T) {
 	test.Parallel()
 
-	if _, err := DecodeRequireOptimizationOptions([]byte(`{"allowDecorators":`)); err == nil {
+	if _, decodeRequireOptimizationOptionsError := DecodeRequireOptimizationOptions([]byte(`{"allowDecorators":`)); decodeRequireOptimizationOptionsError == nil {
 		test.Fatal("truncated JSON decoded without error")
 	}
-	if _, err := DecodeRequireOptimizationOptions([]byte(`"error"`)); err == nil {
+	if _, decodeRequireOptimizationOptionsError := DecodeRequireOptimizationOptions([]byte(`"error"`)); decodeRequireOptimizationOptionsError == nil {
 		test.Fatal("a string decoded into the options struct without error")
 	}
 }

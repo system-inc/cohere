@@ -59,10 +59,10 @@ func recordCase(test *testing.T, result Result, outcome string, fixedSource stri
 		FixedSource: fixedSource,
 	}
 	if result.capture.options != nil {
-		encoded, err := json.Marshal(result.capture.options)
-		if err != nil {
+		encoded, encodeError := json.Marshal(result.capture.options)
+		if encodeError != nil {
 			// A case whose options cannot be shown cannot be an example either; the test itself passed.
-			test.Logf("docs capture: skipping a case whose options do not encode: %v", err)
+			test.Logf("docs capture: skipping a case whose options do not encode: %v", encodeError)
 			return
 		}
 		record.Options = encoded
@@ -86,7 +86,7 @@ func recordCase(test *testing.T, result Result, outcome string, fixedSource stri
 			Suggestions: len(diagnostic.Suggestions),
 		})
 	}
-	if err := capture.Write(record); err != nil {
-		test.Fatalf("docs capture: %v", err)
+	if writeError := capture.Write(record); writeError != nil {
+		test.Fatalf("docs capture: %v", writeError)
 	}
 }

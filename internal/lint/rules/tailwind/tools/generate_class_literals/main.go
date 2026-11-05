@@ -50,8 +50,8 @@ func main() {
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
-	if err := command.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "node extract.mjs: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		fmt.Fprintf(os.Stderr, "node extract.mjs: %v\n%s", runError, stderr.String())
 		os.Exit(1)
 	}
 
@@ -60,8 +60,8 @@ func main() {
 		DefaultSelectors json.RawMessage `json:"defaultSelectors"`
 		Cases            json.RawMessage `json:"cases"`
 	}
-	if err := json.Unmarshal(stdout.Bytes(), &extracted); err != nil {
-		fmt.Fprintf(os.Stderr, "reading extract.mjs's output: %v\n", err)
+	if decodeError := json.Unmarshal(stdout.Bytes(), &extracted); decodeError != nil {
+		fmt.Fprintf(os.Stderr, "reading extract.mjs's output: %v\n", decodeError)
 		os.Exit(1)
 	}
 
@@ -96,9 +96,9 @@ func main() {
 	stale := false
 	for _, output := range outputs {
 		if *check {
-			committed, err := os.ReadFile(output.path)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "read %s: %v\n", output.path, err)
+			committed, readError := os.ReadFile(output.path)
+			if readError != nil {
+				fmt.Fprintf(os.Stderr, "read %s: %v\n", output.path, readError)
 				os.Exit(1)
 			}
 			if !bytes.Equal(committed, output.contents) {
@@ -107,8 +107,8 @@ func main() {
 			}
 			continue
 		}
-		if err := os.WriteFile(output.path, output.contents, 0o644); err != nil {
-			fmt.Fprintf(os.Stderr, "write %s: %v\n", output.path, err)
+		if writeError := os.WriteFile(output.path, output.contents, 0o644); writeError != nil {
+			fmt.Fprintf(os.Stderr, "write %s: %v\n", output.path, writeError)
 			os.Exit(1)
 		}
 	}
@@ -125,8 +125,8 @@ func main() {
 // indent writes JSON with four spaces and a final newline, so a regenerated file diffs line by line.
 func indent(raw []byte) ([]byte, error) {
 	var buffer bytes.Buffer
-	if err := json.Indent(&buffer, raw, "", "    "); err != nil {
-		return nil, err
+	if indentError := json.Indent(&buffer, raw, "", "    "); indentError != nil {
+		return nil, indentError
 	}
 	buffer.WriteByte('\n')
 	return buffer.Bytes(), nil

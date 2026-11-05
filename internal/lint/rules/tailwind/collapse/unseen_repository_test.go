@@ -129,7 +129,7 @@ func unseenDesignSystem(test *testing.T) *LoadedDesignSystem {
 	if err != nil {
 		test.Fatalf("resolving the unseen system's path: %v", err)
 	}
-	if _, err := os.Stat(entryPoint); err != nil {
+	if _, statError := os.Stat(entryPoint); statError != nil {
 		test.Skipf("the unseen design system is not present at %s", entryPoint)
 	}
 

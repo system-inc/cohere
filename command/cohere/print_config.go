@@ -35,8 +35,8 @@ type printedDeparture struct {
 // declaration files explains their origin without pretending ESLint's writable/readonly knob exists.
 func writeResolvedConfig(out io.Writer, config *configuration.Config, resolved configuration.Resolved, location projectLocation, path string) error {
 	base := optionsBase(config, location.Root)
-	if err := registry.CheckSettings(base); err != nil {
-		return fmt.Errorf("validating the lint config: %w", err)
+	if checkSettingsError := registry.CheckSettings(base); checkSettingsError != nil {
+		return fmt.Errorf("validating the lint config: %w", checkSettingsError)
 	}
 	settings, err := settingsForFile(base, resolved, rule.RegisteredSettings())
 	if err != nil {
@@ -138,17 +138,17 @@ func settingsForFile(base rule.OptionsBase, resolved configuration.Resolved, reg
 					continue
 				}
 				var keys map[string]json.RawMessage
-				if err := json.Unmarshal(part, &keys); err != nil {
-					return nil, fmt.Errorf("settings[%q], as %s reads it: %w", namespace, name, err)
+				if decodeError := json.Unmarshal(part, &keys); decodeError != nil {
+					return nil, fmt.Errorf("settings[%q], as %s reads it: %w", namespace, name, decodeError)
 				}
 				for key, value := range keys {
 					read[key] = value
 				}
 			}
 			if len(read) > 0 {
-				encoded, err := json.Marshal(read)
-				if err != nil {
-					return nil, err
+				encoded, encodeError := json.Marshal(read)
+				if encodeError != nil {
+					return nil, encodeError
 				}
 				settings[namespace] = encoded
 			}

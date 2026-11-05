@@ -37,8 +37,8 @@ func TestAQuietWindowHoldsUntilItEnds(test *testing.T) {
 	if code := quietOn(directory, []string{"--for", "5h"}, opened); code != 2 {
 		test.Errorf("a five hour window was not refused: exited %d", code)
 	}
-	if err := os.WriteFile(quietPath(directory), []byte("tomorrow\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(quietPath(directory), []byte("tomorrow\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	if holds, line := quietHolds(directory, opened); !holds || !strings.Contains(line, "does not start with when it ends") {
 		test.Errorf("an unreadable marker does not hold, or does not say what is wrong: %q", line)
@@ -55,33 +55,33 @@ type quietTrimCase struct {
 func newQuietTrimCase(test *testing.T) quietTrimCase {
 	test.Helper()
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
-	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
-		test.Fatalf("building: %v\n%s", err, output)
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		test.Fatalf("building: %v\n%s", outputError, output)
 	}
 	home := test.TempDir()
 	slots := filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots")
-	if err := os.MkdirAll(slots, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(slots, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 	// The cache in the pool home's user cache directory, where the trim guards it (poolGuards).
 	cache := filepath.Join(userCacheDirectoryIn(home), "go-build")
-	if err := os.MkdirAll(cache, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(cache, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	for index := 0; index < 10; index++ {
 		path := filepath.Join(cache, fmt.Sprintf("%02x", index), fmt.Sprintf("%02xaa-d", index))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, make([]byte, 1024), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, make([]byte, 1024), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		old := time.Now().Add(-3 * time.Hour)
-		if err := os.Chtimes(path, old, old); err != nil {
-			test.Fatal(err)
+		if changeTimesError := os.Chtimes(path, old, old); changeTimesError != nil {
+			test.Fatal(changeTimesError)
 		}
 	}
 	environment := append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratchHome(test),
@@ -93,9 +93,9 @@ func (c quietTrimCase) run(test *testing.T, arguments ...string) string {
 	test.Helper()
 	command := exec.Command(c.wrapper, arguments...)
 	command.Env = c.environment
-	output, err := command.CombinedOutput()
-	if err != nil {
-		test.Fatalf("cohere-dev %s: %v\n%s", strings.Join(arguments, " "), err, output)
+	output, outputError := command.CombinedOutput()
+	if outputError != nil {
+		test.Fatalf("cohere-dev %s: %v\n%s", strings.Join(arguments, " "), outputError, output)
 	}
 	return string(output)
 }
@@ -163,22 +163,22 @@ func TestAQuietWindowOpenedWhileTheTrimWaitsHoldsToo(test *testing.T) {
 	}
 	c := newQuietTrimCase(test)
 
-	held, err := takeSlot(c.slots, 2, "a run that holds a token")
-	if err != nil || held == nil {
-		test.Fatalf("taking a token for the test: %v", err)
+	held, takeSlotError := takeSlot(c.slots, 2, "a run that holds a token")
+	if takeSlotError != nil || held == nil {
+		test.Fatalf("taking a token for the test: %v", takeSlotError)
 	}
 	trim := exec.Command(c.wrapper, trimCacheVerb)
 	trim.Env = c.environment
-	if err := trim.Start(); err != nil {
+	if startError := trim.Start(); startError != nil {
 		held.release()
-		test.Fatal(err)
+		test.Fatal(startError)
 	}
 	// Measuring 10 KB takes milliseconds; two seconds puts the trim well into its wait for the pool.
 	time.Sleep(2 * time.Second)
 	c.run(test, "quiet", "on", "--for", "10m", "lint_rules' pairs")
 	held.release()
-	if err := trim.Wait(); err != nil {
-		test.Fatalf("the trim failed: %v", err)
+	if waitError := trim.Wait(); waitError != nil {
+		test.Fatalf("the trim failed: %v", waitError)
 	}
 	if remaining := c.size(); remaining != 10*1024 {
 		test.Errorf("a window opened while the trim waited did not hold it: %d bytes left of 10 KB", remaining)

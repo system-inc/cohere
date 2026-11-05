@@ -73,8 +73,8 @@ func CheckSettings(base rule.OptionsBase) error {
 		if len(written) == 0 {
 			continue
 		}
-		if err := checkNamespace(registration, written[0], base); err != nil {
-			return err
+		if checkNamespaceError := checkNamespace(registration, written[0], base); checkNamespaceError != nil {
+			return checkNamespaceError
 		}
 	}
 	return nil
@@ -106,8 +106,8 @@ func checkNamespace(registration rule.SettingsRegistration, namespace string, ba
 				return fmt.Errorf("settings[%q], as %s reads it: %w", namespace, ruleName, err)
 			}
 		}
-		if err := optionschema.Check(ruleName, []json.RawMessage{part}); err != nil {
-			return fmt.Errorf("settings[%q], as %s reads it: %w", namespace, ruleName, err)
+		if checkError := optionschema.Check(ruleName, []json.RawMessage{part}); checkError != nil {
+			return fmt.Errorf("settings[%q], as %s reads it: %w", namespace, ruleName, checkError)
 		}
 	}
 	return nil

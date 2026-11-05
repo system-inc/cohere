@@ -20,8 +20,8 @@ func nestedTree(test *testing.T) string {
 	test.Helper()
 	root := test.TempDir()
 	for _, directory := range []string{".git", "library/.git", "library/inner/.git", "library/source", "modules", "projects/clone/.git"} {
-		if err := os.MkdirAll(filepath.Join(root, directory), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Join(root, directory), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
 	}
 	writeTree(test, root, map[string]string{
@@ -62,8 +62,8 @@ func TestARunInsideALibraryWritesTheLibrary(test *testing.T) {
 
 	// A project that is not a repository at all writes where it always did.
 	plain := test.TempDir()
-	if err := os.MkdirAll(filepath.Join(plain, "source"), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(filepath.Join(plain, "source"), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 	if got := writeRepositoryRoot(filepath.Join(plain, "source"), plain); got != plain {
 		test.Errorf("a plain directory's run writes %s, want the project %s", got, plain)
@@ -103,9 +103,9 @@ func TestTheProjectReadsItsLibrariesDrift(test *testing.T) {
 	}
 	before := treeSnapshot(test, root)
 
-	check, err := checkNestedRepositories(engine, root, false)
-	if err != nil {
-		test.Fatal(err)
+	check, checkNestedRepositoriesError := checkNestedRepositories(engine, root, false)
+	if checkNestedRepositoriesError != nil {
+		test.Fatal(checkNestedRepositoriesError)
 	}
 
 	got := []string{}
@@ -138,9 +138,9 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(test *testing.T) {
 	}
 	check := func(label string, wantChecked int, wantDrift ...string) {
 		test.Helper()
-		result, err := checkNestedRepositories(engine, root, false)
-		if err != nil {
-			test.Fatal(err)
+		result, checkNestedRepositoriesError := checkNestedRepositories(engine, root, false)
+		if checkNestedRepositoriesError != nil {
+			test.Fatal(checkNestedRepositoriesError)
 		}
 		got := []string{}
 		for _, drift := range result.Drift {
@@ -162,11 +162,11 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(test *testing.T) {
 		check("a check before either repository keeps a cache", 4, drifted...)
 	}
 	for _, repository := range []string{library, inner} {
-		if _, err := os.Stat(cacheDirectory(repository)); !errors.Is(err, os.ErrNotExist) {
-			test.Fatalf("a check that only reads %s made its cache directory (%v)", repository, err)
+		if _, statError := os.Stat(cacheDirectory(repository)); !errors.Is(statError, os.ErrNotExist) {
+			test.Fatalf("a check that only reads %s made its cache directory (%v)", repository, statError)
 		}
-		if err := os.MkdirAll(cacheDirectory(repository), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(cacheDirectory(repository), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
 	}
 
@@ -224,8 +224,8 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(test *testing.T) {
 		section := readFormatSection(library)
 		section.Key = key
 		section.Entries[thing] = program.FormatEntry{Sum: formatRecordSum([]byte(contents)), Options: options}
-		if err := writeFormatSection(library, section); err != nil {
-			test.Fatal(err)
+		if writeFormatSectionError := writeFormatSection(library, section); writeFormatSectionError != nil {
+			test.Fatal(writeFormatSectionError)
 		}
 	}
 	vouch(key, options)
@@ -254,8 +254,8 @@ func TestASignedEntryStillReadsAnEditedFile(test *testing.T) {
 	test.Parallel()
 	root := nestedTree(test)
 	library := filepath.Join(root, "library")
-	if err := os.MkdirAll(cacheDirectory(library), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(cacheDirectory(library), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 	engine := prettierLike()
 	engine.enumerate = func(walkRoot string) (formatfiles.Enumeration, error) {
@@ -264,14 +264,14 @@ func TestASignedEntryStillReadsAnEditedFile(test *testing.T) {
 	// Older than the second a fresh write is left unsigned for.
 	tidy := filepath.Join(library, "source", "Tidy.ts")
 	past := time.Now().Add(-time.Hour)
-	if err := os.Chtimes(tidy, past, past); err != nil {
-		test.Fatal(err)
+	if changeTimesError := os.Chtimes(tidy, past, past); changeTimesError != nil {
+		test.Fatal(changeTimesError)
 	}
 	drifted := func() []string {
 		test.Helper()
-		check, err := checkNestedRepositories(engine, root, false)
-		if err != nil {
-			test.Fatal(err)
+		check, checkNestedRepositoriesError := checkNestedRepositories(engine, root, false)
+		if checkNestedRepositoriesError != nil {
+			test.Fatal(checkNestedRepositoriesError)
 		}
 		names := []string{}
 		for _, drift := range check.Drift {
@@ -433,18 +433,18 @@ func TestAFreshClonesLibrariesGetTheirCacheAtStartup(test *testing.T) {
 	}
 
 	prepareNestedCacheDirectories(root)
-	if information, err := os.Stat(cacheDirectory(library)); err != nil || !information.IsDir() {
-		test.Fatalf("the library, whose .gitignore ignores .cache, has no cache after the run's start (%v)", err)
+	if information, statError := os.Stat(cacheDirectory(library)); statError != nil || !information.IsDir() {
+		test.Fatalf("the library, whose .gitignore ignores .cache, has no cache after the run's start (%v)", statError)
 	}
-	if _, err := os.Stat(cacheDirectory(inner)); !errors.Is(err, os.ErrNotExist) {
-		test.Fatalf("the inner library, whose .gitignore does not ignore .cache, got a cache directory (%v)", err)
+	if _, statError := os.Stat(cacheDirectory(inner)); !errors.Is(statError, os.ErrNotExist) {
+		test.Fatalf("the inner library, whose .gitignore does not ignore .cache, got a cache directory (%v)", statError)
 	}
 
 	checked := func(label string) int {
 		test.Helper()
-		result, err := checkNestedRepositories(engine, root, false)
-		if err != nil {
-			test.Fatal(err)
+		result, checkNestedRepositoriesError := checkNestedRepositories(engine, root, false)
+		if checkNestedRepositoriesError != nil {
+			test.Fatal(checkNestedRepositoriesError)
 		}
 		if len(result.Drift) != 2 {
 			test.Fatalf("%s: %d files drift, want Thing.ts and Deep.ts", label, len(result.Drift))

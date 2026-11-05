@@ -22,9 +22,9 @@ func TestUnresolvableTypesIsEarnedNotAssumed(test *testing.T) {
 	if testing.Short() {
 		test.Skip("builds a TypeScript program per fixture")
 	}
-	fixtures, err := react_conformance.Load(fixtureRoot)
-	if err != nil {
-		test.Fatalf("loading the corpus: %v", err)
+	fixtures, loadError := react_conformance.Load(fixtureRoot)
+	if loadError != nil {
+		test.Fatalf("loading the corpus: %v", loadError)
 	}
 
 	subject := Rules["set-state-in-render"]
@@ -46,8 +46,8 @@ func TestUnresolvableTypesIsEarnedNotAssumed(test *testing.T) {
 		typed := fixture
 		typed.Source = "import {useState} from 'react';\n" + fixture.Source
 		directory := test.TempDir()
-		if err := writeReactStub(directory); err != nil {
-			test.Fatalf("writing the stub: %v", err)
+		if writeReactStubError := writeReactStub(directory); writeReactStubError != nil {
+			test.Fatalf("writing the stub: %v", writeReactStubError)
 		}
 		withTypes, _ := Analyze(subject, typed, directory)
 

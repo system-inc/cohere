@@ -82,9 +82,9 @@ type formatRecord struct {
 // be read is an empty one, and absent says why.
 func loadFormatRecord(root string) *formatRecord {
 	record := &formatRecord{root: root, entries: map[string]program.FormatEntry{}}
-	key, err := formatRecordKey(root)
-	if err != nil {
-		record.absent = fmt.Sprintf("cohere could not identify its own binary (%v)", firstLine(err.Error()))
+	key, formatRecordKeyError := formatRecordKey(root)
+	if formatRecordKeyError != nil {
+		record.absent = fmt.Sprintf("cohere could not identify its own binary (%v)", firstLine(formatRecordKeyError.Error()))
 		return record
 	}
 	record.key = key
@@ -315,9 +315,9 @@ type formatUniverse struct {
 }
 
 func enumerateFormatUniverse(engine formatEngine, root string) (formatUniverse, error) {
-	rootEnumeration, err := enumerateFormatTree(engine, root)
-	if err != nil {
-		return formatUniverse{}, err
+	rootEnumeration, enumerateFormatTreeError := enumerateFormatTree(engine, root)
+	if enumerateFormatTreeError != nil {
+		return formatUniverse{}, enumerateFormatTreeError
 	}
 	return formatUniverse{root: rootEnumeration, files: append([]string(nil), rootEnumeration.Files...)}, nil
 }
@@ -372,8 +372,8 @@ func enumerateFormatTree(engine formatEngine, root string) (formatfiles.Enumerat
 		return ahead.enumeration, ahead.err
 	}
 	// Less what the projects below this one format, when it is one project of several. See ownership.go.
-	enumeration, err := engine.Enumerate(root)
-	return withoutYieldedDirectories(enumeration), err
+	enumeration, enumerateError := engine.Enumerate(root)
+	return withoutYieldedDirectories(enumeration), enumerateError
 }
 
 // declaredSubmodules reads the submodule paths a repository's `.gitmodules` declares. A repository with
@@ -384,12 +384,12 @@ func enumerateFormatTree(engine formatEngine, root string) (formatfiles.Enumerat
 // stranger than that names a path no read would find, which costs a submodule its drift check.
 func declaredSubmodules(directory string) (map[string]struct{}, error) {
 	declared := map[string]struct{}{}
-	file, err := os.Open(filepath.Join(directory, ".gitmodules"))
-	if errors.Is(err, os.ErrNotExist) {
+	file, openError := os.Open(filepath.Join(directory, ".gitmodules"))
+	if errors.Is(openError, os.ErrNotExist) {
 		return declared, nil
 	}
-	if err != nil {
-		return nil, fmt.Errorf("reading the submodules %s declares: %w", directory, err)
+	if openError != nil {
+		return nil, fmt.Errorf("reading the submodules %s declares: %w", directory, openError)
 	}
 	defer file.Close()
 	lines := bufio.NewScanner(file)
@@ -418,16 +418,16 @@ func (universe formatUniverse) describe() string {
 // unformattedScope is the default format scope: every file in the universe whose bytes are not on record
 // as formatted. It returns the universe's files too, so the record can drop entries outside it.
 func unformattedScope(engine formatEngine, record *formatRecord, root string) (formatScope, []string) {
-	universe, err := enumerateFormatUniverse(engine, root)
-	if err != nil {
+	universe, enumerateFormatUniverseError := enumerateFormatUniverse(engine, root)
+	if enumerateFormatUniverseError != nil {
 		// A failed walk withholds formatting and says why, rather than falling back to a universe that
 		// would format the wrong set. Fixing still runs. No universe means nothing is pruned, and nothing
 		// says what the walk read, so the run is not replayed.
 		declineRunCache("the format walk failed")
 		return formatScope{
 			index:       map[string]struct{}{},
-			Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", err),
-			failure:     err,
+			Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", enumerateFormatUniverseError),
+			failure:     enumerateFormatUniverseError,
 		}, nil
 	}
 

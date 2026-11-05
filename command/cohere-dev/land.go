@@ -54,8 +54,8 @@ func land(arguments []string) int {
 		fmt.Fprintf(os.Stderr, "cohere-dev: land lands commits, and %s has changes that are not committed:\n%s\n", worktree, changes)
 		return 2
 	}
-	if err := checkSubmodules(worktree); err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+	if checkSubmodulesError := checkSubmodules(worktree); checkSubmodulesError != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", checkSubmodulesError)
 		return 2
 	}
 	mainCheckout, err := checkoutOfMain(worktree)
@@ -84,18 +84,18 @@ func land(arguments []string) int {
 	defer held.release()
 
 	for attempt := 1; attempt <= landAttempts; attempt++ {
-		mainCommit, err := gitOutput(worktree, "rev-parse", "main")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: reading main: %v\n", err)
+		mainCommit, gitOutputError := gitOutput(worktree, "rev-parse", "main")
+		if gitOutputError != nil {
+			fmt.Fprintf(os.Stderr, "cohere-dev: reading main: %v\n", gitOutputError)
 			return 1
 		}
-		if err := mergeMain(worktree, mainCommit); err != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+		if mergeMainError := mergeMain(worktree, mainCommit); mergeMainError != nil {
+			fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", mergeMainError)
 			return 1
 		}
 		// The merge may have moved a pin, and the gate must build against what it lands.
-		if err := checkSubmodules(worktree); err != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: after merging main at %s: %v\n", shortCommit(mainCommit), err)
+		if checkSubmodulesError := checkSubmodules(worktree); checkSubmodulesError != nil {
+			fmt.Fprintf(os.Stderr, "cohere-dev: after merging main at %s: %v\n", shortCommit(mainCommit), checkSubmodulesError)
 			return 2
 		}
 		landing, _ := gitOutput(worktree, "rev-parse", "HEAD")
@@ -106,14 +106,14 @@ func land(arguments []string) int {
 		}
 		// git refuses a fast-forward when main has moved since the merge, which is the test that nothing
 		// landed outside this lock during the gate.
-		if output, err := gitCombined(mainCheckout, "merge", "--ff-only", landing); err != nil {
+		if output, gitCombinedError := gitCombined(mainCheckout, "merge", "--ff-only", landing); gitCombinedError != nil {
 			moved, _ := gitOutput(worktree, "rev-parse", "main")
 			if moved != mainCommit {
 				fmt.Fprintf(os.Stderr, "cohere-dev: main moved outside land during the gate, %s to %s; merging and gating again\n",
 					shortCommit(mainCommit), shortCommit(moved))
 				continue
 			}
-			fmt.Fprintf(os.Stderr, "cohere-dev: fast-forwarding main in %s: %v\n%s\n", mainCheckout, err, output)
+			fmt.Fprintf(os.Stderr, "cohere-dev: fast-forwarding main in %s: %v\n%s\n", mainCheckout, gitCombinedError, output)
 			return 1
 		}
 		fmt.Fprintf(os.Stderr, "cohere-dev: landed %s on main\n", shortCommit(landing))
@@ -128,9 +128,9 @@ func land(arguments []string) int {
 // worktree of it, or a symlink to another checkout's, as most of the house's worktrees are made: whichever,
 // its head must be the pin.
 func checkSubmodules(worktree string) error {
-	links, err := project.GitlinksOf(worktree)
-	if err != nil {
-		return err
+	links, gitlinksOfError := project.GitlinksOf(worktree)
+	if gitlinksOfError != nil {
+		return gitlinksOfError
 	}
 	for _, link := range links {
 		pin, path := link.Pin, link.Path
@@ -163,9 +163,9 @@ func checkSubmodules(worktree string) error {
 
 // landDirectory holds the land lock and its line, beside the pool's.
 func landDirectory() (string, error) {
-	pool, err := poolDirectory()
-	if err != nil {
-		return "", err
+	pool, poolDirectoryError := poolDirectory()
+	if poolDirectoryError != nil {
+		return "", poolDirectoryError
 	}
 	directory := filepath.Join(pool, "land")
 	return directory, os.MkdirAll(directory, 0o755)
@@ -174,9 +174,9 @@ func landDirectory() (string, error) {
 // checkoutOfMain is the worktree that has main checked out, whose working tree a fast-forward must move
 // along with the branch.
 func checkoutOfMain(worktree string) (string, error) {
-	listing, err := gitOutput(worktree, "worktree", "list", "--porcelain")
-	if err != nil {
-		return "", fmt.Errorf("listing the repository's worktrees: %w", err)
+	listing, gitOutputError := gitOutput(worktree, "worktree", "list", "--porcelain")
+	if gitOutputError != nil {
+		return "", fmt.Errorf("listing the repository's worktrees: %w", gitOutputError)
 	}
 	path := ""
 	for _, line := range strings.Split(listing, "\n") {
@@ -193,11 +193,11 @@ func checkoutOfMain(worktree string) (string, error) {
 // mergeMain merges main into the worktree, unless it already holds it. A merge that conflicts is undone,
 // leaving the worktree as it was, and says which files conflicted.
 func mergeMain(worktree string, mainCommit string) error {
-	if _, err := gitOutput(worktree, "merge-base", "--is-ancestor", mainCommit, "HEAD"); err == nil {
+	if _, gitOutputError := gitOutput(worktree, "merge-base", "--is-ancestor", mainCommit, "HEAD"); gitOutputError == nil {
 		return nil
 	}
-	output, err := gitCombined(worktree, "merge", "--no-edit", "-m", "Merge main into the work being landed", mainCommit)
-	if err == nil {
+	output, gitCombinedError := gitCombined(worktree, "merge", "--no-edit", "-m", "Merge main into the work being landed", mainCommit)
+	if gitCombinedError == nil {
 		return nil
 	}
 	conflicts, _ := gitOutput(worktree, "diff", "--name-only", "--diff-filter=U")
@@ -206,16 +206,16 @@ func mergeMain(worktree string, mainCommit string) error {
 		return fmt.Errorf("main at %s conflicts with this work in:\n%s\nmerge main and resolve them, then land again",
 			shortCommit(mainCommit), conflicts)
 	}
-	return fmt.Errorf("merging main at %s: %v\n%s", shortCommit(mainCommit), err, output)
+	return fmt.Errorf("merging main at %s: %v\n%s", shortCommit(mainCommit), gitCombinedError, output)
 }
 
 // gate runs the landing gate on the worktree through a pool token: go vet, then the rule CPU budget
 // (checkRuleCPU), then the tests of every module go.work names outside a submodule, each in one go
 // invocation (workspace.go), saying which it covered, then the docs data check (checkDocsData).
 func gate(worktree string, commit string) int {
-	covered, err := readGatedWorkspace(worktree)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: reading the modules to gate: %v\n", err)
+	covered, readGatedWorkspaceError := readGatedWorkspace(worktree)
+	if readGatedWorkspaceError != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: reading the modules to gate: %v\n", readGatedWorkspaceError)
 		return 2
 	}
 	reportWorkspace(covered, os.Stderr)
@@ -226,24 +226,24 @@ func gate(worktree string, commit string) int {
 		vet := exec.Command("go", append([]string{"vet"}, patterns...)...)
 		vet.Dir, vet.Env = worktree, gateEnvironment(step("go vet"))
 		vet.Stdout, vet.Stderr = os.Stdout, os.Stderr
-		if err := vet.Run(); err != nil {
-			return exitCodeOf(err)
+		if runError := vet.Run(); runError != nil {
+			return exitCodeOf(runError)
 		}
 		if code := checkRuleCPU(worktree, func() []string { return gateEnvironment(step("the rule CPU budget check")) }); code != 0 {
 			return code
 		}
 		// The same environment cohere-dev test gives the module's tests, corpora included (corpora.go).
-		testing, uncovered, err := testEnvironment(gateEnvironment(step("the test run")))
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+		testing, uncovered, testEnvironmentError := testEnvironment(gateEnvironment(step("the test run")))
+		if testEnvironmentError != nil {
+			fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", testEnvironmentError)
 			return 2
 		}
 		defer printUncovered(os.Stderr, uncovered)
 		test := exec.Command("go", append([]string{"test"}, patterns...)...)
 		test.Dir, test.Env = worktree, testing
 		test.Stdout, test.Stderr = os.Stdout, os.Stderr
-		if err := test.Run(); err != nil {
-			return exitCodeOf(err)
+		if runError := test.Run(); runError != nil {
+			return exitCodeOf(runError)
 		}
 		return checkDocsData(worktree, func() []string { return gateEnvironment(step("the docs data check")) })
 	})
@@ -258,9 +258,9 @@ const docsDataGenerator = "./internal/docsdata/tools/generate"
 // checkRuleCPU runs uncached on each land attempt, before tests and fast-forward.
 // Repositories without this cohere-specific check say so, like the docs data check.
 func checkRuleCPU(worktree string, environment func() []string) int {
-	if _, err := os.Stat(filepath.Join(worktree, ruleCPUCheck)); err != nil {
-		if !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "cohere-dev: reading the rule CPU check: %v\n", err)
+	if _, statError := os.Stat(filepath.Join(worktree, ruleCPUCheck)); statError != nil {
+		if !os.IsNotExist(statError) {
+			fmt.Fprintf(os.Stderr, "cohere-dev: reading the rule CPU check: %v\n", statError)
 			return 1
 		}
 		fmt.Fprintf(os.Stderr, "cohere-dev: no %s here, so no rule CPU budget to check\n", ruleCPUCheck)
@@ -270,8 +270,8 @@ func checkRuleCPU(worktree string, environment func() []string) int {
 	check := exec.Command("go", "test", "-count=1", "-timeout=30s", "-run=^TestRegisteredRuleCPUBudget$", "-v", "./"+filepath.ToSlash(filepath.Dir(ruleCPUCheck)))
 	check.Dir, check.Env = worktree, environment()
 	check.Stdout, check.Stderr = os.Stdout, os.Stderr
-	if err := check.Run(); err != nil {
-		return exitCodeOf(err)
+	if runError := check.Run(); runError != nil {
+		return exitCodeOf(runError)
 	}
 	fmt.Fprintf(os.Stderr, "cohere-dev: rule CPU budget passed (%s)\n", time.Since(started).Round(time.Millisecond))
 	return 0
@@ -286,7 +286,7 @@ const docsDataRecapture = "go run " + docsDataGenerator + " -capture"
 // -check recaptures every example from the lint tests rather than reading the committed ones back, so it
 // can find one stale. A repository without the generator has no docs data, and the gate says so.
 func checkDocsData(worktree string, environment func() []string) int {
-	if _, err := os.Stat(filepath.Join(worktree, docsDataGenerator)); err != nil {
+	if _, statError := os.Stat(filepath.Join(worktree, docsDataGenerator)); statError != nil {
 		fmt.Fprintf(os.Stderr, "cohere-dev: no %s here, so no docs data to check\n", docsDataGenerator)
 		return 0
 	}
@@ -294,10 +294,10 @@ func checkDocsData(worktree string, environment func() []string) int {
 	check := exec.Command("go", "run", docsDataGenerator, "-check")
 	check.Dir, check.Env = worktree, environment()
 	check.Stdout, check.Stderr = os.Stdout, os.Stderr
-	if err := check.Run(); err != nil {
+	if runError := check.Run(); runError != nil {
 		fmt.Fprintf(os.Stderr, "cohere-dev: the docs data is stale, so nothing landed: recapture it with `%s`, commit docs/data, "+
 			"and land again\n", docsDataRecapture)
-		return exitCodeOf(err)
+		return exitCodeOf(runError)
 	}
 	fmt.Fprintf(os.Stderr, "cohere-dev: the docs data is current (%s)\n", time.Since(started).Round(time.Second))
 	return 0
@@ -347,9 +347,9 @@ func gitOutput(directory string, arguments ...string) (string, error) {
 	command.Dir = directory
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
-	output, err := command.Output()
-	if err != nil {
-		return strings.TrimSpace(string(output)), fmt.Errorf("git %s: %w: %s", strings.Join(arguments, " "), err, strings.TrimSpace(standardError.String()))
+	output, outputError := command.Output()
+	if outputError != nil {
+		return strings.TrimSpace(string(output)), fmt.Errorf("git %s: %w: %s", strings.Join(arguments, " "), outputError, strings.TrimSpace(standardError.String()))
 	}
 	return strings.TrimSpace(string(output)), nil
 }
@@ -358,8 +358,8 @@ func gitOutput(directory string, arguments ...string) (string, error) {
 func gitCombined(directory string, arguments ...string) (string, error) {
 	command := exec.Command("git", arguments...)
 	command.Dir = directory
-	output, err := command.CombinedOutput()
-	return strings.TrimSpace(string(output)), err
+	output, outputError := command.CombinedOutput()
+	return strings.TrimSpace(string(output)), outputError
 }
 
 func shortCommit(commit string) string {

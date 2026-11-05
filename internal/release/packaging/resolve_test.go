@@ -20,17 +20,17 @@ func TestResolveFailsLoudlyWhenNothingIsInstalled(test *testing.T) {
 	clearOverride(test)
 	root := test.TempDir()
 
-	path, err := Resolve([]string{root})
-	if err == nil {
+	path, resolveError := Resolve([]string{root})
+	if resolveError == nil {
 		test.Fatalf("resolved %q with nothing installed, which is the fallback that prints green over zero files", path)
 	}
-	if !errors.Is(err, ErrNoBinary) {
-		test.Fatalf("error did not identify as ErrNoBinary, so a caller cannot tell a missing platform from a broken lookup: %v", err)
+	if !errors.Is(resolveError, ErrNoBinary) {
+		test.Fatalf("error did not identify as ErrNoBinary, so a caller cannot tell a missing platform from a broken lookup: %v", resolveError)
 	}
 
 	// The message has to be actionable on its own, because the person reading it is looking at a
 	// failed install and has no other source of truth about what was wanted.
-	message := err.Error()
+	message := resolveError.Error()
 	for _, required := range []string{runtime.GOOS, runtime.GOARCH, CurrentPlatformPackageName(), DispatcherPackageName, BinaryOverrideVariable} {
 		if !strings.Contains(message, required) {
 			test.Errorf("the failure never mentions %q, so it does not say what was missing: %s", required, message)
@@ -44,9 +44,9 @@ func TestResolveFindsThePlatformPackage(test *testing.T) {
 	root := test.TempDir()
 	expected := writePlatformBinary(test, root, 0o755)
 
-	path, err := Resolve([]string{root})
-	if err != nil {
-		test.Fatalf("a correctly installed platform package did not resolve: %v", err)
+	path, resolveError := Resolve([]string{root})
+	if resolveError != nil {
+		test.Fatalf("a correctly installed platform package did not resolve: %v", resolveError)
 	}
 	if path != expected {
 		test.Fatalf("resolved %s, wanted the installed binary at %s", path, expected)
@@ -63,13 +63,13 @@ func TestResolveWalksUpToAWorkspaceRoot(test *testing.T) {
 	expected := writePlatformBinary(test, workspace, 0o755)
 
 	nested := filepath.Join(workspace, "applications", "web")
-	if err := os.MkdirAll(nested, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(nested, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 
-	path, err := Resolve(SearchRoots(nested, ""))
-	if err != nil {
-		test.Fatalf("a hoisted install did not resolve from a nested package: %v", err)
+	path, resolveError := Resolve(SearchRoots(nested, ""))
+	if resolveError != nil {
+		test.Fatalf("a hoisted install did not resolve from a nested package: %v", resolveError)
 	}
 	if path != expected {
 		test.Fatalf("resolved %s, wanted %s", path, expected)
@@ -88,15 +88,15 @@ func TestResolveReportsABinaryThatIsNotExecutable(test *testing.T) {
 	root := test.TempDir()
 	path := writePlatformBinary(test, root, 0o644)
 
-	resolved, err := Resolve([]string{root})
-	if err == nil {
+	resolved, resolveError := Resolve([]string{root})
+	if resolveError == nil {
 		test.Fatalf("resolved %s despite it being unrunnable", resolved)
 	}
-	if !strings.Contains(err.Error(), path) {
-		test.Fatalf("the failure does not name the file that cannot run: %v", err)
+	if !strings.Contains(resolveError.Error(), path) {
+		test.Fatalf("the failure does not name the file that cannot run: %v", resolveError)
 	}
-	if errors.Is(err, ErrNoBinary) {
-		test.Fatalf("a present-but-unrunnable binary reported as a missing platform, which sends the reader hunting the wrong bug: %v", err)
+	if errors.Is(resolveError, ErrNoBinary) {
+		test.Fatalf("a present-but-unrunnable binary reported as a missing platform, which sends the reader hunting the wrong bug: %v", resolveError)
 	}
 }
 
@@ -109,9 +109,9 @@ func TestOverrideTakesPrecedence(test *testing.T) {
 	writeExecutable(test, override, 0o755)
 	test.Setenv(BinaryOverrideVariable, override)
 
-	path, err := Resolve([]string{root})
-	if err != nil {
-		test.Fatalf("the override did not resolve: %v", err)
+	path, resolveError := Resolve([]string{root})
+	if resolveError != nil {
+		test.Fatalf("the override did not resolve: %v", resolveError)
 	}
 	if path != override {
 		test.Fatalf("resolved %s while %s pointed at %s — a developer would read results from the wrong binary as their own", path, BinaryOverrideVariable, override)
@@ -129,12 +129,12 @@ func TestOverrideFailsLoudlyWhenItPointsAtNothing(test *testing.T) {
 	missing := filepath.Join(test.TempDir(), "not-here")
 	test.Setenv(BinaryOverrideVariable, missing)
 
-	path, err := Resolve([]string{root})
-	if err == nil {
+	path, resolveError := Resolve([]string{root})
+	if resolveError == nil {
 		test.Fatalf("a broken override silently fell back to %s", path)
 	}
-	if !strings.Contains(err.Error(), missing) || !strings.Contains(err.Error(), BinaryOverrideVariable) {
-		test.Fatalf("the failure does not say what was set or where it pointed: %v", err)
+	if !strings.Contains(resolveError.Error(), missing) || !strings.Contains(resolveError.Error(), BinaryOverrideVariable) {
+		test.Fatalf("the failure does not say what was set or where it pointed: %v", resolveError)
 	}
 }
 
@@ -145,7 +145,7 @@ func TestOverrideRejectsADirectory(test *testing.T) {
 	directory := test.TempDir()
 	test.Setenv(BinaryOverrideVariable, directory)
 
-	if path, err := Resolve([]string{test.TempDir()}); err == nil {
+	if path, resolveError := Resolve([]string{test.TempDir()}); resolveError == nil {
 		test.Fatalf("resolved a directory as a binary: %s", path)
 	}
 }
@@ -209,15 +209,15 @@ func writePlatformBinary(test *testing.T, root string, mode os.FileMode) string 
 // writeExecutable writes a placeholder file with an explicit mode.
 func writeExecutable(test *testing.T, path string, mode os.FileMode) {
 	test.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), mode); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), mode); writeError != nil {
+		test.Fatal(writeError)
 	}
 	// WriteFile's mode is masked by umask, so it is set explicitly. A test that meant to write an
 	// unrunnable file and wrote a runnable one would pass while asserting nothing.
-	if err := os.Chmod(path, mode); err != nil {
-		test.Fatal(err)
+	if changeModeError := os.Chmod(path, mode); changeModeError != nil {
+		test.Fatal(changeModeError)
 	}
 }

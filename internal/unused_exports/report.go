@@ -24,9 +24,9 @@ import (
 func Run(ctx context.Context, graph *program.Graph, files []*ast.SourceFile, deep bool) (*Report, error) {
 	roots := module_roots.Build(files)
 
-	report, err := FindUnreferenced(ctx, graph, files, roots, deep)
-	if err != nil {
-		return nil, err
+	report, findUnreferencedError := FindUnreferenced(ctx, graph, files, roots, deep)
+	if findUnreferencedError != nil {
+		return nil, findUnreferencedError
 	}
 
 	for _, file := range files {

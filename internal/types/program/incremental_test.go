@@ -68,12 +68,12 @@ func TestIncrementalProgramSkipsUnchangedFiles(test *testing.T) {
 
 	build := func() *program.Graph {
 		test.Helper()
-		graph, err := program.Build(program.Options{
+		graph, buildError := program.Build(program.Options{
 			ConfigFileName:   "tsconfig.json",
 			CurrentDirectory: directory,
 		})
-		if err != nil {
-			test.Fatalf("building: %v", err)
+		if buildError != nil {
+			test.Fatalf("building: %v", buildError)
 		}
 		return graph
 	}
@@ -112,8 +112,8 @@ func TestIncrementalProgramSkipsUnchangedFiles(test *testing.T) {
 	// the harness can produce a finding at all, which is what makes leg three's result mean
 	// something. Without it, a silent leg three is indistinguishable from a broken detector.
 	plantedPath := filepath.Join(directory, "planted.ts")
-	if err := os.WriteFile(plantedPath, []byte("export const broken: number = \"a string\";\n"), 0o644); err != nil {
-		test.Fatalf("planting: %v", err)
+	if writeError := os.WriteFile(plantedPath, []byte("export const broken: number = \"a string\";\n"), 0o644); writeError != nil {
+		test.Fatalf("planting: %v", writeError)
 	}
 
 	planted := build()
@@ -127,8 +127,8 @@ func TestIncrementalProgramSkipsUnchangedFiles(test *testing.T) {
 	// Leg three: remove the error and confirm the findings clear. A cache that never
 	// invalidates would keep reporting the planted error here, and a cache that reports
 	// nothing regardless would have failed leg two.
-	if err := os.Remove(plantedPath); err != nil {
-		test.Fatalf("removing the planted file: %v", err)
+	if removeError := os.Remove(plantedPath); removeError != nil {
+		test.Fatalf("removing the planted file: %v", removeError)
 	}
 
 	healed := build()
@@ -149,12 +149,12 @@ func TestBuildInfoReaderReturnsNilBeforeAnyBuild(test *testing.T) {
 		"main.ts":       "export const value: number = 1;\n",
 	})
 
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   "tsconfig.json",
 		CurrentDirectory: directory,
 	})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 	if graph.CompilerHost == nil {
 		test.Fatal("Graph.CompilerHost is nil; the incremental path cannot be reached without it")
@@ -188,12 +188,12 @@ func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 
 	build := func() *program.Graph {
 		test.Helper()
-		graph, err := program.Build(program.Options{
+		graph, buildError := program.Build(program.Options{
 			ConfigFileName:   "tsconfig.json",
 			CurrentDirectory: directory,
 		})
-		if err != nil {
-			test.Fatalf("building: %v", err)
+		if buildError != nil {
+			test.Fatalf("building: %v", buildError)
 		}
 		return graph
 	}
@@ -219,10 +219,10 @@ func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 			len(diagnostics), messagesOf(diagnostics))
 	}
 	buildInfoPath := filepath.Join(directory, "tsconfig.tsbuildinfo")
-	written, err := os.Stat(buildInfoPath)
-	if err != nil {
+	written, statError := os.Stat(buildInfoPath)
+	if statError != nil {
 		test.Fatalf("no build info on disk after WriteBuildInfo, so every warm leg below would "+
-			"silently run cold: %v", err)
+			"silently run cold: %v", statError)
 	}
 	if written.Size() == 0 {
 		test.Fatal("the build info is empty, which reads as a successful write and behaves as no cache")
@@ -233,8 +233,8 @@ func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 	// the case a stale cache fails. The file is new, so the cache has never seen it, and a
 	// cache that trusts its snapshot over the filesystem reports nothing here.
 	plantedPath := filepath.Join(directory, "planted.ts")
-	if err := os.WriteFile(plantedPath, []byte("export const broken: number = \"a string\";\n"), 0o644); err != nil {
-		test.Fatalf("planting: %v", err)
+	if writeError := os.WriteFile(plantedPath, []byte("export const broken: number = \"a string\";\n"), 0o644); writeError != nil {
+		test.Fatalf("planting: %v", writeError)
 	}
 
 	warmDirty := build()
@@ -247,8 +247,8 @@ func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 	test.Logf("warm run found the planted violation: %v", dirtyFindings)
 
 	// Leg four: remove it and confirm the findings clear rather than persisting.
-	if err := os.Remove(plantedPath); err != nil {
-		test.Fatalf("removing the planted file: %v", err)
+	if removeError := os.Remove(plantedPath); removeError != nil {
+		test.Fatalf("removing the planted file: %v", removeError)
 	}
 	rewriteSession := warmDirty.NewIncrementalSession()
 	if rewriteSession == nil {
@@ -279,12 +279,12 @@ func TestIncrementalMatchesFullPass(test *testing.T) {
 
 	build := func() *program.Graph {
 		test.Helper()
-		graph, err := program.Build(program.Options{
+		graph, buildError := program.Build(program.Options{
 			ConfigFileName:   "tsconfig.json",
 			CurrentDirectory: directory,
 		})
-		if err != nil {
-			test.Fatalf("building: %v", err)
+		if buildError != nil {
+			test.Fatalf("building: %v", buildError)
 		}
 		return graph
 	}

@@ -13,9 +13,9 @@ import (
 // returnEarly runs the engine as a child and exits with its exit code as soon as the engine writes it to
 // the verdict descriptor, leaving the child to finish alone. See execute.
 func returnEarly(binaryPath string, arguments []string) error {
-	verdictReader, verdictWriter, err := os.Pipe()
-	if err != nil {
-		return fmt.Errorf("opening the verdict pipe: %w", err)
+	verdictReader, verdictWriter, pipeError := os.Pipe()
+	if pipeError != nil {
+		return fmt.Errorf("opening the verdict pipe: %w", pipeError)
 	}
 	command := exec.Command(binaryPath, arguments...)
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
@@ -26,8 +26,8 @@ func returnEarly(binaryPath string, arguments []string) error {
 	// terminal reaches both already, and a second copy changes nothing.
 	signals := make(chan os.Signal, 4)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
-	if err := command.Start(); err != nil {
-		return fmt.Errorf("running %s: %w", binaryPath, err)
+	if startError := command.Start(); startError != nil {
+		return fmt.Errorf("running %s: %w", binaryPath, startError)
 	}
 	verdictWriter.Close()
 	go func() {

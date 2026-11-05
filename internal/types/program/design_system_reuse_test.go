@@ -52,8 +52,8 @@ func TestDesignSystemRulesReplayUntilWhatTheDesignSystemReadChanges(test *testin
 	rules := []rule.Rule{designSystemRule(root)}
 	write := func(name string, contents string) func() {
 		return func() {
-			if err := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 		}
 	}
@@ -87,8 +87,8 @@ func TestDesignSystemRulesReplayUntilWhatTheDesignSystemReadChanges(test *testin
 		{"nothing changed after the stylesheet edit", func() {}, false},
 		{"a candidate it missed created", write("candidate.css", ""), true},
 		{"that candidate removed", func() {
-			if err := os.Remove(filepath.Join(root, "candidate.css")); err != nil {
-				test.Fatal(err)
+			if removeError := os.Remove(filepath.Join(root, "candidate.css")); removeError != nil {
+				test.Fatal(removeError)
 			}
 		}, true},
 	}
@@ -130,9 +130,9 @@ func TestAnotherProgramsDesignSystemDoesNotHideThisWalks(test *testing.T) {
 		"b.ts":          "export const b = 2;\n",
 	})
 	elsewhere := writeProject(test, map[string]string{"tsconfig.json": minimalConfig, "c.ts": "export const c = 3;\n"})
-	other, err := program.Build(program.Options{ConfigFileName: filepath.Join(elsewhere, "tsconfig.json")})
-	if err != nil {
-		test.Fatal(err)
+	other, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(elsewhere, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	inner := designSystemRule(root)
 	interleaved := inner
@@ -154,8 +154,8 @@ func TestAnotherProgramsDesignSystemDoesNotHideThisWalks(test *testing.T) {
 	if recorded.DesignSystem == nil || len(recorded.DesignSystem.Reads) == 0 {
 		test.Fatalf("this walk's design system was recorded as never loaded: %+v", recorded.DesignSystem)
 	}
-	if err := os.WriteFile(filepath.Join(root, "theme.css"), []byte("plain\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "theme.css"), []byte("plain\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	result, _ := walkAndRecord(test, root, rules, recorded)
 	truth := plainWalk(test, root, rules)

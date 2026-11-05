@@ -115,9 +115,9 @@ func (g *Graph) Explain(ctx context.Context, sourceFile *ast.SourceFile, rules [
 			}
 		}
 
-		options, err := g.RuleOptions.Decode(subject.Name, resolution.RawOptionsFor(subject.Name))
-		if err != nil {
-			account.DeclinedBecause = fmt.Sprintf("its options could not be read: %v", err)
+		options, decodeError := g.RuleOptions.Decode(subject.Name, resolution.RawOptionsFor(subject.Name))
+		if decodeError != nil {
+			account.DeclinedBecause = fmt.Sprintf("its options could not be read: %v", decodeError)
 			explanation.Accounts = append(explanation.Accounts, account)
 			continue
 		}

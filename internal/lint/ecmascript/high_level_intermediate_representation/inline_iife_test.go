@@ -612,9 +612,9 @@ func TestMemoInclusiveInliningCallSitesAreReviewed(test *testing.T) {
 		"inline_order_test.go": true,
 	}
 
-	entries, err := os.ReadDir(".")
-	if err != nil {
-		test.Fatalf("reading the package directory: %v", err)
+	entries, readDirectoryError := os.ReadDir(".")
+	if readDirectoryError != nil {
+		test.Fatalf("reading the package directory: %v", readDirectoryError)
 	}
 
 	found := []string{}

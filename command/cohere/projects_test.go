@@ -140,9 +140,9 @@ func TestFormatOnlyRunsTheSwiftEngineInItsFormatOnlyMode(test *testing.T) {
 	if alone == 0 || alone != exitCode || !strings.Contains(output, "notFormatted") && !strings.Contains(output, "Doubler.swift") {
 		test.Errorf("the package alone did not fail on its format finding as the mixed run did (exit %d, mixed %d):\n%s", alone, exitCode, output)
 	}
-	logged, err := os.ReadFile(arguments)
-	if err != nil {
-		test.Fatal(err)
+	logged, readError := os.ReadFile(arguments)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	for _, line := range strings.Split(strings.TrimSpace(string(logged)), "\n") {
 		if !strings.Contains(" "+line+" ", " --no-fix ") || !strings.Contains(" "+line+" ", " --format-only ") {
@@ -157,9 +157,9 @@ func TestFormatOnlyRunsTheSwiftEngineInItsFormatOnlyMode(test *testing.T) {
 // contractDirectory is where the Swift contract's fixtures are.
 func contractDirectory(test *testing.T) string {
 	test.Helper()
-	directory, err := filepath.Abs(filepath.Join("..", "..", "swift", "Contract"))
-	if err != nil {
-		test.Fatal(err)
+	directory, absolutePathError := filepath.Abs(filepath.Join("..", "..", "swift", "Contract"))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	return directory
 }

@@ -37,8 +37,8 @@ const (
 // equality and an unknown value would silently pick a third behaviour of matching nothing.
 func (location *NoWarningCommentsLocation) UnmarshalJSON(raw []byte) error {
 	var spelling string
-	if err := json.Unmarshal(raw, &spelling); err != nil {
-		return err
+	if decodeError := json.Unmarshal(raw, &spelling); decodeError != nil {
+		return decodeError
 	}
 	switch spelling {
 	case "start":
@@ -94,8 +94,8 @@ func DecodeNoWarningCommentsOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	for index, decoration := range options.Decoration {
 		if len([]rune(decoration)) != 1 || text.TrimWhitespace(decoration) == "" {
@@ -205,8 +205,8 @@ func noWarningCommentsMatchers(
 	matched := make([]string, 0, len(terms))
 	leads := make([]rune, 0, len(terms))
 	for _, term := range terms {
-		matcher, err := noWarningCommentsMatcherFor(term, location, decoration)
-		if err != nil {
+		matcher, noWarningCommentsMatcherForError := noWarningCommentsMatcherFor(term, location, decoration)
+		if noWarningCommentsMatcherForError != nil {
 			// A term that cannot be compiled is a configuration mistake rather than a finding.
 			// Skipped rather than reported, matching upstream, whose `escapeRegExp` makes every
 			// term compilable and which therefore has no failure mode here at all.

@@ -49,8 +49,8 @@ func DecodeNoDangerOptions(raw []byte) (any, error) {
 	// Lenient on purpose: eslint-plugin-react 7.37.5's schema leaves this object open (no
 	// `additionalProperties`), so ESLint loads an extra key and so must this.
 	var wire noDangerWireOptions
-	if err := json.Unmarshal(raw, &wire); err != nil {
-		return options, err
+	if decodeError := json.Unmarshal(raw, &wire); decodeError != nil {
+		return options, decodeError
 	}
 	options.CustomComponentNames = wire.CustomComponentNames
 	return options, nil
@@ -307,7 +307,7 @@ func matchesAnyPattern(patterns []string, rendered string) bool {
 	for _, pattern := range patterns {
 		// path.Match, which reads `\` as an escape on every platform. filepath.Match does not on
 		// Windows, so a pattern like `MUI\*` meant something else there than where it was measured.
-		if matched, err := path.Match(pattern, rendered); err == nil && matched {
+		if matched, matchError := path.Match(pattern, rendered); matchError == nil && matched {
 			return true
 		}
 	}

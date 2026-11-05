@@ -941,8 +941,8 @@ func DecodeNoUnknownPropertyOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var wire noUnknownPropertyWireOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	options.Ignore = wire.Ignore
 	options.RequireDataLowercase = wire.RequireDataLowercase

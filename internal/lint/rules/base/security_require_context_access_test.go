@@ -33,10 +33,10 @@ func securityRequireContextAccessLiveOptions() any {
 // schema constraints live -- both fields required, and `requiresAny` non-empty -- and neither has
 // an upstream counterpart to inherit correctness from.
 func securityRequireContextAccessOptions(requirementsJson string) any {
-	decoded, err := DecodeContextRequiresAccessOptions(
+	decoded, decodeContextRequiresAccessOptionsError := DecodeContextRequiresAccessOptions(
 		[]byte(`{"requirements":` + requirementsJson + `}`))
-	if err != nil {
-		panic("the fixture options do not decode: " + err.Error())
+	if decodeContextRequiresAccessOptionsError != nil {
+		panic("the fixture options do not decode: " + decodeContextRequiresAccessOptionsError.Error())
 	}
 	return decoded
 }
@@ -391,9 +391,9 @@ func TestDecodeContextRequiresAccessOptions(test *testing.T) {
 
 	test.Run("nil input yields an empty list", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeContextRequiresAccessOptions(nil)
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeContextRequiresAccessOptionsError := DecodeContextRequiresAccessOptions(nil)
+		if decodeContextRequiresAccessOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeContextRequiresAccessOptionsError)
 		}
 		if len(decoded.(SecurityRequireContextAccessOptions).Requirements) != 0 {
 			test.Error("nil input produced requirements")
@@ -402,26 +402,26 @@ func TestDecodeContextRequiresAccessOptions(test *testing.T) {
 
 	test.Run("a requirement with no contextKey is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeContextRequiresAccessOptions(
-			[]byte(`{"requirements":[{"requiresAny":["A"]}]}`)); err == nil {
+		if _, decodeContextRequiresAccessOptionsError := DecodeContextRequiresAccessOptions(
+			[]byte(`{"requirements":[{"requiresAny":["A"]}]}`)); decodeContextRequiresAccessOptionsError == nil {
 			test.Error("a requirement naming no key decoded")
 		}
 	})
 
 	test.Run("an empty requiresAny is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeContextRequiresAccessOptions(
-			[]byte(`{"requirements":[{"contextKey":"K","requiresAny":[]}]}`)); err == nil {
+		if _, decodeContextRequiresAccessOptionsError := DecodeContextRequiresAccessOptions(
+			[]byte(`{"requirements":[{"contextKey":"K","requiresAny":[]}]}`)); decodeContextRequiresAccessOptionsError == nil {
 			test.Error("a requirement nothing could satisfy decoded")
 		}
 	})
 
 	test.Run("the live wiring decodes", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeContextRequiresAccessOptions([]byte(
+		if _, decodeContextRequiresAccessOptionsError := DecodeContextRequiresAccessOptions([]byte(
 			`{"requirements":[{"contextKey":"AccountRequestContextKey",` +
-				`"requiresAny":["RequireSessionAccess","WithSessionAccess"]}]}`)); err != nil {
-			test.Errorf("the configuration api-phi-health runs did not decode: %v", err)
+				`"requiresAny":["RequireSessionAccess","WithSessionAccess"]}]}`)); decodeContextRequiresAccessOptionsError != nil {
+			test.Errorf("the configuration api-phi-health runs did not decode: %v", decodeContextRequiresAccessOptionsError)
 		}
 	})
 }

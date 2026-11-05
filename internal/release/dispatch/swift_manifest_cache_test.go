@@ -19,7 +19,7 @@ func TestASwiftEngineRebuiltAfterAnEditSaysTheTreeWasModified(test *testing.T) {
 	if runtime.GOOS != "darwin" {
 		test.Skip("the Swift engine is built only on macOS")
 	}
-	if _, err := exec.LookPath("swift"); err != nil {
+	if _, lookPathError := exec.LookPath("swift"); lookPathError != nil {
 		test.Skip("no swift toolchain on PATH")
 	}
 
@@ -41,8 +41,8 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 		command.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
 			"GIT_AUTHOR_NAME=fixture", "GIT_AUTHOR_EMAIL=fixture@example.com",
 			"GIT_COMMITTER_NAME=fixture", "GIT_COMMITTER_EMAIL=fixture@example.com")
-		if output, err := command.CombinedOutput(); err != nil {
-			test.Fatalf("git %s: %v\n%s", strings.Join(arguments, " "), err, output)
+		if output, outputError := command.CombinedOutput(); outputError != nil {
+			test.Fatalf("git %s: %v\n%s", strings.Join(arguments, " "), outputError, output)
 		}
 	}
 	git("init", "--quiet")
@@ -54,12 +54,12 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	says := func() string {
 		test.Helper()
 		binaryPath := filepath.Join(test.TempDir(), "cohere-swift")
-		if err := buildSwiftProductWithSwiftPM(packageDirectory, scratch, binaryPath); err != nil {
-			test.Fatal(err)
+		if buildSwiftProductWithSwiftPMError := buildSwiftProductWithSwiftPM(packageDirectory, scratch, binaryPath); buildSwiftProductWithSwiftPMError != nil {
+			test.Fatal(buildSwiftProductWithSwiftPMError)
 		}
-		output, err := exec.Command(binaryPath).Output()
-		if err != nil {
-			test.Fatal(err)
+		output, outputError := exec.Command(binaryPath).Output()
+		if outputError != nil {
+			test.Fatal(outputError)
 		}
 		return strings.TrimSpace(string(output))
 	}

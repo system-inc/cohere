@@ -65,8 +65,8 @@ func DecodeIdLengthOptions(raw []byte) (any, error) {
 	}
 
 	var wire idLengthRawOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 
 	if wire.Min != nil {
@@ -90,9 +90,9 @@ func DecodeIdLengthOptions(raw []byte) (any, error) {
 	for _, pattern := range wire.ExceptionPatterns {
 		// Upstream's `new RegExp(pattern, "u")`, read as JavaScript reads it: RE2 refuses a lookaround or a
 		// backreference its user wrote, and reads `\s` and `\b` differently (#7mztrdd).
-		compiled, err := esregexp.Compile(pattern, "u")
-		if err != nil {
-			return settings, fmt.Errorf("id-length exceptionPattern %q does not compile: %w", pattern, err)
+		compiled, compileError := esregexp.Compile(pattern, "u")
+		if compileError != nil {
+			return settings, fmt.Errorf("id-length exceptionPattern %q does not compile: %w", pattern, compileError)
 		}
 		settings.ExceptionPatterns = append(settings.ExceptionPatterns, compiled)
 	}

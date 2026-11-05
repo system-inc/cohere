@@ -76,8 +76,8 @@ func parseDimension(input string) *dimension {
 	// `Infinity` to JavaScript, and ParseFloat returns the same infinity alongside its range error,
 	// so the range error is not a reason to decline. Upstream's `Number.isNaN` guard can never fire
 	// on this grammar.
-	value, err := strconv.ParseFloat(input[:numberEnd], 64)
-	if err != nil && !errors.Is(err, strconv.ErrRange) {
+	value, parseError := strconv.ParseFloat(input[:numberEnd], 64)
+	if parseError != nil && !errors.Is(parseError, strconv.ErrRange) {
 		return nil
 	}
 	return &dimension{value: value, unit: unit}

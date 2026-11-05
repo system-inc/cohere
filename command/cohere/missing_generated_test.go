@@ -37,8 +37,8 @@ func TestAMissingGeneratedFileLeadsAsOneCause(test *testing.T) {
 		})
 		command := exec.Command("git", "init", "--quiet")
 		command.Dir = root
-		if output, err := command.CombinedOutput(); err != nil {
-			test.Fatalf("git init: %v\n%s", err, output)
+		if output, outputError := command.CombinedOutput(); outputError != nil {
+			test.Fatalf("git init: %v\n%s", outputError, output)
 		}
 		return root
 	}
@@ -46,13 +46,13 @@ func TestAMissingGeneratedFileLeadsAsOneCause(test *testing.T) {
 		test.Helper()
 		command := exec.Command(binary, append([]string{"--no-fix", "--no-format", "--no-cache"}, arguments...)...)
 		command.Dir = root
-		output, err := command.CombinedOutput()
-		if err == nil {
+		output, outputError := command.CombinedOutput()
+		if outputError == nil {
 			return string(output), 0
 		}
-		exitError, isExit := err.(*exec.ExitError)
+		exitError, isExit := outputError.(*exec.ExitError)
 		if !isExit {
-			test.Fatalf("running cohere: %v\n%s", err, output)
+			test.Fatalf("running cohere: %v\n%s", outputError, output)
 		}
 		return string(output), childExitCode(test, exitError)
 	}
@@ -126,9 +126,9 @@ func TestAMissingGeneratedFileLeadsAsOneCause(test *testing.T) {
 		}
 		page := func() string {
 			test.Helper()
-			contents, err := os.ReadFile(filepath.Join(root, "app/page.ts"))
-			if err != nil {
-				test.Fatal(err)
+			contents, readError := os.ReadFile(filepath.Join(root, "app/page.ts"))
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			return string(contents)
 		}
@@ -162,7 +162,7 @@ func TestAMissingGeneratedFileLeadsAsOneCause(test *testing.T) {
 			!strings.Contains(output, "Cannot find name 'PageProps'") {
 			test.Errorf("a missing file git does not ignore is the source's own mistake, exit %d:\n%s", exitCode, output)
 		}
-		if _, err := os.Stat(filepath.Join(root, "types")); err == nil {
+		if _, statError := os.Stat(filepath.Join(root, "types")); statError == nil {
 			test.Fatalf("the fixture's missing file exists")
 		}
 	})

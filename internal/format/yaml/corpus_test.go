@@ -69,9 +69,9 @@ type frontMatterOracle struct{ engine *prettier.Engine }
 func (oracle frontMatterOracle) Handles(fileName string) bool { return oracle.engine.Handles(fileName) }
 
 func (oracle frontMatterOracle) Format(fileName string, text string) (string, error) {
-	formatted, err := oracle.engine.Format(fileName, text)
-	if err != nil {
-		return "", err
+	formatted, formatError := oracle.engine.Format(fileName, text)
+	if formatError != nil {
+		return "", formatError
 	}
 	normalized, _ := normalizeInput(text)
 	frontMatter, _ := mdast.ParseFrontMatter(normalized)
@@ -155,9 +155,9 @@ type yamlCorpus struct {
 // .build, which no repository formats and the oracle's goja runtime overflows its stack on.
 func yamlCorpora(test *testing.T, roots string) []yamlCorpus {
 	test.Helper()
-	enumerator, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		test.Fatal(err)
+	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 	var corpora []yamlCorpus
 	pending := strings.Split(roots, ":")
@@ -211,8 +211,8 @@ func yamlCorpora(test *testing.T, roots string) []yamlCorpus {
 		// Both sides format with the same options, so a config cohere refuses (one naming an option
 		// only JavaScript reads) measures the printer just as well under the defaults.
 		corpus.options = formatoptions.Default()
-		if resolution, err := formatoptions.Resolve(root); err != nil {
-			test.Logf("%s: formatting with the default options: %v", root, err)
+		if resolution, resolveError := formatoptions.Resolve(root); resolveError != nil {
+			test.Logf("%s: formatting with the default options: %v", root, resolveError)
 		} else {
 			corpus.options = resolution.Options
 		}
@@ -244,9 +244,9 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 	}
 	directory := os.Getenv("COHERE_FORMAT_CACHE")
 	if directory == "" {
-		base, err := os.UserCacheDir()
-		if err != nil {
-			test.Fatal(err)
+		base, userCacheDirectoryError := os.UserCacheDir()
+		if userCacheDirectoryError != nil {
+			test.Fatal(userCacheDirectoryError)
 		}
 		directory = filepath.Join(base, "cohere", "prettier-oracle")
 	}
@@ -268,9 +268,9 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 		fullStack := yamlCandidate{options: options, fullStack: true}
 		var texts, yamlFiles []string
 		for _, path := range corpus.yamlFiles {
-			source, err := os.ReadFile(path)
-			if err != nil {
-				test.Fatal(err)
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			if len(source) > oracleSizeLimit {
 				tooLarge++
@@ -306,9 +306,9 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 		frontMatters := frontMatterCandidate{options: options, frontMatters: map[string]*mdast.FrontMatter{}, values: map[string]string{}, trees: map[string]parsed{}}
 		var frontMatterFiles, values []string
 		for _, path := range corpus.markdownFiles {
-			source, err := os.ReadFile(path)
-			if err != nil {
-				test.Fatal(err)
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			normalized, _ := normalizeInput(string(source))
 			frontMatter, _ := mdast.ParseFrontMatter(normalized)
@@ -328,9 +328,9 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 		for index, tree := range parseTrees(test, values) {
 			frontMatters.trees[frontMatterFiles[index]] = tree
 			// The Go parser must refuse exactly the values the real one refuses.
-			if _, err := parse(values[index], nil); (err != nil) != (tree.err != "") {
+			if _, parseError := parse(values[index], nil); (parseError != nil) != (tree.err != "") {
 				parseDisagreements++
-				report.WriteString(fmt.Sprintf("front matter: the Go parser disagrees (real: %q, Go: %v): %s\n", tree.err, err, frontMatterFiles[index]))
+				report.WriteString(fmt.Sprintf("front matter: the Go parser disagrees (real: %q, Go: %v): %s\n", tree.err, parseError, frontMatterFiles[index]))
 			}
 			if tree.err != "" {
 				// Prettier prints such front matter as written, since the embed fails; there is no
@@ -411,8 +411,8 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 	}
 
 	if path := os.Getenv("COHERE_YAML_REPORT"); path != "" {
-		if err := os.WriteFile(path, []byte(report.String()), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(report.String()), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 }

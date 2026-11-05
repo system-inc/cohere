@@ -105,8 +105,8 @@ func correctnessNoMockOnModuleNamespaceRunUnder(test *testing.T, module string, 
 	return rule_testing.RunTypedFilesWithSetup(test, CorrectnessNoMockOnModuleNamespace,
 		correctnessNoMockOnModuleNamespaceFiles(subjectFileName, sourceText), subjectFileName,
 		func(directory string) {
-			if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-				test.Fatalf("writing the tsconfig: %v", err)
+			if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+				test.Fatalf("writing the tsconfig: %v", writeError)
 			}
 		})
 }

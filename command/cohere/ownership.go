@@ -238,10 +238,10 @@ func readProjectConfigs(found discovery, projects []discoveredProject) map[strin
 		go func() {
 			defer group.Done()
 			reading <- struct{}{}
-			config, err := program.ReadProjectConfig(configFile)
+			config, readProjectConfigurationError := program.ReadProjectConfig(configFile)
 			<-reading
 			lock.Lock()
-			reads[configFile] = projectConfigRead{config: config, err: err}
+			reads[configFile] = projectConfigRead{config: config, err: readProjectConfigurationError}
 			lock.Unlock()
 		}()
 	}
@@ -253,8 +253,8 @@ func readProjectConfigs(found discovery, projects []discoveredProject) map[strin
 // walked and outside what it never enters: a dependency, build or cache directory, a repository of its
 // own, or a marker the root's ignorePatterns refused.
 func (found discovery) projectAt(configFile string) (discoveredProject, bool) {
-	relative, err := filepath.Rel(found.Root, configFile)
-	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+	relative, relativePathError := filepath.Rel(found.Root, configFile)
+	if relativePathError != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		return discoveredProject{}, false
 	}
 	relative = filepath.ToSlash(relative)
@@ -283,8 +283,8 @@ func (found discovery) projectAt(configFile string) (discoveredProject, bool) {
 
 // nearestIncluder is which of the projects that include a file owns it. See Ownership.
 func nearestIncluder(found discovery, fileName string, indexes []int) int {
-	relative, err := filepath.Rel(found.Root, fileName)
-	if err != nil {
+	relative, relativePathError := filepath.Rel(found.Root, fileName)
+	if relativePathError != nil {
 		return indexes[0]
 	}
 	fileDirectory := path.Dir(filepath.ToSlash(relative))
@@ -325,8 +325,8 @@ func sharedSegments(left string, right string) int {
 // mentionsReferences reports whether a tsconfig's text could hold project references: a byte search, so a
 // false positive costs one read and a false negative is impossible.
 func mentionsReferences(configFile string) bool {
-	contents, err := os.ReadFile(configFile)
-	return err != nil || bytes.Contains(contents, []byte(`"references"`))
+	contents, readError := os.ReadFile(configFile)
+	return readError != nil || bytes.Contains(contents, []byte(`"references"`))
 }
 
 // writeProjectYield writes what one project yields to a file of its own for its run to read, and returns
@@ -344,8 +344,8 @@ func writeProjectYield(yield projectYield, directory string) (string, error) {
 		return "", err
 	}
 	defer file.Close()
-	if _, err := file.Write(encoded); err != nil {
-		return "", err
+	if _, writeError := file.Write(encoded); writeError != nil {
+		return "", writeError
 	}
 	return file.Name(), nil
 }
@@ -357,13 +357,13 @@ var activeProjectYield = sync.OnceValues(func() (projectYield, error) {
 	if yieldFile == "" {
 		return projectYield{}, nil
 	}
-	contents, err := os.ReadFile(yieldFile)
-	if err != nil {
-		return projectYield{}, fmt.Errorf("reading what this project yields to the others: %w", err)
+	contents, readError := os.ReadFile(yieldFile)
+	if readError != nil {
+		return projectYield{}, fmt.Errorf("reading what this project yields to the others: %w", readError)
 	}
 	var yield projectYield
-	if err := json.Unmarshal(contents, &yield); err != nil {
-		return projectYield{}, fmt.Errorf("reading what this project yields to the others, %s: %w", yieldFile, err)
+	if decodeError := json.Unmarshal(contents, &yield); decodeError != nil {
+		return projectYield{}, fmt.Errorf("reading what this project yields to the others, %s: %w", yieldFile, decodeError)
 	}
 	return yield, nil
 })
