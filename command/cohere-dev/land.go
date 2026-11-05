@@ -63,6 +63,10 @@ func land(arguments []string) int {
 		)
 		return 2
 	}
+	if checkGitlinksError := checkGitlinks(worktree, "HEAD"); checkGitlinksError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", checkGitlinksError)
+		return 2
+	}
 	if checkSubmodulesError := checkSubmodules(worktree); checkSubmodulesError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", checkSubmodulesError)
 		return 2
@@ -125,6 +129,16 @@ func land(arguments []string) int {
 			fmt.Fprintf(streams.Errors, "cohere-dev: reading what to land after merging main at %s: %v\n",
 				shortCommit(mainCommit), gitOutputError)
 			return 1
+		}
+		// Main may be what records a submodule as a symlink, and what lands is the merge.
+		if checkGitlinksError := checkGitlinks(worktree, landing); checkGitlinksError != nil {
+			fmt.Fprintf(
+				streams.Errors,
+				"cohere-dev: after merging main at %s: %v\n",
+				shortCommit(mainCommit),
+				checkGitlinksError,
+			)
+			return 2
 		}
 		if code := gate(worktree, landing); code != 0 {
 			fmt.Fprintf(
@@ -215,6 +229,83 @@ func checkSubmodules(worktree string) error {
 		}
 	}
 	return nil
+}
+
+// gitlinkMode is the mode git records a submodule's pin under.
+const gitlinkMode = "160000"
+
+// checkGitlinks refuses a commit that records a submodule its `.gitmodules` names as anything but a gitlink.
+// Most of the house's worktrees have TypeScript a symlink on disk, so a `git add` of it there stages the
+// symlink, mode 120000, in the submodule's place, and a merge committed one on 2026-11-05 (ee1660af). With no
+// gitlink nothing marked the fork as a submodule: a bare cohere at the root walked into it, and a whole-module
+// test run took in its packages, which panic under -trimpath. No gate failed, since each tests a disk where the
+// symlink resolves, so this reads the commit, never the disk, and runs before the tests, in seconds.
+func checkGitlinks(repository string, commit string) error {
+	resolved, err := gitOutput(repository, "rev-parse", "--verify", commit+"^{commit}")
+	if err != nil {
+		return fmt.Errorf("reading the commit %s to check its submodules: %w", commit, err)
+	}
+	declared, err := gitOutput(repository, "ls-tree", resolved, "--", ".gitmodules")
+	if err != nil {
+		return fmt.Errorf("reading %s's .gitmodules: %w", shortCommit(resolved), err)
+	}
+	if declared == "" {
+		return nil
+	}
+	// -z, so a path is read whole: each setting is its key, a newline, and its value.
+	settings, err := gitOutput(repository, "config", "--blob", resolved+":.gitmodules", "--list", "-z")
+	if err != nil {
+		return fmt.Errorf("reading %s's .gitmodules: %w", shortCommit(resolved), err)
+	}
+	for _, setting := range strings.Split(settings, "\x00") {
+		key, path, found := strings.Cut(setting, "\n")
+		if !found || !strings.HasPrefix(key, "submodule.") || !strings.HasSuffix(key, ".path") {
+			continue
+		}
+		mode, err := treeMode(repository, resolved, path)
+		if err != nil {
+			return err
+		}
+		if mode == gitlinkMode {
+			continue
+		}
+		recorded := "nothing"
+		if mode != "" {
+			recorded = "mode " + mode
+		}
+		return fmt.Errorf("%s records %s, which .gitmodules names a submodule, as %s, not a gitlink (mode %s): "+
+			"restore the gitlink in the index with `git update-index --cacheinfo %s,%s,%s` and commit, "+
+			"never `git add` the symlink", shortCommit(resolved), path, recorded, gitlinkMode, gitlinkMode,
+			parentPin(repository, resolved, path), path)
+	}
+	return nil
+}
+
+// treeMode is the mode a commit records a path under, or empty when it records nothing there.
+func treeMode(repository string, commit string, path string) (string, error) {
+	entry, err := gitOutput(repository, "ls-tree", commit, "--", path)
+	if err != nil {
+		return "", fmt.Errorf("reading %s at %s: %w", path, shortCommit(commit), err)
+	}
+	if fields := strings.Fields(entry); len(fields) > 0 {
+		return fields[0], nil
+	}
+	return "", nil
+}
+
+// parentPin is the commit a submodule is pinned at in the first of a commit's parents to record it as a gitlink,
+// what a refusal tells its reader to restore, or a placeholder naming what goes there when none does.
+func parentPin(repository string, commit string, path string) string {
+	// Ignored: a parent that can't be read leaves the placeholder, and the refusal itself is already certain.
+	parents, _ := gitOutput(repository, "rev-parse", commit+"^@")
+	for _, parent := range strings.Fields(parents) {
+		// Ignored: as above.
+		entry, _ := gitOutput(repository, "ls-tree", parent, "--", path)
+		if fields := strings.Fields(entry); len(fields) >= 3 && fields[0] == gitlinkMode {
+			return fields[2]
+		}
+	}
+	return "<the commit it pins>"
 }
 
 // landDirectory holds the land lock and its line, beside the pool's.
