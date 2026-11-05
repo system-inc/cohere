@@ -24,8 +24,8 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 
 // The flagged fixtures carry a // want on every call that drops an error, as a statement, under defer or go, or into
 // _, and analysistest fails on a finding no want expects as much as on a want nothing found, so the allowed and
-// lookalike fixtures prove the rule stays quiet on a handled error, a reasoned marker, a write documented never to
-// fail, and a call whose results only look like an error.
+// lookalike fixtures prove the rule stays quiet on a handled error, a reasoned marker, a write exempt by its writer's
+// type, and a call whose results only look like an error.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(
