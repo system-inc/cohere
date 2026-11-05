@@ -154,8 +154,8 @@ func portOutput(input oracleInput) (output string) {
 			tokens = append(tokens, token)
 		}
 	} else {
-		for i := 0; i < len(text); i += input.Chunk {
-			for token := range parser.Parse(slice(text, i, i+input.Chunk), true) {
+		for index := 0; index < len(text); index += input.Chunk {
+			for token := range parser.Parse(slice(text, index, index+input.Chunk), true) {
 				tokens = append(tokens, token)
 			}
 		}
@@ -301,8 +301,8 @@ func writeItem(builder *strings.Builder, item *CollectionItem) {
 // surrogates as \udxxx, everything else as itself.
 func writeString(builder *strings.Builder, units []uint16) {
 	builder.WriteByte('"')
-	for i := 0; i < len(units); i++ {
-		unit := units[i]
+	for index := 0; index < len(units); index++ {
+		unit := units[index]
 		switch {
 		case unit == '"':
 			builder.WriteString(`\"`)
@@ -320,9 +320,9 @@ func writeString(builder *strings.Builder, units []uint16) {
 			builder.WriteString(`\t`)
 		case unit < 0x20:
 			fmt.Fprintf(builder, `\u%04x`, unit)
-		case isHighSurrogate(unit) && i+1 < len(units) && isLowSurrogate(units[i+1]):
-			builder.WriteRune(utf16.DecodeRune(rune(unit), rune(units[i+1])))
-			i++
+		case isHighSurrogate(unit) && index+1 < len(units) && isLowSurrogate(units[index+1]):
+			builder.WriteRune(utf16.DecodeRune(rune(unit), rune(units[index+1])))
+			index++
 		case isHighSurrogate(unit) || isLowSurrogate(unit):
 			fmt.Fprintf(builder, `\u%04x`, unit)
 		default:

@@ -103,20 +103,20 @@ func (walker *Walker) Listeners(visit func(Site)) rule.Listeners {
 }
 
 // siteFinders is, by node kind, what offers the sites at a node of that kind into the walker's sites.
-var siteFinders = map[ast.Kind]func(w *Walker, node *ast.Node){
-	ast.KindVariableDeclaration: func(w *Walker, node *ast.Node) {
+var siteFinders = map[ast.Kind]func(walker *Walker, node *ast.Node){
+	ast.KindVariableDeclaration: func(walker *Walker, node *ast.Node) {
 		declaration := node.AsVariableDeclaration()
-		w.annotated(declaration.Type, declaration.Initializer)
+		walker.annotated(declaration.Type, declaration.Initializer)
 	},
-	ast.KindPropertyDeclaration: func(w *Walker, node *ast.Node) {
+	ast.KindPropertyDeclaration: func(walker *Walker, node *ast.Node) {
 		declaration := node.AsPropertyDeclaration()
-		w.annotated(declaration.Type, declaration.Initializer)
+		walker.annotated(declaration.Type, declaration.Initializer)
 	},
-	ast.KindParameter: func(w *Walker, node *ast.Node) {
+	ast.KindParameter: func(walker *Walker, node *ast.Node) {
 		parameter := node.AsParameterDeclaration()
-		w.annotated(parameter.Type, parameter.Initializer)
+		walker.annotated(parameter.Type, parameter.Initializer)
 	},
-	ast.KindBinaryExpression: func(w *Walker, node *ast.Node) {
+	ast.KindBinaryExpression: func(walker *Walker, node *ast.Node) {
 		binary := node.AsBinaryExpression()
 		if binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken || binary.Left == nil {
 			return
@@ -124,39 +124,39 @@ var siteFinders = map[ast.Kind]func(w *Walker, node *ast.Node){
 		left := ast.SkipParentheses(binary.Left)
 		// A literal on the left is a destructuring pattern: each target in it is a slot of its own.
 		if left.Kind == ast.KindObjectLiteralExpression || left.Kind == ast.KindArrayLiteralExpression {
-			w.destructured(left, binary.Right, w.typeChecker.GetTypeAtLocation(binary.Right))
+			walker.destructured(left, binary.Right, walker.typeChecker.GetTypeAtLocation(binary.Right))
 			return
 		}
-		w.offer(binary.Right, w.typeChecker.GetTypeAtLocation(binary.Left))
+		walker.offer(binary.Right, walker.typeChecker.GetTypeAtLocation(binary.Left))
 	},
 	ast.KindCallExpression: (*Walker).arguments,
-	ast.KindNewExpression: func(w *Walker, node *ast.Node) {
+	ast.KindNewExpression: func(walker *Walker, node *ast.Node) {
 		if node.AsNewExpression().Arguments == nil {
 			return
 		}
-		w.arguments(node)
+		walker.arguments(node)
 	},
-	ast.KindReturnStatement: func(w *Walker, node *ast.Node) {
+	ast.KindReturnStatement: func(walker *Walker, node *ast.Node) {
 		expression := node.AsReturnStatement().Expression
 		if expression == nil {
 			return
 		}
-		w.returned(type_checking.GetParentFunctionNode(node), expression)
+		walker.returned(type_checking.GetParentFunctionNode(node), expression)
 	},
-	ast.KindArrowFunction: func(w *Walker, node *ast.Node) {
+	ast.KindArrowFunction: func(walker *Walker, node *ast.Node) {
 		body := node.AsArrowFunction().Body
 		if body == nil || ast.IsBlock(body) {
 			return
 		}
-		w.returned(node, body)
+		walker.returned(node, body)
 	},
-	ast.KindPropertyAssignment: func(w *Walker, node *ast.Node) {
+	ast.KindPropertyAssignment: func(walker *Walker, node *ast.Node) {
 		if IsDestructuringTarget(node.Parent) {
 			return
 		}
-		w.contextual(node.AsPropertyAssignment().Initializer)
+		walker.contextual(node.AsPropertyAssignment().Initializer)
 	},
-	ast.KindShorthandPropertyAssignment: func(w *Walker, node *ast.Node) {
+	ast.KindShorthandPropertyAssignment: func(walker *Walker, node *ast.Node) {
 		if IsDestructuringTarget(node.Parent) ||
 			node.AsShorthandPropertyAssignment().ObjectAssignmentInitializer != nil {
 			return
@@ -167,9 +167,9 @@ var siteFinders = map[ast.Kind]func(w *Walker, node *ast.Node){
 		}
 		// The key and the value are one identifier: its contextual type is the property's slot and
 		// its type is the value put there, which no-unsafe-assignment reads the same way.
-		w.offer(name, checker.Checker_getContextualType(w.typeChecker, name, checker.ContextFlagsNone))
+		walker.offer(name, checker.Checker_getContextualType(walker.typeChecker, name, checker.ContextFlagsNone))
 	},
-	ast.KindArrayLiteralExpression: func(w *Walker, node *ast.Node) {
+	ast.KindArrayLiteralExpression: func(walker *Walker, node *ast.Node) {
 		if IsDestructuringTarget(node) {
 			return
 		}
@@ -177,7 +177,7 @@ var siteFinders = map[ast.Kind]func(w *Walker, node *ast.Node){
 			if element.Kind == ast.KindSpreadElement || element.Kind == ast.KindOmittedExpression {
 				continue
 			}
-			w.contextual(element)
+			walker.contextual(element)
 		}
 	},
 	ast.KindMethodDeclaration:       (*Walker).offerMethod,
@@ -517,25 +517,26 @@ func (walker *Walker) offerUpcast(node *ast.Node) {
 // members, a generic indexed access, an intersection with an array, tuple or container member, or a type parameter
 // whose constraint has one (#53w68gt). A union's members are never
 // unions, and a type parameter's base constraint is never a type parameter, so this goes at most two deep.
-func (walker *Walker) hasObjectPart(t *checker.Type) bool {
+func (walker *Walker) hasObjectPart(subjectType *checker.Type) bool {
 	switch {
-	case t.Flags()&checker.TypeFlagsObject != 0:
+	case subjectType.Flags()&checker.TypeFlagsObject != 0:
 		return true
-	case IsTypeParameterIndexedAccess(t):
+	case IsTypeParameterIndexedAccess(subjectType):
 		// A generic indexed slot can hold a primitive and still vary with the caller (#xzpba0r).
 		return true
-	case t.Flags()&checker.TypeFlagsUnion != 0:
-		return slices.ContainsFunc(t.Types(), walker.hasObjectPart)
-	case t.Flags()&checker.TypeFlagsIntersection != 0:
+	case subjectType.Flags()&checker.TypeFlagsUnion != 0:
+		return slices.ContainsFunc(subjectType.Types(), walker.hasObjectPart)
+	case subjectType.Flags()&checker.TypeFlagsIntersection != 0:
 		// Only the members a walk pairs; see relate. An object member counts unless a primitive one makes it
 		// a brand (#b9a0wgy).
-		return slices.ContainsFunc(t.Types(), walker.isSlotContainer) ||
-			(!hasPrimitiveMember(t) && slices.ContainsFunc(t.Types(), func(member *checker.Type) bool {
-				return member.Flags()&checker.TypeFlagsObject != 0
-			}))
-	case t.Flags()&checker.TypeFlagsTypeParameter != 0:
-		constraint := checker.Checker_getBaseConstraintOfType(walker.typeChecker, t)
-		return constraint != nil && constraint != t && walker.hasObjectPart(constraint)
+		return slices.ContainsFunc(subjectType.Types(), walker.isSlotContainer) ||
+			(!hasPrimitiveMember(subjectType) &&
+				slices.ContainsFunc(subjectType.Types(), func(member *checker.Type) bool {
+					return member.Flags()&checker.TypeFlagsObject != 0
+				}))
+	case subjectType.Flags()&checker.TypeFlagsTypeParameter != 0:
+		constraint := checker.Checker_getBaseConstraintOfType(walker.typeChecker, subjectType)
+		return constraint != nil && constraint != subjectType && walker.hasObjectPart(constraint)
 	}
 	return false
 }

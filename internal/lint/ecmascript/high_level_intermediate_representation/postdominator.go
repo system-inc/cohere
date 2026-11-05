@@ -152,9 +152,9 @@ func computePostDominance(function *Function) *postDominanceTree {
 
 	// The two pointers walk toward the root, which sits at position zero, so the larger position is
 	// always the one further from it and is the one that steps.
-	intersect := func(a, b int) int {
+	intersect := func(left, right int) int {
 		// The pointers start at the two inputs and step from there, leaving the inputs as given.
-		x, y := a, b
+		x, y := left, right
 		for x != y {
 			for x > y {
 				if immediate[x] == -1 || immediate[x] == x {

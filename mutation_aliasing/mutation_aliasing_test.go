@@ -69,24 +69,24 @@ func place(id ssa.IdentifierId) testPlace { return testPlace{id: id} }
 
 type testGraph struct{}
 
-func (testGraph) Entry(f *testFunction) ssa.BlockId { return f.entry }
-func (testGraph) BlockBound(f *testFunction) int    { return int(f.next) }
-func (testGraph) Block(f *testFunction, id ssa.BlockId) (*testBlock, bool) {
-	block, ok := f.table[id]
+func (testGraph) Entry(function *testFunction) ssa.BlockId { return function.entry }
+func (testGraph) BlockBound(function *testFunction) int    { return int(function.next) }
+func (testGraph) Block(function *testFunction, id ssa.BlockId) (*testBlock, bool) {
+	block, ok := function.table[id]
 	return block, ok
 }
-func (testGraph) Blocks(f *testFunction) []*testBlock            { return f.blocks }
-func (testGraph) SetBlocks(f *testFunction, blocks []*testBlock) { f.blocks = blocks }
-func (testGraph) Retain(f *testFunction, keep func(ssa.BlockId) bool) {
-	for id := range f.table {
+func (testGraph) Blocks(function *testFunction) []*testBlock            { return function.blocks }
+func (testGraph) SetBlocks(function *testFunction, blocks []*testBlock) { function.blocks = blocks }
+func (testGraph) Retain(function *testFunction, keep func(ssa.BlockId) bool) {
+	for id := range function.table {
 		if !keep(id) {
-			delete(f.table, id)
+			delete(function.table, id)
 		}
 	}
 }
-func (testGraph) Placeholder(f *testFunction, block *testBlock) *testBlock { return block }
-func (testGraph) Id(block *testBlock) ssa.BlockId                          { return block.id }
-func (testGraph) Predecessors(block *testBlock) []ssa.BlockId              { return block.predecessors }
+func (testGraph) Placeholder(function *testFunction, block *testBlock) *testBlock { return block }
+func (testGraph) Id(block *testBlock) ssa.BlockId                                 { return block.id }
+func (testGraph) Predecessors(block *testBlock) []ssa.BlockId                     { return block.predecessors }
 func (testGraph) SetPredecessors(block *testBlock, predecessors []ssa.BlockId) {
 	block.predecessors = predecessors
 }
@@ -98,78 +98,87 @@ func (testGraph) EachEdge(block *testBlock, visit func(ssa.BlockId, ssa.Edge)) {
 	}
 }
 func (testGraph) EndsInReturn(block *testBlock) bool { return block.returns != nil }
-func (testGraph) InstructionCount(f *testFunction, block *testBlock) int {
+func (testGraph) InstructionCount(function *testFunction, block *testBlock) int {
 	return len(block.instructions)
 }
-func (testGraph) EachInstructionPlace(f *testFunction, block *testBlock, index int, visit func(*testPlace, ssa.Role)) {
+func (testGraph) EachInstructionPlace(
+	function *testFunction,
+	block *testBlock,
+	index int,
+	visit func(*testPlace, ssa.Role),
+) {
 	instruction := block.instructions[index]
-	for i := range instruction.uses {
-		visit(&instruction.uses[i], ssa.Use)
+	for index := range instruction.uses {
+		visit(&instruction.uses[index], ssa.Use)
 	}
-	for i := range instruction.defines {
-		visit(&instruction.defines[i], ssa.Define)
+	for index := range instruction.defines {
+		visit(&instruction.defines[index], ssa.Define)
 	}
 }
-func (testGraph) IsContextStore(f *testFunction, block *testBlock, index int) bool { return false }
-func (testGraph) ContextStoreDefines(f *testFunction, block *testBlock, index int, place testPlace) bool {
+func (testGraph) IsContextStore(function *testFunction, block *testBlock, index int) bool {
 	return false
 }
-func (testGraph) SetInstructionOrder(f *testFunction, block *testBlock, index int, order ssa.EvaluationOrder) {
+func (testGraph) ContextStoreDefines(function *testFunction, block *testBlock, index int, place testPlace) bool {
+	return false
+}
+func (testGraph) SetInstructionOrder(function *testFunction, block *testBlock, index int, order ssa.EvaluationOrder) {
 	block.instructions[index].order = order
 }
 func (testGraph) EachTerminalPlace(block *testBlock, visit func(*testPlace, ssa.Role)) {}
 func (testGraph) SetTerminalOrder(block *testBlock, order ssa.EvaluationOrder) {
 	block.terminalOrder = order
 }
-func (testGraph) Params(f *testFunction) []testPlace                                 { return f.params }
-func (testGraph) Returns(f *testFunction) *testPlace                                 { return f.returns }
-func (testGraph) Declaration(f *testFunction, id ssa.IdentifierId) ssa.DeclarationId { return 0 }
-func (testGraph) Contextual(f *testFunction, declaration ssa.DeclarationId) bool     { return false }
-func (testGraph) Mint(f *testFunction, original ssa.IdentifierId) ssa.IdentifierId   { return original }
-func (testGraph) Named(f *testFunction, id ssa.IdentifierId) bool                    { return true }
-func (testGraph) PlaceString(f *testFunction, id ssa.IdentifierId) string            { return "" }
-func (testGraph) IdentifierOf(place testPlace) ssa.IdentifierId                      { return place.id }
+func (testGraph) Params(function *testFunction) []testPlace                                 { return function.params }
+func (testGraph) Returns(function *testFunction) *testPlace                                 { return function.returns }
+func (testGraph) Declaration(function *testFunction, id ssa.IdentifierId) ssa.DeclarationId { return 0 }
+func (testGraph) Contextual(function *testFunction, declaration ssa.DeclarationId) bool     { return false }
+func (testGraph) Mint(function *testFunction, original ssa.IdentifierId) ssa.IdentifierId {
+	return original
+}
+func (testGraph) Named(function *testFunction, id ssa.IdentifierId) bool         { return true }
+func (testGraph) PlaceString(function *testFunction, id ssa.IdentifierId) string { return "" }
+func (testGraph) IdentifierOf(place testPlace) ssa.IdentifierId                  { return place.id }
 func (testGraph) WithIdentifier(place testPlace, id ssa.IdentifierId) testPlace {
 	return testPlace{id: id}
 }
 
-func (testGraph) InstructionOrder(f *testFunction, block *testBlock, index int) (ssa.EvaluationOrder, bool) {
+func (testGraph) InstructionOrder(function *testFunction, block *testBlock, index int) (ssa.EvaluationOrder, bool) {
 	return block.instructions[index].order, true
 }
 func (testGraph) TerminalOrder(block *testBlock) ssa.EvaluationOrder { return block.terminalOrder }
-func (testGraph) Effects(f *testFunction, block *testBlock, index int) []AliasingEffect[testPlace] {
+func (testGraph) Effects(function *testFunction, block *testBlock, index int) []AliasingEffect[testPlace] {
 	return block.instructions[index].effects
 }
-func (testGraph) ParametersFrozen(f *testFunction) bool { return f.parametersFrozen }
-func (testGraph) Context(f *testFunction) []testPlace   { return f.context }
+func (testGraph) ParametersFrozen(function *testFunction) bool { return function.parametersFrozen }
+func (testGraph) Context(function *testFunction) []testPlace   { return function.context }
 func (testGraph) ReturnValue(block *testBlock) (testPlace, bool) {
 	if block.returns == nil {
 		return testPlace{}, false
 	}
 	return *block.returns, true
 }
-func (testGraph) StoredContextValue(f *testFunction, block *testBlock, index int) (ssa.IdentifierId, bool) {
+func (testGraph) StoredContextValue(function *testFunction, block *testBlock, index int) (ssa.IdentifierId, bool) {
 	if stored := block.instructions[index].storedContext; stored != nil {
 		return *stored, true
 	}
 	return 0, false
 }
-func (testGraph) Closure(f *testFunction, block *testBlock, index int, into ssa.IdentifierId,
+func (testGraph) Closure(function *testFunction, block *testBlock, index int, into ssa.IdentifierId,
 	kinds map[ssa.IdentifierId]EffectValueKind) ([]testPlace, bool) {
 	return nil, false
 }
 
 // finalize is the sequence both real IRs run before the pass: reverse postorder, predecessors, and
 // evaluation order from 1.
-func finalize(f *testFunction) {
-	ssa.ReversePostorder(testGraph{}, f)
-	ssa.MarkPredecessors(testGraph{}, f)
-	ssa.MarkEvaluationOrder(testGraph{}, f)
+func finalize(function *testFunction) {
+	ssa.ReversePostorder(testGraph{}, function)
+	ssa.MarkPredecessors(testGraph{}, function)
+	ssa.MarkEvaluationOrder(testGraph{}, function)
 }
 
-func ranges(f *testFunction, options Options) *MutableRanges {
-	finalize(f)
-	return InferMutableRanges(testGraph{}, f, options)
+func ranges(function *testFunction, options Options) *MutableRanges {
+	finalize(function)
+	return InferMutableRanges(testGraph{}, function, options)
 }
 
 func expectRange(test *testing.T, table *MutableRanges, id ssa.IdentifierId, want MutableRange, why string) {
@@ -194,10 +203,10 @@ func expectRange(test *testing.T, table *MutableRanges, id ssa.IdentifierId, wan
 func TestParametersDefinedOnEntryBothWays(test *testing.T) {
 	test.Parallel()
 	build := func() (*testFunction, ssa.IdentifierId, ssa.IdentifierId, ssa.IdentifierId) {
-		f := newTestFunction()
+		function := newTestFunction()
 		p, q, r := ssa.IdentifierId(1), ssa.IdentifierId(2), ssa.IdentifierId(3)
-		f.params = []testPlace{place(p), place(q), place(r)}
-		entry := f.block()
+		function.params = []testPlace{place(p), place(q), place(r)}
+		entry := function.block()
 		entry.add(&testInstruction{
 			uses:    []testPlace{place(q)},
 			effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutateTransitiveConditionally, place(p))},
@@ -205,12 +214,12 @@ func TestParametersDefinedOnEntryBothWays(test *testing.T) {
 		entry.add(&testInstruction{uses: []testPlace{place(p)}})
 		entry.add(&testInstruction{uses: []testPlace{place(p)},
 			effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutate, place(p))}})
-		return f, p, q, r
+		return function, p, q, r
 	}
 
-	f, p, q, r := build()
-	without := ranges(f, Options{})
-	if order := f.blocks[0].instructions[0].order; order != 1 {
+	function, p, q, r := build()
+	without := ranges(function, Options{})
+	if order := function.blocks[0].instructions[0].order; order != 1 {
 		test.Fatalf("the first instruction is at order %d, so the ranges below would not mean what they say", order)
 	}
 	expectRange(test, without, p, MutableRange{Start: 2, End: 4},
@@ -223,8 +232,8 @@ func TestParametersDefinedOnEntryBothWays(test *testing.T) {
 	expectRange(test, without, q, MutableRange{}, "q is read and never mutated")
 	expectRange(test, without, r, MutableRange{}, "r is never touched")
 
-	f, p, q, r = build()
-	with := ranges(f, Options{ParametersDefinedOnEntry: true})
+	function, p, q, r = build()
+	with := ranges(function, Options{ParametersDefinedOnEntry: true})
 	expectRange(test, with, p, MutableRange{Start: 1, End: 4}, "a parameter is defined on entry")
 	if !with.Contains(p, 1) {
 		test.Error("with the option, the mutation at order 1 must be inside p's range")
@@ -249,9 +258,9 @@ func TestParametersDefinedOnEntryBothWays(test *testing.T) {
 // the alias widens the source to the mutation.
 func TestAMutationReachesWhatItIsAnAliasOf(test *testing.T) {
 	test.Parallel()
-	f := newTestFunction()
+	function := newTestFunction()
 	source, alias := ssa.IdentifierId(1), ssa.IdentifierId(2)
-	entry := f.block()
+	entry := function.block()
 	entry.add(&testInstruction{defines: []testPlace{place(source)},
 		effects: []AliasingEffect[testPlace]{CreateEffect(place(source), EffectValueMutable)}})
 	entry.add(&testInstruction{uses: []testPlace{place(source)}, defines: []testPlace{place(alias)},
@@ -262,7 +271,7 @@ func TestAMutationReachesWhatItIsAnAliasOf(test *testing.T) {
 	entry.add(&testInstruction{uses: []testPlace{place(alias)},
 		effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutate, place(alias))}})
 
-	table := ranges(f, Options{})
+	table := ranges(function, Options{})
 	expectRange(test, table, source, MutableRange{Start: 1, End: 4}, "the alias's mutation at 3 reaches its source")
 	expectRange(test, table, alias, MutableRange{Start: 2, End: 4}, "mutated at 3")
 }
@@ -271,9 +280,9 @@ func TestAMutationReachesWhatItIsAnAliasOf(test *testing.T) {
 // that existed when it happened, so an alias made later does not reach back.
 func TestAnAliasMadeAfterAMutationDoesNotWiden(test *testing.T) {
 	test.Parallel()
-	f := newTestFunction()
+	function := newTestFunction()
 	source, alias := ssa.IdentifierId(1), ssa.IdentifierId(2)
-	entry := f.block()
+	entry := function.block()
 	entry.add(&testInstruction{defines: []testPlace{place(source)},
 		effects: []AliasingEffect[testPlace]{CreateEffect(place(source), EffectValueMutable)}})
 	entry.add(&testInstruction{defines: []testPlace{place(alias)},
@@ -283,7 +292,7 @@ func TestAnAliasMadeAfterAMutationDoesNotWiden(test *testing.T) {
 	entry.add(&testInstruction{uses: []testPlace{place(source), place(alias)},
 		effects: []AliasingEffect[testPlace]{FlowEffect(AliasingEffectAlias, place(source), place(alias))}})
 
-	table := ranges(f, Options{})
+	table := ranges(function, Options{})
 	expectRange(
 		test,
 		table,
@@ -300,16 +309,18 @@ func TestAnAliasMadeAfterAMutationDoesNotWiden(test *testing.T) {
 func TestFrozenParametersDropAConditionalMutation(test *testing.T) {
 	test.Parallel()
 	for _, frozen := range []bool{true, false} {
-		f := newTestFunction()
-		f.parametersFrozen = frozen
-		p := ssa.IdentifierId(1)
-		f.params = []testPlace{place(p)}
-		entry := f.block()
-		entry.add(&testInstruction{uses: []testPlace{place(p)}})
-		entry.add(&testInstruction{uses: []testPlace{place(p)},
-			effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutateConditionally, place(p))}})
+		function := newTestFunction()
+		function.parametersFrozen = frozen
+		identifierId := ssa.IdentifierId(1)
+		function.params = []testPlace{place(identifierId)}
+		entry := function.block()
+		entry.add(&testInstruction{uses: []testPlace{place(identifierId)}})
+		entry.add(&testInstruction{uses: []testPlace{place(identifierId)},
+			effects: []AliasingEffect[testPlace]{
+				MutationEffect(AliasingEffectMutateConditionally, place(identifierId)),
+			}})
 
-		table := ranges(f, Options{})
+		table := ranges(function, Options{})
 		want := MutableRange{Start: 1, End: 3}
 		if frozen {
 			want = MutableRange{}
@@ -317,7 +328,7 @@ func TestFrozenParametersDropAConditionalMutation(test *testing.T) {
 		expectRange(
 			test,
 			table,
-			p,
+			identifierId,
 			want,
 			map[bool]string{true: "frozen parameters drop it", false: "mutable parameters widen"}[frozen],
 		)
@@ -328,15 +339,15 @@ func TestFrozenParametersDropAConditionalMutation(test *testing.T) {
 // range reaches past the store with no effect consulted.
 func TestAStoreIntoACapturedBindingWidensFromItsShape(test *testing.T) {
 	test.Parallel()
-	f := newTestFunction()
+	function := newTestFunction()
 	value := ssa.IdentifierId(1)
-	entry := f.block()
+	entry := function.block()
 	entry.add(&testInstruction{defines: []testPlace{place(value)}})
 	entry.add(&testInstruction{uses: []testPlace{place(value)}})
 	stored := value
 	entry.add(&testInstruction{uses: []testPlace{place(value)}, storedContext: &stored})
 
-	table := ranges(f, Options{})
+	table := ranges(function, Options{})
 	expectRange(test, table, value, MutableRange{Start: 1, End: 4}, "the store at 3 keeps it live past 3")
 }
 
@@ -344,25 +355,25 @@ func TestAStoreIntoACapturedBindingWidensFromItsShape(test *testing.T) {
 // into the Returns place, and an IR without one skips both the node and the edge.
 func TestMutatingAReturnedValueReachesTheReturnsPlace(test *testing.T) {
 	test.Parallel()
-	f := newTestFunction()
+	function := newTestFunction()
 	value, returned := ssa.IdentifierId(1), ssa.IdentifierId(2)
 	returns := place(returned)
-	f.returns = &returns
-	entry := f.block()
+	function.returns = &returns
+	entry := function.block()
 	entry.add(&testInstruction{defines: []testPlace{place(value)},
 		effects: []AliasingEffect[testPlace]{CreateEffect(place(value), EffectValueMutable)}})
 	entry.returns = &testPlace{id: value}
 
-	finalize(f)
-	graph := BuildAliasingGraph(testGraph{}, f, Options{})
+	finalize(function)
+	graph := BuildAliasingGraph(testGraph{}, function, Options{})
 	if node := graph.state.nodes[returned]; node == nil ||
 		len(node.aliasesOrder) != 1 ||
 		node.aliasesOrder[0] != value {
 		test.Fatalf("the Returns place should alias the returned value, got %+v", node)
 	}
 
-	f.returns = nil
-	graph = BuildAliasingGraph(testGraph{}, f, Options{})
+	function.returns = nil
+	graph = BuildAliasingGraph(testGraph{}, function, Options{})
 	if _, ok := graph.state.nodes[returned]; ok {
 		test.Error("an IR with no Returns place has no Returns node")
 	}
@@ -372,9 +383,9 @@ func TestMutatingAReturnedValueReachesTheReturnsPlace(test *testing.T) {
 // whichever value it may be. Operands are walked in ascending predecessor order.
 func TestAMutationOfAPhiReachesItsOperands(test *testing.T) {
 	test.Parallel()
-	f := newTestFunction()
+	function := newTestFunction()
 	left, right, merged := ssa.IdentifierId(1), ssa.IdentifierId(2), ssa.IdentifierId(3)
-	entry, leftBlock, rightBlock, join := f.block(), f.block(), f.block(), f.block()
+	entry, leftBlock, rightBlock, join := function.block(), function.block(), function.block(), function.block()
 	entry.successors = []ssa.BlockId{leftBlock.id, rightBlock.id}
 	leftBlock.successors = []ssa.BlockId{join.id}
 	rightBlock.successors = []ssa.BlockId{join.id}
@@ -389,7 +400,7 @@ func TestAMutationOfAPhiReachesItsOperands(test *testing.T) {
 	join.add(&testInstruction{uses: []testPlace{place(merged)},
 		effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutate, place(merged))}})
 
-	table := ranges(f, Options{})
+	table := ranges(function, Options{})
 	mutation := join.instructions[0].order
 	for _, operand := range []ssa.IdentifierId{left, right} {
 		if got := table.Get(operand); got.End != mutation+1 {

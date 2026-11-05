@@ -484,8 +484,8 @@ func checkRedundantUnion(ruleContext rule.Context, node *ast.Node, cache map[*as
 	}
 	// Grouped by type node so a node contributing several literals reports once per primitive, in
 	// the order the nodes appear rather than in map order.
-	sort.SliceStable(entries, func(a, b int) bool {
-		return entries[a].typeNode.Pos() < entries[b].typeNode.Pos()
+	sort.SliceStable(entries, func(left, right int) bool {
+		return entries[left].typeNode.Pos() < entries[right].typeNode.Pos()
 	})
 	for _, entry := range entries {
 		ruleContext.ReportNode(entry.typeNode, redundantMessage("literalOverridden", "union", "",

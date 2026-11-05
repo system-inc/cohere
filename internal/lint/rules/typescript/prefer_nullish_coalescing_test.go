@@ -138,8 +138,8 @@ func TestPreferNullishCoalescingDecoderAcceptsTheShapesTheConfigLayerDelivers(te
 	}{
 		{
 			name: "a bare \"error\" delivers no options at all",
-			check: func(test *testing.T, o PreferNullishCoalescingOptions) {
-				if !o.IgnoreConditionalTests {
+			check: func(test *testing.T, options PreferNullishCoalescingOptions) {
+				if !options.IgnoreConditionalTests {
 					test.Error("the non-zero default must survive an absent options value")
 				}
 			},
@@ -150,13 +150,13 @@ func TestPreferNullishCoalescingDecoderAcceptsTheShapesTheConfigLayerDelivers(te
 				`"ignoreBooleanCoercion":true,"ignoreConditionalTests":false,` +
 				`"ignoreIfStatements":true,"ignoreMixedLogicalExpressions":true,` +
 				`"ignoreTernaryTests":true,"ignorePrimitives":true}`,
-			check: func(test *testing.T, o PreferNullishCoalescingOptions) {
-				if !o.AllowWithoutStrictNullChecks || !o.IgnoreBooleanCoercion ||
-					!o.IgnoreIfStatements || !o.IgnoreMixedLogicalExpressions ||
-					!o.IgnoreTernaryTests || !o.IgnorePrimitives.IgnoreAll {
-					test.Errorf("a key was dropped: %#v", o)
+			check: func(test *testing.T, options PreferNullishCoalescingOptions) {
+				if !options.AllowWithoutStrictNullChecks || !options.IgnoreBooleanCoercion ||
+					!options.IgnoreIfStatements || !options.IgnoreMixedLogicalExpressions ||
+					!options.IgnoreTernaryTests || !options.IgnorePrimitives.IgnoreAll {
+					test.Errorf("a key was dropped: %#v", options)
 				}
-				if o.IgnoreConditionalTests {
+				if options.IgnoreConditionalTests {
 					test.Error("an explicit false must override the true default, which is the whole " +
 						"reason these are pointers on the wire")
 				}

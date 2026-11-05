@@ -209,11 +209,11 @@ func Build(sourceText string) *Index {
 }
 
 // RuleReferences returns every rule name a disable or enable comment named, in source order.
-func (i *Index) RuleReferences() []RuleReference {
-	if i == nil {
+func (suppressionIndex *Index) RuleReferences() []RuleReference {
+	if suppressionIndex == nil {
 		return nil
 	}
-	return i.ruleReferences
+	return suppressionIndex.ruleReferences
 }
 
 // resolveFileScopeEnds closes each file-scope directive at the enable comment that matches it.
@@ -270,26 +270,26 @@ func namesIntersect(enableRules []string, blockRules []string) bool {
 //
 // Recording on the query rather than in a separate pass is what makes an unused directive
 // detectable at all: nothing else in the system knows which findings were never reported.
-func (i *Index) Suppresses(ruleName string, offset int) bool {
-	return i.SuppressedBy(ruleName, offset) >= 0
+func (suppressionIndex *Index) Suppresses(ruleName string, offset int) bool {
+	return suppressionIndex.SuppressedBy(ruleName, offset) >= 0
 }
 
 // SuppressedBy is Suppresses answering with which directive silenced the finding, by its index in Directives,
 // or -1 when none did. The findings cache keeps the index, so a replay can mark the same directive applied
 // without producing the finding again (MarkApplied).
-func (i *Index) SuppressedBy(ruleName string, offset int) int {
-	if i == nil || len(i.directives) == 0 {
+func (suppressionIndex *Index) SuppressedBy(ruleName string, offset int) int {
+	if suppressionIndex == nil || len(suppressionIndex.directives) == 0 {
 		return -1
 	}
 
-	line := i.lineOf(offset)
+	line := suppressionIndex.lineOf(offset)
 	reportsOnDirectives := directives.IsSubject(ruleName)
-	for index, candidate := range i.directives {
+	for index, candidate := range suppressionIndex.directives {
 		if reportsOnDirectives && !coversAFindingAboutADirective(candidate, line) {
 			continue
 		}
 		if candidate.Covers(ruleName, line) {
-			i.MarkApplied(index, ruleName)
+			suppressionIndex.MarkApplied(index, ruleName)
 			return index
 		}
 	}
@@ -299,11 +299,11 @@ func (i *Index) SuppressedBy(ruleName string, offset int) int {
 // MarkApplied records that the directive at index withheld a finding this run did not produce, because the
 // findings cache replayed the rule that would have, and reports false when no directive is at index. The index
 // is SuppressedBy's from a run over the same bytes, so it names the same directive.
-func (i *Index) MarkApplied(index int, ruleName string) bool {
-	if i == nil || index < 0 || index >= len(i.directives) {
+func (suppressionIndex *Index) MarkApplied(index int, ruleName string) bool {
+	if suppressionIndex == nil || index < 0 || index >= len(suppressionIndex.directives) {
 		return false
 	}
-	directive := i.directives[index]
+	directive := suppressionIndex.directives[index]
 	directive.applied++
 	if directive.appliedRules == nil {
 		directive.appliedRules = map[string]bool{}
@@ -324,28 +324,28 @@ func (directive *Directive) AppliedTo(named string) bool {
 }
 
 // Directives returns every directive found, in source order.
-func (i *Index) Directives() []*Directive {
-	if i == nil {
+func (suppressionIndex *Index) Directives() []*Directive {
+	if suppressionIndex == nil {
 		return nil
 	}
-	return i.directives
+	return suppressionIndex.directives
 }
 
 // AppliedCount is how many findings the directive at an index actually withheld.
-func (i *Index) AppliedCount(index int) int {
-	if i == nil || index < 0 || index >= len(i.directives) {
+func (suppressionIndex *Index) AppliedCount(index int) int {
+	if suppressionIndex == nil || index < 0 || index >= len(suppressionIndex.directives) {
 		return 0
 	}
-	return i.directives[index].applied
+	return suppressionIndex.directives[index].applied
 }
 
 // TotalApplied is how many findings this file's directives withheld, for the coverage line.
-func (i *Index) TotalApplied() int {
-	if i == nil {
+func (suppressionIndex *Index) TotalApplied() int {
+	if suppressionIndex == nil {
 		return 0
 	}
 	total := 0
-	for _, candidate := range i.directives {
+	for _, candidate := range suppressionIndex.directives {
 		total += candidate.applied
 	}
 	return total
@@ -356,12 +356,12 @@ func (i *Index) TotalApplied() int {
 // This only means what it says after a full run with every rule a directive could name. A run
 // filtered to one rule shows every directive of every other rule as unused, so the caller decides
 // whether to report them.
-func (i *Index) Unused() []*Directive {
-	if i == nil {
+func (suppressionIndex *Index) Unused() []*Directive {
+	if suppressionIndex == nil {
 		return nil
 	}
 	unused := []*Directive{}
-	for _, candidate := range i.directives {
+	for _, candidate := range suppressionIndex.directives {
 		if candidate.applied == 0 {
 			unused = append(unused, candidate)
 		}
@@ -375,12 +375,12 @@ func (i *Index) Unused() []*Directive {
 // naming one of our own rules carry no reason, so a hard requirement on day one would turn working
 // code red rather than teaching anyone anything. The count is the argument for the requirement;
 // the requirement is a policy the caller sets.
-func (i *Index) WithoutReason() []*Directive {
-	if i == nil {
+func (suppressionIndex *Index) WithoutReason() []*Directive {
+	if suppressionIndex == nil {
 		return nil
 	}
 	bare := []*Directive{}
-	for _, candidate := range i.directives {
+	for _, candidate := range suppressionIndex.directives {
 		if !candidate.HasReason() {
 			bare = append(bare, candidate)
 		}
@@ -389,9 +389,9 @@ func (i *Index) WithoutReason() []*Directive {
 }
 
 // LineOf is the zero-based line a byte offset falls on.
-func (i *Index) LineOf(offset int) int {
-	if i == nil {
+func (suppressionIndex *Index) LineOf(offset int) int {
+	if suppressionIndex == nil {
 		return 0
 	}
-	return i.lineOf(offset)
+	return suppressionIndex.lineOf(offset)
 }

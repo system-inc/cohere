@@ -839,9 +839,9 @@ func TestComparisonSeesEveryField(test *testing.T) {
 	errorText := "a: [b"
 	expectedError := oracleParse(test, []string{errorText})[0]
 	for name, corrupt := range map[string]func(*jsonError){
-		"message":  func(e *jsonError) { e.Message += "." },
-		"name":     func(e *jsonError) { e.Name = "TypeError" },
-		"position": func(e *jsonError) { e.Position.End.Offset++ },
+		"message":  func(jsonError *jsonError) { jsonError.Message += "." },
+		"name":     func(jsonError *jsonError) { jsonError.Name = "TypeError" },
+		"position": func(jsonError *jsonError) { jsonError.Position.End.Offset++ },
 	} {
 		copied := *expectedError.Error
 		position := *copied.Position

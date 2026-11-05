@@ -304,23 +304,23 @@ func numberBits(value float64) string {
 }
 
 func (writer *jsonWriter) value(value any) {
-	switch v := value.(type) {
+	switch typed := value.(type) {
 	case nil:
 		writer.raw("null")
 	case string:
-		writer.text(v)
+		writer.text(typed)
 	case bool:
-		writer.raw(strconv.FormatBool(v))
+		writer.raw(strconv.FormatBool(typed))
 	case float64:
-		writer.raw(`{"number":` + numberBits(v) + `}`)
+		writer.raw(`{"number":` + numberBits(typed) + `}`)
 	case *MergeKey:
 		writer.raw(`{"symbol":"<<"}`)
 	case Date:
-		writer.raw(`{"date":` + numberBits(float64(v)) + `}`)
+		writer.raw(`{"date":` + numberBits(float64(typed)) + `}`)
 	case Binary:
-		writer.raw(fmt.Sprintf(`{"bytes":"%x"}`, []byte(v)))
+		writer.raw(fmt.Sprintf(`{"bytes":"%x"}`, []byte(typed)))
 	default:
-		writer.raw(fmt.Sprintf(`{"other":"%T"}`, v))
+		writer.raw(fmt.Sprintf(`{"other":"%T"}`, typed))
 	}
 }
 
@@ -484,8 +484,8 @@ func (writer *jsonWriter) document(document *Document) {
 	for handle := range directives.Tags {
 		handles = append(handles, handle)
 	}
-	slices.SortFunc(handles, func(a string, b string) int {
-		return slices.Compare(stringToUnits(a), stringToUnits(b))
+	slices.SortFunc(handles, func(left string, right string) int {
+		return slices.Compare(stringToUnits(left), stringToUnits(right))
 	})
 	writer.builder.WriteByte('[')
 	for index, handle := range handles {

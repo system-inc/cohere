@@ -502,11 +502,11 @@ func TestRequireRenderReturnSpansAreInSourceOrder(test *testing.T) {
 		test.Fatalf("want 2 diagnostics, got %d", len(result.Diagnostics))
 	}
 	want := []string{"render() { }", "render: function() { }"}
-	for i, expected := range want {
-		diagnostic := result.Diagnostics[i]
+	for index, expected := range want {
+		diagnostic := result.Diagnostics[index]
 		reported := sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if reported != expected {
-			test.Errorf("diagnostic %d points at %q, want %q", i, reported, expected)
+			test.Errorf("diagnostic %d points at %q, want %q", index, reported, expected)
 		}
 	}
 }

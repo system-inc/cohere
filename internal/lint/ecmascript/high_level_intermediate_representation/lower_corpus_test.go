@@ -257,15 +257,15 @@ func TestLowerRealCodebase(test *testing.T) {
 			})
 
 			var count func(*Function)
-			count = func(f *Function) {
-				totalBlocks += len(f.Blocks)
-				totalInstructions += len(f.Instructions)
-				for _, instruction := range f.Instructions {
+			count = func(function *Function) {
+				totalBlocks += len(function.Blocks)
+				totalInstructions += len(function.Instructions)
+				for _, instruction := range function.Instructions {
 					if node, ok := instruction.Value.(*UnsupportedNode); ok {
 						unsupported[node.Reason]++
 					}
 				}
-				for _, nested := range f.Functions {
+				for _, nested := range function.Functions {
 					count(nested)
 				}
 			}

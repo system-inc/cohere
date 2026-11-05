@@ -83,12 +83,12 @@ func TestSSAOverRealCodebase(test *testing.T) {
 								if st.Phis > 0 {
 									withPhis++
 								}
-								for _, v := range VerifySSA(f) {
+								for _, violation := range VerifySSA(f) {
 									violations++
 									if violations <= 8 {
-										test.Errorf("%s: %s", filepath.Base(path), v.Detail)
+										test.Errorf("%s: %s", filepath.Base(path), violation.Detail)
 									}
-									switch v.Kind {
+									switch violation.Kind {
 									case static_single_assignment.SSAViolationMultipleDefinitions:
 										kinds["multiple-definitions"]++
 									default:
@@ -144,11 +144,11 @@ func TestSSAOverRealCodebase(test *testing.T) {
 	test.Logf("phis=%d functionsWithPhis=%d namedValues=%d uses=%d", totalPhis, withPhis, totalNamed, totalUses)
 	test.Logf("violations=%d %v", violations, kinds)
 	keys := make([]string, 0, len(terminals))
-	for k := range terminals {
-		keys = append(keys, k)
+	for key := range terminals {
+		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	for _, k := range keys {
-		test.Logf("  terminal %-8s %d", k, terminals[k])
+	for _, key := range keys {
+		test.Logf("  terminal %-8s %d", key, terminals[key])
 	}
 }

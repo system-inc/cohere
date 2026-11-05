@@ -44,22 +44,22 @@ func TestTheGateRefusesWhatPlainGoVetReports(test *testing.T) {
 	fixture := newLandFixture(test)
 	// The real go: the stand-in's directory comes off the front of PATH.
 	fixture.environment = append(fixture.environment, "PATH="+os.Getenv("PATH"))
-	a := fixture.worktree("a")
-	writeFiles(test, a, unkeyedLiteral)
-	fixture.git(a, "add", "go.mod", "other", "user")
-	fixture.git(a, "commit", "-q", "-m", "an unkeyed literal of another package's struct")
+	worktreeA := fixture.worktree("a")
+	writeFiles(test, worktreeA, unkeyedLiteral)
+	fixture.git(worktreeA, "add", "go.mod", "other", "user")
+	fixture.git(worktreeA, "commit", "-q", "-m", "an unkeyed literal of another package's struct")
 	land := func() (string, error) {
 		landing := exec.Command(fixture.wrapper, "land")
-		landing.Dir, landing.Env = a, fixture.environment
+		landing.Dir, landing.Env = worktreeA, fixture.environment
 		output, outputError := landing.CombinedOutput()
 		return string(output), outputError
 	}
 	if output, err := land(); err == nil || !strings.Contains(output, "struct literal uses unkeyed fields") {
 		test.Fatalf("an unkeyed literal of another package's struct did not refuse the landing (%v):\n%s", err, output)
 	}
-	writeFiles(test, a, map[string]string{"user/user.go": keyed})
-	fixture.git(a, "add", "user/user.go")
-	fixture.git(a, "commit", "-q", "-m", "its fields keyed")
+	writeFiles(test, worktreeA, map[string]string{"user/user.go": keyed})
+	fixture.git(worktreeA, "add", "user/user.go")
+	fixture.git(worktreeA, "commit", "-q", "-m", "its fields keyed")
 	if output, err := land(); err != nil || !strings.Contains(output, "landed") {
 		test.Errorf("the landing did not land once the fields were keyed (%v):\n%s", err, output)
 	}

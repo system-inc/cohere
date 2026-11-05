@@ -134,8 +134,8 @@ func describeNodes(nodes []*Node, indent string) string {
 // quoteForDiff quotes a string so whitespace differences are visible in a failure message.
 func quoteForDiff(value string) string {
 	quoted := "\""
-	for _, r := range value {
-		switch r {
+	for _, character := range value {
+		switch character {
 		case '\n':
 			quoted += "\\n"
 		case '\t':
@@ -145,7 +145,7 @@ func quoteForDiff(value string) string {
 		case '"':
 			quoted += "\\\""
 		default:
-			quoted += string(r)
+			quoted += string(character)
 		}
 	}
 	return quoted + "\""

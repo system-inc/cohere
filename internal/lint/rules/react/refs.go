@@ -598,36 +598,36 @@ type refsFunctionType struct {
 // refsGuard is the exception and does compare its id, because a guard is only sound for the
 // specific ref it guards; treating two guards as interchangeable would let `if (a.current == null)`
 // authorize a write to `b.current`.
-func refsTypeEqual(a, b *refsAccessType) bool {
-	if a == nil || b == nil {
-		return a == nil && b == nil
+func refsTypeEqual(left, right *refsAccessType) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
 	}
-	if a.Kind != b.Kind {
+	if left.Kind != right.Kind {
 		return false
 	}
-	switch a.Kind {
+	switch left.Kind {
 	case refsNone, refsNullable:
 		return true
 	case refsGuard:
-		return a.RefId == b.RefId && a.HasRefId == b.HasRefId
+		return left.RefId == right.RefId && left.HasRefId == right.HasRefId
 	case refsRef:
 		// Ref identity deliberately ignored. See the doc comment.
 		return true
 	case refsRefValue:
 		// Only the access span, deliberately. Ref origin and ref id ignored.
-		return a.Span == b.Span && a.HasSpan == b.HasSpan
+		return left.Span == right.Span && left.HasSpan == right.HasSpan
 	case refsStructure:
-		return refsTypeEqual(a.Value, b.Value) && refsFunctionEqual(a.Function, b.Function)
+		return refsTypeEqual(left.Value, right.Value) && refsFunctionEqual(left.Function, right.Function)
 	}
 	return false
 }
 
 // refsFunctionEqual compares two function types for convergence.
-func refsFunctionEqual(a, b *refsFunctionType) bool {
-	if a == nil || b == nil {
-		return a == nil && b == nil
+func refsFunctionEqual(left, right *refsFunctionType) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
 	}
-	return a.ReadRefEffect == b.ReadRefEffect && refsTypeEqual(a.ReturnType, b.ReturnType)
+	return left.ReadRefEffect == right.ReadRefEffect && refsTypeEqual(left.ReturnType, right.ReturnType)
 }
 
 // refsJoin merges two lattice elements, reproducing upstream's `join_ref_access_types`.
@@ -685,52 +685,52 @@ func refsJoin(a, b *refsAccessType, nextRefId func() int) *refsAccessType {
 // A ref value joined with anything is a ref value with its provenance erased, because the result
 // may or may not have come out of a ref and the conservative answer is that it did. Two refs that
 // are not the same ref produce a fresh id, which is the mint the convergence equality ignores.
-func refsJoinRefCarrying(a, b *refsAccessType, nextRefId func() int) *refsAccessType {
-	if a.Kind == refsRefValue && b.Kind == refsRefValue {
-		if a.HasRefId && b.HasRefId && a.RefId == b.RefId {
-			return a
+func refsJoinRefCarrying(left, right *refsAccessType, nextRefId func() int) *refsAccessType {
+	if left.Kind == refsRefValue && right.Kind == refsRefValue {
+		if left.HasRefId && right.HasRefId && left.RefId == right.RefId {
+			return left
 		}
 		return &refsAccessType{Kind: refsRefValue}
 	}
-	if a.Kind == refsRefValue || b.Kind == refsRefValue {
+	if left.Kind == refsRefValue || right.Kind == refsRefValue {
 		return &refsAccessType{Kind: refsRefValue}
 	}
-	if a.Kind == refsRef && b.Kind == refsRef {
-		if a.HasRefId && b.HasRefId && a.RefId == b.RefId {
-			return a
+	if left.Kind == refsRef && right.Kind == refsRef {
+		if left.HasRefId && right.HasRefId && left.RefId == right.RefId {
+			return left
 		}
 		return &refsAccessType{Kind: refsRef, RefId: nextRefId(), HasRefId: true}
 	}
-	if a.Kind == refsRef || b.Kind == refsRef {
+	if left.Kind == refsRef || right.Kind == refsRef {
 		return &refsAccessType{Kind: refsRef, RefId: nextRefId(), HasRefId: true}
 	}
 	// Both structures.
 	joined := &refsAccessType{Kind: refsStructure}
 	switch {
-	case a.Function == nil:
-		joined.Function = b.Function
-	case b.Function == nil:
-		joined.Function = a.Function
+	case left.Function == nil:
+		joined.Function = right.Function
+	case right.Function == nil:
+		joined.Function = left.Function
 	default:
-		returnType := refsJoin(a.Function.ReturnType, b.Function.ReturnType, nextRefId)
+		returnType := refsJoin(left.Function.ReturnType, right.Function.ReturnType, nextRefId)
 		merged := &refsFunctionType{
-			ReadRefEffect: a.Function.ReadRefEffect || b.Function.ReadRefEffect,
+			ReadRefEffect: left.Function.ReadRefEffect || right.Function.ReadRefEffect,
 			ReturnType:    returnType,
 		}
-		if a.Function.HasRefAccessSpan {
-			merged.RefAccessSpan, merged.HasRefAccessSpan = a.Function.RefAccessSpan, true
-		} else if b.Function.HasRefAccessSpan {
-			merged.RefAccessSpan, merged.HasRefAccessSpan = b.Function.RefAccessSpan, true
+		if left.Function.HasRefAccessSpan {
+			merged.RefAccessSpan, merged.HasRefAccessSpan = left.Function.RefAccessSpan, true
+		} else if right.Function.HasRefAccessSpan {
+			merged.RefAccessSpan, merged.HasRefAccessSpan = right.Function.RefAccessSpan, true
 		}
 		joined.Function = merged
 	}
 	switch {
-	case a.Value == nil:
-		joined.Value = b.Value
-	case b.Value == nil:
-		joined.Value = a.Value
+	case left.Value == nil:
+		joined.Value = right.Value
+	case right.Value == nil:
+		joined.Value = left.Value
 	default:
-		joined.Value = refsJoinRefCarrying(a.Value, b.Value, nextRefId)
+		joined.Value = refsJoinRefCarrying(left.Value, right.Value, nextRefId)
 	}
 	return joined
 }
@@ -748,8 +748,8 @@ func refsJoinMany(types []*refsAccessType, nextRefId func() int) *refsAccessType
 //
 // A structure holding a ref answers the validation checks as though it were that ref, which is what
 // makes `const o = {r}; foo(o)` report where `foo(r)` reports.
-func refsDestructure(t *refsAccessType) *refsAccessType {
-	current := t
+func refsDestructure(accessType *refsAccessType) *refsAccessType {
+	current := accessType
 	for current != nil && current.Kind == refsStructure && current.Value != nil {
 		current = current.Value
 	}

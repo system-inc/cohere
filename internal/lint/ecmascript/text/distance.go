@@ -31,9 +31,9 @@ package text
 // built on it reports on clean code. The name is the closest match on any shelf here and the body is
 // the wrong answer, which is why this comment names it rather than leaving the next reader to find
 // out by shipping it.
-func MinimumEditDistance(a string, b string) int {
-	first := []rune(a)
-	second := []rune(b)
+func MinimumEditDistance(left string, right string) int {
+	first := []rune(left)
+	second := []rune(right)
 
 	// Keep the shorter string on the inner axis so the rows allocated are the smaller of the two.
 	// oxc spells this as a recursive swap on byte length; the effect is the same and the comparison

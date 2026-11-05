@@ -65,8 +65,8 @@ func Settings(newLine string) format.FormatCodeSettings {
 func Apply(text string, changes []core.TextChange) string {
 	ordered := make([]core.TextChange, len(changes))
 	copy(ordered, changes)
-	sort.SliceStable(ordered, func(a, b int) bool {
-		return ordered[a].TextRange.Pos() > ordered[b].TextRange.Pos()
+	sort.SliceStable(ordered, func(left, right int) bool {
+		return ordered[left].TextRange.Pos() > ordered[right].TextRange.Pos()
 	})
 
 	var builder strings.Builder

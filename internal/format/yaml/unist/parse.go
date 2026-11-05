@@ -78,8 +78,8 @@ func Parse(text string, nodes *arena.Arena[Node]) (root *Node, err error) {
 	// different comments the comparator says the earlier one goes first either way round: it orders them
 	// by start offset, which any sort reproduces.
 	comments := context.comments
-	sort.SliceStable(comments, func(i int, j int) bool {
-		return context.position(comments[i]).start.offset < context.position(comments[j]).start.offset
+	sort.SliceStable(comments, func(left int, right int) bool {
+		return context.position(comments[left]).start.offset < context.position(comments[right]).start.offset
 	})
 	root = context.createRoot(context.transformRange(0, len(units)), documents, comments)
 	context.attachComments(root)

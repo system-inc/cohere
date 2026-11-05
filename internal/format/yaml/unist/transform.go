@@ -291,9 +291,9 @@ func isNotWhitespace(unit int) bool {
 
 // findCharIndex is utils/find-char-index.mjs; -1 is its null.
 func findCharIndex(text []uint16, from int, test func(unit int) bool) int {
-	for i := max(from, 0); i < len(text); i++ {
-		if test(int(text[i])) {
-			return i
+	for index := max(from, 0); index < len(text); index++ {
+		if test(int(text[index])) {
+			return index
 		}
 	}
 	return -1
@@ -302,12 +302,12 @@ func findCharIndex(text []uint16, from int, test func(unit int) bool) int {
 // findLastCharIndex is utils/find-last-char-index.mjs. Past the end of the text, text[i] is undefined,
 // and /\S/ tests the string "undefined", which matches.
 func findLastCharIndex(text []uint16, from int, test func(unit int) bool) int {
-	for i := from; i >= 0; i-- {
-		if i >= len(text) {
-			return i
+	for index := from; index >= 0; index-- {
+		if index >= len(text) {
+			return index
 		}
-		if test(int(text[i])) {
-			return i
+		if test(int(text[index])) {
+			return index
 		}
 	}
 	return -1

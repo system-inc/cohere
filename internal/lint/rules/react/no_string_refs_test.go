@@ -688,10 +688,10 @@ func TestNoStringRefsPointsAtTheRightNode(test *testing.T) {
 			if len(result.Diagnostics) != len(testCase.reported) {
 				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
 			}
-			for i, want := range testCase.reported {
-				got := testCase.sourceText[result.Diagnostics[i].Range.Pos():result.Diagnostics[i].Range.End()]
+			for index, want := range testCase.reported {
+				got := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if got != want {
-					test.Errorf("finding %d underlines %q, want %q", i, got, want)
+					test.Errorf("finding %d underlines %q, want %q", index, got, want)
 				}
 			}
 		})

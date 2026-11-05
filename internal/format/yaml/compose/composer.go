@@ -35,8 +35,8 @@ func getErrorPos(source any) [2]int {
 // lines, since the previous document.
 func parsePrelude(prelude [][]uint16) (comment string, afterEmptyLine bool) {
 	atComment := false
-	for i := 0; i < len(prelude); i++ {
-		source := prelude[i]
+	for index := 0; index < len(prelude); index++ {
+		source := prelude[index]
 		switch characterAt(source, 0) {
 		case '#':
 			separator := ""
@@ -57,8 +57,8 @@ func parsePrelude(prelude [][]uint16) (comment string, afterEmptyLine bool) {
 			afterEmptyLine = false
 		case '%':
 			// `prelude[i + 1]?.[0] !== '#'`
-			if i+1 >= len(prelude) || characterAt(prelude[i+1], 0) != '#' {
-				i += 1
+			if index+1 >= len(prelude) || characterAt(prelude[index+1], 0) != '#' {
+				index += 1
 			}
 			atComment = false
 		default:

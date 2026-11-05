@@ -57,7 +57,7 @@ func NewFusedCheck() *FusedCheck {
 // rules, never while holding one.
 func (check *FusedCheck) checkFile(
 	callerContext context.Context,
-	g *Graph,
+	graph *Graph,
 	sourceFile *ast.SourceFile,
 	checkerFile *ast.SourceFile,
 ) {
@@ -69,9 +69,9 @@ func (check *FusedCheck) checkFile(
 	}
 	var diagnostics []*ast.Diagnostic
 	if checkerFile == sourceFile {
-		diagnostics = g.Program.GetSemanticDiagnostics(callerContext, sourceFile)
+		diagnostics = graph.Program.GetSemanticDiagnostics(callerContext, sourceFile)
 	} else {
-		diagnostics = semanticDiagnosticsOn(callerContext, g.Program, sourceFile, checkerFile)
+		diagnostics = semanticDiagnosticsOn(callerContext, graph.Program, sourceFile, checkerFile)
 	}
 	check.mutex.Lock()
 	check.checked[sourceFile] = diagnostics
@@ -105,14 +105,14 @@ func (check *FusedCheck) Checked() int {
 // DiagnosticParts is the check's parts, as AllDiagnosticParts would have returned them. A program file the
 // walk did not check (a third-party declaration, a file the config ignores, any file when no walk ran) is
 // checked here, on its own checker, a goroutine per checker.
-func (check *FusedCheck) DiagnosticParts(callerContext context.Context, g *Graph) TypeDiagnosticParts {
-	syntactic := g.Program.GetSyntacticDiagnostics(callerContext, nil)
+func (check *FusedCheck) DiagnosticParts(callerContext context.Context, graph *Graph) TypeDiagnosticParts {
+	syntactic := graph.Program.GetSyntacticDiagnostics(callerContext, nil)
 	if len(syntactic) > 0 {
 		return TypeDiagnosticParts{Syntactic: syntactic}
 	}
-	bind := g.Program.GetBindDiagnostics(callerContext, nil)
+	bind := graph.Program.GetBindDiagnostics(callerContext, nil)
 
-	programFiles := g.Program.GetSourceFiles()
+	programFiles := graph.Program.GetSourceFiles()
 	var unchecked []*ast.SourceFile
 	check.mutex.Lock()
 	for _, sourceFile := range programFiles {
@@ -121,7 +121,7 @@ func (check *FusedCheck) DiagnosticParts(callerContext context.Context, g *Graph
 		}
 	}
 	check.mutex.Unlock()
-	for index, diagnostics := range g.semanticDiagnosticsOf(callerContext, unchecked) {
+	for index, diagnostics := range graph.semanticDiagnosticsOf(callerContext, unchecked) {
 		check.checked[unchecked[index]] = diagnostics
 	}
 

@@ -325,10 +325,10 @@ var NoFloatingPromises = rule.Rule{
 		}
 
 		hasMatchingSignature := func(
-			t *checker.Type,
+			subjectType *checker.Type,
 			matcher func(signature *checker.Signature) bool,
 		) bool {
-			for part := range type_checking.UnionTypePartsSeq(t) {
+			for part := range type_checking.UnionTypePartsSeq(subjectType) {
 				if type_checking.Some(type_checking.GetCallSignatures(ruleContext.TypeChecker, part), matcher) {
 					return true
 				}
@@ -341,12 +341,12 @@ var NoFloatingPromises = rule.Rule{
 			parameter *ast.Symbol,
 			node *ast.Node,
 		) bool {
-			t := checker.Checker_getApparentType(
+			subjectType := checker.Checker_getApparentType(
 				ruleContext.TypeChecker,
 				ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node),
 			)
 
-			for part := range type_checking.UnionTypePartsSeq(t) {
+			for part := range type_checking.UnionTypePartsSeq(subjectType) {
 				if len(type_checking.GetCallSignatures(ruleContext.TypeChecker, part)) != 0 {
 					return true
 				}
@@ -354,14 +354,14 @@ var NoFloatingPromises = rule.Rule{
 			return false
 		}
 
-		isPromiseLike := func(node *ast.Node, t *checker.Type) bool {
-			if t == nil {
-				t = ruleContext.TypeChecker.GetTypeAtLocation(node)
+		isPromiseLike := func(node *ast.Node, subjectType *checker.Type) bool {
+			if subjectType == nil {
+				subjectType = ruleContext.TypeChecker.GetTypeAtLocation(node)
 			}
 
 			// The highest priority is to allow anything allowlisted
 			if type_checking.TypeMatchesSomeSpecifier(
-				t,
+				subjectType,
 				settings.AllowForKnownSafePromises,
 				settings.AllowForKnownSafePromisesInline,
 				ruleContext.Program,
@@ -370,7 +370,9 @@ var NoFloatingPromises = rule.Rule{
 			}
 
 			// Otherwise, we always consider the built-in Promise to be Promise-like...
-			typeParts := type_checking.UnionTypeParts(checker.Checker_getApparentType(ruleContext.TypeChecker, t))
+			typeParts := type_checking.UnionTypeParts(
+				checker.Checker_getApparentType(ruleContext.TypeChecker, subjectType),
+			)
 			if type_checking.Some(typeParts, func(typePart *checker.Type) bool {
 				return type_checking.IsPromiseLike(ruleContext.Program, ruleContext.TypeChecker, typePart)
 			}) {
@@ -408,8 +410,8 @@ var NoFloatingPromises = rule.Rule{
 		}
 
 		isPromiseArray := func(node *ast.Node) bool {
-			t := ruleContext.TypeChecker.GetTypeAtLocation(node)
-			for typePart := range type_checking.UnionTypePartsSeq(t) {
+			subjectType := ruleContext.TypeChecker.GetTypeAtLocation(node)
+			for typePart := range type_checking.UnionTypePartsSeq(subjectType) {
 				apparent := checker.Checker_getApparentType(ruleContext.TypeChecker, typePart)
 
 				if checker.Checker_isArrayType(ruleContext.TypeChecker, apparent) {
@@ -438,10 +440,10 @@ var NoFloatingPromises = rule.Rule{
 				return false
 			}
 
-			t := ruleContext.TypeChecker.GetTypeAtLocation(node.AsCallExpression().Expression)
+			subjectType := ruleContext.TypeChecker.GetTypeAtLocation(node.AsCallExpression().Expression)
 
 			return type_checking.TypeMatchesSomeSpecifier(
-				t,
+				subjectType,
 				settings.AllowForKnownSafeCalls,
 				settings.AllowForKnownSafeCallsInline,
 				ruleContext.Program,

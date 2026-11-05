@@ -65,10 +65,10 @@ func singleQuotedValue(source []uint16, onError func(rel int, code string, messa
 	// `.replace(/''/g, "'")`
 	folded := foldLines(slice(source, 1, -1))
 	result := make([]uint16, 0, len(folded))
-	for i := 0; i < len(folded); i++ {
-		result = append(result, folded[i])
-		if folded[i] == '\'' && i+1 < len(folded) && folded[i+1] == '\'' {
-			i++
+	for index := 0; index < len(folded); index++ {
+		result = append(result, folded[index])
+		if folded[index] == '\'' && index+1 < len(folded) && folded[index+1] == '\'' {
+			index++
 		}
 	}
 	return result
@@ -145,34 +145,34 @@ func foldLines(source []uint16) []uint16 {
 
 func doubleQuotedValue(source []uint16, onError func(rel int, code string, message string)) []uint16 {
 	result := []uint16{}
-	for i := 1; i < len(source)-1; i++ {
-		codeUnit := source[i]
-		if codeUnit == '\r' && characterAt(source, i+1) == '\n' {
+	for index := 1; index < len(source)-1; index++ {
+		codeUnit := source[index]
+		if codeUnit == '\r' && characterAt(source, index+1) == '\n' {
 			continue
 		}
 		if codeUnit == '\n' {
-			fold, offset := foldNewline(source, i)
+			fold, offset := foldNewline(source, index)
 			result = append(result, fold...)
-			i = offset
+			index = offset
 		} else if codeUnit == '\\' {
-			i++
-			next := characterAt(source, i)
+			index++
+			next := characterAt(source, index)
 			if cc, found := escapeCodes[next]; found {
 				result = append(result, cc)
 			} else if next == '\n' {
 				// skip escaped newlines, but still trim the following line
-				next = characterAt(source, i+1)
+				next = characterAt(source, index+1)
 				for next == ' ' || next == '\t' {
-					i++
-					next = characterAt(source, i+1)
+					index++
+					next = characterAt(source, index+1)
 				}
-			} else if next == '\r' && characterAt(source, i+1) == '\n' {
+			} else if next == '\r' && characterAt(source, index+1) == '\n' {
 				// skip escaped CRLF newlines, but still trim the following line
-				i++
-				next = characterAt(source, i+1)
+				index++
+				next = characterAt(source, index+1)
 				for next == ' ' || next == '\t' {
-					i++
-					next = characterAt(source, i+1)
+					index++
+					next = characterAt(source, index+1)
 				}
 			} else if next == 'x' || next == 'u' || next == 'U' {
 				length := 8
@@ -181,24 +181,24 @@ func doubleQuotedValue(source []uint16, onError func(rel int, code string, messa
 				} else if next == 'u' {
 					length = 4
 				}
-				result = append(result, parseCharCode(source, i+1, length, onError)...)
-				i += length
+				result = append(result, parseCharCode(source, index+1, length, onError)...)
+				index += length
 			} else {
-				raw := substr(source, i-1, 2)
-				onError(i-1, "BAD_DQ_ESCAPE", "Invalid escape sequence "+unitsToString(raw))
+				raw := substr(source, index-1, 2)
+				onError(index-1, "BAD_DQ_ESCAPE", "Invalid escape sequence "+unitsToString(raw))
 				result = append(result, raw...)
 			}
 		} else if codeUnit == ' ' || codeUnit == '\t' {
 			// trim trailing whitespace
-			wsStart := i
-			next := characterAt(source, i+1)
+			wsStart := index
+			next := characterAt(source, index+1)
 			for next == ' ' || next == '\t' {
-				i++
-				next = characterAt(source, i+1)
+				index++
+				next = characterAt(source, index+1)
 			}
-			if next != '\n' && !(next == '\r' && characterAt(source, i+2) == '\n') {
-				if i > wsStart {
-					result = append(result, slice(source, wsStart, i+1)...)
+			if next != '\n' && !(next == '\r' && characterAt(source, index+2) == '\n') {
+				if index > wsStart {
+					result = append(result, slice(source, wsStart, index+1)...)
 				} else {
 					result = append(result, codeUnit)
 				}
@@ -312,10 +312,10 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 	}
 	// determine the end of content & start of chomping
 	chompStart := len(lines)
-	for i := len(lines) - 1; i >= 0; i-- {
-		content := lines[i][1]
+	for index := len(lines) - 1; index >= 0; index-- {
+		content := lines[index][1]
 		if isEmptyContent(content) {
-			chompStart = i
+			chompStart = index
 		} else {
 			break
 		}
@@ -343,8 +343,8 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 	trimIndent := scalar.Indent + header.indent
 	offset := scalar.Offset + header.length
 	contentStart := 0
-	for i := 0; i < chompStart; i++ {
-		indent, content := lines[i][0], lines[i][1]
+	for index := 0; index < chompStart; index++ {
+		indent, content := lines[index][0], lines[index][1]
 		if isEmptyContent(content) {
 			if header.indent == 0 && len(indent) > trimIndent {
 				trimIndent = len(indent)
@@ -357,7 +357,7 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 			if header.indent == 0 {
 				trimIndent = len(indent)
 			}
-			contentStart = i
+			contentStart = index
 			if trimIndent == 0 && !composition.atRoot {
 				message := "Block scalar values in collections must be indented"
 				onError(offset, "BAD_INDENT", message, false)
@@ -367,20 +367,20 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 		offset += len(indent) + len(content) + 1
 	}
 	// include trailing more-indented empty lines in content
-	for i := len(lines) - 1; i >= chompStart; i-- {
-		if len(lines[i][0]) > trimIndent {
-			chompStart = i + 1
+	for index := len(lines) - 1; index >= chompStart; index-- {
+		if len(lines[index][0]) > trimIndent {
+			chompStart = index + 1
 		}
 	}
 	value := []uint16{}
 	sep := []uint16{}
 	previousMoreIndented := false
 	// leading whitespace is kept intact
-	for i := 0; i < contentStart; i++ {
-		value = append(append(value, slice(lines[i][0], trimIndent, len(lines[i][0]))...), '\n')
+	for index := 0; index < contentStart; index++ {
+		value = append(append(value, slice(lines[index][0], trimIndent, len(lines[index][0]))...), '\n')
 	}
-	for i := contentStart; i < chompStart; i++ {
-		indent, content := lines[i][0], lines[i][1]
+	for index := contentStart; index < chompStart; index++ {
+		indent, content := lines[index][0], lines[index][1]
 		offset += len(indent) + len(content) + 1
 		crlf := characterAt(content, len(content)-1) == '\r'
 		if crlf {
@@ -430,8 +430,8 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 	switch header.chomp {
 	case '-':
 	case '+':
-		for i := chompStart; i < len(lines); i++ {
-			value = append(append(value, '\n'), slice(lines[i][0], trimIndent, len(lines[i][0]))...)
+		for index := chompStart; index < len(lines); index++ {
+			value = append(append(value, '\n'), slice(lines[index][0], trimIndent, len(lines[index][0]))...)
 		}
 		if characterAt(value, len(value)-1) != '\n' {
 			value = append(value, '\n')
@@ -460,20 +460,20 @@ func parseBlockScalarHeader(scalar *cst.Token, strict bool, onError onErrorFunc)
 	indent := 0
 	var chomp uint16
 	errorOffset := -1
-	for i := 1; i < len(source); i++ {
-		codeUnit := source[i]
+	for index := 1; index < len(source); index++ {
+		codeUnit := source[index]
 		if chomp == 0 && (codeUnit == '-' || codeUnit == '+') {
 			chomp = codeUnit
 		} else {
 			// `Number(ch)` is truthy only for the digits 1 to 9.
-			n := 0
+			count := 0
 			if codeUnit >= '1' && codeUnit <= '9' {
-				n = int(codeUnit - '0')
+				count = int(codeUnit - '0')
 			}
-			if indent == 0 && n != 0 {
-				indent = n
+			if indent == 0 && count != 0 {
+				indent = count
 			} else if errorOffset == -1 {
-				errorOffset = offset + i
+				errorOffset = offset + index
 			}
 		}
 	}
@@ -488,8 +488,8 @@ func parseBlockScalarHeader(scalar *cst.Token, strict bool, onError onErrorFunc)
 	hasSpace := false
 	comment := ""
 	length := len(source)
-	for i := 1; i < len(properties); i++ {
-		token := properties[i]
+	for index := 1; index < len(properties); index++ {
+		token := properties[index]
 		switch token.Type {
 		case "space":
 			hasSpace = true
@@ -547,8 +547,8 @@ func splitLines(source []uint16) [][2][]uint16 {
 		line0 = [2][]uint16{first[:leading:leading], first[leading:]}
 	}
 	lines := [][2][]uint16{line0}
-	for i := 1; i < len(split); i += 2 {
-		lines = append(lines, [2][]uint16{split[i], split[i+1]})
+	for index := 1; index < len(split); index += 2 {
+		lines = append(lines, [2][]uint16{split[index], split[index+1]})
 	}
 	return lines
 }
