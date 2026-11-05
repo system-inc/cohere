@@ -177,6 +177,8 @@ var beforeSignatureEmit func(fileName string)
 //
 // The emits run on a goroutine of their own, and only this function touches shapes, so whatever the goroutine
 // finishes after the deadline is dropped.
+//
+// Mutates: shapes takes each graduated entry and the abandoned one, for the caller to write to the table
 func (g *Graph) GraduateSignatures(shapes map[string]SignatureEntry, deadline time.Time, abandonAfter time.Duration) (graduated int, abandoned string) {
 	var candidates []*ast.SourceFile
 	for _, sourceFile := range g.ProjectFiles() {

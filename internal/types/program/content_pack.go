@@ -310,6 +310,8 @@ func (p *ContentPack) Save() error {
 }
 
 // appendTo adds this run's reads to the end of the current data file and writes an index naming them.
+//
+// Mutates: entries gains an entry for each file this run read, as the index written here names them
 func (p *ContentPack) appendTo(dataName string, entries map[string]contentPackEntry) error {
 	file, err := os.OpenFile(filepath.Join(p.directory, dataName), os.O_WRONLY|os.O_APPEND, 0)
 	if err != nil {

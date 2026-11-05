@@ -278,6 +278,8 @@ type frame struct {
 // The lock is what makes two reads of the thread's clock a measurement of one goroutine: unlocked, a
 // goroutine preempted mid-call can resume on another thread, and the delta would subtract one thread's
 // clock from another's.
+//
+// Mutates: timings holds the meter started here, or why there is none, so the walk bills to it
 func startWorkerMeter(timings *Timings) *workerMeter {
 	if timings == nil {
 		return nil
@@ -362,6 +364,8 @@ func (w *workerMeter) watchFills(cache *rule.FileCache) {
 
 // setup runs a rule's Run as a frame billed to the rule's setup. The close is deferred because Run can
 // panic and be recovered by the rule's containment, and the frames must still balance.
+//
+// Mutates: timing gains the CPU the rule's Run took, as its setup
 func (w *workerMeter) setup(timing *RuleTiming, run func()) {
 	if w == nil {
 		run()
@@ -374,6 +378,8 @@ func (w *workerMeter) setup(timing *RuleTiming, run func()) {
 
 // call calls a rule's listener on a node, counting the node and billing the call to the rule. Without a
 // meter it only calls the listener.
+//
+// Mutates: timing counts the node offered and gains the CPU the listener took
 func (w *workerMeter) call(timing *RuleTiming, listener func(node *ast.Node), node *ast.Node) {
 	if w == nil {
 		listener(node)

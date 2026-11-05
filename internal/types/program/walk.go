@@ -814,6 +814,8 @@ var housePlugins = map[string]bool{"adamic": true, "base": true, "nexus": true, 
 //
 // Reported straight to the walk rather than through a rule's Report, so no directive can silence a
 // finding about a directive that silences nothing.
+//
+// Mutates: unrun counts each reference to a real rule cohere does not run, for the --verbose note
 func reportUnknownRuleReferences(sourceFile *ast.SourceFile, directives *suppression.Index,
 	catalog *ruleNameCatalog, report func(rule.Diagnostic), unrun map[string]int) {
 	if catalog == nil {
@@ -1028,6 +1030,8 @@ func newFileDispatcher(graph *Graph, timings *Timings, catalog *ruleNameCatalog)
 }
 
 // slotsFor is the slots of a selection's applicable rules, in the same order, found once per selection.
+//
+// Mutates: selection keeps the slots found here, so every later file of the selection reuses them
 func (d *fileDispatcher) slotsFor(selection *ruleSelection) []*ruleSlot {
 	if selection.slots == nil {
 		selection.slots = make([]*ruleSlot, len(selection.applicable))
@@ -1168,6 +1172,9 @@ func (d *fileDispatcher) dispatchFileSafely(
 // Merging before walking is what makes the cost per node independent of the rule count: the walk
 // does one table read per node regardless of whether one rule or five hundred registered for that
 // kind.
+//
+// Mutates: listeningCounts counts each rule that listened on the file, for the caller's totals
+// Mutates: offeredCounts counts each rule the file was offered to, for the caller's totals
 func (d *fileDispatcher) dispatchFile(
 	sourceFile *ast.SourceFile,
 	report func(rule.Diagnostic),
@@ -1523,6 +1530,10 @@ func walk(node *ast.Node, listeners [][]func(node *ast.Node)) int {
 // worker's selections. Made per file, the applicable slice, the decoded options and the cache classes
 // were about 1 GB of a cold ahra run's allocation, for a few dozen distinct answers (#9jpmqm9). The
 // scoped-off and unconfigured counts are still counted per file, from the selection's names.
+//
+// Mutates: selections keeps each selection made here by its resolution, for later files that resolve the same way
+// Mutates: scopedOff counts each rule the configuration scoped off for this file, for the caller's totals
+// Mutates: unconfigured counts each rule left unconfigured for this file, for the caller's totals
 func (g *Graph) rulesFor(
 	fileName string,
 	rules []rule.Rule,
@@ -1822,6 +1833,8 @@ func foreignQueue(queues []*walkQueue, homeFiles []*ast.SourceFile, worker int) 
 // differently (#s9k38p3). Gathered once per selection from the walk's memo, which computes each rule and
 // options pair once, whatever the number of selections or workers. A fingerprint that panics is left out,
 // which keys no file the selection serves: the rule's findings there neither replay nor record this run.
+//
+// Mutates: selection keeps the fingerprints gathered here, so its later files reuse them
 func (g *Graph) programFingerprints(selection *ruleSelection, memo *programFingerprintMemo) map[string][sha256.Size]byte {
 	if selection.programFingerprints != nil {
 		return selection.programFingerprints

@@ -298,6 +298,11 @@ func ruleNames(rules []rule.Rule) []string {
 //
 // hits says which keyed classes are replayed as well as the pure one. A class that is not runs again on this
 // file and counts its own coverage and notes, so replaying them here would count them twice.
+//
+// Mutates: diagnostics gains the replayed findings, for the walk to report with the rest
+// Mutates: reporting counts each replayed finding by its rule, as a walked file's do
+// Mutates: offered counts each replayed rule as offered the file, as a walked file's do
+// Mutates: listening counts each replayed rule that listened on the file, as a walked file's do
 func replayEntry(entry LintCacheEntry, hits classHits, sourceFile *ast.SourceFile, diagnostics *[]rule.Diagnostic,
 	reporting map[string]int, offered map[string]int, listening map[string]int) RuleNotes {
 	replays := make(map[string]bool, len(entry.Rules)+len(entry.TypedRules)+len(entry.ShapedRules)+len(entry.DesignRules)+

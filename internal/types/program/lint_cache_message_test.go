@@ -200,6 +200,8 @@ func TestMessageIdScanSeesBothKinds(test *testing.T) {
 }
 
 // sortedNames keeps the failure message stable across runs, since map iteration is not ordered.
+//
+// Mutates: names is sorted in place and returned, a slice the caller built only for the message
 func sortedNames(names []string) []string {
 	for outer := 1; outer < len(names); outer++ {
 		for inner := outer; inner > 0 && names[inner] < names[inner-1]; inner-- {

@@ -436,6 +436,8 @@ func (loader *loader) testVariantsOf(listedPackage *listedPackage) []*Package {
 
 // parse reads the named files of one package into read, each from the overlay when it names it, with what
 // the parser reported, and with what go list reported when withListErrors, as the package's errors.
+//
+// Mutates: read gains the files, their syntax and their errors, as the package being loaded
 func (loader *loader) parse(listedPackage *listedPackage, names []string, withListErrors bool, read *Package) {
 	if withListErrors && listedPackage.Error != nil {
 		read.Errors = append(read.Errors, errors.New(listedPackage.Error.Err))

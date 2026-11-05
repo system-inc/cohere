@@ -180,6 +180,8 @@ func (p TypeDiagnosticParts) All() []*ast.Diagnostic {
 // to RecordFull: no section, a section under other compiler options or from a run that saw global
 // diagnostics, no shapes this run, or so
 // much changed that the full check, which spreads every checker over every file, is the faster way.
+//
+// Mutates: reuse records what was replayed and the section to save for the next run, unless the graph was retired
 func (g *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (TypeDiagnosticParts, bool) {
 	stored := reuse.stored
 	if stored == nil || stored.Version != typesSectionVersion || stored.Key != reuse.key || !stored.GlobalsClean || g.Shapes == nil {
@@ -242,6 +244,8 @@ func (g *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (
 }
 
 // RecordFull records a full check's semantic diagnostics per project file, for the next run to replay.
+//
+// Mutates: reuse records the section to save for the next run, unless the graph was retired
 func (g *Graph) RecordFull(ctx context.Context, reuse *TypeDiagnosticsReuse, parts TypeDiagnosticParts) {
 	if len(parts.Syntactic) > 0 || g.Shapes == nil || ctx.Err() != nil {
 		return

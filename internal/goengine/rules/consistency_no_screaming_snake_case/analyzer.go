@@ -323,6 +323,8 @@ func mirroredConstants(pass *analysis.Pass) map[types.Object]bool {
 // markAssignedConstants marks each constant in declaration whose value mentions a system constant. A specification
 // with no values repeats the last one that had them, as Go reads a constant group, so `SecondSignal` after
 // `FirstSignal = unix.SignalBase + iota` is computed from unix's constant too.
+//
+// Mutates: mirrored gains each constant whose value mentions a system constant, for the caller to leave unreported
 func markAssignedConstants(pass *analysis.Pass, declaration *ast.GenDecl, mirrored map[types.Object]bool) {
 	var values []ast.Expr
 	for _, specification := range declaration.Specs {
