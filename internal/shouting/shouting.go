@@ -182,7 +182,6 @@ var (
 	// so it can never form a match. The boundary half lives in maskSingleQuotedCapitalPhrases.
 	singleQuotedCapitalPhrase = regexp.MustCompile(`'[A-Z0-9_][A-Z0-9_ .,:=\-/]*[A-Z0-9_]'`)
 
-	notNewline  = regexp.MustCompile(`[^\n]`)
 	jsDocGutter = regexp.MustCompile(`^\s*\*?\s?`)
 	// A block comment's gutter alone, leading whitespace, the asterisk and one space or tab, which
 	// unlike jsDocGutter leaves a line with no asterisk untouched so its indentation can be measured.
@@ -213,9 +212,20 @@ func MaskCodeAndCommands(text string) string {
 }
 
 // blankKeepingNewlines replaces every match with spaces, leaving its newlines in place.
+//
+// One space per byte, not per rune, as every other mask here blanks, so the masked text keeps the
+// input's byte length. Blanking `www.點看.com` rune by rune once shrank it by four bytes, and the Go
+// engine, which slices one masked comment group by its comments' byte offsets, read past the end and
+// panicked on 12 of cohere's packages. A newline is one byte, and never part of a multi-byte rune.
 func blankKeepingNewlines(pattern *regexp.Regexp, text string) string {
 	return pattern.ReplaceAllStringFunc(text, func(match string) string {
-		return notNewline.ReplaceAllString(match, " ")
+		blanked := []byte(match)
+		for index, character := range blanked {
+			if character != '\n' {
+				blanked[index] = ' '
+			}
+		}
+		return string(blanked)
 	})
 }
 

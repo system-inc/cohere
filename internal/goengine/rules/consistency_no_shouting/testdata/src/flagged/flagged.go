@@ -141,6 +141,17 @@ func run() int {
 // This is prose
 //     and you must NEVER do it // want `^"NEVER" in a comment`
 
+// A multi-byte rune inside masked code keeps every later line's place in the group, the shape of micromark's
+// gfm_autolink_literal.go, so each later line reports its own tokens and reads no further than its own end.
+
+// occur, which sounds like ASCII only, but they also support `www.點看.com`,
+// and the line after it is NEVER quiet // want `^"NEVER" in a comment`
+
+// ```
+// 點看
+// ```
+// then ALWAYS check // want `^"ALWAYS" in a comment`
+
 // An example's output is only output in a _test.go file.
 
 func ExampleLoud() {
