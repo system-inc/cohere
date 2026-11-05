@@ -170,7 +170,7 @@ func exportedUtilityNames(test *testing.T) map[string]string {
 	return names
 }
 
-// declaresARule reports whether a file contains a `var Name = rule.Rule{...}` declaration.
+// declaresARule reports whether a file contains a `var Name = rule.Rule[Options]{...}` declaration.
 func declaresARule(test *testing.T, path string) bool {
 	test.Helper()
 
@@ -181,8 +181,8 @@ func declaresARule(test *testing.T, path string) bool {
 		if !isComposite {
 			return true
 		}
-		selector, isSelector := composite.Type.(*ast.SelectorExpr)
-		if !isSelector {
+		selector, isRule := ruleLiteralSelector(composite.Type)
+		if !isRule {
 			return true
 		}
 		identifier, isIdentifier := selector.X.(*ast.Ident)
