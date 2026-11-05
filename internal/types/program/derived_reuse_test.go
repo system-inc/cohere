@@ -30,8 +30,7 @@ func markerRule(name string, fingerprint func(rule.Program, any) [sha256.Size]by
 			if filepath.Base(ctx.SourceFile.FileName().AsString()) == "marker.ts" {
 				return nil
 			}
-			count, _ := runs.LoadOrStore(filepath.Base(ctx.SourceFile.FileName().AsString()), new(int))
-			*count.(*int)++
+			*runCount(runs, filepath.Base(ctx.SourceFile.FileName().AsString()))++
 			marker := markerText(ctx.Program)
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				ctx.ReportNode(node, rule.Message{Id: "marker", Description: "the marker says " + marker})
@@ -55,11 +54,27 @@ func markerFingerprint(program rule.Program, _ any) [sha256.Size]byte {
 	return sha256.Sum256([]byte(markerText(program)))
 }
 
+// runCount is the count of runs on the file with that base name, stored as zero on its first run.
+func runCount(runs *sync.Map, name string) *int {
+	stored, _ := runs.LoadOrStore(name, new(int))
+	return countOf(stored)
+}
+
+// countOf is a value read from a runs map as the count it is.
+func countOf(stored any) *int {
+	count, isCount := stored.(*int)
+	if !isCount {
+		// Invariant: runCount is the only writer to a runs map, and it stores nothing but an *int.
+		panic("a runs map holds something other than an *int")
+	}
+	return count
+}
+
 // runsOf is how many files a markerRule was run on, the marker excluded.
 func runsOf(runs *sync.Map) int {
 	total := 0
-	runs.Range(func(_, count any) bool {
-		total += *count.(*int)
+	runs.Range(func(_, stored any) bool {
+		total += *countOf(stored)
 		return true
 	})
 	return total
@@ -214,9 +229,8 @@ func optionMarkerRule(fingerprint func(rule.Program, any) [sha256.Size]byte, run
 			if strings.HasSuffix(filepath.Base(ctx.SourceFile.FileName().AsString()), "-marker.ts") {
 				return nil
 			}
-			count, _ := runs.LoadOrStore(filepath.Base(ctx.SourceFile.FileName().AsString()), new(int))
-			*count.(*int)++
-			marker := namedMarkerText(ctx.Program, options.(string))
+			*runCount(runs, filepath.Base(ctx.SourceFile.FileName().AsString()))++
+			marker := namedMarkerText(ctx.Program, markerOption(options))
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				ctx.ReportNode(node, rule.Message{Id: "marker", Description: "the marker says " + marker})
 			}}
@@ -234,6 +248,17 @@ func namedMarkerText(program rule.Program, name string) string {
 	return ""
 }
 
+// markerOption is optionMarkerRule's decoded option: the base name of the marker file it reads.
+func markerOption(options any) string {
+	name, isName := options.(string)
+	if !isName {
+		// Invariant: every selection optionMarkerRule runs under configures it with an option, and the only registry
+		// it runs under decodes that option into a string.
+		panic("optionMarkerRule's options are not a marker name")
+	}
+	return name
+}
+
 // A derived rule whose option chooses what it reads is fingerprinted under each selection's own options
 // (#s9k38p3): files configured to read red-marker.ts replay while only blue-marker.ts changes, files
 // configured to read blue-marker.ts run again, and every walk agrees with one with no cache. The control
@@ -247,7 +272,7 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 		wantStale   bool
 	}{
 		{"the options' marker", func(program rule.Program, options any) [sha256.Size]byte {
-			return sha256.Sum256([]byte(namedMarkerText(program, options.(string))))
+			return sha256.Sum256([]byte(namedMarkerText(program, markerOption(options))))
 		}, false},
 		{"control: the top-level option's marker, whatever the selection", func(program rule.Program, _ any) [sha256.Size]byte {
 			return sha256.Sum256([]byte(namedMarkerText(program, "red-marker.ts")))

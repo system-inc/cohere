@@ -78,7 +78,13 @@ func TestSelectionsFingerprintADerivedRuleOncePerOptionsForTheWholeWalk(test *te
 	var calls atomic.Int32
 	rules := []rule.Rule{{Name: "derived", ProgramReads: rule.ReadsOtherFiles, ProgramFingerprint: func(_ rule.Program, options any) [sha256.Size]byte {
 		calls.Add(1)
-		return sha256.Sum256([]byte(options.(string)))
+		marker, isMarker := options.(string)
+		if !isMarker {
+			// Invariant: every selection here configures the rule with an option, and RuleOptions decodes it into a
+			// string.
+			panic("the derived rule's options are not a marker")
+		}
+		return sha256.Sum256([]byte(marker))
 	}}}
 	memo := &programFingerprintMemo{entries: map[programFingerprintKey]*programFingerprintEntry{}}
 
