@@ -482,10 +482,11 @@ func isRuleSelector(expression ast.Expr, name string) bool {
 // argument: a Rule is generic over its options, so a rule's literal is `rule.Rule[Options]{...}`, and a scan that
 // matched only the bare selector would find no rule at all and pass on nothing.
 func ruleLiteralSelector(literalType ast.Expr) (*ast.SelectorExpr, bool) {
+	named := literalType
 	if indexed, isIndexed := literalType.(*ast.IndexExpr); isIndexed {
-		literalType = indexed.X
+		named = indexed.X
 	}
-	selector, isSelector := literalType.(*ast.SelectorExpr)
+	selector, isSelector := named.(*ast.SelectorExpr)
 	if !isSelector || selector.Sel.Name != "Rule" {
 		return nil, false
 	}

@@ -31,20 +31,26 @@ func budgetThreadCpu() time.Duration {
 func TestRuleBudgetRejectsCpuWorkAndDoesNotBillWaiting(test *testing.T) {
 	test.Parallel()
 	graph := buildBudgetGraph(test, map[string]string{"file.ts": "export const value = 1;\n"})
-	sleeper := rule.Rule[rule.NoOptions]{Name: "planted-waiter", Run: func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners {
-		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) { time.Sleep(350 * time.Millisecond) }}
-	}}
+	sleeper := rule.Rule[rule.NoOptions]{
+		Name: "planted-waiter",
+		Run: func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners {
+			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) { time.Sleep(350 * time.Millisecond) }}
+		},
+	}
 	rows, err := checkRuleBudget(test, graph, rule_testing.EntriesOf(test, sleeper), 250*time.Millisecond)
 	if err != nil || len(rows) != 1 || rows[0].NodesOffered != 1 || rows[0].TotalCPU() > 25*time.Millisecond {
 		test.Fatalf("waiter was billed CPU or not run: %v %+v", err, rows)
 	}
-	spinner := rule.Rule[rule.NoOptions]{Name: "planted-spinner", Run: func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners {
-		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-			start := budgetThreadCpu()
-			for budgetThreadCpu()-start < 350*time.Millisecond {
-			}
-		}}
-	}}
+	spinner := rule.Rule[rule.NoOptions]{
+		Name: "planted-spinner",
+		Run: func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners {
+			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+				start := budgetThreadCpu()
+				for budgetThreadCpu()-start < 350*time.Millisecond {
+				}
+			}}
+		},
+	}
 	rows, err = checkRuleBudget(test, graph, rule_testing.EntriesOf(test, spinner), 250*time.Millisecond)
 	if err == nil || !strings.Contains(err.Error(), "rule CPU budget exceeded: planted-spinner") {
 		test.Fatalf("spinner was not refused: %v %+v", err, rows)
@@ -65,7 +71,12 @@ func TestRuleBudgetBoundsANonReturningListener(test *testing.T) {
 				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) { select {} }}
 			},
 		}
-		_, checkRuleBudgetError := checkRuleBudget(test, graph, rule_testing.EntriesOf(test, stuck), 20*time.Millisecond)
+		_, checkRuleBudgetError := checkRuleBudget(
+			test,
+			graph,
+			rule_testing.EntriesOf(test, stuck),
+			20*time.Millisecond,
+		)
 		if checkRuleBudgetError != nil {
 			test.Fatal(checkRuleBudgetError)
 		}

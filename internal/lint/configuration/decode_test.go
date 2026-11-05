@@ -17,28 +17,31 @@ type tuningOptions struct {
 	MaximumLineCount int `json:"maximumLineCount"`
 }
 
-// recordingDecoder is a Decoder the way the registry builds one for a rule taking Options: the rule
-// package's own decoder, its result bound into a rule.Bound. Each decoded value is appended to received,
-// since a Bound closes over its options and a test has no other way to read what the rule was handed.
-// The Bound it returns is named configuredName, so a test can tell it from the rule's Unconfigured.
-func recordingDecoder[Options any](received *[]Options) Decoder {
-	decode := rule.DecodeOptionsInto[Options]()
-	return func(raw json.RawMessage) (rule.Bound, error) {
-		decoded, decodeError := decode(raw)
-		if decodeError != nil {
-			return rule.Bound{}, decodeError
-		}
-		*received = append(*received, decoded)
-		return rule.Bound{Traits: rule.Traits{Name: configuredName}}, nil
-	}
-}
-
 // configuredName and unconfiguredName mark which Bound Decode returned: the decoder's, or the rule's own
 // Unconfigured.
 const (
 	configuredName   = "configured"
 	unconfiguredName = "unconfigured"
 )
+
+// recordingDecoder is a Decoder the way the registry builds one for a rule taking Options: the rule
+// package's own decoder, its result bound into a rule.Bound. It keeps each decoded value, since a Bound
+// closes over its options and a test has no other way to read what the rule was handed, and the second
+// return reads them back. The Bound it returns is named configuredName, so a test can tell it from the
+// rule's Unconfigured.
+func recordingDecoder[Options any]() (Decoder, func() []Options) {
+	decode := rule.DecodeOptionsInto[Options]()
+	var received []Options
+	record := func(raw json.RawMessage) (rule.Bound, error) {
+		decoded, decodeError := decode(raw)
+		if decodeError != nil {
+			return rule.Bound{}, decodeError
+		}
+		received = append(received, decoded)
+		return rule.Bound{Traits: rule.Traits{Name: configuredName}}, nil
+	}
+	return record, func() []Options { return received }
+}
 
 // unconfigured is a rule's Unconfigured as these tests declare it, marked so Decode returning it shows.
 var unconfigured = rule.Bound{Traits: rule.Traits{Name: unconfiguredName}}
@@ -51,9 +54,9 @@ var unconfigured = rule.Bound{Traits: rule.Traits{Name: unconfiguredName}}
 // liveness harness reporting `fixtures=54 live=53 dead=1` was the only thing that ever noticed.
 func TestRequiredOptionsFailLoudlyWhenAbsent(test *testing.T) {
 	test.Parallel()
-	var received []guardOptions
+	decoder, received := recordingDecoder[guardOptions]()
 	registry := OptionsRegistry{
-		"guard": {Decode: recordingDecoder(&received), Required: true, Unconfigured: unconfigured},
+		"guard": {Decode: decoder, Required: true, Unconfigured: unconfigured},
 	}
 
 	if _, decodeError := registry.Decode("guard", nil); decodeError == nil {
@@ -73,8 +76,8 @@ func TestRequiredOptionsFailLoudlyWhenAbsent(test *testing.T) {
 		test.Fatalf("the rule was bound as %q rather than to its decoded options, so it declines every file",
 			bound.Name)
 	}
-	if len(received) != 1 || received[0].LibraryDirectory != "/libraries/structure/" {
-		test.Fatalf("the decoded value is wrong: %+v", received)
+	if len(received()) != 1 || received()[0].LibraryDirectory != "/libraries/structure/" {
+		test.Fatalf("the decoded value is wrong: %+v", received())
 	}
 }
 
@@ -82,9 +85,9 @@ func TestRequiredOptionsFailLoudlyWhenAbsent(test *testing.T) {
 // must run on its own defaults rather than fail, or every unconfigured tunable becomes a hard error.
 func TestTuningOptionsFallBackToDefaults(test *testing.T) {
 	test.Parallel()
-	var received []tuningOptions
+	decoder, _ := recordingDecoder[tuningOptions]()
 	registry := OptionsRegistry{
-		"tunable": {Decode: recordingDecoder(&received), Unconfigured: unconfigured},
+		"tunable": {Decode: decoder, Unconfigured: unconfigured},
 	}
 
 	bound, decodeError := registry.Decode("tunable", nil)
@@ -139,8 +142,8 @@ func TestARuleWithNoDecoderRefusesAnOption(test *testing.T) {
  */
 func TestASecondElementOnASingleElementRuleIsRefused(test *testing.T) {
 	test.Parallel()
-	var received []tuningOptions
-	registry := OptionsRegistry{"tunable": {Decode: recordingDecoder(&received), Unconfigured: unconfigured}}
+	decoder, received := recordingDecoder[tuningOptions]()
+	registry := OptionsRegistry{"tunable": {Decode: decoder, Unconfigured: unconfigured}}
 
 	_, err := registry.Decode("tunable", []json.RawMessage{
 		json.RawMessage(`{"maximumLineCount": 3}`),
@@ -160,8 +163,8 @@ func TestASecondElementOnASingleElementRuleIsRefused(test *testing.T) {
 	if _, err = registry.Decode("tunable", []json.RawMessage{json.RawMessage(`{"maximumLineCount": 3}`)}); err != nil {
 		test.Fatalf("one element on a one-element rule was refused: %v", err)
 	}
-	if len(received) != 1 || received[0].MaximumLineCount != 3 {
-		test.Fatalf("the single element did not reach the decoder: %+v", received)
+	if len(received()) != 1 || received()[0].MaximumLineCount != 3 {
+		test.Fatalf("the single element did not reach the decoder: %+v", received())
 	}
 }
 
@@ -250,8 +253,8 @@ func TestANullIsRefusedBeforeAnyDecoderSeesIt(test *testing.T) {
 // JSON did not parse.
 func TestMalformedOptionsAreAnError(test *testing.T) {
 	test.Parallel()
-	var received []guardOptions
-	registry := OptionsRegistry{"guard": {Decode: recordingDecoder(&received), Required: true}}
+	decoder, _ := recordingDecoder[guardOptions]()
+	registry := OptionsRegistry{"guard": {Decode: decoder, Required: true}}
 
 	if _, decodeError := registry.Decode(
 		"guard",
