@@ -49,7 +49,7 @@ var impliedEvalGlobalObjectNames = map[string]bool{
 //
 // # What decides a report, and why the global test is the whole rule
 //
-// Two questions have to agree. The callee has to be one of three functions, and it has to be THE
+// Two questions have to agree. The callee has to be one of three functions, and it has to be the
 // global one rather than a local of the same name. The second question is not a detail: a helper
 // named `setTimeout` taking a string is ordinary code, and reporting it is a false positive on
 // something that never runs a string. Upstream answers it with `isGlobalReference` over
@@ -104,10 +104,10 @@ var NoImpliedEval = rule.Rule{
 		// Context built by hand still arrives with a nil checker, and every listener below reads
 		// it. Declining the file once here rather than per node.
 		//
-		// This guard and the one in impliedEvalResolvesToAGlobal are a PAIR, and neither is
+		// This guard and the one in impliedEvalResolvesToAGlobal are a pair, and neither is
 		// redundant even though each alone survives a mutation sweep. Scored three ways: neutering
 		// this one survives because the inner one still answers false for every name; neutering the
-		// inner one survives because this one has already declined the file; neutering BOTH is
+		// inner one survives because this one has already declined the file; neutering both is
 		// caught, on three lines. The single-site sweep structurally cannot see a guard whose
 		// partner is covering for it, so the pair is recorded here rather than left to be
 		// rediscovered.
@@ -308,7 +308,7 @@ func impliedEvalAccessReceiver(access *ast.Node) *ast.Node {
 // function names fail a declaration-file test.
 //
 // So the question is inverted: rather than proving the name is the global, ask whether anything in
-// SOURCE declares it, and treat "nothing does" as the global. That answers all seven names above
+// source declares it, and treat "nothing does" as the global. That answers all seven names above
 // correctly, and it answers the shadows correctly too, which is the direction that matters, since a
 // shadow is by definition written in source.
 //
@@ -330,7 +330,7 @@ func impliedEvalResolvesToAGlobal(ruleContext rule.Context, identifier *ast.Node
 		// browser supplies `execScript` without any TypeScript library declaring it. Measured
 		// against the installed eslint 10.8.1, that is backwards: with nothing declared,
 		// `setTimeout("x")`, `execScript("x")`, `window.setTimeout("x")` and
-		// `global.setTimeout("x")` all report ZERO, and each reports once as soon as its own name
+		// `global.setTimeout("x")` all report zero, and each reports once as soon as its own name
 		// is added to the `globals` block. Upstream's gate is `isGlobalReference`, which asks
 		// whether the name resolves to a declared global variable, and an undeclared name resolves
 		// to no variable at all.
@@ -364,7 +364,7 @@ func impliedEvalResolvesToAGlobal(ruleContext rule.Context, identifier *ast.Node
 // impliedEvalFirstArgumentIsAString reports whether the call's first argument is evaluated as a
 // string.
 //
-// Upstream reports when EITHER its syntactic test or its constant evaluator says string. This
+// Upstream reports when either its syntactic test or its constant evaluator says string. This
 // carries the syntactic half; the doc on NoImpliedEval records what the other half would add and
 // what that was measured to cost.
 //
@@ -383,7 +383,7 @@ func impliedEvalFirstArgumentIsAString(call *ast.Node) bool {
 //	any template literal      `x = 1;` and `foo${bar}` alike
 //	a `+` with either side a string, recursively
 //
-// The `+` arm is an OR rather than an AND, and that is the load-bearing part: `'foo' + bar` is a
+// The `+` arm is an `OR` rather than an `AND`, and that is the load-bearing part: `'foo' + bar` is a
 // string whatever `bar` holds, because concatenation with a string coerces. Both operand orders are
 // in the corpus and so is `1 + ';' + 1`, which is a left-nested `+` whose string sits at the second
 // level down.

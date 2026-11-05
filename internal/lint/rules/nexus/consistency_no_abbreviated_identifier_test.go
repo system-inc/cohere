@@ -190,8 +190,8 @@ func TestConsistencyNoAbbreviatedIdentifierStaysSilent(test *testing.T) {
 		{"an import specifier", "import { config } from 'external';\n"},
 		{"a namespace import", "import * as config from 'external';\n"},
 		{"a default import", "import params from 'external';\n"},
-		// A type property signature is NOT here, and it used to be. The original reports one: its
-		// `reportWithTypeKeyGuard` withholds the AUTOFIX and calls `context.report` either way, on
+		// A type property signature is not here, and it used to be. The original reports one: its
+		// `reportWithTypeKeyGuard` withholds the autofix and calls `context.report` either way, on
 		// the reasoning that a blind rename touches the declaration while every caller keeps the old
 		// spelling through the object-literal-key skip. This port ships no fixer, so the guard has
 		// nothing to withhold and collapses to a plain report.
@@ -316,10 +316,10 @@ func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(test *testing.T) 
 			nil,
 		},
 		{
-			// An interface key is JUDGED, and the framework options do not change that. A type
+			// An interface key is judged, and the framework options do not change that. A type
 			// member often shapes an external surface, which is why the original withholds its
 			// autofix there, but it still reports: the name is one this file declares and can
-			// choose. The framework exemptions above are about a name the framework MANDATES,
+			// choose. The framework exemptions above are about a name the framework mandates,
 			// which is a different question and the reason these two are stated separately.
 			"an interface key is judged as a property signature",
 			"/repository/source/Thing.tsx",

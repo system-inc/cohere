@@ -114,12 +114,12 @@ func TestConsistentThisStaysSilent(test *testing.T) {
 // The scope model, measured against the installed rule rather than derived from its source.
 //
 // Upstream's `reference.from === scope` decides whether a later assignment rescues a declaration,
-// and what that expression MEANS was the hard part of this port. It is the innermost eslint scope,
+// and what that expression means was the hard part of this port. It is the innermost eslint scope,
 // and eslint opens one for a block, a switch, a loop body, a catch and a `with`, but not for an
 // unbraced `if` consequent, a labeled statement, or any expression nesting.
 //
 // Upstream's corpus writes none of these shapes, so every row here is a case it cannot express, and
-// each was measured by driving the installed rule. The reporting rows are upstream reporting CORRECT
+// each was measured by driving the installed rule. The reporting rows are upstream reporting correct
 // code: in every one of them the write reaches the same var declaration and the alias does end up
 // holding `this`. Reproduced rather than corrected, and written down here so the next reader does
 // not helpfully fix it back to the intuitive answer.
@@ -199,7 +199,7 @@ func TestConsistentThisOtherDeclarationForms(test *testing.T) {
 // The decoder's own defaults and shapes, which no source fixture can reach.
 //
 // The default is the dangerous line: upstream defaults to ["that"], and a generic decoder handing
-// back a zero-value struct would give an EMPTY alias list, which does not disable the rule. It makes
+// back a zero-value struct would give an empty alias list, which does not disable the rule. It makes
 // aliasNotAssignedToThis unreachable and makes unexpectedAlias report every capture of `this` under
 // any name at all. So the nil case is asserted by behaviour rather than only by field.
 func TestDecodeConsistentThisOptions(test *testing.T) {
@@ -367,7 +367,7 @@ func TestConsistentThisTreatsAnArrowAsNeitherScopeNorTransparent(test *testing.T
 
 // Function expressions are a scope, which the imported corpus cannot show.
 //
-// Its two nested-function cases write `(function() { self = this; }())` around a write to an OUTER
+// Its two nested-function cases write `(function() { self = this; }())` around a write to an outer
 // alias, so they exercise the outer scope declining a foreign write rather than a function
 // expression judging its own declarations. Dropping function expressions from the scope list
 // survives the whole imported corpus and costs the first two rows here.

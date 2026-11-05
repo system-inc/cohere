@@ -151,7 +151,7 @@ func applyArrayCallbackFixes(source string, fixes []rule.Fix) string {
 	return source
 }
 
-// TestArrayCallbackReturnSpan asserts WHERE each finding points.
+// TestArrayCallbackReturnSpan asserts where each finding points.
 //
 // Upstream passes an explicit `loc: getFunctionHeadLoc(node, sourceCode)` for the function-level
 // findings, so a callback body hundreds of lines long does not become the highlighted range. The
@@ -356,7 +356,7 @@ func TestArrayCallbackReturnOptionsDecode(test *testing.T) {
 			`foo.forEach(x => void x)`, decoded)
 		rule_testing.ExpectClean(test, clean)
 
-		// The option changes what is OFFERED, not only what is reported, and only asserting the
+		// The option changes what is offered, not only what is reported, and only asserting the
 		// finding would miss half of it.
 		offered := rule_testing.RunWithOptions(test, ArrayCallbackReturn, "o.ts",
 			`foo.forEach(x => x)`, decoded)
@@ -477,7 +477,7 @@ func TestArrayCallbackReturnCalleeShapes(test *testing.T) {
 			// The control for the row above. Without the trailing call the returned function is an
 			// ordinary return value rather than the callback, so the inner function is not judged.
 			//
-			// The OUTER function is the callback here and it is clean, which is worth stating
+			// The outer function is the callback here and it is clean, which is worth stating
 			// because the intuitive reading is that it should report: it returns on its only path,
 			// so nothing is missing. Measured against the installed rule, which is silent on it.
 			source: `foo.every(function(){ return function() {}; })`,
@@ -494,7 +494,7 @@ func TestArrayCallbackReturnCalleeShapes(test *testing.T) {
 		},
 		{
 			name: "a typed array constructor is an Array.from receiver",
-			// Upstream's pattern is `/Array$/u`, any identifier ENDING in Array, so every typed
+			// Upstream's pattern is `/Array$/u`, any identifier ending in Array, so every typed
 			// array constructor matches.
 			source: `Int32Array.from(x, function() {})`,
 			want:   []string{"expectedInside"},
@@ -593,7 +593,7 @@ func TestArrayCallbackReturnAsyncAndGenerator(test *testing.T) {
 //	foo.forEach((x) => { return a ? b : c; })  -> return void (a ? b : c);
 //	foo.forEach((x) => { return x; })          -> return void x;
 //
-// The last row is the control: a tight expression must NOT gain parentheses, which is what keeps a
+// The last row is the control: a tight expression must not gain parentheses, which is what keeps a
 // port that always wraps from passing the first three.
 func TestArrayCallbackReturnVoidParenthesization(test *testing.T) {
 	test.Parallel()

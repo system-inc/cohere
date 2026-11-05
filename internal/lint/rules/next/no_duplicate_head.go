@@ -177,7 +177,7 @@ var NoDuplicateHead = rule.Rule{
 				}
 				// A named specifier and a namespace import carry their local name in `Name()`; a
 				// default binding is already that identifier. `ImportedNameOf` is deliberately not
-				// used: oxc matches the specifier's LOCAL name, so an aliased import is matched on
+				// used: oxc matches the specifier's local name, so an aliased import is matched on
 				// its alias and never on the name the source module exports.
 				local := binding
 				if binding.Kind == ast.KindImportSpecifier || binding.Kind == ast.KindNamespaceImport {
