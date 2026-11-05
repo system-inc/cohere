@@ -373,11 +373,7 @@ func TestPreferNullishCoalescingIfIsSilentInsideReactCompiledFunctions(test *tes
 		if decodePreferNullishCoalescingOptionsError != nil {
 			test.Fatalf("decoding %s: %v", raw, decodePreferNullishCoalescingOptionsError)
 		}
-		options, isType := decoded.(PreferNullishCoalescingOptions)
-		if !isType {
-			test.Fatalf("decoding the options gave %T, expected PreferNullishCoalescingOptions", decoded)
-		}
-		return options
+		return decoded
 	}
 	compilerOn := decode(`{}`)
 	compilerOff := decode(`{"reactCompiler": false}`)

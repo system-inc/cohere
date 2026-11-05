@@ -552,7 +552,7 @@ func TestNoForInArrayRequiresTheTypedHarness(test *testing.T) {
 		test.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
 	}
 
-	listeners := NoForInArray.Run(rule.Context{SourceFile: typed.SourceFile}, nil)
+	listeners := NoForInArray.Run(rule.Context{SourceFile: typed.SourceFile}, rule.Given[rule.NoOptions]{})
 	listener, hasListener := listeners[ast.KindForInStatement]
 	if !hasListener {
 		test.Fatal("the rule stopped listening on for-in statements")

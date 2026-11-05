@@ -32,16 +32,15 @@ type unboundMethodRawOptions struct {
 //
 // cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what arrives
 // is the bare object rather than upstream's one-element array.
-func DecodeUnboundMethodOptions(raw []byte) (any, error) {
+func DecodeUnboundMethodOptions(raw []byte) (UnboundMethodOptions, error) {
 	decoded, err := rule.DecodeOptionsInto[unboundMethodRawOptions]()(raw)
 	if err != nil {
 		return DefaultUnboundMethodSettings(), err
 	}
 
-	wire, _ := decoded.(unboundMethodRawOptions)
 	options := DefaultUnboundMethodSettings()
-	if wire.IgnoreStatic != nil {
-		options.IgnoreStatic = *wire.IgnoreStatic
+	if decoded.IgnoreStatic != nil {
+		options.IgnoreStatic = *decoded.IgnoreStatic
 	}
 	return options, nil
 }
@@ -107,7 +106,7 @@ func DecodeUnboundMethodOptions(raw []byte) (any, error) {
 //
 // Two anchors, both common, and the syntactic safe-use test declines the overwhelming majority of
 // property accesses in real code before a single type question is asked.
-var UnboundMethod = rule.Rule{
+var UnboundMethod = rule.Rule[UnboundMethodOptions]{
 	Name: "@typescript-eslint/unbound-method",
 
 	// Every finding is decided by resolving a property to its declaration, so there is no syntactic
@@ -118,8 +117,8 @@ var UnboundMethod = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[UnboundMethodOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[UnboundMethodOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultUnboundMethodSettings()
 		}

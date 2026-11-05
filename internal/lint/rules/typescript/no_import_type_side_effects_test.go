@@ -218,5 +218,5 @@ func TestNoImportTypeSideEffectsTakesNoOptions(test *testing.T) {
 	if NoImportTypeSideEffects.NeedsTypeChecker {
 		test.Fatal("the rule declares the type checker and decides nothing that needs it")
 	}
-	var _ rule.Rule = NoImportTypeSideEffects
+	var _ rule.Rule[rule.NoOptions] = NoImportTypeSideEffects
 }

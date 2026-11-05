@@ -73,14 +73,14 @@ import (
 //
 // Two anchors, both uncommon outside type-heavy files, and each member's flags are cached per node
 // because a type reference resolving to a large union would otherwise be re-read once per sibling.
-var NoRedundantTypeConstituents = rule.Rule{
+var NoRedundantTypeConstituents = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-redundant-type-constituents",
 
 	// Every judgment is a type-flag question about a member the checker has already resolved.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The declaration governs registration; the harness can still build a Context by hand, and
 		// a nil dereference here costs every rule its verdict on the whole file.
 		if ruleContext.TypeChecker == nil {

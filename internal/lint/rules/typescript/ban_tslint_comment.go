@@ -110,9 +110,9 @@ func messageBanTslintComment(text string) rule.Message {
 // The judgment upstream makes is reproduced exactly: the same inputs report, at the same span, with
 // the same rendered text. Only the repair is narrower, and it is narrower in the direction that
 // cannot destroy source.
-var BanTslintComment = rule.Rule{
+var BanTslintComment = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/ban-tslint-comment",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

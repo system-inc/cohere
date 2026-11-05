@@ -1012,12 +1012,8 @@ func TestDecodeStrictVoidReturnOptions(test *testing.T) {
 			if decodeStrictVoidReturnOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.raw, decodeStrictVoidReturnOptionsError)
 			}
-			options, isOptions := decoded.(StrictVoidReturnOptions)
-			if !isOptions {
-				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
-			}
-			if options.AllowReturnAny != testCase.want {
-				test.Fatalf("allowReturnAny: expected %v, got %v", testCase.want, options.AllowReturnAny)
+			if decoded.AllowReturnAny != testCase.want {
+				test.Fatalf("allowReturnAny: expected %v, got %v", testCase.want, decoded.AllowReturnAny)
 			}
 		})
 	}

@@ -96,9 +96,9 @@ var suggestionNoUnnecessaryParameterPropertyAssignment = rule.Message{
 // joined, and `this.foo = foo, bar();` has its comma eaten, leaving ` bar();`. Reproduced exactly,
 // as a suggestion, because a suggestion is the vehicle upstream chose and a human sees it before it
 // lands. Shipping this as a fix would let the engine apply those two rewrites unattended.
-var NoUnnecessaryParameterPropertyAssignment = rule.Rule{
+var NoUnnecessaryParameterPropertyAssignment = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unnecessary-parameter-property-assignment",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

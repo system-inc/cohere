@@ -11,7 +11,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // values are a `oneOf` over a boolean, a string, and an object, and a generic decode into any single
 // Go type would discard two of the three shapes and silently ban nothing.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoRestrictedTypesOptions]{
 		Rule:   NoRestrictedTypes,
 		Decode: DecodeNoRestrictedTypesOptions,
 	})

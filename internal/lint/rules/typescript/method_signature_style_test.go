@@ -771,12 +771,8 @@ func TestMethodSignatureStyleDecoderResolvesTheStyle(test *testing.T) {
 			if decodeMethodSignatureStyleOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.configuration, decodeMethodSignatureStyleOptionsError)
 			}
-			options, ok := decoded.(MethodSignatureStyleOptions)
-			if !ok {
-				test.Fatalf("the decoder returned %T rather than MethodSignatureStyleOptions", decoded)
-			}
-			if options.Style != testCase.wantStyle {
-				test.Errorf("style resolved to %q, want %q", options.Style, testCase.wantStyle)
+			if decoded.Style != testCase.wantStyle {
+				test.Errorf("style resolved to %q, want %q", decoded.Style, testCase.wantStyle)
 			}
 		})
 	}

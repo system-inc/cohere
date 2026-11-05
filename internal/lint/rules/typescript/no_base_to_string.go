@@ -58,19 +58,18 @@ type noBaseToStringRawOptions struct {
 // the two mean opposite things here: absent keeps the four builtin names, explicit-empty clears them
 // and asks the rule to report on an `Error`. Upstream expresses the same distinction through
 // `option.ignoredTypeNames ?? []` over a defaults merge.
-func DecodeNoBaseToStringOptions(raw []byte) (any, error) {
+func DecodeNoBaseToStringOptions(raw []byte) (NoBaseToStringOptions, error) {
 	decoded, err := rule.DecodeOptionsInto[noBaseToStringRawOptions]()(raw)
 	if err != nil {
 		return DefaultNoBaseToStringSettings(), err
 	}
 
-	wire, _ := decoded.(noBaseToStringRawOptions)
 	options := DefaultNoBaseToStringSettings()
-	if wire.CheckUnknown != nil {
-		options.CheckUnknown = *wire.CheckUnknown
+	if decoded.CheckUnknown != nil {
+		options.CheckUnknown = *decoded.CheckUnknown
 	}
-	if wire.IgnoredTypeNames != nil {
-		options.IgnoredTypeNames = *wire.IgnoredTypeNames
+	if decoded.IgnoredTypeNames != nil {
+		options.IgnoredTypeNames = *decoded.IgnoredTypeNames
 	}
 	return options, nil
 }
@@ -134,7 +133,7 @@ func DecodeNoBaseToStringOptions(raw []byte) (any, error) {
 // Five anchors, and the recursion is bounded by the type's own depth with a visited set. Every anchor
 // is a coercion site rather than an arbitrary expression, so the rule declines almost everything in a
 // real file before asking a type question.
-var NoBaseToString = rule.Rule{
+var NoBaseToString = rule.Rule[NoBaseToStringOptions]{
 	Name: "@typescript-eslint/no-base-to-string",
 
 	// Every finding is decided by walking a type, so there is no syntactic subset of this rule.
@@ -144,8 +143,8 @@ var NoBaseToString = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[NoBaseToStringOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoBaseToStringOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultNoBaseToStringSettings()
 		}

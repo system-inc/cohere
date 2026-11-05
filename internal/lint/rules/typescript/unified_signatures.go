@@ -70,17 +70,17 @@ import (
 // One map per scope, holding the signatures seen in it, and a pairwise comparison within each key's
 // group. A group of n signatures costs n(n-1)/2 comparisons, and n is the number of overloads
 // sharing one name, which is small in practice.
-var UnifiedSignatures = rule.Rule{
+var UnifiedSignatures = rule.Rule[UnifiedSignaturesOptions]{
 	Name: "@typescript-eslint/unified-signatures",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[UnifiedSignaturesOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 		// The value type, because that is what `DecodeOptionsInto` hands over. This line asserted a
 		// pointer once, the comma-ok form swallowed the mismatch, and both options read false for
 		// every configuration; `TestUnifiedSignaturesOptionsArriveThroughTheDecoder` holds it.
-		settings, _ := rule.OptionsAs[UnifiedSignaturesOptions](options)
+		settings, _ := options.Read()
 
 		// One listener that walks the file itself, rather than a listener per scope kind with an
 		// exit hook. Upstream pairs each `X` with an `X:exit` and checks a scope when it closes;

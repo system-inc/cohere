@@ -85,7 +85,7 @@ const (
 // tree. The cache keeps a chain to one checker question per link rather than one per link per
 // visit, and the computed-key listener declines a literal and an update expression before asking
 // anything, which is upstream's own optimization and is worth keeping for the same reason.
-var NoUnsafeMemberAccess = rule.Rule{
+var NoUnsafeMemberAccess = rule.Rule[NoUnsafeMemberAccessOptions]{
 	Name: "@typescript-eslint/no-unsafe-member-access",
 
 	// Every judgment is a type question about an object or a computed key.
@@ -95,8 +95,8 @@ var NoUnsafeMemberAccess = rule.Rule{
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoUnsafeMemberAccessOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnsafeMemberAccessOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			// A rule configured as a bare "error" is handed nil, and the zero value of the settings
 			// struct happens to be upstream's default here because the only option defaults to
@@ -400,7 +400,7 @@ type noUnsafeMemberAccessRawOptions struct {
 // the other way is what makes an explicit `false` distinguishable from an absent key, and the day
 // this option's default changes upstream, this decoder is the one line that has to move rather than
 // every call site.
-func DecodeNoUnsafeMemberAccessOptions(raw []byte) (any, error) {
+func DecodeNoUnsafeMemberAccessOptions(raw []byte) (NoUnsafeMemberAccessOptions, error) {
 	settings := DefaultNoUnsafeMemberAccessOptions()
 	if len(raw) == 0 {
 		return settings, nil

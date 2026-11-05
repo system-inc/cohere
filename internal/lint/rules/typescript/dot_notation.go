@@ -66,7 +66,7 @@ type DotNotationOptions struct {
 //
 // The index-signature question needs a key type that is string-like, so `[key: number]` and
 // `[key: symbol]` do not exempt, and `any` has no index signature at all.
-var DotNotation = rule.Rule{
+var DotNotation = rule.Rule[DotNotationOptions]{
 	Name: "@typescript-eslint/dot-notation",
 
 	// The accessed property's declaration and the object's index signatures are the checker's answers
@@ -74,8 +74,8 @@ var DotNotation = rule.Rule{
 	// Whether noPropertyAccessFromIndexSignature is on
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		resolved, isDotNotationOptions := rule.OptionsAs[DotNotationOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[DotNotationOptions]) rule.Listeners {
+		resolved, isDotNotationOptions := options.Read()
 		if !isDotNotationOptions {
 			resolved = DefaultDotNotationOptions()
 		}
@@ -166,7 +166,7 @@ func DefaultDotNotationOptions() DotNotationOptions {
 // Hand-rolled for the core rule's reason: `allowKeywords` defaults to true, so decoding an absent
 // option into a plain bool would invert the rule, and a bare `"error"` arrives as empty input. Unknown
 // keys are refused, as upstream's schema does with additionalProperties false.
-func DecodeDotNotationOptions(raw []byte) (any, error) {
+func DecodeDotNotationOptions(raw []byte) (DotNotationOptions, error) {
 	options := DefaultDotNotationOptions()
 	if len(raw) == 0 {
 		return options, nil

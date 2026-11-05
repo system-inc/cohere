@@ -70,7 +70,7 @@ func DefaultNoShadowOptions() NoShadowOptions {
 //
 // Its own decoder rather than `rule.DecodeOptionsInto`, for no-redeclare's reason: two options default
 // to true, and the generic helper's zero value would turn both off for every bare configuration.
-func DecodeNoShadowOptions(raw []byte) (any, error) {
+func DecodeNoShadowOptions(raw []byte) (NoShadowOptions, error) {
 	options := DefaultNoShadowOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -203,7 +203,7 @@ func DecodeNoShadowOptions(raw []byte) (any, error) {
 //
 // A function hoists by its first declaration, upstream's `defs[0]`, and the first of an overload set
 // is a bodiless signature (upstream's TSDeclareFunction), which is not in either set.
-var NoShadow = rule.Rule{
+var NoShadow = rule.Rule[NoShadowOptions]{
 	Name: "@typescript-eslint/no-shadow",
 
 	// For binding rather than for types. See the doc comment above: the locals tables this rule
@@ -213,14 +213,14 @@ var NoShadow = rule.Rule{
 	// builtinGlobals asks whether a global's declarations live in a lib file.
 	ProgramReads: rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoShadowOptions]) rule.Listeners {
 		// Declined once per file rather than once per node. NeedsTypeChecker governs the
 		// registration path only; a Context built by hand still arrives with a nil checker, and
 		// `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes` builds exactly that.
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}
-		settings, ok := rule.OptionsAs[NoShadowOptions](options)
+		settings, ok := options.Read()
 		if !ok {
 			// A bare "error" arrives as nil, whose zero value turns off both options that default to
 			// true; the real defaults are what a bare configuration means.

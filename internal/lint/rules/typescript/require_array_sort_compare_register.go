@@ -13,7 +13,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // helper would yield a zero-value struct on an absent key and invert the rule silently. The
 // hand-rolled decoder keeps an absent key distinguishable from an explicit false.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[RequireArraySortCompareOptions]{
 		Rule:   RequireArraySortCompare,
 		Decode: DecodeRequireArraySortCompareOptions,
 	})

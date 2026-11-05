@@ -651,7 +651,7 @@ func TestNoImpliedEvalDeclaresItNeedsTheTypeChecker(test *testing.T) {
 		test.Fatalf("the typed harness found %d findings on a clean case, want none", len(typed.Diagnostics))
 	}
 
-	listeners := NoImpliedEval.Run(rule.Context{SourceFile: typed.SourceFile}, nil)
+	listeners := NoImpliedEval.Run(rule.Context{SourceFile: typed.SourceFile}, rule.Given[rule.NoOptions]{})
 	for _, kind := range []ast.Kind{ast.KindCallExpression, ast.KindNewExpression} {
 		listener, hasListener := listeners[kind]
 		if !hasListener {

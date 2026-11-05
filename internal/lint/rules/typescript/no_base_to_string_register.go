@@ -12,7 +12,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // four builtin names rather than to a zero value, so the generic helper would hand the rule an empty
 // slice for an absent key and it would start reporting on every Error.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoBaseToStringOptions]{
 		Rule:   NoBaseToString,
 		Decode: DecodeNoBaseToStringOptions,
 	})

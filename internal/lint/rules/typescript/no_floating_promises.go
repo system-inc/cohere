@@ -268,7 +268,7 @@ func buildFloatingVoidMessage() rule.Message {
 // ask for a type. `isPromiseArray` runs before `isPromiseLike` and walks union parts asking for
 // apparent types, so a statement whose expression is not a promise still costs one type read. That
 // is upstream's ordering and it is kept.
-var NoFloatingPromises = rule.Rule{
+var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 	Name: "@typescript-eslint/no-floating-promises",
 
 	NeedsTypeChecker: true,
@@ -278,8 +278,8 @@ var NoFloatingPromises = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		opts, ok := rule.OptionsAs[NoFloatingPromisesOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoFloatingPromisesOptions]) rule.Listeners {
+		opts, ok := options.Read()
 		if !ok {
 			opts = NoFloatingPromisesOptions{
 				AllowForKnownSafeCalls:          []type_checking.TypeOrValueSpecifier{},
@@ -753,22 +753,22 @@ func specifiersFrom(raw []noFloatingPromisesRawSpecifier) ([]type_checking.TypeO
 // "absent" is distinguishable from "false" and the rule's own defaulting is what fills them in.
 // That matters most for `ignoreVoid`, whose default is true: binding it to a plain bool would make
 // an unconfigured rule behave as though it had been explicitly turned off.
-func DecodeNoFloatingPromisesOptions(raw []byte) (any, error) {
+func DecodeNoFloatingPromisesOptions(raw []byte) (NoFloatingPromisesOptions, error) {
 	decoded, err := rule.DecodeOptionsInto[noFloatingPromisesRawOptions]()(raw)
 	if err != nil {
 		return NoFloatingPromisesOptions{}, err
 	}
 
-	wire, _ := decoded.(noFloatingPromisesRawOptions)
-
 	options := NoFloatingPromisesOptions{
-		CheckThenables: wire.CheckThenables,
-		IgnoreIIFE:     wire.IgnoreIIFE,
-		IgnoreVoid:     wire.IgnoreVoid,
+		CheckThenables: decoded.CheckThenables,
+		IgnoreIIFE:     decoded.IgnoreIIFE,
+		IgnoreVoid:     decoded.IgnoreVoid,
 	}
-	options.AllowForKnownSafeCalls, options.AllowForKnownSafeCallsInline = specifiersFrom(wire.AllowForKnownSafeCalls)
+	options.AllowForKnownSafeCalls, options.AllowForKnownSafeCallsInline = specifiersFrom(
+		decoded.AllowForKnownSafeCalls,
+	)
 	options.AllowForKnownSafePromises, options.AllowForKnownSafePromisesInline = specifiersFrom(
-		wire.AllowForKnownSafePromises,
+		decoded.AllowForKnownSafePromises,
 	)
 
 	return options, nil

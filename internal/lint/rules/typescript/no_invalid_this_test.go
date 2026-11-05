@@ -626,13 +626,9 @@ func TestDecodeNoInvalidThisOptions(test *testing.T) {
 			if decodeNoInvalidThisOptionsError != nil {
 				test.Fatalf("decode returned %v", decodeNoInvalidThisOptionsError)
 			}
-			settings, ok := decoded.(noInvalidThisSettings)
-			if !ok {
-				test.Fatalf("decode returned %T", decoded)
-			}
-			if settings.CapIsConstructor != testCase.want {
+			if decoded.CapIsConstructor != testCase.want {
 				test.Fatalf("capIsConstructor was %v, want %v",
-					settings.CapIsConstructor, testCase.want)
+					decoded.CapIsConstructor, testCase.want)
 			}
 		})
 	}

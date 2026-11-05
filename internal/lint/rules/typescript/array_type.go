@@ -160,9 +160,9 @@ func messageArrayTypeGenericSimple(className string, elementType string, readonl
 //	function f() { type Array<Y> = Y; const y: Array<2>; }       clean, function scope
 //	type G<Array> = { a: Array<string> };                        clean, type parameter
 //	{ type Array<Y> = Y; } const y: Array<2>;                    REPORTS, a sibling block does not shadow
-var ArrayType = rule.Rule{
+var ArrayType = rule.Rule[ArrayTypeOptions]{
 	Name: "@typescript-eslint/array-type",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ArrayTypeOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -172,7 +172,7 @@ var ArrayType = rule.Rule{
 		// errors on empty input and the config layer turns that into nil. A bare type assertion
 		// would then yield an empty `default`, which matches no arm below, and the rule would
 		// register on every file and report nothing while every fixture stayed green.
-		parsed, decoded := rule.OptionsAs[ArrayTypeOptions](options)
+		parsed, decoded := options.Read()
 		if !decoded {
 			parsed = DefaultArrayTypeOptions()
 		}
@@ -634,7 +634,7 @@ type arrayTypeRawOptions struct {
 // naming the key and the value. This used to fall back to the default for an unknown spelling, which
 // ran a setting nobody wrote and loaded clean doing it; upstream's schema is an enum and refuses it at
 // load, and the config layer now refuses a decoder's error by rule name (#rfbha44).
-func DecodeArrayTypeOptions(raw []byte) (any, error) {
+func DecodeArrayTypeOptions(raw []byte) (ArrayTypeOptions, error) {
 	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	trimmed := strings.TrimSpace(string(raw))
 	if trimmed == "" || trimmed == "null" {
@@ -649,15 +649,14 @@ func DecodeArrayTypeOptions(raw []byte) (any, error) {
 		)
 	}
 
-	wire, _ := decoded.(arrayTypeRawOptions)
 	options := DefaultArrayTypeOptions()
 
-	if wire.Default != nil {
-		setting, recognized := arrayTypeSettingFromWire(*wire.Default)
+	if decoded.Default != nil {
+		setting, recognized := arrayTypeSettingFromWire(*decoded.Default)
 		if !recognized {
 			return DefaultArrayTypeOptions(), fmt.Errorf(
 				`default %q is not "array", "array-simple" or "generic"`,
-				*wire.Default,
+				*decoded.Default,
 			)
 		}
 		options.Default = setting
@@ -665,12 +664,12 @@ func DecodeArrayTypeOptions(raw []byte) (any, error) {
 
 	// Resolved after `default`, and from it, which is upstream's `options.readonly ?? defaultOption`.
 	options.Readonly = options.Default
-	if wire.Readonly != nil {
-		setting, recognized := arrayTypeSettingFromWire(*wire.Readonly)
+	if decoded.Readonly != nil {
+		setting, recognized := arrayTypeSettingFromWire(*decoded.Readonly)
 		if !recognized {
 			return DefaultArrayTypeOptions(), fmt.Errorf(
 				`readonly %q is not "array", "array-simple" or "generic"`,
-				*wire.Readonly,
+				*decoded.Readonly,
 			)
 		}
 		options.Readonly = setting

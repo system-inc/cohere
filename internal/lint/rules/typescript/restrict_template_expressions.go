@@ -75,7 +75,7 @@ type restrictTemplateExpressionsRawOptions struct {
 // default is not the zero value: absent `allow` means upstream's three standard-library types
 // rather than an empty list, so a decoder returning nil there would report every interpolated
 // `Error` in the tree while every fixture built from an explicit struct still passed.
-func DecodeRestrictTemplateExpressionsOptions(raw []byte) (any, error) {
+func DecodeRestrictTemplateExpressionsOptions(raw []byte) (RestrictTemplateExpressionsOptions, error) {
 	options := RestrictTemplateExpressionsOptions{Allow: defaultAllowSpecifiers()}
 	if len(raw) == 0 {
 		return options, nil
@@ -85,22 +85,21 @@ func DecodeRestrictTemplateExpressionsOptions(raw []byte) (any, error) {
 	if err != nil {
 		return options, err
 	}
-	wire, _ := decoded.(restrictTemplateExpressionsRawOptions)
 
-	options.AllowAny = wire.AllowAny
-	options.AllowArray = wire.AllowArray
-	options.AllowBoolean = wire.AllowBoolean
-	options.AllowNever = wire.AllowNever
-	options.AllowNullish = wire.AllowNullish
-	options.AllowNumber = wire.AllowNumber
-	options.AllowRegExp = wire.AllowRegExp
+	options.AllowAny = decoded.AllowAny
+	options.AllowArray = decoded.AllowArray
+	options.AllowBoolean = decoded.AllowBoolean
+	options.AllowNever = decoded.AllowNever
+	options.AllowNullish = decoded.AllowNullish
+	options.AllowNumber = decoded.AllowNumber
+	options.AllowRegExp = decoded.AllowRegExp
 
 	// An explicitly configured `allow` replaces the default rather than adding to it, matching
 	// upstream, where `defaultOptions` is merged key by key and a supplied array wins outright.
-	if wire.Allow != nil {
+	if decoded.Allow != nil {
 		options.Allow = nil
 		options.AllowInline = nil
-		for _, entry := range wire.Allow {
+		for _, entry := range decoded.Allow {
 			if entry.inline != "" {
 				options.AllowInline = append(options.AllowInline, entry.inline)
 				continue
@@ -171,7 +170,7 @@ func DecodeRestrictTemplateExpressionsOptions(raw []byte) (any, error) {
 //
 // The anchor is a template literal, and the body exits immediately on one with no interpolations,
 // which is the common case for a template used only for its multi-line-ness.
-var RestrictTemplateExpressions = rule.Rule{
+var RestrictTemplateExpressions = rule.Rule[RestrictTemplateExpressionsOptions]{
 	Name: "@typescript-eslint/restrict-template-expressions",
 
 	// Every judgment is about the type of an interpolated value.
@@ -181,15 +180,15 @@ var RestrictTemplateExpressions = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[RestrictTemplateExpressionsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[RestrictTemplateExpressionsOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			// A rule configured as a bare severity reaches here with nil options, and the zero
 			// value of this struct is upstream's strict preset rather than its default. Routing
 			// through the decoder keeps `"error"` meaning what upstream means by it.
 			// Ignored: empty input returns the defaults before any decoding, so it has no error to return.
 			decoded, _ := DecodeRestrictTemplateExpressionsOptions(nil)
-			settings, _ = decoded.(RestrictTemplateExpressionsOptions)
+			settings = decoded
 		}
 
 		allowAny := restrictTemplateExpressionsEnabled(settings.AllowAny, true)

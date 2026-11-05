@@ -87,9 +87,9 @@ var messageUselessEmptyExport = rule.Message{
 // doing any work, and its second tester block is four inputs that all report as `.ts` and all stay
 // silent as `.d.ts`. Those four are the only thing pinning the gate, so they are kept here twice,
 // once per extension.
-var NoUselessEmptyExport = rule.Rule{
+var NoUselessEmptyExport = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-useless-empty-export",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

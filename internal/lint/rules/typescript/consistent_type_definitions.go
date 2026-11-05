@@ -64,7 +64,7 @@ func DefaultConsistentTypeDefinitionsSettings() ConsistentTypeDefinitionsOptions
 // value. A rule configured as a plain "error" reaches here with empty input, and a plain string
 // field would read that as "", which matches neither arm and silences the rule on every file --
 // indistinguishable, in a violation count, from a clean tree.
-func DecodeConsistentTypeDefinitionsOptions(raw []byte) (any, error) {
+func DecodeConsistentTypeDefinitionsOptions(raw []byte) (ConsistentTypeDefinitionsOptions, error) {
 	settings := DefaultConsistentTypeDefinitionsSettings()
 	if len(raw) == 0 {
 		return settings, nil
@@ -128,10 +128,10 @@ func DecodeConsistentTypeDefinitionsOptions(raw []byte) (any, error) {
 //
 // Reproducing a decline matters more than it looks: a fixer that repairs a case upstream refuses to
 // touch is a defect no message-id fixture can see, because the finding is identical either way.
-var ConsistentTypeDefinitions = rule.Rule{
+var ConsistentTypeDefinitions = rule.Rule[ConsistentTypeDefinitionsOptions]{
 	Name: "@typescript-eslint/consistent-type-definitions",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, configured := rule.OptionsAs[ConsistentTypeDefinitionsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistentTypeDefinitionsOptions]) rule.Listeners {
+		settings, configured := options.Read()
 		if !configured {
 			settings = DefaultConsistentTypeDefinitionsSettings()
 		}

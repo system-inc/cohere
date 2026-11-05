@@ -538,13 +538,9 @@ func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(test *testing.T
 			if decodeConsistentGenericConstructorsOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.wire, decodeConsistentGenericConstructorsOptionsError)
 			}
-			settings, isSettings := decoded.(ConsistentGenericConstructorsOptions)
-			if !isSettings {
-				test.Fatalf("decoding %q produced %T rather than the options struct", testCase.wire, decoded)
-			}
-			if settings.Mode != testCase.want {
+			if decoded.Mode != testCase.want {
 				test.Fatalf("decoding %q: expected mode %q, got %q", testCase.wire, testCase.want,
-					settings.Mode)
+					decoded.Mode)
 			}
 		})
 	}

@@ -1441,7 +1441,7 @@ func TestRestrictPlusOperandsDecoder(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decoding %s: %v", raw, err)
 		}
-		return restrictPlusOperandsSettingsFrom(decoded)
+		return restrictPlusOperandsSettingsFrom(rule.Configured(decoded))
 	}
 
 	test.Run("an empty object leaves every allow at its true default", func(test *testing.T) {
@@ -1454,7 +1454,9 @@ func TestRestrictPlusOperandsDecoder(test *testing.T) {
 
 	test.Run("nil options are the defaults rather than the zero struct", func(test *testing.T) {
 		test.Parallel()
-		if got := restrictPlusOperandsSettingsFrom(nil); got != DefaultRestrictPlusOperandsSettings() {
+		if got := restrictPlusOperandsSettingsFrom(
+			rule.Given[RestrictPlusOperandsOptions]{},
+		); got != DefaultRestrictPlusOperandsSettings() {
 			test.Errorf("got %+v, want the defaults %+v", got, DefaultRestrictPlusOperandsSettings())
 		}
 	})

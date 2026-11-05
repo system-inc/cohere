@@ -180,11 +180,11 @@ var messageRelatedGetterSetterPairs = rule.Message{
 // `set value(v: never)` reports while `get value(): never` beside `set value(v: string)` is clean,
 // which is the pair that pins the direction, since `never` is assignable to everything and nothing
 // but `never` is assignable to it. Both measured.
-var RelatedGetterSetterPairs = rule.Rule{
+var RelatedGetterSetterPairs = rule.Rule[rule.NoOptions]{
 	Name:             "@typescript-eslint/related-getter-setter-pairs",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// A typed rule handed a nil checker goes silent rather than crashing, which is the more
 		// dangerous of the two failure modes because a whole StaysSilent suite passes vacuously
 		// over it. Kept at the top of the only listener, and it is also the `.TypeChecker`

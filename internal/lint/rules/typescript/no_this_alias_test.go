@@ -339,20 +339,16 @@ func TestNoThisAliasDecodeMapsUpstreamSpellings(test *testing.T) {
 			if decodeNoThisAliasOptionsError != nil {
 				test.Fatalf("decoding: %v", decodeNoThisAliasOptionsError)
 			}
-			options, ok := decoded.(NoThisAliasOptions)
-			if !ok {
-				test.Fatalf("decoder produced %T", decoded)
-			}
-			if options.ReportDestructuring != testCase.wantReportDestructuring {
+			if decoded.ReportDestructuring != testCase.wantReportDestructuring {
 				test.Errorf("ReportDestructuring is %v, wanted %v",
-					options.ReportDestructuring, testCase.wantReportDestructuring)
+					decoded.ReportDestructuring, testCase.wantReportDestructuring)
 			}
-			if len(options.AllowedNames) != len(testCase.wantAllowedNames) {
-				test.Fatalf("AllowedNames is %v, wanted %v", options.AllowedNames, testCase.wantAllowedNames)
+			if len(decoded.AllowedNames) != len(testCase.wantAllowedNames) {
+				test.Fatalf("AllowedNames is %v, wanted %v", decoded.AllowedNames, testCase.wantAllowedNames)
 			}
 			for index, name := range testCase.wantAllowedNames {
-				if options.AllowedNames[index] != name {
-					test.Errorf("AllowedNames[%d] is %q, wanted %q", index, options.AllowedNames[index], name)
+				if decoded.AllowedNames[index] != name {
+					test.Errorf("AllowedNames[%d] is %q, wanted %q", index, decoded.AllowedNames[index], name)
 				}
 			}
 		})

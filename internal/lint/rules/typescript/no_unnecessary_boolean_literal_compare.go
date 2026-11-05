@@ -134,7 +134,7 @@ func messageNoUnnecessaryBooleanLiteralCompareNoStrictNullCheck() rule.Message {
 // option is still true, in both the default path and the hook path. The predicate is therefore
 // pinned by a unit test on the option resolution rather than by a rule fixture, and that is stated
 // rather than left as a gap.
-var NoUnnecessaryBooleanLiteralCompare = rule.Rule{
+var NoUnnecessaryBooleanLiteralCompare = rule.Rule[NoUnnecessaryBooleanLiteralCompareOptions]{
 	Name:             "@typescript-eslint/no-unnecessary-boolean-literal-compare",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
@@ -142,7 +142,7 @@ var NoUnnecessaryBooleanLiteralCompare = rule.Rule{
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnnecessaryBooleanLiteralCompareOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -152,7 +152,7 @@ var NoUnnecessaryBooleanLiteralCompare = rule.Rule{
 		// the rule would report cases upstream is silent on. A rule configured as a bare `"error"`
 		// is handed nil options, because `DecodeOptionsInto` errors on empty input and the config
 		// layer turns that into nil.
-		parsed, decoded := rule.OptionsAs[NoUnnecessaryBooleanLiteralCompareOptions](options)
+		parsed, decoded := options.Read()
 		if !decoded {
 			parsed = DefaultNoUnnecessaryBooleanLiteralCompareOptions()
 		}
@@ -702,23 +702,22 @@ type noUnnecessaryBooleanLiteralCompareRawOptions struct {
 // both allowances off and make the rule report the two nullish families upstream allows by default.
 // Every fixture built from a struct rather than routed through this decoder would pass anyway,
 // which is the failure this project has shipped before.
-func DecodeNoUnnecessaryBooleanLiteralCompareOptions(raw []byte) (any, error) {
+func DecodeNoUnnecessaryBooleanLiteralCompareOptions(raw []byte) (NoUnnecessaryBooleanLiteralCompareOptions, error) {
 	decoded, err := rule.DecodeOptionsInto[noUnnecessaryBooleanLiteralCompareRawOptions]()(raw)
 	if err != nil {
 		return DefaultNoUnnecessaryBooleanLiteralCompareOptions(), err
 	}
 
-	wire, _ := decoded.(noUnnecessaryBooleanLiteralCompareRawOptions)
 	options := DefaultNoUnnecessaryBooleanLiteralCompareOptions()
 
-	if wire.AllowComparingNullableBooleansToFalse != nil {
-		options.AllowComparingNullableBooleansToFalse = *wire.AllowComparingNullableBooleansToFalse
+	if decoded.AllowComparingNullableBooleansToFalse != nil {
+		options.AllowComparingNullableBooleansToFalse = *decoded.AllowComparingNullableBooleansToFalse
 	}
-	if wire.AllowComparingNullableBooleansToTrue != nil {
-		options.AllowComparingNullableBooleansToTrue = *wire.AllowComparingNullableBooleansToTrue
+	if decoded.AllowComparingNullableBooleansToTrue != nil {
+		options.AllowComparingNullableBooleansToTrue = *decoded.AllowComparingNullableBooleansToTrue
 	}
-	if wire.AllowRuleToRunWithoutStrictNullChecks != nil {
-		options.AllowRuleToRunWithoutStrictNullChecks = *wire.AllowRuleToRunWithoutStrictNullChecks
+	if decoded.AllowRuleToRunWithoutStrictNullChecks != nil {
+		options.AllowRuleToRunWithoutStrictNullChecks = *decoded.AllowRuleToRunWithoutStrictNullChecks
 	}
 
 	return options, nil

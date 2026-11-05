@@ -1001,19 +1001,15 @@ func TestDecodeNoDuplicateTypeConstituentsOptions(test *testing.T) {
 			if decodeNoDuplicateTypeConstituentsOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.raw, decodeNoDuplicateTypeConstituentsOptionsError)
 			}
-			options, isOptions := decoded.(NoDuplicateTypeConstituentsOptions)
-			if !isOptions {
-				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
-			}
-			if options.IgnoreIntersections != testCase.wantIntersections {
+			if decoded.IgnoreIntersections != testCase.wantIntersections {
 				test.Fatalf(
 					"ignoreIntersections: expected %v, got %v",
 					testCase.wantIntersections,
-					options.IgnoreIntersections,
+					decoded.IgnoreIntersections,
 				)
 			}
-			if options.IgnoreUnions != testCase.wantUnions {
-				test.Fatalf("ignoreUnions: expected %v, got %v", testCase.wantUnions, options.IgnoreUnions)
+			if decoded.IgnoreUnions != testCase.wantUnions {
+				test.Fatalf("ignoreUnions: expected %v, got %v", testCase.wantUnions, decoded.IgnoreUnions)
 			}
 		})
 	}

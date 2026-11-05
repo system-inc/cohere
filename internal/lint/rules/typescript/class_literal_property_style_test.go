@@ -783,12 +783,8 @@ func TestClassLiteralPropertyStyleDecoderResolvesTheStyle(test *testing.T) {
 			if decodeClassLiteralPropertyStyleOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.configuration, decodeClassLiteralPropertyStyleOptionsError)
 			}
-			options, ok := decoded.(ClassLiteralPropertyStyleOptions)
-			if !ok {
-				test.Fatalf("the decoder returned %T rather than ClassLiteralPropertyStyleOptions", decoded)
-			}
-			if options.Style != testCase.wantStyle {
-				test.Errorf("style resolved to %q, want %q", options.Style, testCase.wantStyle)
+			if decoded.Style != testCase.wantStyle {
+				test.Errorf("style resolved to %q, want %q", decoded.Style, testCase.wantStyle)
 			}
 		})
 	}
@@ -983,11 +979,7 @@ func TestClassLiteralPropertyStyleDecoderRefusesWhatUpstreamRefuses(test *testin
 			test.Errorf("%s was refused: %v", accepted.wire, decodeClassLiteralPropertyStyleOptionsError)
 			continue
 		}
-		options, isType := decoded.(ClassLiteralPropertyStyleOptions)
-		if !isType {
-			test.Fatalf("decoding the options gave %T, expected ClassLiteralPropertyStyleOptions", decoded)
-		}
-		if got := options.Style; got != accepted.want {
+		if got := decoded.Style; got != accepted.want {
 			test.Errorf("%s decoded to %s, want %s", accepted.wire, got, accepted.want)
 		}
 	}

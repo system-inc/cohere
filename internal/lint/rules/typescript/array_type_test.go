@@ -1836,15 +1836,11 @@ func TestArrayTypeDecoderResolvesBothAxes(test *testing.T) {
 			if decodeArrayTypeOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.configuration, decodeArrayTypeOptionsError)
 			}
-			options, ok := decoded.(ArrayTypeOptions)
-			if !ok {
-				test.Fatalf("the decoder returned %T rather than ArrayTypeOptions", decoded)
+			if decoded.Default != testCase.wantDefault {
+				test.Errorf("default resolved to %q, want %q", decoded.Default, testCase.wantDefault)
 			}
-			if options.Default != testCase.wantDefault {
-				test.Errorf("default resolved to %q, want %q", options.Default, testCase.wantDefault)
-			}
-			if options.Readonly != testCase.wantReadonly {
-				test.Errorf("readonly resolved to %q, want %q", options.Readonly, testCase.wantReadonly)
+			if decoded.Readonly != testCase.wantReadonly {
+				test.Errorf("readonly resolved to %q, want %q", decoded.Readonly, testCase.wantReadonly)
 			}
 		})
 	}
@@ -1945,15 +1941,11 @@ func TestArrayTypeDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
 			test.Errorf("%s was refused: %v", accepted.wire, decodeArrayTypeOptionsError)
 			continue
 		}
-		options, isType := decoded.(ArrayTypeOptions)
-		if !isType {
-			test.Fatalf("decoding the options gave %T, expected ArrayTypeOptions", decoded)
-		}
-		if options.Default != accepted.default_ || options.Readonly != accepted.readonly {
+		if decoded.Default != accepted.default_ || decoded.Readonly != accepted.readonly {
 			test.Errorf(
 				"%s decoded to %+v, want %s and %s",
 				accepted.wire,
-				options,
+				decoded,
 				accepted.default_,
 				accepted.readonly,
 			)

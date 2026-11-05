@@ -30,15 +30,14 @@ type strictVoidReturnRawOptions struct {
 // DecodeStrictVoidReturnOptions reads the rule's configuration.
 //
 // cohere's config layer strips ESLint's `[severity, options]` tuple, so the bare object arrives.
-func DecodeStrictVoidReturnOptions(raw []byte) (any, error) {
+func DecodeStrictVoidReturnOptions(raw []byte) (StrictVoidReturnOptions, error) {
 	decoded, err := rule.DecodeOptionsInto[strictVoidReturnRawOptions]()(raw)
 	if err != nil {
 		return DefaultStrictVoidReturnSettings(), err
 	}
-	wire, _ := decoded.(strictVoidReturnRawOptions)
 	options := DefaultStrictVoidReturnSettings()
-	if wire.AllowReturnAny != nil {
-		options.AllowReturnAny = *wire.AllowReturnAny
+	if decoded.AllowReturnAny != nil {
+		options.AllowReturnAny = *decoded.AllowReturnAny
 	}
 	return options, nil
 }
@@ -90,15 +89,15 @@ func DecodeStrictVoidReturnOptions(raw []byte) (any, error) {
 // Twelve anchors, most of them common, but each exits on a cheap syntactic test before the
 // contextual type is requested. The checker is consulted only for an expression sitting in a
 // position that could expect a function.
-var StrictVoidReturn = rule.Rule{
+var StrictVoidReturn = rule.Rule[StrictVoidReturnOptions]{
 	Name: "@typescript-eslint/strict-void-return",
 
 	// The contextual type decides every finding.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[StrictVoidReturnOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[StrictVoidReturnOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultStrictVoidReturnSettings()
 		}

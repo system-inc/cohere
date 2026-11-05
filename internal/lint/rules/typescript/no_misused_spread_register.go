@@ -12,5 +12,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // specifier objects and leaves as two typed fields, which no struct tag can express. Unlike
 // restrict-plus-operands, the zero value is already correct, so nil options need no fallback.
 func init() {
-	rule.Register(rule.Registration{Rule: NoMisusedSpread, Decode: DecodeNoMisusedSpreadOptions})
+	rule.Register(
+		rule.Registration[NoMisusedSpreadOptions]{Rule: NoMisusedSpread, Decode: DecodeNoMisusedSpreadOptions},
+	)
 }

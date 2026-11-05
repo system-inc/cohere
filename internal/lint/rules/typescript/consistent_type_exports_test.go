@@ -688,13 +688,9 @@ func TestConsistentTypeExportsDecoderResolvesTheOption(test *testing.T) {
 			if decodeConsistentTypeExportsOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.configuration, decodeConsistentTypeExportsOptionsError)
 			}
-			options, ok := decoded.(ConsistentTypeExportsOptions)
-			if !ok {
-				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
-			}
-			if options.FixMixedExportsWithInlineTypeSpecifier != testCase.wantInline {
+			if decoded.FixMixedExportsWithInlineTypeSpecifier != testCase.wantInline {
 				test.Errorf("the inline option resolved to %v, want %v",
-					options.FixMixedExportsWithInlineTypeSpecifier, testCase.wantInline)
+					decoded.FixMixedExportsWithInlineTypeSpecifier, testCase.wantInline)
 			}
 		})
 	}

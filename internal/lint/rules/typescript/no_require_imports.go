@@ -147,7 +147,7 @@ var messageNoRequireImports = rule.Message{
 // require('y')` into an import moves a statement to the top of the file, changes when the module is
 // evaluated, and has no correct answer when the call sits inside a function or a conditional. That
 // is a change of meaning at a site the rule does not own, so it is not even a suggestion here.
-var NoRequireImports = rule.Rule{
+var NoRequireImports = rule.Rule[NoRequireImportsOptions]{
 	Name: "@typescript-eslint/no-require-imports",
 
 	// See the doc above: telling the CommonJS `require` from a local binding of that name is name
@@ -155,8 +155,8 @@ var NoRequireImports = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[NoRequireImportsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoRequireImportsOptions]) rule.Listeners {
+		settings, _ := options.Read()
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -366,16 +366,14 @@ func matchesAnyAllowPattern(allow []*esregexp.RegExp, path string) bool {
 // entry in a configuration file reports a clean tree, which is the failure this tool exists to
 // remove. The dropped pattern simply permits nothing, so the rule stays strict rather than silently
 // going permissive.
-func DecodeNoRequireImportsOptions(raw []byte) (any, error) {
+func DecodeNoRequireImportsOptions(raw []byte) (NoRequireImportsOptions, error) {
 	decoded, err := rule.DecodeOptionsInto[noRequireImportsRawOptions]()(raw)
 	if err != nil {
 		return NoRequireImportsOptions{}, err
 	}
 
-	wire, _ := decoded.(noRequireImportsRawOptions)
-
-	options := NoRequireImportsOptions{AllowAsImport: wire.AllowAsImport}
-	for _, pattern := range wire.Allow {
+	options := NoRequireImportsOptions{AllowAsImport: decoded.AllowAsImport}
+	for _, pattern := range decoded.Allow {
 		compiled, compileError := esregexp.Compile(pattern, "u")
 		if compileError != nil {
 			continue

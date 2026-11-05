@@ -107,11 +107,11 @@ func messageTripleSlashReference(referenceName string) rule.Message {
 // `import()`, a bare `require()` call, an `export * from`, and an import nested inside a
 // `declare module` are all silent, each measured. That is why this does not reach for
 // `imports.SourceVisitors`, which would widen the rule to the two call shapes upstream ignores.
-var TripleSlashReference = rule.Rule{
+var TripleSlashReference = rule.Rule[TripleSlashReferenceOptions]{
 	// No namespace prefix. The config writes `typescript/triple-slash-reference` and the parity
 	// guard strips the namespace on a `/` boundary.
 	Name: "@typescript-eslint/triple-slash-reference",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[TripleSlashReferenceOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -131,7 +131,7 @@ var TripleSlashReference = rule.Rule{
 		// the rule goes silent on every file while every fixture stays green because fixtures reach
 		// the rule through the decoder. Found by the dry run rather than by the suite: 3,407 files,
 		// 3,407 registrations, zero findings, and a seeded probe tree that also reported nothing.
-		parsed, decoded := rule.OptionsAs[TripleSlashReferenceOptions](options)
+		parsed, decoded := options.Read()
 		if !decoded {
 			parsed = DefaultTripleSlashReferenceOptions()
 		}
@@ -391,18 +391,17 @@ type tripleSlashReferenceRawOptions struct {
 // key. Upstream refuses such a configuration outright; there is no error channel that reaches a
 // user here, so the default is used and the rule keeps its documented behavior instead of going
 // quiet on a typo.
-func DecodeTripleSlashReferenceOptions(raw []byte) (any, error) {
+func DecodeTripleSlashReferenceOptions(raw []byte) (TripleSlashReferenceOptions, error) {
 	decoded, err := rule.DecodeOptionsInto[tripleSlashReferenceRawOptions]()(raw)
 	if err != nil {
 		return DefaultTripleSlashReferenceOptions(), err
 	}
 
-	wire, _ := decoded.(tripleSlashReferenceRawOptions)
 	options := DefaultTripleSlashReferenceOptions()
 
-	options.Lib = settingOrDefault(wire.Lib, options.Lib, false)
-	options.Path = settingOrDefault(wire.Path, options.Path, false)
-	options.Types = settingOrDefault(wire.Types, options.Types, true)
+	options.Lib = settingOrDefault(decoded.Lib, options.Lib, false)
+	options.Path = settingOrDefault(decoded.Path, options.Path, false)
+	options.Types = settingOrDefault(decoded.Types, options.Types, true)
 
 	return options, nil
 }

@@ -60,9 +60,9 @@ var suggestionRemoveTheConstraint = rule.Message{
 // parenthesis skip rather than to add one. This is written down because skipping parentheses reads
 // as a free correctness improvement and adding it here would ship a silent divergence upstream's
 // own corpus cannot see, since the corpus writes no parenthesized constraint at all.
-var NoUnnecessaryTypeConstraint = rule.Rule{
+var NoUnnecessaryTypeConstraint = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unnecessary-type-constraint",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

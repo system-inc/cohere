@@ -842,21 +842,17 @@ func TestNoUnnecessaryBooleanLiteralCompareDecoderKeepsTheDefaultsTrue(test *tes
 					decodeNoUnnecessaryBooleanLiteralCompareOptionsError,
 				)
 			}
-			options, ok := decoded.(NoUnnecessaryBooleanLiteralCompareOptions)
-			if !ok {
-				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
-			}
-			if options.AllowComparingNullableBooleansToFalse != testCase.wantFalse {
+			if decoded.AllowComparingNullableBooleansToFalse != testCase.wantFalse {
 				test.Errorf("allowComparingNullableBooleansToFalse resolved to %v, want %v",
-					options.AllowComparingNullableBooleansToFalse, testCase.wantFalse)
+					decoded.AllowComparingNullableBooleansToFalse, testCase.wantFalse)
 			}
-			if options.AllowComparingNullableBooleansToTrue != testCase.wantTrue {
+			if decoded.AllowComparingNullableBooleansToTrue != testCase.wantTrue {
 				test.Errorf("allowComparingNullableBooleansToTrue resolved to %v, want %v",
-					options.AllowComparingNullableBooleansToTrue, testCase.wantTrue)
+					decoded.AllowComparingNullableBooleansToTrue, testCase.wantTrue)
 			}
-			if options.AllowRuleToRunWithoutStrictNullChecks != testCase.wantUnstrict {
+			if decoded.AllowRuleToRunWithoutStrictNullChecks != testCase.wantUnstrict {
 				test.Errorf("the strictNullChecks escape resolved to %v, want %v",
-					options.AllowRuleToRunWithoutStrictNullChecks, testCase.wantUnstrict)
+					decoded.AllowRuleToRunWithoutStrictNullChecks, testCase.wantUnstrict)
 			}
 		})
 	}

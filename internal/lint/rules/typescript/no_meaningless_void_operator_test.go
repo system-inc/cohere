@@ -1019,12 +1019,8 @@ func TestDecodeNoMeaninglessVoidOperatorOptions(test *testing.T) {
 			if decodeNoMeaninglessVoidOperatorOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.raw, decodeNoMeaninglessVoidOperatorOptionsError)
 			}
-			options, isOptions := decoded.(NoMeaninglessVoidOperatorOptions)
-			if !isOptions {
-				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
-			}
-			if options.CheckNever != testCase.want {
-				test.Fatalf("checkNever: expected %v, got %v", testCase.want, options.CheckNever)
+			if decoded.CheckNever != testCase.want {
+				test.Fatalf("checkNever: expected %v, got %v", testCase.want, decoded.CheckNever)
 			}
 		})
 	}

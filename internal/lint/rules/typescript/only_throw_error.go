@@ -181,7 +181,7 @@ func buildOnlyThrowErrorUndefMessage() rule.Message {
 // `KindThrowStatement` is a rare anchor. The checker is consulted once per throw, and the rethrow
 // arm short-circuits on anything that is not a bare identifier, so the thenable test runs only for
 // a `throw e` inside a callback.
-var OnlyThrowError = rule.Rule{
+var OnlyThrowError = rule.Rule[OnlyThrowErrorOptions]{
 	Name: "@typescript-eslint/only-throw-error",
 
 	// Every arm reads the argument's type, so the checker is required.
@@ -191,8 +191,8 @@ var OnlyThrowError = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[OnlyThrowErrorOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[OnlyThrowErrorOptions]) rule.Listeners {
+		settings, _ := options.Read()
 
 		// A rule configured as bare `"error"` is handed nil options, and `options.(T)` on nil yields
 		// the zero value, which is three nil pointers. Every default here is true, so defaulting
@@ -534,20 +534,18 @@ func (specifier *onlyThrowErrorRawSpecifier) UnmarshalJSON(raw []byte) error {
 // enum in the struct. The three booleans stay pointers all the way through so that "absent" stays
 // distinguishable from "false"; every one of them defaults to true, so collapsing that distinction
 // would turn an unconfigured rule into a maximally strict one.
-func DecodeOnlyThrowErrorOptions(raw []byte) (any, error) {
+func DecodeOnlyThrowErrorOptions(raw []byte) (OnlyThrowErrorOptions, error) {
 	decoded, err := rule.DecodeOptionsInto[onlyThrowErrorRawOptions]()(raw)
 	if err != nil {
 		return OnlyThrowErrorOptions{}, err
 	}
 
-	wire, _ := decoded.(onlyThrowErrorRawOptions)
-
 	options := OnlyThrowErrorOptions{
-		AllowRethrowing:      wire.AllowRethrowing,
-		AllowThrowingAny:     wire.AllowThrowingAny,
-		AllowThrowingUnknown: wire.AllowThrowingUnknown,
+		AllowRethrowing:      decoded.AllowRethrowing,
+		AllowThrowingAny:     decoded.AllowThrowingAny,
+		AllowThrowingUnknown: decoded.AllowThrowingUnknown,
 	}
-	for _, entry := range wire.Allow {
+	for _, entry := range decoded.Allow {
 		if entry.inline != "" {
 			options.AllowInline = append(options.AllowInline, entry.inline)
 			continue

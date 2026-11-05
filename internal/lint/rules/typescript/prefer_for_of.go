@@ -80,7 +80,7 @@ var preferForOfMessage = rule.Message{
 // One listener on a rare anchor, and the body walk runs only after the initializer, test and update
 // have all matched, which is a syntactic filter that declines almost every for loop in a real tree
 // before a single type question is asked.
-var PreferForOf = rule.Rule{
+var PreferForOf = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/prefer-for-of",
 
 	// Resolving a body identifier back to the loop's own declarator is the only way to tell a
@@ -88,7 +88,7 @@ var PreferForOf = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindForStatement: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

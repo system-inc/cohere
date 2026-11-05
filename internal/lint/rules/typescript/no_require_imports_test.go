@@ -492,12 +492,11 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 		if decodeNoRequireImportsOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
-		options, _ := decoded.(NoRequireImportsOptions)
-		if options.AllowAsImport {
+		if decoded.AllowAsImport {
 			test.Error("allowAsImport defaulted to true; both upstreams default it to false")
 		}
-		if len(options.Allow) != 0 {
-			test.Errorf("allow decoded %d patterns from an empty object", len(options.Allow))
+		if len(decoded.Allow) != 0 {
+			test.Errorf("allow decoded %d patterns from an empty object", len(decoded.Allow))
 		}
 	})
 
@@ -508,14 +507,13 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 		if decodeNoRequireImportsOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
-		options, _ := decoded.(NoRequireImportsOptions)
-		if len(options.Allow) != 2 {
-			test.Fatalf("compiled %d patterns, want 2", len(options.Allow))
+		if len(decoded.Allow) != 2 {
+			test.Fatalf("compiled %d patterns, want 2", len(decoded.Allow))
 		}
-		if !options.Allow[0].Test("../packages/package.json") {
+		if !decoded.Allow[0].Test("../packages/package.json") {
 			test.Error("the escaped-dot pattern did not match a path upstream permits")
 		}
-		if options.Allow[0].Test("./package.jsonc") {
+		if decoded.Allow[0].Test("./package.jsonc") {
 			test.Error("the anchored pattern matched a path upstream reports")
 		}
 	})
@@ -529,11 +527,10 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 		if decodeNoRequireImportsOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
-		options, _ := decoded.(NoRequireImportsOptions)
-		if len(options.Allow) != 1 {
-			test.Fatalf("kept %d patterns, want 1; JavaScript has lookbehind", len(options.Allow))
+		if len(decoded.Allow) != 1 {
+			test.Fatalf("kept %d patterns, want 1; JavaScript has lookbehind", len(decoded.Allow))
 		}
-		if !options.Allow[0].Test("xy") {
+		if !decoded.Allow[0].Test("xy") {
 			test.Error("the lookbehind did not match a path JavaScript matches")
 		}
 	})
@@ -547,11 +544,10 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 		if decodeNoRequireImportsOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
-		options, _ := decoded.(NoRequireImportsOptions)
-		if len(options.Allow) != 1 {
-			test.Fatalf("kept %d patterns, want 1; an unterminated group does not compile", len(options.Allow))
+		if len(decoded.Allow) != 1 {
+			test.Fatalf("kept %d patterns, want 1; an unterminated group does not compile", len(decoded.Allow))
 		}
-		if !options.Allow[0].Test("ok") {
+		if !decoded.Allow[0].Test("ok") {
 			test.Error("the surviving pattern is not the compilable one")
 		}
 	})

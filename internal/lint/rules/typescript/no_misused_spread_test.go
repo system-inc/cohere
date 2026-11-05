@@ -1327,8 +1327,7 @@ func TestNoMisusedSpreadDecoder(test *testing.T) {
 		if decodeNoMisusedSpreadOptionsError != nil {
 			test.Fatalf("decoding %s: %v", raw, decodeNoMisusedSpreadOptionsError)
 		}
-		options, _ := decoded.(NoMisusedSpreadOptions)
-		return options
+		return decoded
 	}
 
 	test.Run("an empty object allows nothing", func(test *testing.T) {

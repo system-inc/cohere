@@ -619,13 +619,9 @@ func TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers(test *tes
 			if decodeConsistentReturnOptionsError != nil {
 				test.Fatalf("the decoder refused %s: %v", testCase.raw, decodeConsistentReturnOptionsError)
 			}
-			settings, ok := decoded.(ConsistentReturnSettings)
-			if !ok {
-				test.Fatalf("the decoder returned %T rather than ConsistentReturnSettings", decoded)
-			}
-			if settings.TreatUndefinedAsUnspecified != testCase.wantFlag {
+			if decoded.TreatUndefinedAsUnspecified != testCase.wantFlag {
 				test.Errorf("treatUndefinedAsUnspecified: expected %v, got %v",
-					testCase.wantFlag, settings.TreatUndefinedAsUnspecified)
+					testCase.wantFlag, decoded.TreatUndefinedAsUnspecified)
 			}
 		})
 	}

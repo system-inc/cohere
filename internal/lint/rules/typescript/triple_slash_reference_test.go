@@ -550,12 +550,8 @@ func TestDecodeTripleSlashReferenceOptions(test *testing.T) {
 			if decodeTripleSlashReferenceOptionsError != nil {
 				test.Fatalf("could not decode: %v", decodeTripleSlashReferenceOptionsError)
 			}
-			got, ok := decoded.(TripleSlashReferenceOptions)
-			if !ok {
-				test.Fatalf("expected TripleSlashReferenceOptions, got %T", decoded)
-			}
-			if got != testCase.want {
-				test.Fatalf("expected %+v, got %+v", testCase.want, got)
+			if decoded != testCase.want {
+				test.Fatalf("expected %+v, got %+v", testCase.want, decoded)
 			}
 		})
 	}

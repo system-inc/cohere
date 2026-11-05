@@ -340,11 +340,7 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(test *testin
 			if err != nil {
 				test.Fatalf("decoding %s: %v", testCase.config, err)
 			}
-			decoded, ok := decodedAny.(NoMisusedPromisesOptions)
-			if !ok {
-				test.Fatalf("the decoder produced %T rather than NoMisusedPromisesOptions", decodedAny)
-			}
-			testCase.assert(test, decoded)
+			testCase.assert(test, decodedAny)
 		})
 	}
 }

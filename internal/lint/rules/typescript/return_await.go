@@ -42,17 +42,16 @@ func DefaultReturnAwaitSettings() ReturnAwaitOptions {
 // The option is a bare JSON string, not an object, so upstream's `["error"]` tuple becomes a lone
 // string once cohere's config layer strips the severity. An unrecognised value keeps the default
 // rather than silently selecting a mode nobody asked for.
-func DecodeReturnAwaitOptions(raw []byte) (any, error) {
+func DecodeReturnAwaitOptions(raw []byte) (ReturnAwaitOptions, error) {
 	decoded, err := rule.DecodeOptionsInto[string]()(raw)
 	if err != nil {
 		return DefaultReturnAwaitSettings(), err
 	}
 
-	wire, _ := decoded.(string)
-	switch ReturnAwaitMode(wire) {
+	switch ReturnAwaitMode(decoded) {
 	case ReturnAwaitAlways, ReturnAwaitErrorHandlingCorrectnessOnly,
 		ReturnAwaitInTryCatch, ReturnAwaitNever:
-		return ReturnAwaitOptions{Mode: ReturnAwaitMode(wire)}, nil
+		return ReturnAwaitOptions{Mode: ReturnAwaitMode(decoded)}, nil
 	}
 	return DefaultReturnAwaitSettings(), nil
 }
@@ -171,13 +170,13 @@ func dispositionsFor(mode ReturnAwaitMode) (errorHandling returnAwaitDisposition
 //
 // The anchor is a return statement plus the concise body of an async arrow, and the body exits
 // before touching the checker unless the enclosing function is async and there is an argument.
-var ReturnAwait = rule.Rule{
+var ReturnAwait = rule.Rule[ReturnAwaitOptions]{
 	Name: "@typescript-eslint/return-await",
 
 	// Whether the returned expression is thenable decides every finding.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ReturnAwaitOptions]) rule.Listeners {
 		// NeedsTypeChecker governs registration; the harness builds a Context by hand and can hand
 		// this rule a nil checker, which is how a sibling rule panicked. Declining the file once
 		// here is cheaper than a guard in every listener.
@@ -185,7 +184,7 @@ var ReturnAwait = rule.Rule{
 			return nil
 		}
 
-		settings, isSettings := rule.OptionsAs[ReturnAwaitOptions](options)
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultReturnAwaitSettings()
 		}

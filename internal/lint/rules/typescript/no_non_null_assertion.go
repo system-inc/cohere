@@ -58,9 +58,9 @@ func messageSuggestOptionalChain() rule.Message {
 // typescript-go it parses as an ExclamationToken on the declaration, never a NonNullExpression, so
 // a listener keyed to this node kind cannot see it. Verified against the parser rather than assumed,
 // and pinned by a clean fixture, because the two constructs are one keystroke apart in source.
-var NoNonNullAssertion = rule.Rule{
+var NoNonNullAssertion = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-non-null-assertion",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

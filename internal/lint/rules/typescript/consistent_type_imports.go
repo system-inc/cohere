@@ -187,7 +187,7 @@ func consistentTypeImportsSomeAreOnlyTypes(names []string) rule.Message {
 // they go into a new declaration beside the reported one. The repair moves only names the report
 // found type-only, so a class decorator metadata serializes is never moved, and a declaration
 // carrying import attributes, which a type-only import cannot have, reports with no repair.
-var ConsistentTypeImports = rule.Rule{
+var ConsistentTypeImports = rule.Rule[ConsistentTypeImportsOptions]{
 	Name: "@typescript-eslint/consistent-type-imports",
 
 	// Every part of the rule resolves a name to a declaration. There is no syntactic route to
@@ -200,8 +200,8 @@ var ConsistentTypeImports = rule.Rule{
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[ConsistentTypeImportsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistentTypeImportsOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			// A rule configured as a bare `"error"` is handed nil, and every default here is
 			// non-zero. Without this line the rule registers, passes its fixtures through the
@@ -901,28 +901,27 @@ func consistentTypeImportsWordList(names []string) string {
 // back to the default rather than disabling the arm: upstream refuses such a configuration outright
 // and there is no error channel that reaches a user here, so the choice is between the documented
 // behavior and silence, and silence would look like the rule working.
-func DecodeConsistentTypeImportsOptions(raw []byte) (any, error) {
+func DecodeConsistentTypeImportsOptions(raw []byte) (ConsistentTypeImportsOptions, error) {
 	options := DefaultConsistentTypeImportsOptions()
 
 	decoded, err := rule.DecodeOptionsInto[consistentTypeImportsRawOptions]()(raw)
 	if err != nil {
 		return options, err
 	}
-	wire, _ := decoded.(consistentTypeImportsRawOptions)
 
-	if wire.DisallowTypeAnnotations != nil {
-		options.DisallowTypeAnnotations = *wire.DisallowTypeAnnotations
+	if decoded.DisallowTypeAnnotations != nil {
+		options.DisallowTypeAnnotations = *decoded.DisallowTypeAnnotations
 	}
-	if wire.Prefer != nil {
-		switch ConsistentTypeImportsPrefer(*wire.Prefer) {
+	if decoded.Prefer != nil {
+		switch ConsistentTypeImportsPrefer(*decoded.Prefer) {
 		case ConsistentTypeImportsPreferTypeImports:
 			options.Prefer = ConsistentTypeImportsPreferTypeImports
 		case ConsistentTypeImportsPreferNoTypeImports:
 			options.Prefer = ConsistentTypeImportsPreferNoTypeImports
 		}
 	}
-	if wire.FixStyle != nil {
-		switch ConsistentTypeImportsFixStyle(*wire.FixStyle) {
+	if decoded.FixStyle != nil {
+		switch ConsistentTypeImportsFixStyle(*decoded.FixStyle) {
 		case ConsistentTypeImportsFixStyleSeparate:
 			options.FixStyle = ConsistentTypeImportsFixStyleSeparate
 		case ConsistentTypeImportsFixStyleInline:

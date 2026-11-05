@@ -125,7 +125,7 @@ import (
 // crash. It buys a vacuous green, where every clean fixture passes having proven nothing and every
 // reporting one fails. A test in this package pins the declaration and the guard together so a
 // later revert fails loudly.
-var NoForInArray = rule.Rule{
+var NoForInArray = rule.Rule[rule.NoOptions]{
 	// Upstream spells this "no-for-in-array-rule". That trailing "-rule" is a typo, and correcting
 	// it is the one correction this absorption carries.
 	//
@@ -149,7 +149,7 @@ var NoForInArray = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		hasArrayishLength := func(t *checker.Type) bool {
 			lengthProperty := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, t, "length")
 			if lengthProperty == nil {

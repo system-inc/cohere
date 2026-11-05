@@ -76,14 +76,14 @@ import (
 // one file holding 324 of them. The rule is not auto-fixable and every site is a human decision
 // about what the code really guarantees, so switching it on is a project rather than a config line.
 // The port is here and correct; whether the tree adopts it is not a porter's call.
-var NoUnsafeTypeAssertion = rule.Rule{
+var NoUnsafeTypeAssertion = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unsafe-type-assertion",
 
 	// Every step is a type question, and two of them are assignability queries.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		checkAssertion := func(node *ast.Node, expression *ast.Node, assertedTypeNode *ast.Node) {
 			if ruleContext.TypeChecker == nil {
 				return

@@ -815,15 +815,11 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 		if decodeOnlyThrowErrorOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
 		}
-		options, ok := decoded.(OnlyThrowErrorOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want OnlyThrowErrorOptions", decoded)
+		if decoded.AllowRethrowing != nil || decoded.AllowThrowingAny != nil || decoded.AllowThrowingUnknown != nil {
+			test.Errorf("absent booleans decoded to non-nil: %+v", decoded)
 		}
-		if options.AllowRethrowing != nil || options.AllowThrowingAny != nil || options.AllowThrowingUnknown != nil {
-			test.Errorf("absent booleans decoded to non-nil: %+v", options)
-		}
-		if len(options.Allow) != 0 || len(options.AllowInline) != 0 {
-			test.Errorf("absent allow decoded to %+v", options)
+		if len(decoded.Allow) != 0 || len(decoded.AllowInline) != 0 {
+			test.Errorf("absent allow decoded to %+v", decoded)
 		}
 	})
 
@@ -834,14 +830,10 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 		if decodeOnlyThrowErrorOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
 		}
-		options, isType := decoded.(OnlyThrowErrorOptions)
-		if !isType {
-			test.Fatalf("decoding the options gave %T, expected OnlyThrowErrorOptions", decoded)
-		}
-		if options.AllowThrowingAny == nil {
+		if decoded.AllowThrowingAny == nil {
 			test.Fatal("allowThrowingAny: false decoded to nil, which the rule would read as the TRUE default")
 		}
-		if *options.AllowThrowingAny {
+		if *decoded.AllowThrowingAny {
 			test.Error("allowThrowingAny: false decoded to true")
 		}
 	})
@@ -853,21 +845,17 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 		if decodeOnlyThrowErrorOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
 		}
-		options, isType := decoded.(OnlyThrowErrorOptions)
-		if !isType {
-			test.Fatalf("decoding the options gave %T, expected OnlyThrowErrorOptions", decoded)
+		if len(decoded.AllowInline) != 1 || decoded.AllowInline[0] != "Promise" {
+			test.Errorf("AllowInline is %v, want [Promise]", decoded.AllowInline)
 		}
-		if len(options.AllowInline) != 1 || options.AllowInline[0] != "Promise" {
-			test.Errorf("AllowInline is %v, want [Promise]", options.AllowInline)
+		if len(decoded.Allow) != 1 {
+			test.Fatalf("Allow holds %d specifiers, want 1", len(decoded.Allow))
 		}
-		if len(options.Allow) != 1 {
-			test.Fatalf("Allow holds %d specifiers, want 1", len(options.Allow))
+		if decoded.Allow[0].From != type_checking.TypeOrValueSpecifierFromLib {
+			test.Errorf("from decoded to %v, want the lib enum", decoded.Allow[0].From)
 		}
-		if options.Allow[0].From != type_checking.TypeOrValueSpecifierFromLib {
-			test.Errorf("from decoded to %v, want the lib enum", options.Allow[0].From)
-		}
-		if len(options.Allow[0].Name) != 1 || options.Allow[0].Name[0] != "undefined" {
-			test.Errorf("name decoded to %v, want [undefined]", options.Allow[0].Name)
+		if len(decoded.Allow[0].Name) != 1 || decoded.Allow[0].Name[0] != "undefined" {
+			test.Errorf("name decoded to %v, want [undefined]", decoded.Allow[0].Name)
 		}
 	})
 
@@ -878,18 +866,14 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 		if decodeOnlyThrowErrorOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
 		}
-		options, isType := decoded.(OnlyThrowErrorOptions)
-		if !isType {
-			test.Fatalf("decoding the options gave %T, expected OnlyThrowErrorOptions", decoded)
+		if len(decoded.Allow) != 1 || len(decoded.Allow[0].Name) != 2 {
+			test.Fatalf("Allow decoded to %+v", decoded.Allow)
 		}
-		if len(options.Allow) != 1 || len(options.Allow[0].Name) != 2 {
-			test.Fatalf("Allow decoded to %+v", options.Allow)
+		if strings.Join(decoded.Allow[0].Name, ",") != "A,B" {
+			test.Errorf("name decoded to %v, want [A B]", decoded.Allow[0].Name)
 		}
-		if strings.Join(options.Allow[0].Name, ",") != "A,B" {
-			test.Errorf("name decoded to %v, want [A B]", options.Allow[0].Name)
-		}
-		if options.Allow[0].Path != "x.ts" {
-			test.Errorf("path decoded to %q, want x.ts", options.Allow[0].Path)
+		if decoded.Allow[0].Path != "x.ts" {
+			test.Errorf("path decoded to %q, want x.ts", decoded.Allow[0].Path)
 		}
 	})
 
@@ -900,14 +884,10 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 		if decodeOnlyThrowErrorOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
 		}
-		options, isType := decoded.(OnlyThrowErrorOptions)
-		if !isType {
-			test.Fatalf("decoding the options gave %T, expected OnlyThrowErrorOptions", decoded)
-		}
 		// `file` is the zero value, so keeping the specifier would silently mean `file`. Dropping
 		// it says nothing at all, which is the honest answer for a value we cannot represent.
-		if len(options.Allow) != 0 {
-			test.Errorf("an unrecognized from produced %+v, want it dropped", options.Allow)
+		if len(decoded.Allow) != 0 {
+			test.Errorf("an unrecognized from produced %+v, want it dropped", decoded.Allow)
 		}
 	})
 
@@ -918,18 +898,14 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 		if decodeOnlyThrowErrorOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
 		}
-		options, isType := decoded.(OnlyThrowErrorOptions)
-		if !isType {
-			test.Fatalf("decoding the options gave %T, expected OnlyThrowErrorOptions", decoded)
+		if len(decoded.Allow) != 1 {
+			test.Fatalf("Allow decoded to %+v", decoded.Allow)
 		}
-		if len(options.Allow) != 1 {
-			test.Fatalf("Allow decoded to %+v", options.Allow)
+		if decoded.Allow[0].From != type_checking.TypeOrValueSpecifierFromPackage {
+			test.Errorf("from decoded to %v, want the package enum", decoded.Allow[0].From)
 		}
-		if options.Allow[0].From != type_checking.TypeOrValueSpecifierFromPackage {
-			test.Errorf("from decoded to %v, want the package enum", options.Allow[0].From)
-		}
-		if options.Allow[0].Package != "errors" {
-			test.Errorf("package decoded to %q, want errors", options.Allow[0].Package)
+		if decoded.Allow[0].Package != "errors" {
+			test.Errorf("package decoded to %q, want errors", decoded.Allow[0].Package)
 		}
 	})
 }

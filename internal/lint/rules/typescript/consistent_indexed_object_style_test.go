@@ -1173,12 +1173,8 @@ func TestDecodeConsistentIndexedObjectStyleOptions(test *testing.T) {
 			if decodeConsistentIndexedObjectStyleOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.raw, decodeConsistentIndexedObjectStyleOptionsError)
 			}
-			options, isOptions := decoded.(ConsistentIndexedObjectStyleOptions)
-			if !isOptions {
-				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
-			}
-			if options.Mode != testCase.want {
-				test.Fatalf("mode: expected %q, got %q", testCase.want, options.Mode)
+			if decoded.Mode != testCase.want {
+				test.Fatalf("mode: expected %q, got %q", testCase.want, decoded.Mode)
 			}
 		})
 	}

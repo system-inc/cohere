@@ -160,7 +160,7 @@ const (
 //
 // Nothing is special-cased for it. A rule that suppressed these would be lying about what its own
 // checker knows, and would go silent if the resolution is later fixed.
-var NoUnsafeAssignment = rule.Rule{
+var NoUnsafeAssignment = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unsafe-assignment",
 
 	// Every judgment compares a sender type against a receiver type.
@@ -170,7 +170,7 @@ var NoUnsafeAssignment = rule.Rule{
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

@@ -1992,7 +1992,10 @@ func TestSwitchExhaustivenessCheckDeclaresItNeedsTheChecker(test *testing.T) {
 		test.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
 	}
 
-	listeners := SwitchExhaustivenessCheck.Run(rule.Context{SourceFile: typed.SourceFile}, nil)
+	listeners := SwitchExhaustivenessCheck.Run(
+		rule.Context{SourceFile: typed.SourceFile},
+		rule.Given[SwitchExhaustivenessCheckOptions]{},
+	)
 	listener, hasListener := listeners[ast.KindSwitchStatement]
 	if !hasListener {
 		test.Fatal("the rule stopped listening on switch statements")
@@ -2027,21 +2030,16 @@ func TestSwitchExhaustivenessCheckOptionsBindFromCamelCaseJson(test *testing.T) 
 		test.Fatalf("decoding options: %v", err)
 	}
 
-	options, isOptions := decoded.(SwitchExhaustivenessCheckOptions)
-	if !isOptions {
-		test.Fatalf("expected %T, got %T", SwitchExhaustivenessCheckOptions{}, decoded)
-	}
-
-	if options.AllowDefaultCaseForExhaustiveSwitch == nil || *options.AllowDefaultCaseForExhaustiveSwitch {
+	if decoded.AllowDefaultCaseForExhaustiveSwitch == nil || *decoded.AllowDefaultCaseForExhaustiveSwitch {
 		test.Fatal("allowDefaultCaseForExhaustiveSwitch did not bind to false")
 	}
-	if options.RequireDefaultForNonUnion == nil || !*options.RequireDefaultForNonUnion {
+	if decoded.RequireDefaultForNonUnion == nil || !*decoded.RequireDefaultForNonUnion {
 		test.Fatal("requireDefaultForNonUnion did not bind to true")
 	}
 	// The unset option must stay nil rather than becoming false, because the rule's own defaulting
 	// block reads exactly that distinction and `considerDefaultExhaustiveForUnions` happens to
 	// default to false only by coincidence of it being the safer direction.
-	if options.ConsiderDefaultExhaustiveForUnions != nil {
+	if decoded.ConsiderDefaultExhaustiveForUnions != nil {
 		test.Fatal("an option nobody configured must stay nil so the rule can apply its own default")
 	}
 
@@ -2051,7 +2049,7 @@ func TestSwitchExhaustivenessCheckOptionsBindFromCamelCaseJson(test *testing.T) 
 	if err != nil {
 		test.Fatalf("decoding the inert option: %v", err)
 	}
-	if patternOptions, _ := withPattern.(SwitchExhaustivenessCheckOptions); patternOptions.DefaultCaseCommentPattern == nil {
+	if withPattern.DefaultCaseCommentPattern == nil {
 		test.Fatal("defaultCaseCommentPattern did not bind")
 	}
 }

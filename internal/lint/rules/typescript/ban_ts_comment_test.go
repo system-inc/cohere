@@ -229,11 +229,7 @@ func TestDecodeBanTsCommentOptionsReadsEveryShape(test *testing.T) {
 			if decodeBanTsCommentOptionsError != nil {
 				test.Fatalf("could not decode %s: %v", testCase.configuration, decodeBanTsCommentOptionsError)
 			}
-			options, isOptions := decoded.(BanTsCommentOptions)
-			if !isOptions {
-				test.Fatalf("decoder returned %T rather than BanTsCommentOptions", decoded)
-			}
-			testCase.check(test, options)
+			testCase.check(test, decoded)
 		})
 	}
 }

@@ -20,21 +20,17 @@ func TestPreferNullishCoalescingDefaultsMatchUpstream(test *testing.T) {
 	if decodePreferNullishCoalescingOptionsError != nil {
 		test.Fatalf("the decoder refused absent options: %v", decodePreferNullishCoalescingOptionsError)
 	}
-	options, ok := decoded.(PreferNullishCoalescingOptions)
-	if !ok {
-		test.Fatalf("the decoder returned %T", decoded)
-	}
 
-	if !options.IgnoreConditionalTests {
+	if !decoded.IgnoreConditionalTests {
 		test.Error("ignoreConditionalTests defaults TRUE upstream, measured absent-vs-explicit-false")
 	}
-	if options.IgnoreTernaryTests || options.IgnoreMixedLogicalExpressions ||
-		options.IgnoreBooleanCoercion || options.IgnoreIfStatements ||
-		options.AllowWithoutStrictNullChecks {
-		test.Errorf("every other flag defaults false: %#v", options)
+	if decoded.IgnoreTernaryTests || decoded.IgnoreMixedLogicalExpressions ||
+		decoded.IgnoreBooleanCoercion || decoded.IgnoreIfStatements ||
+		decoded.AllowWithoutStrictNullChecks {
+		test.Errorf("every other flag defaults false: %#v", decoded)
 	}
-	if options.IgnorePrimitives != (PreferNullishCoalescingPrimitives{}) {
-		test.Errorf("ignorePrimitives defaults to exempting nothing: %#v", options.IgnorePrimitives)
+	if decoded.IgnorePrimitives != (PreferNullishCoalescingPrimitives{}) {
+		test.Errorf("ignorePrimitives defaults to exempting nothing: %#v", decoded.IgnorePrimitives)
 	}
 }
 
@@ -112,12 +108,8 @@ func TestPreferNullishCoalescingIgnorePrimitivesBothSpellings(test *testing.T) {
 			if decodePreferNullishCoalescingOptionsError != nil {
 				test.Fatalf("the decoder refused %s: %v", testCase.raw, decodePreferNullishCoalescingOptionsError)
 			}
-			options, isType := decoded.(PreferNullishCoalescingOptions)
-			if !isType {
-				test.Fatalf("decoding the options gave %T, expected PreferNullishCoalescingOptions", decoded)
-			}
-			if options.IgnorePrimitives != testCase.want {
-				test.Errorf("expected %#v, got %#v", testCase.want, options.IgnorePrimitives)
+			if decoded.IgnorePrimitives != testCase.want {
+				test.Errorf("expected %#v, got %#v", testCase.want, decoded.IgnorePrimitives)
 			}
 		})
 	}
@@ -185,11 +177,7 @@ func TestPreferNullishCoalescingDecoderAcceptsTheShapesTheConfigLayerDelivers(te
 				test.Fatalf("the decoder refused %s: %v", testCase.raw, decodePreferNullishCoalescingOptionsError)
 			}
 			if testCase.check != nil {
-				options, isType := decoded.(PreferNullishCoalescingOptions)
-				if !isType {
-					test.Fatalf("decoding the options gave %T, expected PreferNullishCoalescingOptions", decoded)
-				}
-				testCase.check(test, options)
+				testCase.check(test, decoded)
 			}
 		})
 	}

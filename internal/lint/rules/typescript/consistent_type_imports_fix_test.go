@@ -116,11 +116,11 @@ func TestConsistentTypeImportsFixMatchesUpstream(test *testing.T) {
 // returns each file's diagnostics, keyed by file name.
 func consistentTypeImportsTypeErrors(test *testing.T, sources map[string]string) map[string]map[string]int {
 	test.Helper()
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "test/type-check",
 		NeedsTypeChecker: true,
 		ProgramReads:     rule.ReadsOtherFiles,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					for _, sourceFile := range ruleContext.Program.SourceFiles() {
@@ -276,11 +276,7 @@ func TestConsistentTypeImportsFixCases(test *testing.T) {
 				if decodeConsistentTypeImportsOptionsError != nil {
 					test.Fatalf("decoding %s: %v", testCase.options, decodeConsistentTypeImportsOptionsError)
 				}
-				typed, isType := decoded.(ConsistentTypeImportsOptions)
-				if !isType {
-					test.Fatalf("decoding the options gave %T, expected ConsistentTypeImportsOptions", decoded)
-				}
-				settings = typed
+				settings = decoded
 			}
 			result := rule_testing.RunTypedWithOptions(
 				test,

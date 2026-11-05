@@ -112,7 +112,7 @@ import (
 // "just past the name, or just past the `?` if there is one" to the type's end. Measured against the
 // installed rule's own byte ranges: `(err?: string)` replaces [29,37] and `(err: any /* c1 */ = 2)`
 // replaces [28,33], and both are reproduced by that arithmetic.
-var UseUnknownInCatchCallbackVariable = rule.Rule{
+var UseUnknownInCatchCallbackVariable = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/use-unknown-in-catch-callback-variable",
 
 	// Every verdict comes from the checker: whether the receiver is thenable, and whether the
@@ -120,7 +120,7 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Declines the file once rather than per node. Unreachable through registration, since
 		// NeedsTypeChecker is declared above; this covers the harness path, where a Context can be
 		// built by hand. Without it every listener below would read a nil checker and go silent,

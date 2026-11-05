@@ -99,7 +99,7 @@ import (
 //
 // One pass per class, and the checker is asked only at a property access whose name matches a
 // declared private member by text. A class with no `private` member registers nothing.
-var NoUnusedPrivateClassMembers = rule.Rule{
+var NoUnusedPrivateClassMembers = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unused-private-class-members",
 
 	// A use is attributed by resolving the property name to its declaration, which is the checker's
@@ -107,7 +107,7 @@ var NoUnusedPrivateClassMembers = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return rule.Listeners{}
 		}

@@ -750,15 +750,11 @@ func TestNoRestrictedTypesSurvivesNilOptions(test *testing.T) {
 		if decodeNoRestrictedTypesOptionsError != nil {
 			test.Fatalf("decoding %q: %v", raw, decodeNoRestrictedTypesOptionsError)
 		}
-		settings, ok := decoded.(NoRestrictedTypesOptions)
-		if !ok {
-			test.Fatalf("decoding %q produced %T rather than the options struct", raw, decoded)
-		}
-		if settings.Types == nil {
+		if decoded.Types == nil {
 			test.Fatalf("decoding %q left the ban map nil, so every lookup would panic or miss", raw)
 		}
-		if len(settings.Types) != 0 {
-			test.Fatalf("decoding %q banned %d types, expected none", raw, len(settings.Types))
+		if len(decoded.Types) != 0 {
+			test.Fatalf("decoding %q banned %d types, expected none", raw, len(decoded.Types))
 		}
 	}
 

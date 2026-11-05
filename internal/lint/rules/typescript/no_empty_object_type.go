@@ -64,7 +64,7 @@ type noEmptyObjectTypeWire struct {
 //
 // An allowWithName JavaScript will not compile is an error, as upstream's `new RegExp` throws when
 // the rule is created. An empty one is no pattern at all, as upstream's falsy test reads it.
-func DecodeNoEmptyObjectTypeOptions(raw []byte) (any, error) {
+func DecodeNoEmptyObjectTypeOptions(raw []byte) (NoEmptyObjectTypeOptions, error) {
 	options := DefaultNoEmptyObjectTypeOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -144,10 +144,10 @@ func DecodeNoEmptyObjectTypeOptions(raw []byte) (any, error) {
 // files', which upstream never sees. An interface with type parameters has a scope of its own to
 // upstream, the type scope its parameters live in, so its question finds nothing and it is always
 // offered the rewrite; kept as upstream's, and measured.
-var NoEmptyObjectType = rule.Rule{
+var NoEmptyObjectType = rule.Rule[NoEmptyObjectTypeOptions]{
 	Name: "@typescript-eslint/no-empty-object-type",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoEmptyObjectTypeOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoEmptyObjectTypeOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultNoEmptyObjectTypeOptions()
 		}

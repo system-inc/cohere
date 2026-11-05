@@ -44,25 +44,24 @@ type noExtraneousClassRawOptions struct {
 //
 // cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what arrives
 // is the bare object rather than upstream's one-element array.
-func DecodeNoExtraneousClassOptions(raw []byte) (any, error) {
+func DecodeNoExtraneousClassOptions(raw []byte) (NoExtraneousClassOptions, error) {
 	decoded, err := rule.DecodeOptionsInto[noExtraneousClassRawOptions]()(raw)
 	if err != nil {
 		return DefaultNoExtraneousClassSettings(), err
 	}
 
-	wire, _ := decoded.(noExtraneousClassRawOptions)
 	options := DefaultNoExtraneousClassSettings()
-	if wire.AllowConstructorOnly != nil {
-		options.AllowConstructorOnly = *wire.AllowConstructorOnly
+	if decoded.AllowConstructorOnly != nil {
+		options.AllowConstructorOnly = *decoded.AllowConstructorOnly
 	}
-	if wire.AllowEmpty != nil {
-		options.AllowEmpty = *wire.AllowEmpty
+	if decoded.AllowEmpty != nil {
+		options.AllowEmpty = *decoded.AllowEmpty
 	}
-	if wire.AllowStaticOnly != nil {
-		options.AllowStaticOnly = *wire.AllowStaticOnly
+	if decoded.AllowStaticOnly != nil {
+		options.AllowStaticOnly = *decoded.AllowStaticOnly
 	}
-	if wire.AllowWithDecorator != nil {
-		options.AllowWithDecorator = *wire.AllowWithDecorator
+	if decoded.AllowWithDecorator != nil {
+		options.AllowWithDecorator = *decoded.AllowWithDecorator
 	}
 	return options, nil
 }
@@ -146,7 +145,7 @@ var noExtraneousClassOnlyStaticMessage = rule.Message{
 //
 // One listener on each class kind, both rare, and the member walk breaks as soon as neither
 // classification can still hold. No checker, no program, no per-file state.
-var NoExtraneousClass = rule.Rule{
+var NoExtraneousClass = rule.Rule[NoExtraneousClassOptions]{
 	Name: "@typescript-eslint/no-extraneous-class",
 
 	// The checker answers only the load-bearing-empty-class question (see
@@ -155,8 +154,8 @@ var NoExtraneousClass = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[NoExtraneousClassOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoExtraneousClassOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultNoExtraneousClassSettings()
 		}

@@ -142,7 +142,7 @@ const (
 //
 // `KindEnumDeclaration` is a rare anchor. The checker is consulted once for the declaration's own
 // name, and once per member whose initializer is not a literal the switch already names.
-var NoMixedEnums = rule.Rule{
+var NoMixedEnums = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-mixed-enums",
 
 	// The classification of a non-literal initializer is a type question, and so is finding the
@@ -150,7 +150,7 @@ var NoMixedEnums = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

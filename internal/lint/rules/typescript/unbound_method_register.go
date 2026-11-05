@@ -13,7 +13,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // relying on that coincidence leaves the next person to add a default-true key here inheriting a
 // decoder that silently inverts their rule.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[UnboundMethodOptions]{
 		Rule:   UnboundMethod,
 		Decode: DecodeUnboundMethodOptions,
 	})

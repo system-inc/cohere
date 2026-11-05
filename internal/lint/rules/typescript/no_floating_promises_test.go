@@ -2797,11 +2797,7 @@ func TestDecodeNoFloatingPromisesOptions(test *testing.T) {
 		if decodeNoFloatingPromisesOptionsError != nil {
 			test.Fatalf("decoding %s: %v", raw, decodeNoFloatingPromisesOptionsError)
 		}
-		options, ok := decoded.(NoFloatingPromisesOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, want NoFloatingPromisesOptions", decoded)
-		}
-		return options
+		return decoded
 	}
 
 	test.Run("an empty object leaves every pointer nil so the rule's own defaults apply", func(test *testing.T) {

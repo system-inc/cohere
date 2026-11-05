@@ -40,7 +40,7 @@ type consistentReturnWire struct {
 // A malformed configuration is refused rather than decoded to an empty one. A decoder answering "no
 // options" to a shape it did not understand produces a rule that registers, reports, and enforces
 // something other than what the config says, which is the failure this repository exists to catch.
-func DecodeConsistentReturnOptions(raw []byte) (any, error) {
+func DecodeConsistentReturnOptions(raw []byte) (ConsistentReturnSettings, error) {
 	settings := ConsistentReturnSettings{}
 	if len(raw) == 0 {
 		return settings, nil
@@ -177,11 +177,11 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 // boundary, and `IsThenableType` walks to the `Promise` declaration in the default library. Both are
 // the checker's answers, not reads of ctx.Program, and the findings cache keys them on the type
 // fingerprint, which covers the import closure, and on the binary, which holds the default library.
-var ConsistentReturn = rule.Rule{
+var ConsistentReturn = rule.Rule[ConsistentReturnSettings]{
 	Name:             "@typescript-eslint/consistent-return",
 	NeedsTypeChecker: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[ConsistentReturnSettings](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistentReturnSettings]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = ConsistentReturnSettings{}
 		}

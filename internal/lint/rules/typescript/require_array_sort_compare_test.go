@@ -315,12 +315,8 @@ func TestDecodeRequireArraySortCompareOptionsKeepsTheDefaultWhenTheKeyIsAbsent(t
 			if decodeRequireArraySortCompareOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.raw, decodeRequireArraySortCompareOptionsError)
 			}
-			options, isOptions := decoded.(RequireArraySortCompareOptions)
-			if !isOptions {
-				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
-			}
-			if options.IgnoreStringArrays != testCase.want {
-				test.Fatalf("ignoreStringArrays: expected %v, got %v", testCase.want, options.IgnoreStringArrays)
+			if decoded.IgnoreStringArrays != testCase.want {
+				test.Fatalf("ignoreStringArrays: expected %v, got %v", testCase.want, decoded.IgnoreStringArrays)
 			}
 		})
 	}

@@ -13,7 +13,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // rejects, and the rule would silently run with the option off -- a rule that registers, reports,
 // and enforces something other than what the config says.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[ConsistentReturnSettings]{
 		Rule:   ConsistentReturn,
 		Decode: DecodeConsistentReturnOptions,
 	})

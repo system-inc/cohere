@@ -40,16 +40,15 @@ type noUselessDefaultAssignmentRawOptions struct {
 //
 // cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what
 // arrives is the bare object rather than upstream's one-element array.
-func DecodeNoUselessDefaultAssignmentOptions(raw []byte) (any, error) {
+func DecodeNoUselessDefaultAssignmentOptions(raw []byte) (NoUselessDefaultAssignmentOptions, error) {
 	decoded, err := rule.DecodeOptionsInto[noUselessDefaultAssignmentRawOptions]()(raw)
 	if err != nil {
 		return DefaultNoUselessDefaultAssignmentSettings(), err
 	}
 
-	wire, _ := decoded.(noUselessDefaultAssignmentRawOptions)
 	options := DefaultNoUselessDefaultAssignmentSettings()
-	if wire.AllowRuleToRunWithoutStrictNullChecks != nil {
-		options.AllowRuleToRunWithoutStrictNullChecks = *wire.AllowRuleToRunWithoutStrictNullChecks
+	if decoded.AllowRuleToRunWithoutStrictNullChecks != nil {
+		options.AllowRuleToRunWithoutStrictNullChecks = *decoded.AllowRuleToRunWithoutStrictNullChecks
 	}
 	return options, nil
 }
@@ -115,7 +114,7 @@ func DecodeNoUselessDefaultAssignmentOptions(raw []byte) (any, error) {
 // Both anchors are common, and the body exits immediately when there is no initializer, which is
 // the overwhelming majority of parameters and binding elements. The checker is consulted only for a
 // declaration that actually carries a default.
-var NoUselessDefaultAssignment = rule.Rule{
+var NoUselessDefaultAssignment = rule.Rule[NoUselessDefaultAssignmentOptions]{
 	Name: "@typescript-eslint/no-useless-default-assignment",
 
 	// Every judgment is a question about whether a type admits undefined.
@@ -125,8 +124,8 @@ var NoUselessDefaultAssignment = rule.Rule{
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[NoUselessDefaultAssignmentOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoUselessDefaultAssignmentOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultNoUselessDefaultAssignmentSettings()
 		}
