@@ -18,6 +18,38 @@ var messageInvalidTypeConfiguration = rule.Message{
 		"as a hook, or rename so the name no longer claims to be one.",
 }
 
+// moduleTypeProvider is the table consulted for a module, and the seam a test can substitute at.
+//
+// A variable rather than a direct call, and the reason is the whole difficulty of this rule. The
+// user-supplied `moduleTypeProvider` does not exist in this tree, and the hardcoded default table
+// is provably self-consistent, so a rule calling `defaultModuleTypeProvider` directly could not be
+// shown to fire by any input whatsoever. That is a rule nothing can guard: every fixture would pass
+// by finding nothing, which reads exactly like a working rule and exactly like a broken one.
+//
+// This seam is what makes the difference visible. The seeded test replaces it with upstream's own
+// test provider, the one the four `error.invalid-type-provider-*` fixtures are written against, and
+// asserts that all four report. Restoring the default and re-running the same four asserts they go
+// silent. That pair is the only available proof that the zero this rule produces on Kirk's tree is
+// a real zero rather than an inert rule.
+//
+// It is deliberately not exported and deliberately not a configuration surface. Making it one would
+// invent a config channel React does not have in this form, and this rule's job is to reproduce a
+// judgment rather than to grow the place that judgment reads from.
+var moduleTypeProvider = defaultModuleTypeProvider
+
+// typeConfigKind is the `kind` discriminant of a TypeConfig entry.
+//
+// Only the two values this rule can distinguish are modelled. React's schema also carries `object`
+// and `type`, and both answer `isHook == false` exactly as `function` does, so collapsing them into
+// one non-hook value cannot change a verdict. Named rather than boolean so a reader sees which
+// upstream field is being compared.
+type typeConfigKind string
+
+const (
+	typeConfigHook     typeConfigKind = "hook"
+	typeConfigFunction typeConfigKind = "function"
+)
+
 // Config flags a React Compiler module type configuration whose declared type contradicts its name.
 //
 //	valid:   import {useForm} from 'react-hook-form';
@@ -173,38 +205,6 @@ var Config = rule.Rule{
 		}
 	},
 }
-
-// typeConfigKind is the `kind` discriminant of a TypeConfig entry.
-//
-// Only the two values this rule can distinguish are modelled. React's schema also carries `object`
-// and `type`, and both answer `isHook == false` exactly as `function` does, so collapsing them into
-// one non-hook value cannot change a verdict. Named rather than boolean so a reader sees which
-// upstream field is being compared.
-type typeConfigKind string
-
-const (
-	typeConfigHook     typeConfigKind = "hook"
-	typeConfigFunction typeConfigKind = "function"
-)
-
-// moduleTypeProvider is the table consulted for a module, and the seam a test can substitute at.
-//
-// A variable rather than a direct call, and the reason is the whole difficulty of this rule. The
-// user-supplied `moduleTypeProvider` does not exist in this tree, and the hardcoded default table
-// is provably self-consistent, so a rule calling `defaultModuleTypeProvider` directly could not be
-// shown to fire by any input whatsoever. That is a rule nothing can guard: every fixture would pass
-// by finding nothing, which reads exactly like a working rule and exactly like a broken one.
-//
-// This seam is what makes the difference visible. The seeded test replaces it with upstream's own
-// test provider, the one the four `error.invalid-type-provider-*` fixtures are written against, and
-// asserts that all four report. Restoring the default and re-running the same four asserts they go
-// silent. That pair is the only available proof that the zero this rule produces on Kirk's tree is
-// a real zero rather than an inert rule.
-//
-// It is deliberately not exported and deliberately not a configuration surface. Making it one would
-// invent a config channel React does not have in this form, and this rule's job is to reproduce a
-// judgment rather than to grow the place that judgment reads from.
-var moduleTypeProvider = defaultModuleTypeProvider
 
 // defaultModuleTypeProvider returns the property table the compiler holds for a module, if it holds one.
 //

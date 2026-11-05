@@ -447,7 +447,7 @@ func runExhaustiveDeps(ruleContext rule.Context, options any) rule.Listeners {
 		requireExplicitEffectDeps: settings.RequireExplicitEffectDeps,
 	}
 	if settings.AdditionalHooks != "" {
-		// A malformed pattern disables the extension rather than failing the run. See the option's
+		// Ignored: a malformed pattern disables the extension rather than failing the run. See the option's
 		// own comment for why. Upstream's `new RegExp(additionalHooks)`, with no flags, read as
 		// JavaScript reads it: RE2 refuses a lookaround or a backreference its user wrote (#7mztrdd).
 		run.additionalHooks, _ = esregexp.Compile(settings.AdditionalHooks, "")
@@ -465,6 +465,20 @@ func runExhaustiveDeps(ruleContext rule.Context, options any) rule.Listeners {
 		},
 	}
 }
+
+// callbackResolution says how far following a named callback got.
+//
+// Three answers rather than two, because upstream reports differently for each. A name bound to a
+// function written here is analyzed in place; a name bound to something else in the component is a
+// missing dependency naming the callback; and a name that leads nowhere readable is the unknown
+// case where nothing can be said about the array.
+type callbackResolution int
+
+const (
+	callbackResolutionFound callbackResolution = iota
+	callbackResolutionNotAFunction
+	callbackResolutionUnknown
+)
 
 // visitHookCall is the rule's whole control flow, and its arm order is upstream's.
 //
@@ -753,6 +767,8 @@ func gatherDependencies(ruleContext rule.Context, callback *ast.Node, componentS
 
 // recordDependencyRead resolves one identifier and, if it names a value from the component scope,
 // files the property path it was read through.
+//
+// Mutates: reads gains the path this identifier was read through, which the caller compares to the array
 func recordDependencyRead(ruleContext rule.Context, identifier *ast.Node, callback *ast.Node,
 	componentScope *ast.Node, reads map[string]*dependencyRead) {
 
@@ -904,6 +920,8 @@ func assignmentTargetObject(node *ast.Node) *ast.Node {
 //
 // The second result separates "this is not a path" from "this is the empty path", which the caller
 // needs because an unreadable dependency array entry is its own finding.
+//
+// Mutates: optional records, for each prefix of the path, whether that step was written with `?.`
 func analyzePropertyChain(node *ast.Node, optional map[string]bool) (string, bool) {
 	node = unwrapExpression(node)
 	if node == nil {
@@ -1155,6 +1173,10 @@ func collectRecommendations(reads map[string]*dependencyRead, declared []declare
 //
 // Missing paths are appended in the order the descent reaches them; see the caller for why that
 // order is load-bearing rather than incidental.
+//
+// Mutates: missing gains each missing path, in the order the descent reaches it
+// Mutates: missingSeen remembers each missing path, so it is appended to missing once
+// Mutates: satisfying gains each declared path that a read below it is satisfied by
 func scanDependencyTree(node *dependencyTreeNode, prefix string, missing *[]string,
 	missingSeen map[string]bool, satisfying map[string]bool) {
 	for _, segment := range node.order {
@@ -1361,6 +1383,8 @@ func optionalAtPrefix(prefix string, reads map[string]*dependencyRead) bool {
 // deep, matching React: oxc recurses without limit and treats a cycle as stable, which makes two
 // mutually recursive component-body functions look stable when neither is. The measurement is in
 // the rule's doc comment.
+//
+// Mutates: visiting holds symbol while its function's reads are judged and drops it on return, so a cycle stops
 func isStableValue(ruleContext rule.Context, symbol *ast.Symbol, callback *ast.Node, componentScope *ast.Node,
 	visiting map[*ast.Symbol]bool) bool {
 
@@ -1409,6 +1433,9 @@ func stableDeclarationOf(symbol *ast.Symbol) *ast.Node {
 	return earliest
 }
 
+// isStableVariableDeclaration answers isStableValue for a symbol bound by a variable declaration.
+//
+// Mutates: visiting holds symbol while its function's reads are judged and drops it on return, so a cycle stops
 func isStableVariableDeclaration(ruleContext rule.Context, declaration *ast.Node, symbol *ast.Symbol,
 	callback *ast.Node, componentScope *ast.Node, visiting map[*ast.Symbol]bool) bool {
 
@@ -2015,20 +2042,6 @@ func dependencyArrayNamesIdentifier(dependencyArrayNode *ast.Node, name string) 
 	}
 	return false
 }
-
-// callbackResolution says how far following a named callback got.
-//
-// Three answers rather than two, because upstream reports differently for each. A name bound to a
-// function written here is analyzed in place; a name bound to something else in the component is a
-// missing dependency naming the callback; and a name that leads nowhere readable is the unknown
-// case where nothing can be said about the array.
-type callbackResolution int
-
-const (
-	callbackResolutionFound callbackResolution = iota
-	callbackResolutionNotAFunction
-	callbackResolutionUnknown
-)
 
 // resolvedFunctionBody follows a callback passed by name to the function it names.
 func resolvedFunctionBody(ruleContext rule.Context, identifier *ast.Node) (*ast.Node, callbackResolution) {

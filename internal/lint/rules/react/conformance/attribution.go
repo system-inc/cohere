@@ -50,167 +50,6 @@ package react_conformance
 // `Error`), so it is a necessary rather than sufficient check, and that limit is stated here rather
 // than left for a reader to discover.
 
-// CategoryForMessage returns the upstream ErrorCategory that produces a diagnostic message.
-//
-// Keyed on the message's first line, which is what the golden prints after the heading and what
-// upstream's own backend comparison asserts on.
-func CategoryForMessage(message string) (string, bool) {
-	if category, found := categoryByMessage[message]; found {
-		return category, true
-	}
-	for _, pattern := range categoryByMessagePrefix {
-		if len(message) >= len(pattern.Prefix) && message[:len(pattern.Prefix)] == pattern.Prefix {
-			return pattern.Category, true
-		}
-	}
-	return "", false
-}
-
-// messagePrefix matches the interpolated messages, which have no literal form to key on.
-type messagePrefix struct {
-	Prefix   string
-	Category string
-}
-
-// categoryByMessagePrefix covers the diagnostics upstream assembles from a template.
-//
-// These cannot be exact-matched because the variable part is a node type, a binding name, or a
-// joined word. The prefix is the invariant half, taken from the template in upstream's source
-// rather than from the corpus, so a fixture using a spelling the corpus does not currently contain
-// still attributes.
-var categoryByMessagePrefix = []messagePrefix{
-	{"(BuildHIR::node.lowerReorderableExpression) Expression type ", "Todo"},
-	{"(BuildHIR::lowerExpression) Handle ", "Todo"},
-	{"(BuildHIR::lowerStatement) Handle ", "Todo"},
-	{"(BuildHIR::lowerStatement) Support ", "Todo"},
-	{"[FindContextIdentifiers] Cannot handle Object destructuring assignment target ", "Todo"},
-}
-
-// RuleForCategory maps an upstream ErrorCategory to the lint rule name upstream gives it.
-//
-// Transcribed from `getRuleForCategoryImpl` in `CompilerError.ts` at the pinned sha, which is the
-// function ESLint itself uses to decide which rule name a diagnostic is reported under. Kept as
-// data rather than folded into the message map because the two change for different reasons: a
-// message can be reworded without moving rules, and a category can be renamed without touching a
-// message.
-func RuleForCategory(category string) (string, bool) {
-	rule, found := ruleByCategory[category]
-	return rule, found
-}
-
-var ruleByCategory = map[string]string{
-	"CapitalizedCalls":             "capitalized-calls",
-	"Config":                       "config",
-	"EffectDependencies":           "memoized-effect-dependencies",
-	"EffectDerivationsOfState":     "no-deriving-state-in-effects",
-	"EffectExhaustiveDependencies": "exhaustive-effect-dependencies",
-	"EffectSetState":               "set-state-in-effect",
-	"ErrorBoundaries":              "error-boundaries",
-	"FBT":                          "fbt",
-	"Gating":                       "gating",
-	"Globals":                      "globals",
-	"Hooks":                        "hooks",
-	"Immutability":                 "immutability",
-	"IncompatibleLibrary":          "incompatible-library",
-	"Invariant":                    "invariant",
-	"MemoDependencies":             "memo-dependencies",
-	"PreserveManualMemo":           "preserve-manual-memoization",
-	"Purity":                       "purity",
-	"Refs":                         "refs",
-	"RenderSetState":               "set-state-in-render",
-	"StaticComponents":             "static-components",
-	"Suppression":                  "rule-suppression",
-	"Syntax":                       "syntax",
-	"Todo":                         "todo",
-	"UnsupportedSyntax":            "unsupported-syntax",
-	"UseMemo":                      "use-memo",
-	"VoidUseMemo":                  "void-use-memo",
-}
-
-// HeadingForCategory returns the severity word upstream's printer prints for a category.
-//
-// Transcribed from the switch in `printErrorSummary` (`CompilerError.ts:565`), which closes with
-// `assertExhaustive` over every `ErrorCategory`. This exists to be run against the corpus as a
-// cross-check: the heading is recorded independently in each golden, so a category attributed
-// wrongly across a heading boundary produces a mismatch that nothing else in this package would
-// notice.
-func HeadingForCategory(category string) (string, bool) {
-	heading, found := headingByCategory[category]
-	return heading, found
-}
-
-var headingByCategory = map[string]string{
-	"CapitalizedCalls":             "Error",
-	"Config":                       "Error",
-	"EffectDerivationsOfState":     "Error",
-	"EffectSetState":               "Error",
-	"ErrorBoundaries":              "Error",
-	"FBT":                          "Error",
-	"Gating":                       "Error",
-	"Globals":                      "Error",
-	"Hooks":                        "Error",
-	"Immutability":                 "Error",
-	"Purity":                       "Error",
-	"Refs":                         "Error",
-	"RenderSetState":               "Error",
-	"StaticComponents":             "Error",
-	"Suppression":                  "Error",
-	"Syntax":                       "Error",
-	"UseMemo":                      "Error",
-	"VoidUseMemo":                  "Error",
-	"MemoDependencies":             "Error",
-	"EffectExhaustiveDependencies": "Error",
-
-	"EffectDependencies":  "Compilation Skipped",
-	"IncompatibleLibrary": "Compilation Skipped",
-	"PreserveManualMemo":  "Compilation Skipped",
-	"UnsupportedSyntax":   "Compilation Skipped",
-
-	"Invariant": "Invariant",
-	"Todo":      "Todo",
-}
-
-// Categories returns the categories a fixture's diagnostics belong to, and whether every one was
-// attributed.
-//
-// The bool is not decoration. A fixture with an unattributed diagnostic must not be scored against
-// any rule, because the rule that owns it is exactly the unknown; scoring it would credit or blame
-// whichever rule happened to be running.
-func (f Fixture) Categories() (categories []string, complete bool) {
-	seen := map[string]bool{}
-	complete = true
-	for _, expectedError := range f.Expected.Errors {
-		category, found := CategoryForMessage(expectedError.Message)
-		if !found {
-			complete = false
-			continue
-		}
-		if !seen[category] {
-			seen[category] = true
-			categories = append(categories, category)
-		}
-	}
-	return categories, complete
-}
-
-// Rules returns the upstream rule names a fixture's diagnostics belong to.
-func (f Fixture) Rules() (rules []string, complete bool) {
-	categories, complete := f.Categories()
-	seen := map[string]bool{}
-	for _, category := range categories {
-		rule, found := RuleForCategory(category)
-		if !found {
-			complete = false
-			continue
-		}
-		if !seen[rule] {
-			seen[rule] = true
-			rules = append(rules, rule)
-		}
-	}
-	return rules, complete
-}
-
 // categoryByMessage maps a diagnostic's first line to the ErrorCategory that produced it.
 //
 // Every entry was read from an emission site in upstream's source at the pinned sha, never inferred
@@ -320,3 +159,164 @@ var categoryByMessage = map[string]string{
 	"useMemo() callbacks may not accept parameters":                                   "UseMemo",
 	"useMemo() callbacks may not be async or generator functions":                     "UseMemo",
 	"useMemo() callbacks may not reassign variables declared outside of the callback": "UseMemo"}
+
+// categoryByMessagePrefix covers the diagnostics upstream assembles from a template.
+//
+// These cannot be exact-matched because the variable part is a node type, a binding name, or a
+// joined word. The prefix is the invariant half, taken from the template in upstream's source
+// rather than from the corpus, so a fixture using a spelling the corpus does not currently contain
+// still attributes.
+var categoryByMessagePrefix = []messagePrefix{
+	{"(BuildHIR::node.lowerReorderableExpression) Expression type ", "Todo"},
+	{"(BuildHIR::lowerExpression) Handle ", "Todo"},
+	{"(BuildHIR::lowerStatement) Handle ", "Todo"},
+	{"(BuildHIR::lowerStatement) Support ", "Todo"},
+	{"[FindContextIdentifiers] Cannot handle Object destructuring assignment target ", "Todo"},
+}
+
+// CategoryForMessage returns the upstream ErrorCategory that produces a diagnostic message.
+//
+// Keyed on the message's first line, which is what the golden prints after the heading and what
+// upstream's own backend comparison asserts on.
+func CategoryForMessage(message string) (string, bool) {
+	if category, found := categoryByMessage[message]; found {
+		return category, true
+	}
+	for _, pattern := range categoryByMessagePrefix {
+		if len(message) >= len(pattern.Prefix) && message[:len(pattern.Prefix)] == pattern.Prefix {
+			return pattern.Category, true
+		}
+	}
+	return "", false
+}
+
+// messagePrefix matches the interpolated messages, which have no literal form to key on.
+type messagePrefix struct {
+	Prefix   string
+	Category string
+}
+
+var ruleByCategory = map[string]string{
+	"CapitalizedCalls":             "capitalized-calls",
+	"Config":                       "config",
+	"EffectDependencies":           "memoized-effect-dependencies",
+	"EffectDerivationsOfState":     "no-deriving-state-in-effects",
+	"EffectExhaustiveDependencies": "exhaustive-effect-dependencies",
+	"EffectSetState":               "set-state-in-effect",
+	"ErrorBoundaries":              "error-boundaries",
+	"FBT":                          "fbt",
+	"Gating":                       "gating",
+	"Globals":                      "globals",
+	"Hooks":                        "hooks",
+	"Immutability":                 "immutability",
+	"IncompatibleLibrary":          "incompatible-library",
+	"Invariant":                    "invariant",
+	"MemoDependencies":             "memo-dependencies",
+	"PreserveManualMemo":           "preserve-manual-memoization",
+	"Purity":                       "purity",
+	"Refs":                         "refs",
+	"RenderSetState":               "set-state-in-render",
+	"StaticComponents":             "static-components",
+	"Suppression":                  "rule-suppression",
+	"Syntax":                       "syntax",
+	"Todo":                         "todo",
+	"UnsupportedSyntax":            "unsupported-syntax",
+	"UseMemo":                      "use-memo",
+	"VoidUseMemo":                  "void-use-memo",
+}
+
+// RuleForCategory maps an upstream ErrorCategory to the lint rule name upstream gives it.
+//
+// Transcribed from `getRuleForCategoryImpl` in `CompilerError.ts` at the pinned sha, which is the
+// function ESLint itself uses to decide which rule name a diagnostic is reported under. Kept as
+// data rather than folded into the message map because the two change for different reasons: a
+// message can be reworded without moving rules, and a category can be renamed without touching a
+// message.
+func RuleForCategory(category string) (string, bool) {
+	rule, found := ruleByCategory[category]
+	return rule, found
+}
+
+var headingByCategory = map[string]string{
+	"CapitalizedCalls":             "Error",
+	"Config":                       "Error",
+	"EffectDerivationsOfState":     "Error",
+	"EffectSetState":               "Error",
+	"ErrorBoundaries":              "Error",
+	"FBT":                          "Error",
+	"Gating":                       "Error",
+	"Globals":                      "Error",
+	"Hooks":                        "Error",
+	"Immutability":                 "Error",
+	"Purity":                       "Error",
+	"Refs":                         "Error",
+	"RenderSetState":               "Error",
+	"StaticComponents":             "Error",
+	"Suppression":                  "Error",
+	"Syntax":                       "Error",
+	"UseMemo":                      "Error",
+	"VoidUseMemo":                  "Error",
+	"MemoDependencies":             "Error",
+	"EffectExhaustiveDependencies": "Error",
+
+	"EffectDependencies":  "Compilation Skipped",
+	"IncompatibleLibrary": "Compilation Skipped",
+	"PreserveManualMemo":  "Compilation Skipped",
+	"UnsupportedSyntax":   "Compilation Skipped",
+
+	"Invariant": "Invariant",
+	"Todo":      "Todo",
+}
+
+// HeadingForCategory returns the severity word upstream's printer prints for a category.
+//
+// Transcribed from the switch in `printErrorSummary` (`CompilerError.ts:565`), which closes with
+// `assertExhaustive` over every `ErrorCategory`. This exists to be run against the corpus as a
+// cross-check: the heading is recorded independently in each golden, so a category attributed
+// wrongly across a heading boundary produces a mismatch that nothing else in this package would
+// notice.
+func HeadingForCategory(category string) (string, bool) {
+	heading, found := headingByCategory[category]
+	return heading, found
+}
+
+// Categories returns the categories a fixture's diagnostics belong to, and whether every one was
+// attributed.
+//
+// The bool is not decoration. A fixture with an unattributed diagnostic must not be scored against
+// any rule, because the rule that owns it is exactly the unknown; scoring it would credit or blame
+// whichever rule happened to be running.
+func (f Fixture) Categories() (categories []string, complete bool) {
+	seen := map[string]bool{}
+	complete = true
+	for _, expectedError := range f.Expected.Errors {
+		category, found := CategoryForMessage(expectedError.Message)
+		if !found {
+			complete = false
+			continue
+		}
+		if !seen[category] {
+			seen[category] = true
+			categories = append(categories, category)
+		}
+	}
+	return categories, complete
+}
+
+// Rules returns the upstream rule names a fixture's diagnostics belong to.
+func (f Fixture) Rules() (rules []string, complete bool) {
+	categories, complete := f.Categories()
+	seen := map[string]bool{}
+	for _, category := range categories {
+		rule, found := RuleForCategory(category)
+		if !found {
+			complete = false
+			continue
+		}
+		if !seen[rule] {
+			seen[rule] = true
+			rules = append(rules, rule)
+		}
+	}
+	return rules, complete
+}

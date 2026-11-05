@@ -65,6 +65,19 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
+// The three Hooks messages the corpus uses, spelled once because they are long and because a typo
+// in one copy of a 200-character literal is invisible in review.
+//
+// Upstream emits four distinct Hooks messages and cohere's rule carries nine message ids, so the
+// join is many-to-one in both directions. That asymmetry is real rather than a modelling shortcut:
+// React's `Hooks` category makes one distinction (called conditionally / referenced as a value /
+// called somewhere that is not a component body / not stable across renders) where cohere's rule
+// makes nine, because cohere's messages were written to tell a developer which shape they wrote.
+const (
+	hooksConditional    = "Hooks must always be called in a consistent order, and may not be called conditionally. See the Rules of Hooks (https://react.dev/warnings/invalid-hook-call-warning)"
+	hooksNestedFunction = "Hooks must be called at the top level in the body of a function component or custom hook, and may not be called within function expressions. See the Rules of Hooks (https://react.dev/warnings/invalid-hook-call-warning)"
+)
+
 // Rules are the cohere rules wired to upstream rule names, with the message join for each.
 //
 // Keyed by UPSTREAM's rule name, which is what `Fixture.Rules()` reports and what `ShippedRules` is
@@ -213,19 +226,6 @@ var Rules = map[string]RuleUnderTest{
 // decorative 32-of-32, which is exactly the pressure `verdict.go` warns that a scoring harness
 // creates. They should stay failures until somebody decides to widen the rule or to state the
 // boundary formally.
-
-// The three Hooks messages the corpus uses, spelled once because they are long and because a typo
-// in one copy of a 200-character literal is invisible in review.
-//
-// Upstream emits four distinct Hooks messages and cohere's rule carries nine message ids, so the
-// join is many-to-one in both directions. That asymmetry is real rather than a modelling shortcut:
-// React's `Hooks` category makes one distinction (called conditionally / referenced as a value /
-// called somewhere that is not a component body / not stable across renders) where cohere's rule
-// makes nine, because cohere's messages were written to tell a developer which shape they wrote.
-const (
-	hooksConditional    = "Hooks must always be called in a consistent order, and may not be called conditionally. See the Rules of Hooks (https://react.dev/warnings/invalid-hook-call-warning)"
-	hooksNestedFunction = "Hooks must be called at the top level in the body of a function component or custom hook, and may not be called within function expressions. See the Rules of Hooks (https://react.dev/warnings/invalid-hook-call-warning)"
-)
 
 // UpstreamMessage is the golden-side text a cohere message id corresponds to.
 type UpstreamMessage struct {

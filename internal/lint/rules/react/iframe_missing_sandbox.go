@@ -475,6 +475,15 @@ func iframeMissingSandboxJsxValue(initializer *ast.Node) *ast.Node {
 	return initializer
 }
 
+// iframeMissingSandboxOrigin is what URL text proves about the framed document's origin.
+type iframeMissingSandboxOrigin int
+
+const (
+	iframeMissingSandboxOriginUnknown iframeMissingSandboxOrigin = iota
+	iframeMissingSandboxOriginSame
+	iframeMissingSandboxOriginCross
+)
+
 // iframeMissingSandboxValueIsCrossOrigin decides a `src` value from its text when it has one, from a
 // `const` binding's initializer when it names one, and from its type otherwise.
 //
@@ -533,15 +542,6 @@ func iframeMissingSandboxValueIsCrossOrigin(ruleContext rule.Context, value *ast
 	}
 	return true
 }
-
-// iframeMissingSandboxOrigin is what URL text proves about the framed document's origin.
-type iframeMissingSandboxOrigin int
-
-const (
-	iframeMissingSandboxOriginUnknown iframeMissingSandboxOrigin = iota
-	iframeMissingSandboxOriginSame
-	iframeMissingSandboxOriginCross
-)
 
 // iframeMissingSandboxClassifyUrl decides what URL text proves about the framed document's origin.
 // `complete` is false for a prefix, the head of a template, whose substitution may still change what

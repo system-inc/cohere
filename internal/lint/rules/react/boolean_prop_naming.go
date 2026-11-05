@@ -57,6 +57,15 @@ func DefaultBooleanPropNamingOptions() BooleanPropNamingOptions {
 	}
 }
 
+// errBooleanPropNamingNeedsOptions is returned for an absent options object.
+//
+// The text names the pattern because that is the key somebody has to write, and a configuration
+// error a reader cannot act on is barely better than silence.
+var errBooleanPropNamingNeedsOptions = errors.New(
+	"needs an options object, because upstream reads its pattern from the options and is inert " +
+		"without one; write {\"rule\": \"" + DefaultBooleanPropNamingRulePattern + "\"} to get " +
+		"upstream's documented default")
+
 // DecodeBooleanPropNamingOptions reads this rule's configuration from the config layer.
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto` because two keys carry non-zero defaults that
@@ -527,6 +536,8 @@ func componentPropsTypeNode(component *ast.Node) *ast.Node {
 //
 // The visited set breaks reference cycles: `interface A { self: A }` resolves back to itself and
 // would otherwise recurse forever.
+//
+// Mutates: visited marks each type node the walk enters, so a reference cycle is walked once
 func collectTypeMembers(ruleContext rule.Context, typeNode *ast.Node, visited map[*ast.Node]bool) []*ast.Node {
 	if typeNode == nil || visited[typeNode] {
 		return nil
@@ -639,12 +650,3 @@ func interpolateMessage(template string, values map[string]string) string {
 		return match
 	})
 }
-
-// errBooleanPropNamingNeedsOptions is returned for an absent options object.
-//
-// The text names the pattern because that is the key somebody has to write, and a configuration
-// error a reader cannot act on is barely better than silence.
-var errBooleanPropNamingNeedsOptions = errors.New(
-	"needs an options object, because upstream reads its pattern from the options and is inert " +
-		"without one; write {\"rule\": \"" + DefaultBooleanPropNamingRulePattern + "\"} to get " +
-		"upstream's documented default")

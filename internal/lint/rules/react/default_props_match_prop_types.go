@@ -291,6 +291,8 @@ func enclosingClassOwnerName(member *ast.Node) string {
 // The name is read through `ast.TryGetTextOfPropertyName` rather than `Text()`, which panics on
 // several name shapes. The walk recovers per FILE rather than per rule, so one such call would cost
 // every rule in this package its verdict on that file.
+//
+// Mutates: declarations records which of the two the component declared, on the record the caller keeps for it
 func readPropDeclaration(declarations *componentPropDeclarations, name *ast.Node, value *ast.Node) {
 	if name == nil {
 		return
@@ -317,6 +319,8 @@ func readPropDeclaration(declarations *componentPropDeclarations, name *ast.Node
 // A spread marks the whole component unresolved, which silences it. Upstream's reason is that a
 // spread hides names the rule would otherwise call missing, so judging on a partial view would
 // manufacture false positives. Measured: a spread in propTypes silences the component entirely.
+//
+// Mutates: declarations gains each declared prop in source order, or is marked unresolved by a spread
 func readPropTypesObject(declarations *componentPropDeclarations, value *ast.Node) {
 	value = resolveToObjectLiteral(value)
 	if value == nil {
@@ -371,6 +375,8 @@ func propTypeIsRequired(property *ast.Node) bool {
 }
 
 // readDefaultPropsObject records each default, in source order.
+//
+// Mutates: declarations gains each default in source order, or is marked unresolved when one cannot be read
 func readDefaultPropsObject(declarations *componentPropDeclarations, value *ast.Node) {
 	value = resolveToObjectLiteral(value)
 	if value == nil {
@@ -503,6 +509,8 @@ func enclosingObjectOwnerName(member *ast.Node) string {
 }
 
 // addSinglePropType folds a `C.propTypes.foo = ...` assignment into a component's record.
+//
+// Mutates: declarations gains the prop, as a `propTypes` member would add it
 func addSinglePropType(declarations *componentPropDeclarations, name string, value *ast.Node) {
 	declarations.sawPropTypes = true
 	if _, already := declarations.propTypes[name]; !already {
@@ -515,6 +523,8 @@ func addSinglePropType(declarations *componentPropDeclarations, name string, val
 //
 // The node reported on is the whole assignment statement, because there is no property node to
 // point at: the default is written as a statement rather than as a member of an object literal.
+//
+// Mutates: declarations gains the default, as a `defaultProps` member would add it
 func addSingleDefaultProp(declarations *componentPropDeclarations, name string, assignment *ast.Node) {
 	declarations.sawDefaults = true
 	declarations.defaults = append(declarations.defaults,
@@ -533,6 +543,13 @@ func expressionIsRequired(value *ast.Node) bool {
 	name := value.AsPropertyAccessExpression().Name()
 	return name != nil && name.Kind == ast.KindIdentifier && name.Text() == "isRequired"
 }
+
+// objectResolutionDepthLimit bounds `const a = b; const b = a;`, which resolves forever otherwise.
+//
+// A limit rather than a visited set because the chain is short in every real spelling and the limit
+// states the expectation. Reaching it answers unresolved, which is the safe direction: the component
+// is not judged rather than judged on a guess.
+const objectResolutionDepthLimit = 8
 
 // resolveToObjectLiteral follows an identifier to the object literal it was declared with.
 //
@@ -567,13 +584,6 @@ func resolveToObjectLiteral(value *ast.Node) *ast.Node {
 	}
 	return nil
 }
-
-// objectResolutionDepthLimit bounds `const a = b; const b = a;`, which resolves forever otherwise.
-//
-// A limit rather than a visited set because the chain is short in every real spelling and the limit
-// states the expectation. Reaching it answers unresolved, which is the safe direction: the component
-// is not judged rather than judged on a guess.
-const objectResolutionDepthLimit = 8
 
 // declarationOfIdentifier finds the declaration an identifier names, within this file.
 //

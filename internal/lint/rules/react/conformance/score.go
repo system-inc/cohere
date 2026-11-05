@@ -177,6 +177,9 @@ func Run(fixtures []Fixture, implementation Implementation, options Options) (Sc
 	return score, nil
 }
 
+// asUnsupported reports whether an *ErrUnsupported is in the chain err unwraps to.
+//
+// Mutates: target receives the *ErrUnsupported found, as errors.As fills its target
 func asUnsupported(err error, target **ErrUnsupported) bool {
 	for err != nil {
 		if unsupported, ok := err.(*ErrUnsupported); ok {
@@ -228,7 +231,8 @@ func Compare(expected Expectation, result Result) FixtureScore {
 		got[pair(reportedError)]++
 	}
 
-	var missing, unexpected []string
+	var missing []string
+	var unexpected []string
 	for key, count := range want {
 		if got[key] < count {
 			missing = append(missing, fmt.Sprintf("%s: %s (line %d) x%d", key.Heading, key.Message, key.Line, count-got[key]))

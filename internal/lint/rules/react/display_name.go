@@ -311,6 +311,9 @@ func isEs5ComponentFactoryArgument(node *ast.Node) bool {
 // Upstream spreads this across four listeners: a class property, a member expression assignment, a
 // class method, and a property inside an ES5 factory object. All four are folded into one walk here
 // because the gathering has to happen inside the source-file listener anyway.
+//
+// Mutates: named gains every component the walk finds a display name for
+// Mutates: namedContexts gains every context object a `displayName` write names
 func markDeclaredDisplayNames(
 	ruleContext rule.Context,
 	sourceFile *ast.Node,
@@ -590,6 +593,8 @@ func isShadowedPragmaWrapper(ruleContext rule.Context, component *ast.Node) bool
 // Upstream matches on the CALLEE NAME alone for the member form, so `other.createContext()` counts
 // as a context object exactly as `React.createContext()` does. Measured, and reproduced rather than
 // narrowed: the receiver is never checked.
+//
+// Mutates: contexts gains every `createContext` result, keyed by the declaration it resolves to
 func collectContextObjects(contextCheckerHolder rule.Context, sourceFile *ast.Node, contexts map[*ast.Node]*ast.Node) {
 	var visit func(*ast.Node)
 	visit = func(node *ast.Node) {

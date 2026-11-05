@@ -180,7 +180,8 @@ func Load(root string) ([]Fixture, error) {
 	// fixtures by copying them into one directory loses any whose basenames collide, and four of the
 	// clean ones do -- that collection returned 66 of 70 and errored on nothing. A check for "some
 	// clean fixtures exist" passes on 66 as happily as on 70.
-	var errorNamed, clean int
+	var errorNamed int
+	var clean int
 	for _, path := range inputPaths {
 		if base := filepath.Base(path); strings.HasPrefix(base, "error.") ||
 			strings.HasPrefix(base, "todo.error.") {

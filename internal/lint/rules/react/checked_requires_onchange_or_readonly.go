@@ -238,6 +238,19 @@ func propertyIdentifierName(property *ast.Node) string {
 	return name.Text()
 }
 
+// reactPragmaName is the object name the namespaced spelling is compared against.
+//
+// Fixed rather than configurable, because both of upstream's sources for it are out of reach or
+// deliberately declined. `settings.react.pragma` has no counterpart in `internal/config` at all. A
+// `/** @jsx Foo.bar */` comment IS readable here through `comments.ForFile`, and is not read, which
+// is a stated divergence rather than an oversight: implementing it would mean scanning every
+// comment in every file to answer a question that changes the verdict only for a file that opts out
+// of the automatic runtime by hand, and the ahra tree contains no such comment. The cost is a false
+// NEGATIVE on such a file, which is the safe direction, and the next reader adding it should add a
+// fixture for `/** @jsx Preact.h */ Preact.createElement('input', {checked: 1})`, which reports
+// upstream and is measured silent here.
+const reactPragmaName = "React"
+
 // isPragmaCreateElementCall reproduces upstream's `isCreateElement` for the fixed `React` pragma.
 //
 // Two accepting shapes, matching the reference implementation branch for branch.
@@ -287,16 +300,3 @@ func isPragmaCreateElementCall(ruleContext rule.Context, node *ast.Node) bool {
 
 	return false
 }
-
-// reactPragmaName is the object name the namespaced spelling is compared against.
-//
-// Fixed rather than configurable, because both of upstream's sources for it are out of reach or
-// deliberately declined. `settings.react.pragma` has no counterpart in `internal/config` at all. A
-// `/** @jsx Foo.bar */` comment IS readable here through `comments.ForFile`, and is not read, which
-// is a stated divergence rather than an oversight: implementing it would mean scanning every
-// comment in every file to answer a question that changes the verdict only for a file that opts out
-// of the automatic runtime by hand, and the ahra tree contains no such comment. The cost is a false
-// NEGATIVE on such a file, which is the safe direction, and the next reader adding it should add a
-// fixture for `/** @jsx Preact.h */ Preact.createElement('input', {checked: 1})`, which reports
-// upstream and is measured silent here.
-const reactPragmaName = "React"

@@ -809,6 +809,8 @@ func immutabilitySweepFunction(ruleContext rule.Context, function *high_level_in
 // Destructuring is handled by the ordinary instruction arms rather than here: a destructured
 // parameter lowers to a temporary in `Params` plus destructuring instructions in the entry block,
 // so freezing the temporary reaches every bound name through `Destructure`.
+//
+// Mutates: entry gains each parameter's starting kind, the state the sweep starts from
 func immutabilitySeedParameters(function *high_level_intermediate_representation.Function, entry map[static_single_assignment.IdentifierId]immutabilityAbstractValue) {
 	for _, param := range function.Params {
 		entry[param.Identifier] = immutabilityAbstractValue{
@@ -822,6 +824,8 @@ func immutabilitySeedParameters(function *high_level_intermediate_representation
 //
 // Gathered once rather than per round because aliasing is a syntactic fact that does not depend on
 // the abstract state, and because a use can precede its definition across a back edge.
+//
+// Mutates: state takes the alias side map, and its changed flag is cleared so the first round starts clean
 func immutabilityCollectAliases(function *high_level_intermediate_representation.Function, state *immutabilityState) {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
@@ -877,6 +881,8 @@ func immutabilityCollectAliases(function *high_level_intermediate_representation
 // control that reports. A hook building a value and returning it is what hooks are for; the freeze
 // that matters is the one the CALLER applies when it receives the value, and that is already
 // modelled at the call site by `immutabilityHookResultKind`.
+//
+// Mutates: state is the fixpoint's abstract state, which each round advances and marks in or out of a loop
 func immutabilityRunOneRound(ruleContext rule.Context, function *high_level_intermediate_representation.Function, state *immutabilityState) []immutabilityFinding {
 	var findings []immutabilityFinding
 	order := 0
@@ -1153,6 +1159,8 @@ func immutabilityPropagate(state *immutabilityState, object static_single_assign
 }
 
 // immutabilityCheckWrite asks the lattice what writing to a value does and reports when it must.
+//
+// Mutates: order advances past each finding it numbers, so findings keep instruction order
 func immutabilityCheckWrite(
 	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
@@ -1666,6 +1674,8 @@ func immutabilityCapturedWrites(
 }
 
 // immutabilityCapturedWriteFinding reports one write through a captured value when it is frozen.
+//
+// Mutates: order advances past each finding it numbers, so findings keep instruction order
 func immutabilityCapturedWriteFinding(
 	ruleContext rule.Context,
 	inner *high_level_intermediate_representation.Function,
@@ -1780,6 +1790,8 @@ func immutabilityReassignmentsInner(function *high_level_intermediate_representa
 // is upstream's own split between `reassigned_after_render` and `reassigned_in_async_function`.
 // Both are reported at the reassignment, plus one `known_mutable_function` at the site where the
 // function is handed over, which is why React emits two diagnostics for a single such callback.
+//
+// Mutates: order advances past each finding it numbers, so findings keep instruction order
 func immutabilityCheckFrozenFunction(
 	state *immutabilityState,
 	id static_single_assignment.IdentifierId,
