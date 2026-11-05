@@ -100,13 +100,13 @@ func indexFields(fields shape, index map[string]shape) {
 
 // contractShapes is every record shape the contract shows, by kind, merged over the JSON examples in
 // Contract.md and every line of its fixtures, plus every nested field's shape by name.
-func contractShapes(t *testing.T) (map[Kind]shape, map[string]shape) {
-	t.Helper()
+func contractShapes(test *testing.T) (map[Kind]shape, map[string]shape) {
+	test.Helper()
 	objects := []map[string]any{}
 
 	document, readError := os.ReadFile(contractDocument)
 	if readError != nil {
-		t.Fatal(readError)
+		test.Fatal(readError)
 	}
 	inBlock := false
 	var block strings.Builder
@@ -125,7 +125,7 @@ func contractShapes(t *testing.T) (map[Kind]shape, map[string]shape) {
 					break
 				}
 				if decodeError != nil {
-					t.Fatalf("a JSON example in Contract.md does not parse: %v\n%s", decodeError, block.String())
+					test.Fatalf("a JSON example in Contract.md does not parse: %v\n%s", decodeError, block.String())
 				}
 				objects = append(objects, object)
 			}
@@ -137,17 +137,17 @@ func contractShapes(t *testing.T) (map[Kind]shape, map[string]shape) {
 
 	fixtures, globError := filepath.Glob(contractFixtures)
 	if globError != nil || len(fixtures) == 0 {
-		t.Fatalf("no contract fixtures at %s (%v)", contractFixtures, globError)
+		test.Fatalf("no contract fixtures at %s (%v)", contractFixtures, globError)
 	}
 	for _, fixture := range fixtures {
 		contents, readError := os.ReadFile(fixture)
 		if readError != nil {
-			t.Fatal(readError)
+			test.Fatal(readError)
 		}
 		for _, line := range strings.Split(strings.TrimSpace(string(contents)), "\n") {
 			object := map[string]any{}
 			if decodeError := json.Unmarshal([]byte(line), &object); decodeError != nil {
-				t.Fatalf("%s: %v\n%s", fixture, decodeError, line)
+				test.Fatalf("%s: %v\n%s", fixture, decodeError, line)
 			}
 			objects = append(objects, object)
 		}
@@ -158,7 +158,7 @@ func contractShapes(t *testing.T) (map[Kind]shape, map[string]shape) {
 	for _, object := range objects {
 		kind, isString := object["kind"].(string)
 		if !isString {
-			t.Fatalf("a contract example has no kind: %v", object)
+			test.Fatalf("a contract example has no kind: %v", object)
 		}
 		fields := shapeOf("", object)
 		delete(fields, "kind")
@@ -239,58 +239,58 @@ func populatedRecords() []Record {
 // depth, against the fields the contract shows for that kind. The front door's own decoding lives in
 // package main, which no test outside it can import, so the contract's examples and fixtures, which the
 // front door's tests read too, are the reference.
-func TestEveryRecordWritesTheContractsFields(t *testing.T) {
-	t.Parallel()
-	shapes, fieldIndex := contractShapes(t)
+func TestEveryRecordWritesTheContractsFields(test *testing.T) {
+	test.Parallel()
+	shapes, fieldIndex := contractShapes(test)
 
 	var output bytes.Buffer
 	writer := NewWriter(&output)
 	records := populatedRecords()
 	for _, record := range records {
 		if writeError := writer.Write(record); writeError != nil {
-			t.Fatalf("%s: %v", record.kind(), writeError)
+			test.Fatalf("%s: %v", record.kind(), writeError)
 		}
 	}
 	lines := strings.Split(strings.TrimSuffix(output.String(), "\n"), "\n")
 	if len(lines) != len(records) {
-		t.Fatalf("%d records wrote %d lines", len(records), len(lines))
+		test.Fatalf("%d records wrote %d lines", len(records), len(lines))
 	}
 
 	written := map[Kind]bool{}
 	for index, record := range records {
 		object := map[string]any{}
 		if decodeError := json.Unmarshal([]byte(lines[index]), &object); decodeError != nil {
-			t.Fatalf("%s: %v\n%s", record.kind(), decodeError, lines[index])
+			test.Fatalf("%s: %v\n%s", record.kind(), decodeError, lines[index])
 		}
 		if object["kind"] != string(record.kind()) {
-			t.Errorf("a %s record wrote kind %v", record.kind(), object["kind"])
+			test.Errorf("a %s record wrote kind %v", record.kind(), object["kind"])
 		}
 		written[record.kind()] = true
 		ours := shapeOf("", object)
 		delete(ours, "kind")
 		for _, additive := range additiveFields[record.kind()] {
 			if _, present := ours[additive]; !present {
-				t.Errorf("%s does not write its additive field %s", record.kind(), additive)
+				test.Errorf("%s does not write its additive field %s", record.kind(), additive)
 			}
 			delete(ours, additive)
 		}
 		theirs, inContract := shapes[record.kind()]
 		if !inContract {
-			t.Errorf("%s is written and the contract shows no such record", record.kind())
+			test.Errorf("%s is written and the contract shows no such record", record.kind())
 			continue
 		}
 		for _, problem := range compareShapes(string(record.kind()), ours, theirs, fieldIndex, fieldsNotWritten[record.kind()]) {
-			t.Error(problem)
+			test.Error(problem)
 		}
 	}
 
 	for kind := range shapes {
 		_, onPurpose := kindsNotWritten[kind]
 		if !written[kind] && !onPurpose {
-			t.Errorf("the contract shows a %q record and this package has no type for it", kind)
+			test.Errorf("the contract shows a %q record and this package has no type for it", kind)
 		}
 		if written[kind] && onPurpose {
-			t.Errorf("%q is written and is listed as not written", kind)
+			test.Errorf("%q is written and is listed as not written", kind)
 		}
 	}
 }
@@ -301,8 +301,8 @@ func TestEveryRecordWritesTheContractsFields(t *testing.T) {
 // bytes: the fixtures captured from real Swift runs have their keys sorted by Swift's encoder, and key
 // order is not part of JSON. Provenance is exempt, since it leaves out the Swift library versions on
 // purpose, and so is a fix record from before `changedFiles`, which this engine always writes.
-func TestFixtureRecordsReencodeToTheSameJSON(t *testing.T) {
-	t.Parallel()
+func TestFixtureRecordsReencodeToTheSameJSON(test *testing.T) {
+	test.Parallel()
 	newRecord := map[Kind]func() Record{
 		KindProvenance: func() Record { return &ProvenanceRecord{} },
 		KindProject:    func() Record { return &ProjectRecord{} },
@@ -317,13 +317,13 @@ func TestFixtureRecordsReencodeToTheSameJSON(t *testing.T) {
 	}
 	fixtures, globError := filepath.Glob(contractFixtures)
 	if globError != nil || len(fixtures) == 0 {
-		t.Fatalf("no contract fixtures at %s (%v)", contractFixtures, globError)
+		test.Fatalf("no contract fixtures at %s (%v)", contractFixtures, globError)
 	}
 	compared := 0
 	for _, fixture := range fixtures {
 		contents, readError := os.ReadFile(fixture)
 		if readError != nil {
-			t.Fatal(readError)
+			test.Fatal(readError)
 		}
 		var output bytes.Buffer
 		writer := NewWriter(&output)
@@ -332,22 +332,22 @@ func TestFixtureRecordsReencodeToTheSameJSON(t *testing.T) {
 				Kind Kind `json:"kind"`
 			}
 			if decodeError := json.Unmarshal([]byte(line), &envelope); decodeError != nil {
-				t.Fatalf("%s: %v", fixture, decodeError)
+				test.Fatalf("%s: %v", fixture, decodeError)
 			}
 			if _, onPurpose := kindsNotWritten[envelope.Kind]; onPurpose {
 				continue
 			}
 			newRecordOfKind, known := newRecord[envelope.Kind]
 			if !known {
-				t.Fatalf("%s: a %q record, which this package has no type for", filepath.Base(fixture), envelope.Kind)
+				test.Fatalf("%s: a %q record, which this package has no type for", filepath.Base(fixture), envelope.Kind)
 			}
 			record := newRecordOfKind()
 			if decodeError := json.Unmarshal([]byte(line), record); decodeError != nil {
-				t.Fatalf("%s: %v\n%s", fixture, decodeError, line)
+				test.Fatalf("%s: %v\n%s", fixture, decodeError, line)
 			}
 			output.Reset()
 			if writeError := writer.Write(record); writeError != nil {
-				t.Fatalf("%s: %v", filepath.Base(fixture), writeError)
+				test.Fatalf("%s: %v", filepath.Base(fixture), writeError)
 			}
 			if envelope.Kind == KindProvenance || (envelope.Kind == KindFix && !strings.Contains(line, `"changedFiles"`)) {
 				continue
@@ -355,10 +355,10 @@ func TestFixtureRecordsReencodeToTheSameJSON(t *testing.T) {
 			compared++
 			var reencoded, original any
 			if decodeError := json.Unmarshal(output.Bytes(), &reencoded); decodeError != nil {
-				t.Fatalf("%s: the reencoded %s record does not decode: %v\n%s", filepath.Base(fixture), envelope.Kind, decodeError, output.String())
+				test.Fatalf("%s: the reencoded %s record does not decode: %v\n%s", filepath.Base(fixture), envelope.Kind, decodeError, output.String())
 			}
 			if decodeError := json.Unmarshal([]byte(line), &original); decodeError != nil {
-				t.Fatal(decodeError)
+				test.Fatal(decodeError)
 			}
 			// A fixture from before an additive field has none, and this engine always writes it.
 			if reencodedObject, isObject := reencoded.(map[string]any); isObject {
@@ -369,29 +369,29 @@ func TestFixtureRecordsReencodeToTheSameJSON(t *testing.T) {
 				}
 			}
 			if !reflect.DeepEqual(reencoded, original) {
-				t.Errorf("%s: a %s record reencodes differently\n got: %s want: %s", filepath.Base(fixture), envelope.Kind, output.String(), line)
+				test.Errorf("%s: a %s record reencodes differently\n got: %s want: %s", filepath.Base(fixture), envelope.Kind, output.String(), line)
 			}
 		}
 	}
 	if compared == 0 {
-		t.Error("no fixture line was compared")
+		test.Error("no fixture line was compared")
 	}
 }
 
 // TestLintRecordWritesEmptyWithheldCountsAsObjects keeps an unset count from encoding as null, which would read
 // as "not counted" rather than "none withheld".
-func TestLintRecordWritesEmptyWithheldCountsAsObjects(t *testing.T) {
-	t.Parallel()
+func TestLintRecordWritesEmptyWithheldCountsAsObjects(test *testing.T) {
+	test.Parallel()
 	var output bytes.Buffer
 	writer := NewWriter(&output)
 	for _, record := range []Record{ProvenanceRecord{Contract: Version}, LintRecord{}} {
 		if writeError := writer.Write(record); writeError != nil {
-			t.Fatal(writeError)
+			test.Fatal(writeError)
 		}
 	}
 	for _, field := range []string{`"withheldBySuppression":{}`, `"withheldAsGenerated":{}`} {
 		if !strings.Contains(output.String(), field) {
-			t.Errorf("an empty lint record wrote %s, want %s in it", output.String(), field)
+			test.Errorf("an empty lint record wrote %s, want %s in it", output.String(), field)
 		}
 	}
 }

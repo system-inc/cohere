@@ -11,10 +11,10 @@ const minimalRuleNaming = `{"about": "a", "verbs": [{"name": "no", "definition":
 
 // TestTheLoaderRefusesWhatWouldReadAsSomethingElse: the minimal file loads, and each one-place change that
 // would misread does not.
-func TestTheLoaderRefusesWhatWouldReadAsSomethingElse(t *testing.T) {
-	t.Parallel()
+func TestTheLoaderRefusesWhatWouldReadAsSomethingElse(test *testing.T) {
+	test.Parallel()
 	if _, err := loadRuleNaming([]byte(minimalRuleNaming)); err != nil {
-		t.Fatalf("the minimal file is refused (%v), so no refusal below would mean anything", err)
+		test.Fatalf("the minimal file is refused (%v), so no refusal below would mean anything", err)
 	}
 	for _, refused := range []struct {
 		name string
@@ -30,18 +30,18 @@ func TestTheLoaderRefusesWhatWouldReadAsSomethingElse(t *testing.T) {
 		{"a word with an empty segment", `"name": "consistency"`, `"name": "consistency-"`},
 	} {
 		if !strings.Contains(minimalRuleNaming, refused.old) {
-			t.Fatalf("%s: the anchor %q is not in the minimal file, so the change would not apply", refused.name, refused.old)
+			test.Fatalf("%s: the anchor %q is not in the minimal file, so the change would not apply", refused.name, refused.old)
 		}
 		if _, err := loadRuleNaming([]byte(strings.Replace(minimalRuleNaming, refused.old, refused.new, 1))); err == nil {
-			t.Errorf("%s loaded", refused.name)
+			test.Errorf("%s loaded", refused.name)
 		}
 	}
 }
 
 // TestParseHouseRuleNameSplitsTheThreeParts: names that fit split into category, verb and object, those
 // that don't are refused, each for its own reason.
-func TestParseHouseRuleNameSplitsTheThreeParts(t *testing.T) {
-	t.Parallel()
+func TestParseHouseRuleNameSplitsTheThreeParts(test *testing.T) {
+	test.Parallel()
 	for leaf, want := range map[string]HouseRuleName{
 		"consistency-no-print":                    {"consistency", "no", "print"},
 		"react-hook-no-any-type":                  {"react-hook", "no", "any-type"},
@@ -49,7 +49,7 @@ func TestParseHouseRuleNameSplitsTheThreeParts(t *testing.T) {
 	} {
 		got, err := Naming.ParseHouseRuleName(leaf)
 		if err != nil || got != want {
-			t.Errorf("%s: %+v, %v; want %+v", leaf, got, err, want)
+			test.Errorf("%s: %+v, %v; want %+v", leaf, got, err, want)
 		}
 	}
 	for leaf, because := range map[string]string{
@@ -61,7 +61,7 @@ func TestParseHouseRuleNameSplitsTheThreeParts(t *testing.T) {
 		"consistency":                  "does not begin with a category",
 	} {
 		if _, err := Naming.ParseHouseRuleName(leaf); err == nil || !strings.Contains(err.Error(), because) {
-			t.Errorf("%s: %v; want an error saying it %s", leaf, err, because)
+			test.Errorf("%s: %v; want an error saying it %s", leaf, err, because)
 		}
 	}
 }
@@ -69,46 +69,46 @@ func TestParseHouseRuleNameSplitsTheThreeParts(t *testing.T) {
 // TestALongerCategoryWinsOverItsPrefix: with `react` listed before `react-hook`, a `react-hook-` name still
 // reads as `react-hook`. In file order it would read as `react` and fail on the verb `hook`, so the case
 // tells longest-first from file order, which a list with no shared prefix cannot.
-func TestALongerCategoryWinsOverItsPrefix(t *testing.T) {
-	t.Parallel()
+func TestALongerCategoryWinsOverItsPrefix(test *testing.T) {
+	test.Parallel()
 	naming := RuleNaming{
 		Verbs:      []RuleNamingWord{{Name: "no", Definition: "d"}},
 		Categories: []RuleNamingWord{{Name: "react", Definition: "d"}, {Name: "react-hook", Definition: "d"}},
 	}
 	if got, err := naming.ParseHouseRuleName("react-no-anchor"); err != nil || got.Category != "react" {
-		t.Fatalf("the shorter category's own name: %+v, %v", got, err)
+		test.Fatalf("the shorter category's own name: %+v, %v", got, err)
 	}
 	if got, err := naming.ParseHouseRuleName("react-hook-no-any-type"); err != nil || got.Category != "react-hook" {
-		t.Errorf("react-hook-no-any-type: %+v, %v; want the category react-hook", got, err)
+		test.Errorf("react-hook-no-any-type: %+v, %v; want the category react-hook", got, err)
 	}
 }
 
 // TestAClosedNamespaceAcceptsOnlyItsList: an adamic name on the list reads as the namespace's, one off the
 // list is refused by name, and a namespace with no closed list still reads by the scheme. The refusal is
 // the guard: without it a misspelled adamic rule would publish because nothing judged it.
-func TestAClosedNamespaceAcceptsOnlyItsList(t *testing.T) {
-	t.Parallel()
+func TestAClosedNamespaceAcceptsOnlyItsList(test *testing.T) {
+	test.Parallel()
 	if got, err := Naming.ParseRuleName("adamic", "invariant-mutable"); err != nil || got.Category != "adamic" || got.Object != "invariant-mutable" {
-		t.Errorf("adamic/invariant-mutable: %+v, %v; want the namespace as its category and the name as its object", got, err)
+		test.Errorf("adamic/invariant-mutable: %+v, %v; want the namespace as its category and the name as its object", got, err)
 	}
 	if _, err := Naming.ParseRuleName("adamic", "invariant-mutables"); err == nil || !strings.Contains(err.Error(), "closed list") {
-		t.Errorf("adamic/invariant-mutables: %v; want a refusal naming the closed list", err)
+		test.Errorf("adamic/invariant-mutables: %v; want a refusal naming the closed list", err)
 	}
 	if _, err := Naming.ParseRuleName("adamic", "correctness-no-any"); err == nil {
-		t.Error("adamic/correctness-no-any fits the scheme but not the list, and loaded: the list must win in its namespace")
+		test.Error("adamic/correctness-no-any fits the scheme but not the list, and loaded: the list must win in its namespace")
 	}
 	if got, err := Naming.ParseRuleName("nexus", "consistency-no-print"); err != nil || got.Verb != "no" {
-		t.Errorf("nexus/consistency-no-print: %+v, %v; want the scheme's reading", got, err)
+		test.Errorf("nexus/consistency-no-print: %+v, %v; want the scheme's reading", got, err)
 	}
 }
 
 // TestTheLoaderRefusesAMisreadNamespace: each one-place change to a closed namespace that would misread is
 // refused, as the verbs' and categories' are.
-func TestTheLoaderRefusesAMisreadNamespace(t *testing.T) {
-	t.Parallel()
+func TestTheLoaderRefusesAMisreadNamespace(test *testing.T) {
+	test.Parallel()
 	const withNamespace = `{"about": "a", "verbs": [{"name": "no", "definition": "d"}], "categories": [{"name": "consistency", "definition": "d"}], "namespaces": [{"name": "adamic", "definition": "d", "names": [{"name": "single-spread", "definition": "d"}]}]}`
 	if _, err := loadRuleNaming([]byte(withNamespace)); err != nil {
-		t.Fatalf("a file with one closed namespace is refused (%v), so no refusal below would mean anything", err)
+		test.Fatalf("a file with one closed namespace is refused (%v), so no refusal below would mean anything", err)
 	}
 	for _, refused := range []struct {
 		name string
@@ -123,10 +123,10 @@ func TestTheLoaderRefusesAMisreadNamespace(t *testing.T) {
 		{"a namespace named twice", `"namespaces": [{"name": "adamic", "definition": "d", "names": [{"name": "single-spread", "definition": "d"}]}]`, `"namespaces": [{"name": "adamic", "definition": "d", "names": [{"name": "single-spread", "definition": "d"}]}, {"name": "adamic", "definition": "d", "names": [{"name": "nominal-class", "definition": "d"}]}]`},
 	} {
 		if !strings.Contains(withNamespace, refused.old) {
-			t.Fatalf("%s: the anchor %q is not in the file, so the change would not apply", refused.name, refused.old)
+			test.Fatalf("%s: the anchor %q is not in the file, so the change would not apply", refused.name, refused.old)
 		}
 		if _, err := loadRuleNaming([]byte(strings.Replace(withNamespace, refused.old, refused.new, 1))); err == nil {
-			t.Errorf("%s loaded", refused.name)
+			test.Errorf("%s loaded", refused.name)
 		}
 	}
 }
