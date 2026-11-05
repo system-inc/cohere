@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/goengine/settings"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 )
@@ -77,6 +78,7 @@ var keyFixtures = map[string]map[string]string{
 	"jsPlugins":      {"CohereSettings.json": `{"jsPlugins": ["./rules.js"]}`},
 	"settings":       {"CohereSettings.json": `{"settings": {"better-tailwindcss": {"callees": ["cn"]}}}`},
 	"output":         {"CohereSettings.json": `{"output": {"phases": true}}`},
+	"go":             {"CohereSettings.json": `{"go": ` + examples["go"] + `}`},
 	FormatKey:        {"CohereSettings.json": `{"format": {"tabWidth": 4}}`},
 }
 
@@ -133,6 +135,17 @@ func TestTheSchemaHasExactlyTheKeysTheLoaderAccepts(t *testing.T) {
 	ours := filepath.Dir(writeSettings(t, map[string]string{"CohereSettings.json": `{"extends": "cohere:system-inc/structure", "format": {"tabWidth": 2}}`}))
 	if _, err := formatoptions.Resolve(ours); err == nil {
 		t.Error("a format block in a chain extending cohere:system-inc/structure resolved, so the description is wrong to say it is refused")
+	}
+}
+
+// TestTheGoExampleLoadsInTheGoEngine: the TypeScript loader only leaves the go block alone, so the block the
+// reference documents is held to the loader that reads it, knowing the rule the example names.
+func TestTheGoExampleLoadsInTheGoEngine(test *testing.T) {
+	test.Parallel()
+	path := writeSettings(test, keyFixtures["go"])
+	knownRules := []string{"cohere-go/performance-require-parallel-test"}
+	if _, loadError := settings.Load(filepath.Dir(path), path, knownRules); loadError != nil {
+		test.Errorf("the reference's go example is refused by the Go engine: %v", loadError)
 	}
 }
 

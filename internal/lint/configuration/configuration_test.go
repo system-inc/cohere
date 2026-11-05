@@ -357,6 +357,28 @@ func TestUnimplementedTopLevelKeyIsRefused(t *testing.T) {
 	}
 }
 
+// TestAGoBlockIsLeftToTheGoEngine: one CohereSettings.json serves a repository holding both a tsconfig and
+// a go.mod, so the TypeScript loader accepts the Go engine's block and reads none of its rules as its own.
+func TestAGoBlockIsLeftToTheGoEngine(test *testing.T) {
+	test.Parallel()
+	path := filepath.Join(test.TempDir(), "CohereSettings.json")
+	contents := `{"rules": {"a-rule": "error"}, "go": {"rules": {"cohere-go/a-go-rule": ["warn", {"limit": 3}]}}}`
+	if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+		test.Fatalf("writing the config: %v", writeError)
+	}
+	loaded, loadError := Load(path)
+	if loadError != nil {
+		test.Fatalf("a config with a go block was refused, so a repository holding both engines cannot lint "+
+			"its TypeScript: %v", loadError)
+	}
+	if _, read := loaded.Rules["cohere-go/a-go-rule"]; read {
+		test.Error("the go block's rule was read as a TypeScript rule")
+	}
+	if loaded.Rules["a-rule"].Severity != SeverityError {
+		test.Errorf("the TypeScript rule beside the go block is %+v, want error", loaded.Rules["a-rule"])
+	}
+}
+
 // TestIgnoredKeyWithoutAReasonIsRefused is the guard on the guard.
 //
 // The escape hatch for an unimplemented key is to record it as deliberately ignored. That hatch is

@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/system-inc/cohere/internal/goengine/project"
 )
 
 // cohere-dev land: a merge queue, so a green gate can't be starved by main moving under it (#fz6xejy).
@@ -126,12 +128,12 @@ func land(arguments []string) int {
 // worktree of it, or a symlink to another checkout's, as most of the house's worktrees are made: whichever,
 // its head must be the pin.
 func checkSubmodules(worktree string) error {
-	links, err := gitlinksOf(worktree)
+	links, err := project.GitlinksOf(worktree)
 	if err != nil {
 		return err
 	}
 	for _, link := range links {
-		pin, path := link.pin, link.path
+		pin, path := link.Pin, link.Path
 		directory := filepath.Join(worktree, path)
 		notCheckedOut := fmt.Errorf("%s's submodule %s is not checked out, so the gate could not build against its pin %s",
 			worktree, path, shortCommit(pin))
@@ -211,13 +213,13 @@ func mergeMain(worktree string, mainCommit string) error {
 // (checkRuleCPU), then the tests of every module go.work names outside a submodule, each in one go
 // invocation (workspace.go), saying which it covered, then the docs data check (checkDocsData).
 func gate(worktree string, commit string) int {
-	covered, err := readWorkspace(worktree)
+	covered, err := readGatedWorkspace(worktree)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "cohere-dev: reading the modules to gate: %v\n", err)
 		return 2
 	}
-	covered.report(os.Stderr)
-	patterns := covered.patterns()
+	reportWorkspace(covered, os.Stderr)
+	patterns := covered.Patterns()
 	// Each command takes its share as the pool is when it starts (tokenRun.step): a gate that waited for its
 	// token on a busy pool widens for its tests or its docs check once the pool goes idle.
 	return withSteppedToken("land gate on "+shortCommit(commit)+" in "+worktree, func(step func(string) []string) int {
