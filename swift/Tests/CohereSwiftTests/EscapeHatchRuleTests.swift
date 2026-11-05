@@ -5,7 +5,7 @@ import Testing
 
 @testable import CohereSwift
 
-/* Fixture pairs for print by target kind, escape hatches with reasons, discarded try?, failure messages and TODO comments. */
+/* Fixture pairs for print by target kind, escape hatches with reasons, discarded try?, failure messages and `TODO` comments. */
 struct EscapeHatchRuleTests {
     static func file(_ source: String, kind: String = "library") -> ParsedFile {
         ParsedFile(
