@@ -118,7 +118,7 @@ var UnboundMethod = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[UnboundMethodOptions](options)
 		if !isSettings {
 			settings = DefaultUnboundMethodSettings()
@@ -126,24 +126,24 @@ var UnboundMethod = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				access := node.AsPropertyAccessExpression()
-				checkUnboundMemberAccess(ctx, settings, node, access.Expression, access.Name())
+				checkUnboundMemberAccess(ruleContext, settings, node, access.Expression, access.Name())
 			},
 			ast.KindElementAccessExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				access := node.AsElementAccessExpression()
-				checkUnboundMemberAccess(ctx, settings, node, access.Expression, access.ArgumentExpression)
+				checkUnboundMemberAccess(ruleContext, settings, node, access.Expression, access.ArgumentExpression)
 			},
 			ast.KindObjectBindingPattern: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				checkUnboundDestructuring(ctx, settings, node)
+				checkUnboundDestructuring(ruleContext, settings, node)
 			},
 			// The SECOND half of upstream's one ObjectPattern visitor.
 			//
@@ -157,10 +157,10 @@ var UnboundMethod = rule.Rule{
 			// is four of upstream's sixty-nine findings and, unlike most gaps, costs findings rather
 			// than adding them.
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				checkUnboundDestructuringAssignment(ctx, settings, node)
+				checkUnboundDestructuringAssignment(ruleContext, settings, node)
 			},
 		}
 	},
@@ -189,7 +189,7 @@ var unboundMethodWithoutThisAnnotationMessage = rule.Message{
 // awkward: the computed branch is the only one that has to ask the checker what the subscript
 // evaluates to, and the dotted branch reads its name straight off the node.
 func checkUnboundMemberAccess(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	settings UnboundMethodOptions,
 	node *ast.Node,
 	object *ast.Node,
@@ -198,21 +198,21 @@ func checkUnboundMemberAccess(
 	if object == nil || property == nil {
 		return
 	}
-	if isSafeUnboundUse(node) || isNativelyBoundMember(ctx, object, property) {
+	if isSafeUnboundUse(node) || isNativelyBoundMember(ruleContext, object, property) {
 		return
 	}
 
-	propertyNames := accessedPropertyNames(ctx, node, property)
+	propertyNames := accessedPropertyNames(ruleContext, node, property)
 	if len(propertyNames) == 0 {
 		return
 	}
 
-	objectType := ctx.TypeChecker.GetTypeAtLocation(object)
+	objectType := ruleContext.TypeChecker.GetTypeAtLocation(object)
 	if objectType == nil {
 		return
 	}
 	for _, propertyName := range propertyNames {
-		if reportUnboundConstituent(ctx, settings, node, propertyName, objectType) {
+		if reportUnboundConstituent(ruleContext, settings, node, propertyName, objectType) {
 			break
 		}
 	}
@@ -223,7 +223,7 @@ func checkUnboundMemberAccess(
 // Pulling a method out of an object by destructuring detaches it exactly as a member access does, and
 // upstream reports on the KEY rather than on the whole pattern, so `const { a, method } = o` points at
 // `method` alone.
-func checkUnboundDestructuring(ctx rule.Context, settings UnboundMethodOptions, node *ast.Node) {
+func checkUnboundDestructuring(ruleContext rule.Context, settings UnboundMethodOptions, node *ast.Node) {
 	if isInsideTypeDeclaration(node) {
 		return
 	}
@@ -256,7 +256,7 @@ func checkUnboundDestructuring(ctx rule.Context, settings UnboundMethodOptions, 
 		}
 	}
 
-	patternType := ctx.TypeChecker.GetTypeAtLocation(node)
+	patternType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 
 	for _, element := range node.AsBindingPattern().Elements.Nodes {
 		binding := element.AsBindingElement()
@@ -273,11 +273,11 @@ func checkUnboundDestructuring(ctx rule.Context, settings UnboundMethodOptions, 
 		keyName := key.AsIdentifier().Text
 
 		if initializer != nil {
-			if !isNativelyBoundMember(ctx, initializer, key) {
-				initializerType := ctx.TypeChecker.GetTypeAtLocation(initializer)
+			if !isNativelyBoundMember(ruleContext, initializer, key) {
+				initializerType := ruleContext.TypeChecker.GetTypeAtLocation(initializer)
 				if initializerType != nil {
-					property := checker.Checker_getPropertyOfType(ctx.TypeChecker, initializerType, keyName)
-					if reportIfUnboundMethod(ctx, settings, key, property) {
+					property := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, initializerType, keyName)
+					if reportIfUnboundMethod(ruleContext, settings, key, property) {
 						continue
 					}
 				}
@@ -290,7 +290,7 @@ func checkUnboundDestructuring(ctx rule.Context, settings UnboundMethodOptions, 
 		}
 
 		if patternType != nil {
-			reportUnboundConstituent(ctx, settings, key, keyName, patternType)
+			reportUnboundConstituent(ruleContext, settings, key, keyName, patternType)
 		}
 	}
 }
@@ -301,7 +301,7 @@ func checkUnboundDestructuring(ctx rule.Context, settings UnboundMethodOptions, 
 // enough. Upstream stops at the first constituent that reports, which is what keeps a union of two
 // unbound shapes from producing two findings on one reference.
 func reportUnboundConstituent(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	settings UnboundMethodOptions,
 	reportNode *ast.Node,
 	propertyName string,
@@ -309,8 +309,8 @@ func reportUnboundConstituent(
 ) bool {
 	for unionPart := range type_checking.UnionTypePartsSeq(subjectType) {
 		for _, intersectionPart := range type_checking.IntersectionTypeParts(unionPart) {
-			property := checker.Checker_getPropertyOfType(ctx.TypeChecker, intersectionPart, propertyName)
-			if reportIfUnboundMethod(ctx, settings, reportNode, property) {
+			property := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, intersectionPart, propertyName)
+			if reportIfUnboundMethod(ruleContext, settings, reportNode, property) {
 				return true
 			}
 		}
@@ -344,7 +344,7 @@ const (
 
 // reportIfUnboundMethod is upstream's `checkIfMethodAndReport`.
 func reportIfUnboundMethod(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	settings UnboundMethodOptions,
 	reportNode *ast.Node,
 	property *ast.Symbol,
@@ -364,7 +364,7 @@ func reportIfUnboundMethod(
 	if thisParameter == unboundThisParameterAbsent {
 		message = unboundMethodWithoutThisAnnotationMessage
 	}
-	ctx.ReportNode(reportNode, message)
+	ruleContext.ReportNode(reportNode, message)
 	return true
 }
 
@@ -456,7 +456,7 @@ func methodIsDangerous(
 // A dotted access names one property. A computed one names as many as its subscript type has literal
 // constituents, so `o[cond ? 'a' : 'b']` asks about both, and a subscript that is not a literal names
 // none and the rule declines.
-func accessedPropertyNames(ctx rule.Context, node *ast.Node, property *ast.Node) []string {
+func accessedPropertyNames(ruleContext rule.Context, node *ast.Node, property *ast.Node) []string {
 	if node.Kind == ast.KindPropertyAccessExpression {
 		if property.Kind == ast.KindIdentifier {
 			return []string{property.AsIdentifier().Text}
@@ -465,7 +465,7 @@ func accessedPropertyNames(ctx rule.Context, node *ast.Node, property *ast.Node)
 		return nil
 	}
 
-	subscriptType := ctx.TypeChecker.GetTypeAtLocation(property)
+	subscriptType := ruleContext.TypeChecker.GetTypeAtLocation(property)
 	if subscriptType == nil {
 		return nil
 	}
@@ -477,7 +477,7 @@ func accessedPropertyNames(ctx rule.Context, node *ast.Node, property *ast.Node)
 		// The checker renders a string literal type quoted and a numeric one bare, so the quotes
 		// have to come off to compare against a property name. Upstream reads `part.value` directly,
 		// which is already the cooked value.
-		rendered := ctx.TypeChecker.TypeToString(part)
+		rendered := ruleContext.TypeChecker.TypeToString(part)
 		if len(rendered) >= 2 && (rendered[0] == '"' || rendered[0] == '\'') &&
 			rendered[len(rendered)-1] == rendered[0] {
 			rendered = rendered[1 : len(rendered)-1]
@@ -492,33 +492,33 @@ func accessedPropertyNames(ctx rule.Context, node *ast.Node, property *ast.Node)
 // Two routes, and the first exists because the second is not enough. Upstream's comment says a
 // declaration can come from `@types/node` rather than from the default library, in which case the
 // type-level test answers false for something that is in fact natively bound.
-func isNativelyBoundMember(ctx rule.Context, object *ast.Node, property *ast.Node) bool {
+func isNativelyBoundMember(ruleContext rule.Context, object *ast.Node, property *ast.Node) bool {
 	if object.Kind == ast.KindIdentifier && property != nil && property.Kind == ast.KindIdentifier {
-		objectSymbol := ctx.TypeChecker.GetSymbolAtLocation(object)
-		if objectSymbol != nil && isSymbolNotFromThisFile(ctx, objectSymbol) {
+		objectSymbol := ruleContext.TypeChecker.GetSymbolAtLocation(object)
+		if objectSymbol != nil && isSymbolNotFromThisFile(ruleContext, objectSymbol) {
 			if nativelyBoundMembers[object.AsIdentifier().Text+"."+property.AsIdentifier().Text] {
 				return true
 			}
 		}
 	}
 
-	objectType := ctx.TypeChecker.GetTypeAtLocation(object)
+	objectType := ruleContext.TypeChecker.GetTypeAtLocation(object)
 	if objectType == nil {
 		return false
 	}
-	if !type_checking.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, objectType,
+	if !type_checking.IsBuiltinSymbolLike(ruleContext.Program, ruleContext.TypeChecker, objectType,
 		supportedGlobalTypeNames...) {
 		return false
 	}
 	if property == nil {
 		return false
 	}
-	propertyType := ctx.TypeChecker.GetTypeAtLocation(property)
+	propertyType := ruleContext.TypeChecker.GetTypeAtLocation(property)
 	if propertyType == nil {
 		return false
 	}
 	propertySymbol := checker.Type_symbol(propertyType)
-	return propertySymbol != nil && rule.IsSymbolFromDefaultLibrary(ctx.Program, propertySymbol)
+	return propertySymbol != nil && rule.IsSymbolFromDefaultLibrary(ruleContext.Program, propertySymbol)
 }
 
 // isSymbolNotFromThisFile is upstream's `isNotImported`, named for what it measures.
@@ -527,14 +527,14 @@ func isNativelyBoundMember(ctx rule.Context, object *ast.Node, property *ast.Nod
 // calls that "not imported", which reads backwards: a global like `Math` is declared in a library
 // file and is therefore "not imported" in this sense, while a locally declared `const Math = ...`
 // shadows it and is. The name here says what the comparison does rather than what it implies.
-func isSymbolNotFromThisFile(ctx rule.Context, symbol *ast.Symbol) bool {
+func isSymbolNotFromThisFile(ruleContext rule.Context, symbol *ast.Symbol) bool {
 	valueDeclaration := symbol.ValueDeclaration
 	if valueDeclaration == nil {
 		// Upstream works around the same compiler issue here and answers false.
 		return false
 	}
 	declarationFile := ast.GetSourceFileOfNode(valueDeclaration)
-	return declarationFile != nil && ctx.SourceFile != nil && declarationFile != ctx.SourceFile
+	return declarationFile != nil && ruleContext.SourceFile != nil && declarationFile != ruleContext.SourceFile
 }
 
 // isInsideTypeDeclaration is upstream's `isNodeInsideTypeDeclaration`.
@@ -701,7 +701,7 @@ var supportedGlobalTypeNames = []string{
 // target, and one anywhere else is an ordinary object being constructed.
 //
 // The initializer is the assignment's right side, which is upstream's `node.parent.right` arm.
-func checkUnboundDestructuringAssignment(ctx rule.Context, settings UnboundMethodOptions, node *ast.Node) {
+func checkUnboundDestructuringAssignment(ruleContext rule.Context, settings UnboundMethodOptions, node *ast.Node) {
 	parent := node.Parent
 	if parent == nil || parent.Kind != ast.KindBinaryExpression {
 		return
@@ -717,7 +717,7 @@ func checkUnboundDestructuringAssignment(ctx rule.Context, settings UnboundMetho
 	}
 
 	initializer := binary.Right
-	patternType := ctx.TypeChecker.GetTypeAtLocation(node)
+	patternType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 
 	for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
 		// Upstream requires the property be a Property whose key is an identifier. A shorthand
@@ -738,11 +738,11 @@ func checkUnboundDestructuringAssignment(ctx rule.Context, settings UnboundMetho
 		keyName := key.AsIdentifier().Text
 
 		if initializer != nil {
-			if !isNativelyBoundMember(ctx, initializer, key) {
-				initializerType := ctx.TypeChecker.GetTypeAtLocation(initializer)
+			if !isNativelyBoundMember(ruleContext, initializer, key) {
+				initializerType := ruleContext.TypeChecker.GetTypeAtLocation(initializer)
 				if initializerType != nil {
-					found := checker.Checker_getPropertyOfType(ctx.TypeChecker, initializerType, keyName)
-					if reportIfUnboundMethod(ctx, settings, key, found) {
+					found := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, initializerType, keyName)
+					if reportIfUnboundMethod(ruleContext, settings, key, found) {
 						continue
 					}
 				}
@@ -754,7 +754,7 @@ func checkUnboundDestructuringAssignment(ctx rule.Context, settings UnboundMetho
 		}
 
 		if patternType != nil {
-			reportUnboundConstituent(ctx, settings, key, keyName, patternType)
+			reportUnboundConstituent(ruleContext, settings, key, keyName, patternType)
 		}
 	}
 }

@@ -91,7 +91,7 @@ type NoCondAssignOptions = NoCondAssignMode
 // divergence is stated rather than silent, and the fixtures assert the single count.
 var NoCondAssign = rule.Rule{
 	Name: "no-cond-assign",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Unrecognized and absent both land on the permissive mode. A rule enabled with a bare
 		// severity must not silently run the strict half, and a typo must not silently escalate.
 		always := false
@@ -109,7 +109,7 @@ var NoCondAssign = rule.Rule{
 						return
 					}
 					if assignmentSitsInAConditionalTest(node) {
-						reportCondAssign(ctx, node)
+						reportCondAssign(ruleContext, node)
 					}
 				},
 			}
@@ -126,7 +126,7 @@ var NoCondAssign = rule.Rule{
 			if !isAssignmentExpression(test) {
 				return
 			}
-			reportCondAssign(ctx, test)
+			reportCondAssign(ruleContext, test)
 		}
 
 		return rule.Listeners{
@@ -231,7 +231,7 @@ func assignmentSitsInAConditionalTest(assignment *ast.Node) bool {
 // its leading trivia, so on `while (a /* = */ = b) {}` a span built from `OperatorToken.Pos()`
 // covers ` /* = */ =` and anchors the finding inside the comment. Upstream carries that exact input
 // in its fail corpus for this reason, and `TokenRange` scans past the trivia to the token itself.
-func reportCondAssign(ctx rule.Context, assignment *ast.Node) {
+func reportCondAssign(ruleContext rule.Context, assignment *ast.Node) {
 	operator := assignment.AsBinaryExpression().OperatorToken
-	ctx.ReportRange(rule.TokenRange(ctx.SourceFile, operator), messageCondAssign)
+	ruleContext.ReportRange(rule.TokenRange(ruleContext.SourceFile, operator), messageCondAssign)
 }

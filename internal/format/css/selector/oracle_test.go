@@ -496,9 +496,9 @@ func runSelectorOracle(test *testing.T, root string, inputs []oracleInput) []map
 		stdin.WriteByte('\n')
 	}
 	// The library hangs on some selectors (see ErrLoopsForever), so the oracle runs on a deadline.
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	timeoutContext, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	command := exec.CommandContext(ctx, "node", "--input-type=module", "-e", selectorParseScript)
+	command := exec.CommandContext(timeoutContext, "node", "--input-type=module", "-e", selectorParseScript)
 	command.Dir = root
 	command.Stdin = &stdin
 	var stdout, stderr bytes.Buffer

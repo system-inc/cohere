@@ -85,12 +85,12 @@ func SpellsManualMemoization(text string) bool {
 // every function, this gate would have been inexact for them, and they lowered every function anyway,
 // so gating the other five saved almost nothing. They gate on `IsComponentOrHookLike` now, as upstream
 // does, and this is exact for all seven.
-func MayHoldComponentOrHook(ctx rule.Context) bool {
-	if ctx.SourceFile == nil {
+func MayHoldComponentOrHook(ruleContext rule.Context) bool {
+	if ruleContext.SourceFile == nil {
 		return true
 	}
-	return rule.Cached(ctx.FileCache, "hir.MayHoldComponentOrHook", func() bool {
-		return mayHoldComponentOrHook(ctx.SourceFile)
+	return rule.Cached(ruleContext.FileCache, "hir.MayHoldComponentOrHook", func() bool {
+		return mayHoldComponentOrHook(ruleContext.SourceFile)
 	})
 }
 

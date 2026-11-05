@@ -225,11 +225,11 @@ func noArrowFunctionLifecycleParameterNames(parameters *ast.NodeList) (string, b
 var NoArrowFunctionLifecycle = rule.Rule{
 	Name: "react/no-arrow-function-lifecycle",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		sourceText := ctx.SourceFile.Text()
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		sourceText := ruleContext.SourceFile.Text()
 
 		textOf := func(node *ast.Node) string {
-			span := rule.TokenRange(ctx.SourceFile, node)
+			span := rule.TokenRange(ruleContext.SourceFile, node)
 			if span.Pos() < 0 || span.End() > len(sourceText) || span.Pos() > span.End() {
 				return ""
 			}
@@ -262,7 +262,7 @@ var NoArrowFunctionLifecycle = rule.Rule{
 			arrow := value.AsArrowFunction()
 			body := arrow.Body
 			if body == nil {
-				ctx.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
+				ruleContext.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
 				return
 			}
 
@@ -270,7 +270,7 @@ var NoArrowFunctionLifecycle = rule.Rule{
 			if !renderable {
 				// Reported without a repair. See the doc comment: upstream would write the literal
 				// text `undefined` here, and a wrong fix applied unattended is worse than none.
-				ctx.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
+				ruleContext.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
 				return
 			}
 
@@ -282,7 +282,7 @@ var NoArrowFunctionLifecycle = rule.Rule{
 			// JavaScript. Declining matches what this rule already does for a typed parameter:
 			// report the arrow, leave the repair to a human who can see the type.
 			if arrow.Type != nil {
-				ctx.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
+				ruleContext.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
 				return
 			}
 
@@ -305,14 +305,14 @@ var NoArrowFunctionLifecycle = rule.Rule{
 			// A comment in the head itself, before the `=>`, is declined rather than dropped.
 			// Upstream's head range swallows it, so its output parses and the comment is gone; a fix
 			// runs unattended, and deleting what someone wrote is not a spelling change.
-			bodyStart := rule.TokenRange(ctx.SourceFile, body).Pos()
+			bodyStart := rule.TokenRange(ruleContext.SourceFile, body).Pos()
 			if arrow.EqualsGreaterThanToken == nil {
-				ctx.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
+				ruleContext.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
 				return
 			}
-			arrowEnd := rule.TokenRange(ctx.SourceFile, arrow.EqualsGreaterThanToken).End()
+			arrowEnd := rule.TokenRange(ruleContext.SourceFile, arrow.EqualsGreaterThanToken).End()
 			if len(commentsBetween(sourceText, key.End(), arrowEnd)) > 0 {
-				ctx.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
+				ruleContext.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
 				return
 			}
 			leading := commentsBetween(sourceText, arrowEnd, bodyStart)
@@ -323,7 +323,7 @@ var NoArrowFunctionLifecycle = rule.Rule{
 			headRange := core.NewTextRange(key.End(), headEnd)
 
 			if body.Kind == ast.KindBlock {
-				ctx.ReportNodeWithFixes(property, noArrowFunctionLifecycleMessage(propertyName),
+				ruleContext.ReportNodeWithFixes(property, noArrowFunctionLifecycleMessage(propertyName),
 					rule.ReplaceRange(headRange, head))
 				return
 			}
@@ -369,7 +369,7 @@ var NoArrowFunctionLifecycle = rule.Rule{
 				trailingText += sourceText[comment.start:comment.end]
 			}
 
-			ctx.ReportNodeWithFixes(property, noArrowFunctionLifecycleMessage(propertyName),
+			ruleContext.ReportNodeWithFixes(property, noArrowFunctionLifecycleMessage(propertyName),
 				rule.ReplaceRange(headRange, head),
 				rule.ReplaceRange(
 					core.NewTextRange(leadingStart(leading, bodyStart), replacedEnd),

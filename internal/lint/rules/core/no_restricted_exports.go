@@ -197,7 +197,7 @@ func DecodeNoRestrictedExportsOptions(raw []byte) (any, error) {
 // syntax, has nothing to say about it.
 var NoRestrictedExports = rule.Rule{
 	Name: "no-restricted-exports",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, configured := rule.OptionsAs[NoRestrictedExportsOptions](options)
 		if !configured {
 			return rule.Listeners{}
@@ -227,7 +227,7 @@ var NoRestrictedExports = rule.Rule{
 		}
 
 		checker := &noRestrictedExportsChecker{
-			ctx:        ctx,
+			ctx:        ruleContext,
 			restricted: restricted,
 			pattern:    pattern,
 			defaults:   settings.RestrictDefaultExports,

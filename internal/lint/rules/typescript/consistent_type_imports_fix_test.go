@@ -110,10 +110,10 @@ func consistentTypeImportsTypeErrors(test *testing.T, sources map[string]string)
 		Name:             "test/type-check",
 		NeedsTypeChecker: true,
 		ProgramReads:     rule.ReadsOtherFiles,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					for _, sourceFile := range ctx.Program.SourceFiles() {
+					for _, sourceFile := range ruleContext.Program.SourceFiles() {
 						// The harness writes fixtures under a temporary root, so a file is matched to
 						// its fixture by the path the fixture named, as a suffix.
 						key := ""
@@ -128,8 +128,8 @@ func consistentTypeImportsTypeErrors(test *testing.T, sources map[string]string)
 						// The checker this rule already holds, never Program.GetSemanticDiagnostics: the harness
 						// holds the file's checker exclusively while a rule runs, and the program-level call waits
 						// for that same lock, so it deadlocked and read as a suite too slow to finish.
-						for _, diagnostic := range ctx.TypeChecker.GetDiagnostics(context.Background(), sourceFile) {
-							ctx.ReportNode(node, rule.Message{
+						for _, diagnostic := range ruleContext.TypeChecker.GetDiagnostics(context.Background(), sourceFile) {
+							ruleContext.ReportNode(node, rule.Message{
 								Id:          key,
 								Description: fmt.Sprintf("TS%d %s", diagnostic.Code(), diagnostic.MessageText()),
 							})

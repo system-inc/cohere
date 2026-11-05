@@ -64,21 +64,21 @@ var NoUnsafeArgument = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
 				if call.Expression == nil || call.Arguments == nil {
 					return
 				}
-				checkUnsafeArguments(ctx, call.Arguments.Nodes, call.Expression, node, false)
+				checkUnsafeArguments(ruleContext, call.Arguments.Nodes, call.Expression, node, false)
 			},
 			ast.KindNewExpression: func(node *ast.Node) {
 				newExpression := node.AsNewExpression()
 				if newExpression.Expression == nil || newExpression.Arguments == nil {
 					return
 				}
-				checkUnsafeArguments(ctx, newExpression.Arguments.Nodes, newExpression.Expression,
+				checkUnsafeArguments(ruleContext, newExpression.Arguments.Nodes, newExpression.Expression,
 					node, false)
 			},
 			ast.KindTaggedTemplateExpression: func(node *ast.Node) {
@@ -104,7 +104,7 @@ var NoUnsafeArgument = rule.Rule{
 						expressions = append(expressions, expression)
 					}
 				}
-				checkUnsafeArguments(ctx, expressions, tagged.Tag, node, true)
+				checkUnsafeArguments(ruleContext, expressions, tagged.Tag, node, true)
 			},
 		}
 	},
@@ -112,13 +112,13 @@ var NoUnsafeArgument = rule.Rule{
 
 // checkUnsafeArguments is upstream's single body, shared by all three anchors.
 func checkUnsafeArguments(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	arguments []*ast.Node,
 	callee *ast.Node,
 	node *ast.Node,
 	isTaggedTemplate bool,
 ) {
-	if ctx.TypeChecker == nil || len(arguments) == 0 {
+	if ruleContext.TypeChecker == nil || len(arguments) == 0 {
 		return
 	}
 
@@ -137,12 +137,12 @@ func checkUnsafeArguments(
 	// return for an unresolvable call rather than on anything guaranteed, and because it states the
 	// intent that the two rules do not double-report. The measurement is here instead of a
 	// deletion.
-	calleeType := ctx.TypeChecker.GetTypeAtLocation(callee)
+	calleeType := ruleContext.TypeChecker.GetTypeAtLocation(callee)
 	if calleeType == nil || type_checking.IsTypeAnyType(calleeType) {
 		return
 	}
 
-	signature := newUnsafeArgumentSignature(ctx, node)
+	signature := newUnsafeArgumentSignature(ruleContext, node)
 	if signature == nil {
 		// Upstream asserts the signature is non-nil, on the argument that a node from the AST map
 		// always resolves. That holds for a call the checker understands and does not hold for one
@@ -159,7 +159,7 @@ func checkUnsafeArguments(
 
 	for _, argument := range arguments {
 		if argument.Kind == ast.KindSpreadElement {
-			checkUnsafeSpreadArgument(ctx, argument, signature)
+			checkUnsafeSpreadArgument(ruleContext, argument, signature)
 			continue
 		}
 
@@ -167,19 +167,19 @@ func checkUnsafeArguments(
 		if parameterType == nil {
 			continue
 		}
-		argumentType := ctx.TypeChecker.GetTypeAtLocation(argument)
+		argumentType := ruleContext.TypeChecker.GetTypeAtLocation(argument)
 		if argumentType == nil {
 			continue
 		}
 		_, _, unsafe := type_checking.IsUnsafeAssignment(argumentType, parameterType,
-			ctx.TypeChecker, argument)
+			ruleContext.TypeChecker, argument)
 		if !unsafe {
 			continue
 		}
-		ctx.ReportNode(argument, rule.Message{
+		ruleContext.ReportNode(argument, rule.Message{
 			Id: "unsafeArgument",
-			Description: "Unsafe argument of type " + describeUnsafeArgumentType(ctx, argumentType) +
-				" assigned to a parameter of type " + describeUnsafeArgumentType(ctx, parameterType) + ".",
+			Description: "Unsafe argument of type " + describeUnsafeArgumentType(ruleContext, argumentType) +
+				" assigned to a parameter of type " + describeUnsafeArgumentType(ruleContext, parameterType) + ".",
 		})
 	}
 }
@@ -190,7 +190,7 @@ func checkUnsafeArguments(
 // there and this reproduces the gap rather than closing it, because closing it would report inputs
 // upstream is silent on.
 func checkUnsafeSpreadArgument(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	spread *ast.Node,
 	signature *unsafeArgumentSignature,
 ) {
@@ -198,7 +198,7 @@ func checkUnsafeSpreadArgument(
 	if inner == nil {
 		return
 	}
-	spreadType := ctx.TypeChecker.GetTypeAtLocation(inner)
+	spreadType := ruleContext.TypeChecker.GetTypeAtLocation(inner)
 	if spreadType == nil {
 		return
 	}
@@ -207,22 +207,22 @@ func checkUnsafeSpreadArgument(
 	// argument` where `argument` is the SpreadElement rather than its inner expression.
 	switch {
 	case type_checking.IsTypeAnyType(spreadType):
-		ctx.ReportNode(spread, rule.Message{
+		ruleContext.ReportNode(spread, rule.Message{
 			Id:          "unsafeSpread",
-			Description: "Unsafe spread of an " + describeUnsafeArgumentType(ctx, spreadType) + " type.",
+			Description: "Unsafe spread of an " + describeUnsafeArgumentType(ruleContext, spreadType) + " type.",
 		})
 
-	case type_checking.IsTypeAnyArrayType(spreadType, ctx.TypeChecker):
-		ctx.ReportNode(spread, rule.Message{
+	case type_checking.IsTypeAnyArrayType(spreadType, ruleContext.TypeChecker):
+		ruleContext.ReportNode(spread, rule.Message{
 			Id: "unsafeArraySpread",
 			Description: "Unsafe spread of an " +
-				describeUnsafeSpreadType(ctx, spreadType) + " array type.",
+				describeUnsafeSpreadType(ruleContext, spreadType) + " array type.",
 		})
 
 	case checker.IsTupleType(spreadType):
 		// A tuple spreads across several parameters, so each member is judged separately and the
 		// finding is repeated on the same span once per unsafe member.
-		for _, memberType := range checker.Checker_getTypeArguments(ctx.TypeChecker, spreadType) {
+		for _, memberType := range checker.Checker_getTypeArguments(ruleContext.TypeChecker, spreadType) {
 			parameterType := signature.nextParameterType()
 			if parameterType == nil {
 				continue
@@ -232,16 +232,16 @@ func checkUnsafeSpreadArgument(
 			// inside IsUnsafeAssignment cannot apply and must not be given a node that would make
 			// it fire on the wrong thing.
 			_, _, unsafe := type_checking.IsUnsafeAssignment(memberType, parameterType,
-				ctx.TypeChecker, nil)
+				ruleContext.TypeChecker, nil)
 			if !unsafe {
 				continue
 			}
-			ctx.ReportNode(spread, rule.Message{
+			ruleContext.ReportNode(spread, rule.Message{
 				Id: "unsafeTupleSpread",
 				Description: "Unsafe spread of a tuple type. The argument is " +
-					describeUnsafeTupleType(ctx, memberType) +
+					describeUnsafeTupleType(ruleContext, memberType) +
 					" and is assigned to a parameter of type " +
-					describeUnsafeArgumentType(ctx, parameterType) + ".",
+					describeUnsafeArgumentType(ruleContext, parameterType) + ".",
 			})
 		}
 
@@ -260,34 +260,34 @@ func checkUnsafeSpreadArgument(
 // word `any` and a message saying "of type `any`" about a type the checker could not resolve sends
 // the reader hunting an `any` that is not written anywhere. The backticks around a real type name
 // are upstream's message text rather than markup added here.
-func describeUnsafeArgumentType(ctx rule.Context, t *checker.Type) string {
+func describeUnsafeArgumentType(ruleContext rule.Context, t *checker.Type) string {
 	if type_checking.IsIntrinsicErrorType(t) {
 		return "error typed"
 	}
-	return "`" + ctx.TypeChecker.TypeToString(t) + "`"
+	return "`" + ruleContext.TypeChecker.TypeToString(t) + "`"
 }
 
 // describeUnsafeSpreadType is upstream's `describeTypeForSpread`, which differs from the plain one
 // in exactly one place: an array OF the error type renders as the bare word `error`, so the message
 // reads "Unsafe spread of an error array type" rather than naming the array.
-func describeUnsafeSpreadType(ctx rule.Context, t *checker.Type) string {
-	if checker.Checker_isArrayType(ctx.TypeChecker, t) {
-		typeArguments := checker.Checker_getTypeArguments(ctx.TypeChecker, t)
+func describeUnsafeSpreadType(ruleContext rule.Context, t *checker.Type) string {
+	if checker.Checker_isArrayType(ruleContext.TypeChecker, t) {
+		typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, t)
 		if len(typeArguments) > 0 && type_checking.IsIntrinsicErrorType(typeArguments[0]) {
 			return "error"
 		}
 	}
-	return describeUnsafeArgumentType(ctx, t)
+	return describeUnsafeArgumentType(ruleContext, t)
 }
 
 // describeUnsafeTupleType is upstream's `describeTypeForTuple`. The difference from the plain one is
 // the words rather than the type: this slot sits after "The argument is", so a resolved type reads
 // "of type `X`" while the error type reads "error typed" with no preposition.
-func describeUnsafeTupleType(ctx rule.Context, t *checker.Type) string {
+func describeUnsafeTupleType(ruleContext rule.Context, t *checker.Type) string {
 	if type_checking.IsIntrinsicErrorType(t) {
 		return "error typed"
 	}
-	return "of type `" + ctx.TypeChecker.TypeToString(t) + "`"
+	return "of type `" + ruleContext.TypeChecker.TypeToString(t) + "`"
 }
 
 // unsafeArgumentSignature tracks which parameter the next argument lands on.
@@ -329,15 +329,15 @@ const (
 //
 // Returns nil when the call does not resolve, which upstream treats as impossible and asserts on.
 // See the caller for why declining is the right answer here rather than a panic.
-func newUnsafeArgumentSignature(ctx rule.Context, node *ast.Node) *unsafeArgumentSignature {
-	resolved := ctx.TypeChecker.GetResolvedSignature(node)
+func newUnsafeArgumentSignature(ruleContext rule.Context, node *ast.Node) *unsafeArgumentSignature {
+	resolved := ruleContext.TypeChecker.GetResolvedSignature(node)
 	if resolved == nil {
 		return nil
 	}
 
 	signature := &unsafeArgumentSignature{restKind: restKindNone}
 	for index, parameter := range checker.Signature_parameters(resolved) {
-		parameterType := ctx.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node)
+		parameterType := ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node)
 		if parameterType == nil {
 			continue
 		}
@@ -354,7 +354,7 @@ func newUnsafeArgumentSignature(ctx rule.Context, node *ast.Node) *unsafeArgumen
 			continue
 		}
 
-		constrained := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, parameterType)
+		constrained := checker.Checker_getBaseConstraintOfType(ruleContext.TypeChecker, parameterType)
 		if constrained == nil {
 			constrained = parameterType
 		}
@@ -362,12 +362,12 @@ func newUnsafeArgumentSignature(ctx rule.Context, node *ast.Node) *unsafeArgumen
 		switch {
 		case checker.IsTupleType(constrained):
 			signature.restKind = restKindTuple
-			signature.restTypeArguments = checker.Checker_getTypeArguments(ctx.TypeChecker, constrained)
+			signature.restTypeArguments = checker.Checker_getTypeArguments(ruleContext.TypeChecker, constrained)
 		default:
 			// The shelf already answers exactly this question, wrapping the two-argument
 			// index lookup with the checker's number type. Upstream spells it
 			// `getIndexTypeOfType(t, ts.IndexKind.Number)`.
-			elementType := type_checking.GetNumberIndexType(ctx.TypeChecker, constrained)
+			elementType := type_checking.GetNumberIndexType(ruleContext.TypeChecker, constrained)
 			if elementType != nil {
 				signature.restKind = restKindArray
 				signature.restType = elementType

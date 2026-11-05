@@ -140,7 +140,7 @@ var NoDuplicateTypeConstituents = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[NoDuplicateTypeConstituentsOptions](options)
 		if !isSettings {
 			settings = DefaultNoDuplicateTypeConstituentsSettings()
@@ -166,8 +166,8 @@ var NoDuplicateTypeConstituents = rule.Rule{
 				}
 				inner = next
 			}
-			nodeRange := rule.TokenRange(ctx.SourceFile, inner)
-			return ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
+			nodeRange := rule.TokenRange(ruleContext.SourceFile, inner)
+			return ruleContext.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
 		}
 
 		// report builds the two ranges and emits the finding.
@@ -175,7 +175,7 @@ var NoDuplicateTypeConstituents = rule.Rule{
 		// `parent` is the union or intersection the constituent belongs to, which bounds the search
 		// for a separator so that an operator belonging to an enclosing type is never taken.
 		report := func(message rule.Message, constituent *ast.Node, parent *ast.Node) {
-			constituentRange := rule.TokenRange(ctx.SourceFile, constituent)
+			constituentRange := rule.TokenRange(ruleContext.SourceFile, constituent)
 
 			// The SPAN starts inside any parentheses while the REMOVAL starts outside them, and
 			// that asymmetry is upstream's rather than a choice here. estree has no parenthesized
@@ -192,11 +192,11 @@ var NoDuplicateTypeConstituents = rule.Rule{
 				if next == nil {
 					break
 				}
-				spanStart = rule.TokenRange(ctx.SourceFile, next).Pos()
+				spanStart = rule.TokenRange(ruleContext.SourceFile, next).Pos()
 				inner = next
 			}
-			parentRange := rule.TokenRange(ctx.SourceFile, parent)
-			text := ctx.SourceFile.Text()
+			parentRange := rule.TokenRange(ruleContext.SourceFile, parent)
+			text := ruleContext.SourceFile.Text()
 
 			// The separator before the constituent, searched backwards within the parent. Upstream
 			// takes the LAST such token before the node, which is the one immediately preceding it.
@@ -252,7 +252,7 @@ var NoDuplicateTypeConstituents = rule.Rule{
 
 			// The reported span starts at the constituent and ends after its trailing brackets,
 			// which is narrower than what the repair removes whenever a separator was taken.
-			ctx.ReportRangeWithFixes(
+			ruleContext.ReportRangeWithFixes(
 				core.NewTextRange(spanStart, closeEnd),
 				message,
 				fixes...,
@@ -277,7 +277,7 @@ var NoDuplicateTypeConstituents = rule.Rule{
 				return
 			}
 
-			constituentType := ctx.TypeChecker.GetTypeAtLocation(constituent)
+			constituentType := ruleContext.TypeChecker.GetTypeAtLocation(constituent)
 			if constituentType == nil {
 				return
 			}
@@ -329,7 +329,7 @@ var NoDuplicateTypeConstituents = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindIntersectionType: func(node *ast.Node) {
-				if ctx.TypeChecker == nil || settings.IgnoreIntersections {
+				if ruleContext.TypeChecker == nil || settings.IgnoreIntersections {
 					return
 				}
 				// A nested intersection is reached through its parent's recursion, so visiting it
@@ -341,7 +341,7 @@ var NoDuplicateTypeConstituents = rule.Rule{
 			},
 
 			ast.KindUnionType: func(node *ast.Node) {
-				if ctx.TypeChecker == nil || settings.IgnoreUnions {
+				if ruleContext.TypeChecker == nil || settings.IgnoreUnions {
 					return
 				}
 				if isNestedInSameKind(node, ast.KindUnionType) {

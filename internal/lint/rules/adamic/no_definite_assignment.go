@@ -35,10 +35,10 @@ var noDefiniteAssignmentText = policy.MessageOf("adamic/no-definite-assignment",
 var NoDefiniteAssignment = rule.Rule{
 	Name: "adamic/no-definite-assignment",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		report := func(name *ast.Node) {
 			if name != nil {
-				ctx.ReportNode(name, rule.Message{
+				ruleContext.ReportNode(name, rule.Message{
 					Id:          "definiteAssignment",
 					Description: noDefiniteAssignmentText.Render(nil),
 				})

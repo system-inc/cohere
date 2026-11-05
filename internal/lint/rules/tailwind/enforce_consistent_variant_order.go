@@ -79,8 +79,8 @@ var EnforceConsistentVariantOrder = rule.Rule{
 	Name: "better-tailwindcss/enforce-consistent-variant-order",
 	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -89,17 +89,17 @@ var EnforceConsistentVariantOrder = rule.Rule{
 		// never looks at this rule (#zwd43jn).
 		configured, isConfigured := rule.OptionsAs[EnforceConsistentVariantOrderOptions](options)
 
-		designSystem := DesignSystemForProgramAt(ctx.Program, configured.Location())
+		designSystem := DesignSystemForProgramAt(ruleContext.Program, configured.Location())
 		if designSystem.Err != nil {
-			if ctx.Program == nil {
+			if ruleContext.Program == nil {
 				return nil
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if skipWithoutTailwind(ctx, designSystem.Err) {
+			if skipWithoutTailwind(ruleContext, designSystem.Err) {
 				return nil
 			}
-			return declineListeners(ctx, "enforce-consistent-variant-order", designSystem)
+			return declineListeners(ruleContext, "enforce-consistent-variant-order", designSystem)
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
@@ -107,11 +107,11 @@ var EnforceConsistentVariantOrder = rule.Rule{
 			surfaces = configured.ClassLiteralSurfaces()
 		}
 
-		reader := surfaces.ReaderFor(ctx.FileCache)
+		reader := surfaces.ReaderFor(ruleContext.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
-				reportVariantOrder(ctx, literal, designSystem)
+				reportVariantOrder(ruleContext, literal, designSystem)
 			}
 		}
 
@@ -124,7 +124,7 @@ var EnforceConsistentVariantOrder = rule.Rule{
 }
 
 // reportVariantOrder checks each class in one literal against the engine's variant sort.
-func reportVariantOrder(ctx rule.Context, literal ClassLiteral, designSystem DesignSystemResult) {
+func reportVariantOrder(ruleContext rule.Context, literal ClassLiteral, designSystem DesignSystemResult) {
 	system := designSystem.System
 	if system == nil {
 		return
@@ -135,7 +135,7 @@ func reportVariantOrder(ctx rule.Context, literal ClassLiteral, designSystem Des
 		if !needsReorder {
 			continue
 		}
-		ctx.ReportRange(literal.Range, messageVariantOrder(className, sorted))
+		ruleContext.ReportRange(literal.Range, messageVariantOrder(className, sorted))
 	}
 }
 

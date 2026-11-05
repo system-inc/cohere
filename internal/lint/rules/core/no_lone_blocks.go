@@ -96,7 +96,7 @@ var messageRedundantNestedBlock = rule.Message{
 // comments attached to the braces. Upstream ships no fixer either.
 var NoLoneBlocks = rule.Rule{
 	Name: "no-lone-blocks",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				type finding struct {
@@ -153,7 +153,7 @@ var NoLoneBlocks = rule.Rule{
 				node.ForEachChild(visit)
 
 				for _, found := range findings {
-					ctx.ReportNode(found.node, found.message)
+					ruleContext.ReportNode(found.node, found.message)
 				}
 			},
 		}

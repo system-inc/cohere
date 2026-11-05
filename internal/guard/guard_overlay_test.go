@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -333,6 +334,10 @@ func TestAnOverlayFlagGoFlagsDoesNotCarryIsRefused(test *testing.T) {
 	}
 }
 
+// reactPragmaOwnFileCall is the rule's own-file pragma call, matched whatever the rule names its context
+// parameter, so a rename of that parameter never breaks the fixture below.
+var reactPragmaOwnFileCall = regexp.MustCompile(`rule\.IsReactPragmaBinding\([A-Za-z_][A-Za-z0-9_]*\.SourceFile,`)
+
 // A pragma reader may inspect the home file's bodies only when home is the rule's own file. Runtime
 // identifier checks alone cannot establish that argument at a call site; the scan must check it too.
 func TestPragmaReaderTrustRequiresTheRulesOwnSourceFile(test *testing.T) {
@@ -346,10 +351,11 @@ func TestPragmaReaderTrustRequiresTheRulesOwnSourceFile(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	before := "rule.IsReactPragmaBinding(ctx.SourceFile,"
-	if strings.Count(string(original), before) != 1 {
-		test.Fatal("fixture must replace exactly one pragma call")
+	matches := reactPragmaOwnFileCall.FindAllString(string(original), -1)
+	if len(matches) != 1 {
+		test.Fatalf("fixture must replace exactly one pragma call, found %d", len(matches))
 	}
+	before := matches[0]
 	overlay := guardOverlay(test)
 	planted := make(map[string][]byte, len(overlay)+1)
 	for path, contents := range overlay {

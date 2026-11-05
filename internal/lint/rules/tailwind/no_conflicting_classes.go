@@ -74,8 +74,8 @@ var NoConflictingClasses = rule.Rule{
 	Name: "better-tailwindcss/no-conflicting-classes",
 	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -87,17 +87,17 @@ var NoConflictingClasses = rule.Rule{
 		// Resolved once per file and before the listeners are built, matching the other migrated
 		// rules. A project with no Tailwind is silence with nothing wrong; a project whose CSS will
 		// not parse is reported once per file rather than swallowed.
-		designSystem := DesignSystemForProgramAt(ctx.Program, configured.Location())
+		designSystem := DesignSystemForProgramAt(ruleContext.Program, configured.Location())
 		if designSystem.Err != nil {
-			if ctx.Program == nil {
+			if ruleContext.Program == nil {
 				return nil
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if skipWithoutTailwind(ctx, designSystem.Err) {
+			if skipWithoutTailwind(ruleContext, designSystem.Err) {
 				return nil
 			}
-			return declineListeners(ctx, "no-conflicting-classes", designSystem)
+			return declineListeners(ruleContext, "no-conflicting-classes", designSystem)
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
@@ -105,11 +105,11 @@ var NoConflictingClasses = rule.Rule{
 			surfaces = configured.ClassLiteralSurfaces()
 		}
 
-		reader := surfaces.ReaderFor(ctx.FileCache)
+		reader := surfaces.ReaderFor(ruleContext.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
-				reportConflicts(ctx, literal, designSystem)
+				reportConflicts(ruleContext, literal, designSystem)
 			}
 		}
 
@@ -143,7 +143,7 @@ type classFacts struct {
 }
 
 // reportConflicts finds classes in one literal that collide on the same element in the same state.
-func reportConflicts(ctx rule.Context, literal ClassLiteral, designSystem DesignSystemResult) {
+func reportConflicts(ruleContext rule.Context, literal ClassLiteral, designSystem DesignSystemResult) {
 	classes := SplitClasses(literal.Text)
 	if len(classes) < 2 {
 		return
@@ -164,7 +164,7 @@ func reportConflicts(ctx rule.Context, literal ClassLiteral, designSystem Design
 	for _, finding := range conflictFindingsIn(distinct, designSystem) {
 		// Reported per class rather than per pair, which is what makes the output symmetric and
 		// matches upstream: `flex block` produces two findings, one anchored at each class.
-		ctx.ReportRange(literal.Range, messageConflictingClasses(
+		ruleContext.ReportRange(literal.Range, messageConflictingClasses(
 			finding.ClassName, finding.Conflicting, finding.Properties))
 	}
 }

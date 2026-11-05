@@ -64,7 +64,7 @@ func TestRuleMayDeclineAFile(test *testing.T) {
 	test.Parallel()
 	declining := Rule{
 		Name: "declines-everything",
-		Run: func(ctx Context, options any) Listeners {
+		Run: func(ruleContext Context, options any) Listeners {
 			return nil
 		},
 	}

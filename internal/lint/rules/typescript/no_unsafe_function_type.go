@@ -54,15 +54,15 @@ var messageBannedFunctionType = rule.Message{
 // blocking the rule on, and the clean fixtures pin the behavior either way.
 var NoUnsafeFunctionType = rule.Rule{
 	Name: "@typescript-eslint/no-unsafe-function-type",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		// One pass over the file's own statements, before any node is visited, to learn whether the
 		// name is shadowed here. Declining costs this scan; being wrong costs a false positive on a
 		// type the author defined themselves.
-		if module.DeclaresTypeNamed(ctx.SourceFile, "Function") {
+		if module.DeclaresTypeNamed(ruleContext.SourceFile, "Function") {
 			return nil
 		}
 
@@ -70,7 +70,7 @@ var NoUnsafeFunctionType = rule.Rule{
 			if node == nil || node.Kind != ast.KindIdentifier || node.Text() != "Function" {
 				return
 			}
-			ctx.ReportNode(node, messageBannedFunctionType)
+			ruleContext.ReportNode(node, messageBannedFunctionType)
 		}
 
 		// One listener covers all three positions, which is a real difference from the original and

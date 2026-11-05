@@ -15,11 +15,11 @@ func withSourceFile(test *testing.T, source string, ask func(sourceFile *ast.Sou
 	called := false
 	rule_testing.Run(test, rule.Rule{
 		Name: "declaration-probe",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					called = true
-					ask(ctx.SourceFile)
+					ask(ruleContext.SourceFile)
 				},
 			}
 		},

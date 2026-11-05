@@ -191,7 +191,7 @@ var ForbidPropTypes = rule.Rule{
 	// and `resolveToObjectLiteral` guards for it. The fixture below pins that the typed harness is
 	// required, so a later revert fails loudly instead of silently losing one shape.
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[ForbidPropTypesOptions](options)
 		if !ok {
 			// A rule configured as bare `"error"` arrives with nil options, which type-asserts to
@@ -202,7 +202,7 @@ var ForbidPropTypes = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				walker := &forbidPropTypesWalker{ctx: ctx, settings: settings}
+				walker := &forbidPropTypesWalker{ctx: ruleContext, settings: settings}
 				walker.collectImports(node)
 				walker.walk(node)
 			},

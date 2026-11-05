@@ -101,7 +101,7 @@ var StaticComponents = rule.Rule{
 	NeedsTypeChecker: true,
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// The whole file is taken at once rather than listening on each function kind, because
 			// lowering already descends into nested functions through the function arena. Listening
@@ -110,18 +110,18 @@ var StaticComponents = rule.Rule{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// A file that cannot hold a component or a hook is not lowered at all; see
 				// high_level_intermediate_representation.MayHoldComponentOrHook for why that is exact.
-				if !high_level_intermediate_representation.MayHoldComponentOrHook(ctx) {
+				if !high_level_intermediate_representation.MayHoldComponentOrHook(ruleContext) {
 					return
 				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
 					// Shared with the other rules that lower this same function; see high_level_intermediate_representation.ForFunction.
 					// Construct runs inside the cached computation, because it mutates in place and is
 					// not idempotent.
-					lowered := high_level_intermediate_representation.ForFunction(ctx, functionNode)
+					lowered := high_level_intermediate_representation.ForFunction(ruleContext, functionNode)
 					if lowered == nil {
 						return
 					}
-					analyzeCompiledFunction(ctx, lowered)
+					analyzeCompiledFunction(ruleContext, lowered)
 				})
 			},
 		}
@@ -159,7 +159,7 @@ func forEachCompiledFunction(root *ast.Node, visit func(*ast.Node)) {
 //
 // `Blocks` is in reverse postorder, which is what makes a single forward walk correct for
 // everything except a back edge, and the back edge is upstream's limitation too.
-func reportDynamicComponents(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+func reportDynamicComponents(ruleContext rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
@@ -225,11 +225,11 @@ func reportDynamicComponents(ctx rule.Context, function *high_level_intermediate
 				if !ok {
 					continue
 				}
-				message := staticComponentsMessage(ctx, function, creation)
+				message := staticComponentsMessage(ruleContext, function, creation)
 				if tagNode := identifierNode(function, value.Tag.Place.Identifier); tagNode != nil {
-					ctx.ReportNode(tagNode, message)
+					ruleContext.ReportNode(tagNode, message)
 				} else {
-					ctx.ReportRange(value.Tag.Place.Range, message)
+					ruleContext.ReportRange(value.Tag.Place.Range, message)
 				}
 			}
 		}
@@ -269,7 +269,7 @@ func reportDynamicComponents(ctx rule.Context, function *high_level_intermediate
 // is what makes this divergence dangerous rather than obvious. Fidelity is the authority here, the
 // gate is upstream's, and improving on it silently would make our findings and oxc's disagree on
 // real code while both looked correct.
-func analyzeCompiledFunction(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+func analyzeCompiledFunction(ruleContext rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
@@ -278,13 +278,13 @@ func analyzeCompiledFunction(ctx rule.Context, function *high_level_intermediate
 	// the functions it contains, because one of those may be a unit even when its wrapper is not.
 	if !isCompilationUnit(function) {
 		for _, nested := range function.Functions {
-			analyzeCompiledFunction(ctx, nested)
+			analyzeCompiledFunction(ruleContext, nested)
 		}
 		return
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+	function = high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunction)
 
 	// The OUTERMOST component or hook is the compilation unit, and the walk stops here. A function
@@ -302,7 +302,7 @@ func analyzeCompiledFunction(ctx rule.Context, function *high_level_intermediate
 	// rather than JSX it is not a component at all, so nothing admits it, and the walk continues
 	// down to `Inner`, which is one. That is `forEachOutermostFunction` plus this gate agreeing,
 	// not an exception to either.
-	reportDynamicComponents(ctx, function)
+	reportDynamicComponents(ruleContext, function)
 }
 
 // identifierNode returns the syntactic node a value came from, or nil for a pure temporary.
@@ -333,11 +333,11 @@ func identifierNode(function *high_level_intermediate_representation.Function, i
 // put, so it is quoted into the message instead. Read from the source text rather than rebuilt from
 // the representation, because the representation holds values rather than syntax and
 // `props.foo.bar()` has no readable spelling there.
-func staticComponentsMessage(ctx rule.Context, function *high_level_intermediate_representation.Function, creator static_single_assignment.IdentifierId) rule.Message {
+func staticComponentsMessage(ruleContext rule.Context, function *high_level_intermediate_representation.Function, creator static_single_assignment.IdentifierId) rule.Message {
 	created := ""
-	if node := identifierNode(function, creator); node != nil && ctx.SourceFile != nil {
-		span := rule.TokenRange(ctx.SourceFile, node)
-		sourceText := ctx.SourceFile.Text()
+	if node := identifierNode(function, creator); node != nil && ruleContext.SourceFile != nil {
+		span := rule.TokenRange(ruleContext.SourceFile, node)
+		sourceText := ruleContext.SourceFile.Text()
 		if span.Pos() >= 0 && span.End() <= len(sourceText) && span.Pos() < span.End() {
 			created = sourceText[span.Pos():span.End()]
 		}

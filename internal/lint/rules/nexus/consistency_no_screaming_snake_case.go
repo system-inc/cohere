@@ -56,7 +56,7 @@ func messageScreamingSnakeCaseLocal(name string, suggestion string) rule.Message
 // because MAX_RETRY_COUNT to maximumRetryCount is a rename the casing conversion cannot do.
 var ConsistencyNoScreamingSnakeCase = rule.Rule{
 	Name: "nexus/consistency-no-screaming-snake-case",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		allowed := map[string]bool{}
 		if settings, hasSettings := rule.OptionsAs[ConsistencyNoScreamingSnakeCaseOptions](options); hasSettings {
 			for _, name := range settings.Allow {
@@ -89,10 +89,10 @@ var ConsistencyNoScreamingSnakeCase = rule.Rule{
 				}
 
 				if module.IsExported(declarationList.Parent) {
-					ctx.ReportNode(name, messageScreamingSnakeCaseExported(name.Text(), toPascalCase(name.Text())))
+					ruleContext.ReportNode(name, messageScreamingSnakeCaseExported(name.Text(), toPascalCase(name.Text())))
 					return
 				}
-				ctx.ReportNode(name, messageScreamingSnakeCaseLocal(name.Text(), toCamelCase(name.Text())))
+				ruleContext.ReportNode(name, messageScreamingSnakeCaseLocal(name.Text(), toCamelCase(name.Text())))
 			},
 		}
 	},

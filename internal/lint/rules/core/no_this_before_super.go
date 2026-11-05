@@ -106,7 +106,7 @@ import (
 // appeared.
 var NoThisBeforeSuper = rule.Rule{
 	Name: "no-this-before-super",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		check := func(constructor *ast.Node) {
 			if !isDerivedClassConstructor(constructor) {
 				return
@@ -143,7 +143,7 @@ var NoThisBeforeSuper = rule.Rule{
 			if !violated && !scanner.scanStatements(declaration.Body.AsNode()) {
 				return
 			}
-			ctx.ReportRange(rule.TokenRange(ctx.SourceFile, constructor), rule.Message{
+			ruleContext.ReportRange(rule.TokenRange(ruleContext.SourceFile, constructor), rule.Message{
 				Id: "thisBeforeSuper",
 				Description: "This derived constructor reads `this` or `super` on a path that has " +
 					"not called `super()` yet, which throws a ReferenceError because the `this` " +

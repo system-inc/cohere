@@ -95,13 +95,13 @@ var CorrectnessNoCallbackInParseTry = rule.Rule{
 	// `parseJsonOrThrow` from any function of that name, and a parameter from a local of its name.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{
 			ast.KindTryStatement: func(node *ast.Node) {
-				correctnessNoCallbackInParseTryCheck(ctx, node)
+				correctnessNoCallbackInParseTryCheck(ruleContext, node)
 			},
 		}
 	},
@@ -110,17 +110,17 @@ var CorrectnessNoCallbackInParseTry = rule.Rule{
 // correctnessNoCallbackInParseTryJsonFileSuffix is the nexus file that declares `parseJsonOrThrow`.
 const correctnessNoCallbackInParseTryJsonFileSuffix = "/source/structured-text/json/Json.ts"
 
-func correctnessNoCallbackInParseTryCheck(ctx rule.Context, node *ast.Node) {
+func correctnessNoCallbackInParseTryCheck(ruleContext rule.Context, node *ast.Node) {
 	tryStatement := node.AsTryStatement()
-	if tryStatement.CatchClause == nil || !correctnessNoCallbackInParseTryCatchDiscards(ctx, tryStatement.CatchClause) {
+	if tryStatement.CatchClause == nil || !correctnessNoCallbackInParseTryCatchDiscards(ruleContext, tryStatement.CatchClause) {
 		return
 	}
 	parses := false
 	var callbacks []*ast.Node
 	correctnessNoCallbackInParseTryGuarded(tryStatement.TryBlock, func(call *ast.Node) {
-		if correctnessNoCallbackInParseTryIsParse(ctx, call) {
+		if correctnessNoCallbackInParseTryIsParse(ruleContext, call) {
 			parses = true
-		} else if correctnessNoCallbackInParseTryIsCallback(ctx, call) {
+		} else if correctnessNoCallbackInParseTryIsCallback(ruleContext, call) {
 			callbacks = append(callbacks, call)
 		}
 	})
@@ -128,14 +128,14 @@ func correctnessNoCallbackInParseTryCheck(ctx rule.Context, node *ast.Node) {
 		return
 	}
 	for _, call := range callbacks {
-		ctx.ReportNode(call, correctnessNoCallbackInParseTryMessage())
+		ruleContext.ReportNode(call, correctnessNoCallbackInParseTryMessage())
 	}
 }
 
 // correctnessNoCallbackInParseTryCatchDiscards says whether a catch clause throws the caught value
 // away: it binds nothing, or binds a plain name it never refers to. A destructured binding reads the
 // value by construction and does not count.
-func correctnessNoCallbackInParseTryCatchDiscards(ctx rule.Context, catchClause *ast.Node) bool {
+func correctnessNoCallbackInParseTryCatchDiscards(ruleContext rule.Context, catchClause *ast.Node) bool {
 	clause := catchClause.AsCatchClause()
 	if clause.VariableDeclaration == nil {
 		return true
@@ -144,7 +144,7 @@ func correctnessNoCallbackInParseTryCatchDiscards(ctx rule.Context, catchClause 
 	if name == nil || name.Kind != ast.KindIdentifier {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if symbol == nil {
 		return false
 	}
@@ -155,9 +155,9 @@ func correctnessNoCallbackInParseTryCatchDiscards(ctx rule.Context, catchClause 
 			return true
 		}
 		if child.Kind == ast.KindIdentifier && child.Text() == name.Text() {
-			resolved := ctx.TypeChecker.GetSymbolAtLocation(child)
+			resolved := ruleContext.TypeChecker.GetSymbolAtLocation(child)
 			if parent := child.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
-				resolved = ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent)
+				resolved = ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(parent)
 			}
 			// An unresolved identifier of the same name may still be the binding; count it as read.
 			if resolved == nil || resolved == symbol {
@@ -201,16 +201,16 @@ func correctnessNoCallbackInParseTryGuarded(block *ast.Node, visitCall func(call
 
 // correctnessNoCallbackInParseTryIsParse says whether a call is `JSON.parse` or nexus
 // `parseJsonOrThrow`, by the declaration its callee resolves to.
-func correctnessNoCallbackInParseTryIsParse(ctx rule.Context, call *ast.Node) bool {
+func correctnessNoCallbackInParseTryIsParse(ruleContext rule.Context, call *ast.Node) bool {
 	callee := ast.SkipParentheses(call.AsCallExpression().Expression)
 	switch callee.Kind {
 	case ast.KindIdentifier:
 		// Resolved whatever it is spelled, so an aliased import of nexus's parser counts and a local
 		// function that happens to share its name does not.
-		return correctnessNoCallbackInParseTryIsParseJsonOrThrow(ctx, ctx.TypeChecker.GetSymbolAtLocation(callee))
+		return correctnessNoCallbackInParseTryIsParseJsonOrThrow(ruleContext, ruleContext.TypeChecker.GetSymbolAtLocation(callee))
 	case ast.KindPropertyAccessExpression:
 		name := callee.AsPropertyAccessExpression().Name()
-		return name.Kind == ast.KindIdentifier && correctnessNoCallbackInParseTryIsJsonParse(ctx.TypeChecker.GetSymbolAtLocation(name))
+		return name.Kind == ast.KindIdentifier && correctnessNoCallbackInParseTryIsJsonParse(ruleContext.TypeChecker.GetSymbolAtLocation(name))
 	}
 	return false
 }
@@ -239,12 +239,12 @@ func correctnessNoCallbackInParseTryIsJsonParse(symbol *ast.Symbol) bool {
 
 // correctnessNoCallbackInParseTryIsParseJsonOrThrow says whether a symbol, through an import, is the
 // function `parseJsonOrThrow` declared in nexus's Json.ts.
-func correctnessNoCallbackInParseTryIsParseJsonOrThrow(ctx rule.Context, symbol *ast.Symbol) bool {
+func correctnessNoCallbackInParseTryIsParseJsonOrThrow(ruleContext rule.Context, symbol *ast.Symbol) bool {
 	if symbol == nil {
 		return false
 	}
 	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
-		symbol = checker.SkipAlias(symbol, ctx.TypeChecker)
+		symbol = checker.SkipAlias(symbol, ruleContext.TypeChecker)
 	}
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false
@@ -282,7 +282,7 @@ func correctnessNoCallbackInParseTryIsGlobalDeclaration(declaration *ast.Node) b
 // correctnessNoCallbackInParseTryIsCallback says whether a call runs a caller-supplied function: its
 // callee is a name bound by a parameter, directly or destructured, whose type is callable once the
 // nullish part is set aside, and which is not a Promise executor's resolve or reject.
-func correctnessNoCallbackInParseTryIsCallback(ctx rule.Context, call *ast.Node) bool {
+func correctnessNoCallbackInParseTryIsCallback(ruleContext rule.Context, call *ast.Node) bool {
 	callee := call.AsCallExpression().Expression
 	for callee.Kind == ast.KindParenthesizedExpression || callee.Kind == ast.KindNonNullExpression {
 		if callee.Kind == ast.KindParenthesizedExpression {
@@ -294,20 +294,20 @@ func correctnessNoCallbackInParseTryIsCallback(ctx rule.Context, call *ast.Node)
 	if callee.Kind != ast.KindIdentifier {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(callee)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(callee)
 	if symbol == nil || len(symbol.Declarations) != 1 {
 		return false
 	}
 	parameter := correctnessNoCallbackInParseTryOwningParameter(symbol.Declarations[0])
-	if parameter == nil || correctnessNoCallbackInParseTryIsPromiseExecutorParameter(ctx, parameter) {
+	if parameter == nil || correctnessNoCallbackInParseTryIsPromiseExecutorParameter(ruleContext, parameter) {
 		return false
 	}
 	// An `any` callee has no call signature, so it is not counted here.
-	calleeType := ctx.TypeChecker.GetTypeAtLocation(callee)
+	calleeType := ruleContext.TypeChecker.GetTypeAtLocation(callee)
 	if calleeType == nil {
 		return false
 	}
-	return len(ctx.TypeChecker.GetSignaturesOfType(ctx.TypeChecker.GetNonNullableType(calleeType), checker.SignatureKindCall)) > 0
+	return len(ruleContext.TypeChecker.GetSignaturesOfType(ruleContext.TypeChecker.GetNonNullableType(calleeType), checker.SignatureKindCall)) > 0
 }
 
 // correctnessNoCallbackInParseTryOwningParameter is the parameter a declaration belongs to: the
@@ -331,7 +331,7 @@ func correctnessNoCallbackInParseTryOwningParameter(declaration *ast.Node) *ast.
 // correctnessNoCallbackInParseTryIsPromiseExecutorParameter says whether a parameter is the first or
 // second of a function passed straight as the executor of `new Promise(...)`, the global Promise.
 // Those are the resolve and reject functions, which never throw.
-func correctnessNoCallbackInParseTryIsPromiseExecutorParameter(ctx rule.Context, parameter *ast.Node) bool {
+func correctnessNoCallbackInParseTryIsPromiseExecutorParameter(ruleContext rule.Context, parameter *ast.Node) bool {
 	executor := parameter.Parent
 	if executor == nil || (executor.Kind != ast.KindArrowFunction && executor.Kind != ast.KindFunctionExpression) {
 		return false
@@ -357,7 +357,7 @@ func correctnessNoCallbackInParseTryIsPromiseExecutorParameter(ctx rule.Context,
 	if constructor.Kind != ast.KindIdentifier || constructor.Text() != "Promise" {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(constructor)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(constructor)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false
 	}

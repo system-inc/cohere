@@ -80,10 +80,10 @@ var CorrectnessRequireOrmColumnNullableParity = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -126,13 +126,13 @@ var CorrectnessRequireOrmColumnNullableParity = rule.Rule{
 					return
 				}
 
-				propertyType := ctx.TypeChecker.GetTypeAtLocation(name)
+				propertyType := ruleContext.TypeChecker.GetTypeAtLocation(name)
 				if propertyType == nil || decorators.IsNullableType(propertyType) {
 					return
 				}
 
-				ctx.ReportNode(name, buildColumnNullableButTypeNotMessage(
-					ctx.TypeChecker.TypeToString(propertyType)))
+				ruleContext.ReportNode(name, buildColumnNullableButTypeNotMessage(
+					ruleContext.TypeChecker.TypeToString(propertyType)))
 			},
 		}
 	},

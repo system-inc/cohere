@@ -127,30 +127,30 @@ var LocalizationNoUntranslatedValue = rule.Rule{
 	// A file's verdict reads its own bytes and path and its directory's English tables, so every English
 	// table in the program is the fingerprint (#31ffaaa). See localizationNoUntranslatedValueFingerprint.
 	ProgramFingerprint: localizationNoUntranslatedValueFingerprint,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
-		localeCode, translationsDirectory, isTranslationFile := translationFileInformation(ctx.SourceFile)
+		localeCode, translationsDirectory, isTranslationFile := translationFileInformation(ruleContext.SourceFile)
 		if !isTranslationFile {
 			// Deciding on the path alone, before any node is visited, is what keeps this rule free
 			// on the overwhelming majority of files that are not locale data.
 			return nil
 		}
 
-		if ctx.Program == nil {
+		if ruleContext.Program == nil {
 			return nil
 		}
-		englishSourceFile, both := englishSibling(ctx.Program, translationsDirectory, ctx.SourceFile.FileName().AsString())
-		fileStart := ctx.SourceFile.AsNode().Loc.WithEnd(ctx.SourceFile.AsNode().Loc.Pos())
+		englishSourceFile, both := englishSibling(ruleContext.Program, translationsDirectory, ruleContext.SourceFile.FileName().AsString())
+		fileStart := ruleContext.SourceFile.AsNode().Loc.WithEnd(ruleContext.SourceFile.AsNode().Loc.Pos())
 		if both != nil {
-			ctx.ReportRange(fileStart, messageAmbiguousEnglishSibling(both[0], both[1]))
+			ruleContext.ReportRange(fileStart, messageAmbiguousEnglishSibling(both[0], both[1]))
 			return nil
 		}
 		if englishSourceFile == nil {
-			lookedFor := englishSiblingBaseNames(ctx.SourceFile.FileName().AsString())
-			ctx.ReportRange(fileStart, messageMissingEnglishSibling(lookedFor[0], lookedFor[1]))
+			lookedFor := englishSiblingBaseNames(ruleContext.SourceFile.FileName().AsString())
+			ruleContext.ReportRange(fileStart, messageMissingEnglishSibling(lookedFor[0], lookedFor[1]))
 			return nil
 		}
 		englishValues := map[string]string{}
@@ -170,12 +170,12 @@ var LocalizationNoUntranslatedValue = rule.Rule{
 					return
 				}
 
-				objectLiteral := resolveObjectLiteral(assignment.Expression, ctx.SourceFile)
+				objectLiteral := resolveObjectLiteral(assignment.Expression, ruleContext.SourceFile)
 				if objectLiteral == nil {
 					return
 				}
 
-				reportUntranslated(ctx, objectLiteral, "", englishValues, localeCode)
+				reportUntranslated(ruleContext, objectLiteral, "", englishValues, localeCode)
 			},
 		}
 	},
@@ -186,7 +186,7 @@ var LocalizationNoUntranslatedValue = rule.Rule{
 // Nested objects recurse with a dotted prefix, so a key path in a finding reads the same way it is
 // written in the file.
 func reportUntranslated(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	objectLiteral *ast.Node,
 	prefix string,
 	englishValues map[string]string,
@@ -201,15 +201,15 @@ func reportUntranslated(
 		}
 
 		if text.TrimWhitespace(value) == "" && text.TrimWhitespace(englishValue) != "" {
-			ctx.ReportNode(valueNode, messageMissingTranslation(key, localeCode))
+			ruleContext.ReportNode(valueNode, messageMissingTranslation(key, localeCode))
 			return
 		}
 
 		if value == englishValue && len(englishValue) >= minimumLengthToFlagAsUntranslated {
-			ctx.ReportNode(valueNode, messageIdenticalToSource(key, localeCode, englishValue))
+			ruleContext.ReportNode(valueNode, messageIdenticalToSource(key, localeCode, englishValue))
 		}
 	}, func(key string, nested *ast.Node) {
-		reportUntranslated(ctx, nested, key, englishValues, localeCode)
+		reportUntranslated(ruleContext, nested, key, englishValues, localeCode)
 	})
 }
 

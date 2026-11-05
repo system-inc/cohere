@@ -209,16 +209,16 @@ func jsxNoConstructedContextValuesMessage(
 var JsxNoConstructedContextValues = rule.Rule{
 	Name:             "react/jsx-no-constructed-context-values",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
 		check := func(node *ast.Node, tagName *ast.Node, attributes *ast.Node) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
-			if !jsxNoConstructedContextValuesIsProvider(ctx, tagName) {
+			if !jsxNoConstructedContextValuesIsProvider(ruleContext, tagName) {
 				return
 			}
 
@@ -227,13 +227,13 @@ var JsxNoConstructedContextValues = rule.Rule{
 				return
 			}
 
-			construction := jsxNoConstructedContextValuesConstructionOf(ctx, value, 0)
+			construction := jsxNoConstructedContextValuesConstructionOf(ruleContext, value, 0)
 			if construction == nil {
 				// Upstream stops here. cohere goes one level further: a memoized value whose inputs
 				// change every render is not stable either. See
 				// jsx_no_constructed_context_values_stability.go.
 				if jsxNoConstructedContextValuesInComponent(node) {
-					jsxNoConstructedContextValuesCheckMemo(ctx, value, node)
+					jsxNoConstructedContextValuesCheckMemo(ruleContext, value, node)
 				}
 				return
 			}
@@ -254,19 +254,19 @@ var JsxNoConstructedContextValues = rule.Rule{
 			// `ctx.ReportNode` already routes through TokenRange and so was pointing correctly all
 			// along; only the interpolated line number was wrong, which is exactly the failure the
 			// brief describes for any message built with a format string.
-			nodeLine, _ := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile,
-				rule.TokenRange(ctx.SourceFile, construction.node).Pos())
+			nodeLine, _ := scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile,
+				rule.TokenRange(ruleContext.SourceFile, construction.node).Pos())
 			usageLine, variableName := 0, ""
 			if construction.usage != nil {
-				usageLine, _ = scanner.GetLineAndCharacterOfPosition(ctx.SourceFile,
-					rule.TokenRange(ctx.SourceFile, construction.usage).Pos())
+				usageLine, _ = scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile,
+					rule.TokenRange(ruleContext.SourceFile, construction.usage).Pos())
 				usageLine++
 				if construction.usage.Kind == ast.KindIdentifier {
 					variableName = construction.usage.Text()
 				}
 			}
 
-			ctx.ReportNode(construction.node, jsxNoConstructedContextValuesMessage(
+			ruleContext.ReportNode(construction.node, jsxNoConstructedContextValuesMessage(
 				*construction, nodeLine+1, usageLine, variableName,
 			))
 		}
@@ -289,7 +289,7 @@ var JsxNoConstructedContextValues = rule.Rule{
 // The two paths are not symmetric and the asymmetry is upstream's. A qualified name only has to end
 // in `Provider`, with the object never examined, so `<Anything.Provider>` qualifies. A bare
 // identifier has to resolve to a `createContext` call. Both measured on the installed build.
-func jsxNoConstructedContextValuesIsProvider(ctx rule.Context, tagName *ast.Node) bool {
+func jsxNoConstructedContextValuesIsProvider(ruleContext rule.Context, tagName *ast.Node) bool {
 	if tagName == nil {
 		return false
 	}
@@ -300,7 +300,7 @@ func jsxNoConstructedContextValuesIsProvider(ctx rule.Context, tagName *ast.Node
 		return name != nil && name.Kind == ast.KindIdentifier && name.Text() == "Provider"
 
 	case ast.KindIdentifier:
-		return jsxNoConstructedContextValuesResolvesToCreateContext(ctx, tagName)
+		return jsxNoConstructedContextValuesResolvesToCreateContext(ruleContext, tagName)
 	}
 	return false
 }
@@ -316,8 +316,8 @@ func jsxNoConstructedContextValuesIsProvider(ctx rule.Context, tagName *ast.Node
 // index-zero read goes silent on merged shapes. Upstream reads `defs[0]`; looping can only be
 // wider, and for this predicate wider means "any declaration initializes it as a context", which is
 // the same answer whenever only one declaration has an initializer at all.
-func jsxNoConstructedContextValuesResolvesToCreateContext(ctx rule.Context, identifier *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func jsxNoConstructedContextValuesResolvesToCreateContext(ruleContext rule.Context, identifier *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return false
 	}
@@ -432,7 +432,7 @@ const jsxNoConstructedContextValuesRecursionLimit = 16
 // logical expression is observable: the LEFT side is tried first, so `c ? {a:1} : {b:2}` reports on
 // `{a:1}`.
 func jsxNoConstructedContextValuesConstructionOf(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	depth int,
 ) *jsxNoConstructedContextValuesConstruction {
@@ -473,13 +473,13 @@ func jsxNoConstructedContextValuesConstructionOf(
 		// Recursing through it reproduces upstream's verdict on source upstream cannot represent,
 		// and `({a:1})` as a value is ordinary in this tree.
 		return jsxNoConstructedContextValuesConstructionOf(
-			ctx, node.AsParenthesizedExpression().Expression, depth+1,
+			ruleContext, node.AsParenthesizedExpression().Expression, depth+1,
 		)
 
 	case ast.KindAsExpression:
 		// Upstream's `TSAsExpression` arm.
 		return jsxNoConstructedContextValuesConstructionOf(
-			ctx, node.AsAsExpression().Expression, depth+1,
+			ruleContext, node.AsAsExpression().Expression, depth+1,
 		)
 
 	case ast.KindSatisfiesExpression:
@@ -488,22 +488,22 @@ func jsxNoConstructedContextValuesConstructionOf(
 		// reproduction. It has its own arm because its node is not an AsExpression: reading it as one
 		// panicked on `value={({} satisfies object)}`.
 		return jsxNoConstructedContextValuesConstructionOf(
-			ctx, node.AsSatisfiesExpression().Expression, depth+1,
+			ruleContext, node.AsSatisfiesExpression().Expression, depth+1,
 		)
 
 	case ast.KindConditionalExpression:
 		conditional := node.AsConditionalExpression()
-		if found := jsxNoConstructedContextValuesConstructionOf(ctx, conditional.WhenTrue, depth+1); found != nil {
+		if found := jsxNoConstructedContextValuesConstructionOf(ruleContext, conditional.WhenTrue, depth+1); found != nil {
 			return found
 		}
-		return jsxNoConstructedContextValuesConstructionOf(ctx, conditional.WhenFalse, depth+1)
+		return jsxNoConstructedContextValuesConstructionOf(ruleContext, conditional.WhenFalse, depth+1)
 
 	case ast.KindBinaryExpression:
 		binary := node.AsBinaryExpression()
 		if ast.IsAssignmentOperator(binary.OperatorToken.Kind) {
 			// Upstream's AssignmentExpression arm: recurse into the right side, then relabel the
 			// kind and set the whole assignment as the usage.
-			found := jsxNoConstructedContextValuesConstructionOf(ctx, binary.Right, depth+1)
+			found := jsxNoConstructedContextValuesConstructionOf(ruleContext, binary.Right, depth+1)
 			if found == nil {
 				return nil
 			}
@@ -518,14 +518,14 @@ func jsxNoConstructedContextValuesConstructionOf(
 			// LogicalExpression arm and no BinaryExpression one.
 			return nil
 		}
-		if found := jsxNoConstructedContextValuesConstructionOf(ctx, binary.Left, depth+1); found != nil {
+		if found := jsxNoConstructedContextValuesConstructionOf(ruleContext, binary.Left, depth+1); found != nil {
 			return found
 		}
-		return jsxNoConstructedContextValuesConstructionOf(ctx, binary.Right, depth+1)
+		return jsxNoConstructedContextValuesConstructionOf(ruleContext, binary.Right, depth+1)
 
 	case ast.KindPropertyAccessExpression:
 		found := jsxNoConstructedContextValuesConstructionOf(
-			ctx, node.AsPropertyAccessExpression().Expression, depth+1,
+			ruleContext, node.AsPropertyAccessExpression().Expression, depth+1,
 		)
 		if found == nil {
 			return nil
@@ -538,7 +538,7 @@ func jsxNoConstructedContextValuesConstructionOf(
 		}
 
 	case ast.KindIdentifier:
-		return jsxNoConstructedContextValuesFollowIdentifier(ctx, node, depth)
+		return jsxNoConstructedContextValuesFollowIdentifier(ruleContext, node, depth)
 	}
 
 	return nil
@@ -570,11 +570,11 @@ func jsxNoConstructedContextValuesIsLogicalOperator(kind ast.Kind) bool {
 // `GetSymbolAtLocation` is truncated on an exported declaration, which would otherwise go silent on
 // `export const v = {a:1}`, a shape the corpus does not write and this tree does constantly.
 func jsxNoConstructedContextValuesFollowIdentifier(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	identifier *ast.Node,
 	depth int,
 ) *jsxNoConstructedContextValuesConstruction {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return nil
 	}
@@ -620,7 +620,7 @@ func jsxNoConstructedContextValuesFollowIdentifier(
 		if initializer == nil {
 			return nil
 		}
-		found := jsxNoConstructedContextValuesConstructionOf(ctx, initializer, depth+1)
+		found := jsxNoConstructedContextValuesConstructionOf(ruleContext, initializer, depth+1)
 		if found == nil {
 			return nil
 		}

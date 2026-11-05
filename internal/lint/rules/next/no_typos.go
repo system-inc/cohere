@@ -109,8 +109,8 @@ var NoTypos = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-typos` and matching strips the namespace on a
 	// `/` boundary, so a prefixed name matches nothing and runs on no files while every test passes.
 	Name: "@next/next/no-typos",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if !nextjs.IsInPagesDirectory(ctx.SourceFile.FileName().AsString()) {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if !nextjs.IsInPagesDirectory(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 
@@ -134,7 +134,7 @@ var NoTypos = rule.Rule{
 			// alone, and ESLint's original reports the whole export, so this follows oxc. The
 			// narrower span is also the one that reads correctly when a statement declares several
 			// names and only one is wrong.
-			ctx.ReportNode(name, message)
+			ruleContext.ReportNode(name, message)
 		}
 
 		return rule.Listeners{

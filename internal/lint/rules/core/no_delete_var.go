@@ -34,14 +34,14 @@ var messageUnexpectedDeleteVar = rule.Message{
 // and guessing wrong changes what the code does rather than how it reads.
 var NoDeleteVar = rule.Rule{
 	Name: "no-delete-var",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDeleteExpression: func(node *ast.Node) {
 				target := ast.SkipParentheses(node.AsDeleteExpression().Expression)
 				if target == nil || target.Kind != ast.KindIdentifier {
 					return
 				}
-				ctx.ReportNode(node, messageUnexpectedDeleteVar)
+				ruleContext.ReportNode(node, messageUnexpectedDeleteVar)
 			},
 		}
 	},

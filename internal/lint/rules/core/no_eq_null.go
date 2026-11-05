@@ -51,7 +51,7 @@ var messageNoEqNull = rule.Message{
 // stays on the whole binary expression, parentheses included, which is what those columns say.
 var NoEqNull = rule.Rule{
 	Name: "no-eq-null",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
@@ -71,7 +71,7 @@ var NoEqNull = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(node, messageNoEqNull)
+				ruleContext.ReportNode(node, messageNoEqNull)
 			},
 		}
 	},

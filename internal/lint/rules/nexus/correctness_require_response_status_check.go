@@ -145,13 +145,13 @@ var CorrectnessRequireResponseStatusCheck = rule.Rule{
 	// Structure NetworkService method from any other `request`, and one binding from a shadowing one.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
-				correctnessRequireResponseStatusCheckScanFile(ctx, sourceFile)
+				correctnessRequireResponseStatusCheckScanFile(ruleContext, sourceFile)
 			},
 		}
 	},
@@ -208,7 +208,7 @@ type correctnessRequireResponseStatusCheckEvent struct {
 	report *ast.Node
 }
 
-func correctnessRequireResponseStatusCheckScanFile(ctx rule.Context, sourceFile *ast.Node) {
+func correctnessRequireResponseStatusCheckScanFile(ruleContext rule.Context, sourceFile *ast.Node) {
 	bindingsByRoot := map[*ast.Node][]*correctnessRequireResponseStatusCheckBinding{}
 	var roots []*ast.Node
 	track := func(binding *correctnessRequireResponseStatusCheckBinding) {
@@ -225,21 +225,21 @@ func correctnessRequireResponseStatusCheckScanFile(ctx rule.Context, sourceFile 
 			awaited := ast.SkipParentheses(node.AsExpressionStatement().Expression)
 			if awaited.Kind == ast.KindAwaitExpression {
 				call := ast.SkipParentheses(awaited.AsAwaitExpression().Expression)
-				if correctnessRequireResponseStatusCheckIsProducer(ctx, call) {
-					ctx.ReportNode(node, correctnessRequireResponseStatusCheckDiscardMessage())
+				if correctnessRequireResponseStatusCheckIsProducer(ruleContext, call) {
+					ruleContext.ReportNode(node, correctnessRequireResponseStatusCheckDiscardMessage())
 				}
 			}
 		case ast.KindAwaitExpression:
 			call := ast.SkipParentheses(node.AsAwaitExpression().Expression)
-			if correctnessRequireResponseStatusCheckIsProducer(ctx, call) {
-				if binding := correctnessRequireResponseStatusCheckConstBinding(ctx, node); binding != nil {
+			if correctnessRequireResponseStatusCheckIsProducer(ruleContext, call) {
+				if binding := correctnessRequireResponseStatusCheckConstBinding(ruleContext, node); binding != nil {
 					track(binding)
 				} else if use, report := correctnessRequireResponseStatusCheckClassify(node); use == correctnessRequireResponseStatusCheckBodyRead {
-					ctx.ReportNode(report, correctnessRequireResponseStatusCheckBodyMessage())
+					ruleContext.ReportNode(report, correctnessRequireResponseStatusCheckBodyMessage())
 				}
 			}
 		case ast.KindCallExpression:
-			if binding := correctnessRequireResponseStatusCheckThenBinding(ctx, node); binding != nil {
+			if binding := correctnessRequireResponseStatusCheckThenBinding(ruleContext, node); binding != nil {
 				track(binding)
 			}
 		}
@@ -249,14 +249,14 @@ func correctnessRequireResponseStatusCheckScanFile(ctx rule.Context, sourceFile 
 	sourceFile.ForEachChild(visit)
 
 	for _, root := range roots {
-		correctnessRequireResponseStatusCheckAnalyzeRoot(ctx, root, bindingsByRoot[root])
+		correctnessRequireResponseStatusCheckAnalyzeRoot(ruleContext, root, bindingsByRoot[root])
 	}
 }
 
 // correctnessRequireResponseStatusCheckIsProducer says whether a node is a call to the platform's
 // fetch or to Structure's NetworkService request methods, the calls known not to throw on an HTTP
 // error status.
-func correctnessRequireResponseStatusCheckIsProducer(ctx rule.Context, node *ast.Node) bool {
+func correctnessRequireResponseStatusCheckIsProducer(ruleContext rule.Context, node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return false
 	}
@@ -275,10 +275,10 @@ func correctnessRequireResponseStatusCheckIsProducer(ctx rule.Context, node *ast
 	}
 	switch name.Text() {
 	case "fetch":
-		return correctnessRequireResponseStatusCheckIsGlobalFetch(ctx.TypeChecker.GetSymbolAtLocation(name))
+		return correctnessRequireResponseStatusCheckIsGlobalFetch(ruleContext.TypeChecker.GetSymbolAtLocation(name))
 	case "request", "baseApiRequest":
 		return callee.Kind == ast.KindPropertyAccessExpression &&
-			correctnessRequireResponseStatusCheckIsNetworkServiceMethod(ctx.TypeChecker.GetSymbolAtLocation(name))
+			correctnessRequireResponseStatusCheckIsNetworkServiceMethod(ruleContext.TypeChecker.GetSymbolAtLocation(name))
 	}
 	return false
 }
@@ -358,7 +358,7 @@ func correctnessRequireResponseStatusCheckIsNetworkServiceMethod(symbol *ast.Sym
 // correctnessRequireResponseStatusCheckConstBinding is the binding `const response = await
 // <producer>(...)` declares, when the await is that whole initializer and the name is a plain
 // identifier.
-func correctnessRequireResponseStatusCheckConstBinding(ctx rule.Context, await *ast.Node) *correctnessRequireResponseStatusCheckBinding {
+func correctnessRequireResponseStatusCheckConstBinding(ruleContext rule.Context, await *ast.Node) *correctnessRequireResponseStatusCheckBinding {
 	declaration := await.Parent
 	for declaration != nil && declaration.Kind == ast.KindParenthesizedExpression {
 		declaration = declaration.Parent
@@ -373,7 +373,7 @@ func correctnessRequireResponseStatusCheckConstBinding(ctx rule.Context, await *
 		list.Flags&ast.NodeFlagsConst == 0 {
 		return nil
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	root := control_flow_graph.RootOf(declaration)
 	if symbol == nil || root == nil {
 		return nil
@@ -384,14 +384,14 @@ func correctnessRequireResponseStatusCheckConstBinding(ctx rule.Context, await *
 // correctnessRequireResponseStatusCheckThenBinding is the parameter of `producer(...).then(function(
 // response) { ... })`, a callback passed straight to `.then` on a tracked call, when that parameter
 // is a plain identifier with no default.
-func correctnessRequireResponseStatusCheckThenBinding(ctx rule.Context, call *ast.Node) *correctnessRequireResponseStatusCheckBinding {
+func correctnessRequireResponseStatusCheckThenBinding(ruleContext rule.Context, call *ast.Node) *correctnessRequireResponseStatusCheckBinding {
 	callee := ast.SkipParentheses(call.AsCallExpression().Expression)
 	if callee.Kind != ast.KindPropertyAccessExpression {
 		return nil
 	}
 	access := callee.AsPropertyAccessExpression()
 	if access.Name().Kind != ast.KindIdentifier || access.Name().Text() != "then" ||
-		!correctnessRequireResponseStatusCheckIsProducer(ctx, ast.SkipParentheses(access.Expression)) {
+		!correctnessRequireResponseStatusCheckIsProducer(ruleContext, ast.SkipParentheses(access.Expression)) {
 		return nil
 	}
 	arguments := call.AsCallExpression().Arguments
@@ -411,7 +411,7 @@ func correctnessRequireResponseStatusCheckThenBinding(ctx rule.Context, call *as
 	if name == nil || name.Kind != ast.KindIdentifier || parameter.Initializer != nil || parameter.DotDotDotToken != nil {
 		return nil
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if symbol == nil {
 		return nil
 	}
@@ -466,7 +466,7 @@ func correctnessRequireResponseStatusCheckClassify(expression *ast.Node) (correc
 // correctnessRequireResponseStatusCheckAnalyzeRoot collects each binding's references, builds the
 // root's graph once for all of them, and reports every body read on an unchecked path.
 func correctnessRequireResponseStatusCheckAnalyzeRoot(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	root *ast.Node,
 	bindings []*correctnessRequireResponseStatusCheckBinding,
 ) {
@@ -483,11 +483,11 @@ func correctnessRequireResponseStatusCheckAnalyzeRoot(
 			return nil
 		}
 		if parent := identifier.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
-			if symbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
+			if symbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
 				return bySymbol[symbol]
 			}
 		}
-		return bySymbol[ctx.TypeChecker.GetSymbolAtLocation(identifier)]
+		return bySymbol[ruleContext.TypeChecker.GetSymbolAtLocation(identifier)]
 	}
 
 	// Every reference, with the ones inside a nested function dropping their binding and the ones in
@@ -511,7 +511,7 @@ func correctnessRequireResponseStatusCheckAnalyzeRoot(
 
 	for _, binding := range bindings {
 		if !binding.dropped && len(binding.references) == 0 {
-			ctx.ReportNode(binding.producer, correctnessRequireResponseStatusCheckDiscardMessage())
+			ruleContext.ReportNode(binding.producer, correctnessRequireResponseStatusCheckDiscardMessage())
 			binding.dropped = true
 		}
 	}
@@ -555,7 +555,7 @@ func correctnessRequireResponseStatusCheckAnalyzeRoot(
 			continue
 		}
 		for _, report := range correctnessRequireResponseStatusCheckUncheckedReads(graph, final, binding) {
-			ctx.ReportNode(report, correctnessRequireResponseStatusCheckBodyMessage())
+			ruleContext.ReportNode(report, correctnessRequireResponseStatusCheckBodyMessage())
 		}
 	}
 }

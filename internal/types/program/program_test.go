@@ -137,8 +137,8 @@ func TestWalkDispatchesRulesWithALiveChecker(test *testing.T) {
 		// below is what catches an undeclared rule, and it caught this one.
 		NeedsTypeChecker: true,
 
-		Run: func(ctx rule.Context, options any) rule.Listeners {
-			if ctx.TypeChecker == nil {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			if ruleContext.TypeChecker == nil {
 				test.Error("a rule was dispatched without a checker")
 				return nil
 			}
@@ -148,12 +148,12 @@ func TestWalkDispatchesRulesWithALiveChecker(test *testing.T) {
 					if declaration == nil || declaration.Initializer == nil {
 						return
 					}
-					initializerType := ctx.TypeChecker.GetTypeAtLocation(declaration.Initializer)
+					initializerType := ruleContext.TypeChecker.GetTypeAtLocation(declaration.Initializer)
 					if initializerType == nil {
 						return
 					}
-					typeNames = append(typeNames, ctx.TypeChecker.TypeToString(initializerType))
-					ctx.ReportNode(node, rule.Message{Id: "sawType", Description: "saw a type"})
+					typeNames = append(typeNames, ruleContext.TypeChecker.TypeToString(initializerType))
+					ruleContext.ReportNode(node, rule.Message{Id: "sawType", Description: "saw a type"})
 				},
 			}
 		},
@@ -199,7 +199,7 @@ func TestWalkReportsCoverage(test *testing.T) {
 
 	listening := rule.Rule{
 		Name: "test-listening",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {}}
 		},
 	}
@@ -207,7 +207,7 @@ func TestWalkReportsCoverage(test *testing.T) {
 	// Four rules in the gate this tool replaces were dead for months inside that ambiguity.
 	declining := rule.Rule{
 		Name: "test-declining",
-		Run:  func(ctx rule.Context, options any) rule.Listeners { return nil },
+		Run:  func(ruleContext rule.Context, options any) rule.Listeners { return nil },
 	}
 
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{listening, declining})
@@ -446,10 +446,10 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(test *testing.T) {
 	panicsInAListener := rule.Rule{
 		Name:             "test-typed-panics-in-a-listener",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindVariableDeclaration: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Error("a type-aware rule ran without a checker, so this is not the typed path")
 					}
 					panic("simulated accessor panic on an unhandled kind")
@@ -460,16 +460,16 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(test *testing.T) {
 	panicsInRun := rule.Rule{
 		Name:             "test-typed-panics-in-run",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			panic("simulated panic before any listener")
 		},
 	}
 	witness := rule.Rule{
 		Name: "test-reports-every-declaration",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindVariableDeclaration: func(node *ast.Node) {
-					ctx.ReportNode(node, rule.Message{Id: "sawDeclaration", Description: "saw a declaration"})
+					ruleContext.ReportNode(node, rule.Message{Id: "sawDeclaration", Description: "saw a declaration"})
 				},
 			}
 		},
@@ -536,15 +536,15 @@ func TestAProgramARuleKeepsPastItsFileIsEnded(test *testing.T) {
 	keeper := rule.Rule{
 		Name:         "test-keeps-its-program",
 		ProgramReads: rule.ReadsCompilerOptions,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
-			if ctx.Program.Options() == nil {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			if ruleContext.Program.Options() == nil {
 				test.Error("the program view read no options during its own file")
 			}
 			keptLock.Lock()
-			kept = append(kept, ctx.Program)
+			kept = append(kept, ruleContext.Program)
 			keptLock.Unlock()
 			return rule.Listeners{
-				ast.KindVariableDeclaration: func(node *ast.Node) { ctx.Program.Options() },
+				ast.KindVariableDeclaration: func(node *ast.Node) { ruleContext.Program.Options() },
 			}
 		},
 	}
@@ -591,7 +591,7 @@ func TestAWalkWithoutAPanicReportsNoCrashedFile(test *testing.T) {
 
 	quiet := rule.Rule{
 		Name: "test-reports-nothing",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindVariableDeclaration: func(node *ast.Node) {},
 			}

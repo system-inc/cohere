@@ -105,7 +105,7 @@ var PreferReduceTypeParameter = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// isArrayOrTupleThroughout answers upstream's `isArrayType`: every union constituent, and
 		// within each, every intersection constituent, must be an array or a tuple.
 		//
@@ -114,7 +114,7 @@ var PreferReduceTypeParameter = rule.Rule{
 		isArrayOrTupleThroughout := func(receiverType *checker.Type) bool {
 			for unionPart := range type_checking.UnionTypePartsSeq(receiverType) {
 				for _, part := range type_checking.IntersectionTypeParts(unionPart) {
-					if !checker.Checker_isArrayType(ctx.TypeChecker, part) &&
+					if !checker.Checker_isArrayType(ruleContext.TypeChecker, part) &&
 						!checker.IsTupleType(part) {
 						return false
 					}
@@ -125,7 +125,7 @@ var PreferReduceTypeParameter = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -179,16 +179,16 @@ var PreferReduceTypeParameter = rule.Rule{
 				// Upstream: report only when the assertion is UNNECESSARY, meaning the value is
 				// already assignable to the asserted type. An assertion doing real work is left
 				// alone because rewriting it into a type parameter would stop compiling.
-				initializerType := ctx.TypeChecker.GetTypeAtLocation(assertedValue)
-				assertedTypeValue := ctx.TypeChecker.GetTypeAtLocation(assertedType)
+				initializerType := ruleContext.TypeChecker.GetTypeAtLocation(assertedValue)
+				assertedTypeValue := ruleContext.TypeChecker.GetTypeAtLocation(assertedType)
 				if initializerType == nil || assertedTypeValue == nil {
 					return
 				}
-				if !checker.Checker_isTypeAssignableTo(ctx.TypeChecker, initializerType, assertedTypeValue) {
+				if !checker.Checker_isTypeAssignableTo(ruleContext.TypeChecker, initializerType, assertedTypeValue) {
 					return
 				}
 
-				receiverType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, receiver)
+				receiverType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, receiver)
 				if receiverType == nil || !isArrayOrTupleThroughout(receiverType) {
 					return
 				}
@@ -201,8 +201,8 @@ var PreferReduceTypeParameter = rule.Rule{
 				// Ranges are taken from the trimmed token bounds rather than Pos(), which includes
 				// leading trivia and would make the first removal swallow the whitespace or the
 				// comment before the argument.
-				assertionRange := rule.TokenRange(ctx.SourceFile, secondArgument)
-				valueRange := rule.TokenRange(ctx.SourceFile, assertedValue)
+				assertionRange := rule.TokenRange(ruleContext.SourceFile, secondArgument)
+				valueRange := rule.TokenRange(ruleContext.SourceFile, assertedValue)
 
 				fixes := []rule.Fix{
 					rule.RemoveRange(core.NewTextRange(assertionRange.Pos(), valueRange.Pos())),
@@ -218,11 +218,11 @@ var PreferReduceTypeParameter = rule.Rule{
 					// insert anchors on the callee BEFORE parentheses were skipped only in the
 					// sense that upstream anchors on the member expression; measured, that puts the
 					// text inside a parenthesized callee, which is what the installed build writes.
-					typeText := ctx.SourceFile.Text()[rule.TokenRange(ctx.SourceFile, assertedType).Pos():assertedType.End()]
-					fixes = append(fixes, ctx.InsertAfter(callee, "<"+typeText+">"))
+					typeText := ruleContext.SourceFile.Text()[rule.TokenRange(ruleContext.SourceFile, assertedType).Pos():assertedType.End()]
+					fixes = append(fixes, ruleContext.InsertAfter(callee, "<"+typeText+">"))
 				}
 
-				ctx.ReportNodeWithFixes(secondArgument, buildPreferTypeParameterMessage(), fixes...)
+				ruleContext.ReportNodeWithFixes(secondArgument, buildPreferTypeParameterMessage(), fixes...)
 			},
 		}
 	},

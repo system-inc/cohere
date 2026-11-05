@@ -149,7 +149,7 @@ type optionsReachControlOptions struct {
 // exists to catch.
 var optionsReachControl = rule.Rule{
 	Name: "control/options-read-inside-a-listener",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{ast.KindClassDeclaration: func(node *ast.Node) {
 			rule.OptionsAs[optionsReachControlOptions](options)
 		}}

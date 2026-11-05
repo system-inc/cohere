@@ -86,7 +86,7 @@ func (checkLoops *NoConstantConditionCheckLoops) UnmarshalJSON(raw []byte) error
 // positive on code that redefines `undefined`, which has larger problems.
 var NoConstantCondition = rule.Rule{
 	Name: "no-constant-condition",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		checkLoops := NoConstantConditionCheckLoops("allExceptWhileTrue")
 		if parsed, ok := rule.OptionsAs[NoConstantConditionOptions](options); ok && parsed.CheckLoops != "" {
 			checkLoops = parsed.CheckLoops
@@ -94,7 +94,7 @@ var NoConstantCondition = rule.Rule{
 
 		reportIfConstant := func(condition *ast.Node) {
 			if condition != nil && isConstantExpression(condition, true) {
-				ctx.ReportNode(condition, messageUnexpectedConstantCondition)
+				ruleContext.ReportNode(condition, messageUnexpectedConstantCondition)
 			}
 		}
 

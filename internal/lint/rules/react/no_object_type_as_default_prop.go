@@ -63,8 +63,8 @@ var NoObjectTypeAsDefaultProp = rule.Rule{
 	Name:             "react/no-object-type-as-default-prop",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -74,12 +74,12 @@ var NoObjectTypeAsDefaultProp = rule.Rule{
 				// `createElement` back to a React binding. A nil checker would make this rule
 				// silently narrower rather than crash, which is the more dangerous failure, so it
 				// declines outright and a test asserts the typed harness is required.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
-				for _, component := range collectDetectedComponents(ctx, node) {
-					reportForbiddenDefaults(ctx, component.node)
+				for _, component := range collectDetectedComponents(ruleContext, node) {
+					reportForbiddenDefaults(ruleContext, component.node)
 				}
 			},
 		}
@@ -87,7 +87,7 @@ var NoObjectTypeAsDefaultProp = rule.Rule{
 }
 
 // reportForbiddenDefaults checks one component's first parameter for offending defaults.
-func reportForbiddenDefaults(ctx rule.Context, component *ast.Node) {
+func reportForbiddenDefaults(ruleContext rule.Context, component *ast.Node) {
 	parameters := componentParameters(component)
 	if parameters == nil || len(parameters.Nodes) == 0 {
 		return
@@ -141,7 +141,7 @@ func reportForbiddenDefaults(ctx rule.Context, component *ast.Node) {
 		// Upstream reports on `prop.value`, the whole assignment pattern, so the span covers the
 		// name, the equals sign and the value rather than the value alone. Measured by slicing the
 		// installed build's reported range: `a = {}` for `function C({a = {}, b = []})`.
-		ctx.ReportNode(element, messageForbiddenTypeDefaultParam(propertyName, forbiddenType))
+		ruleContext.ReportNode(element, messageForbiddenTypeDefaultParam(propertyName, forbiddenType))
 	}
 }
 

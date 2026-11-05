@@ -98,7 +98,7 @@ var NoIsMounted = rule.Rule{
 	// namespace on a `/` boundary, so `react-no-is-mounted` would match no inventory entry, lint no
 	// files, and still pass every fixture in this package.
 	Name: "react/no-is-mounted",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if !isThisIsMountedCallee(node.AsCallExpression().Expression) {
@@ -109,7 +109,7 @@ var NoIsMounted = rule.Rule{
 				}
 				// The whole call expression, matching oxc's `call_expr.span` rather than ESLint's
 				// narrower `callee`.
-				ctx.ReportNode(node, messageNoIsMounted)
+				ruleContext.ReportNode(node, messageNoIsMounted)
 			},
 		}
 	},

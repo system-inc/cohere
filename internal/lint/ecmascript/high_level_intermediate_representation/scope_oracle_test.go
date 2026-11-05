@@ -190,20 +190,20 @@ func TestScopeStructureAgainstUpstreamGuards(test *testing.T) {
 		probe := rule.Rule{
 			Name:             "scope-oracle",
 			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
-						if ctx.TypeChecker == nil {
+						if ruleContext.TypeChecker == nil {
 							return
 						}
 						forEachFunctionLike(node, func(functionNode *ast.Node) {
-							function := Lower(functionNode, ctx.TypeChecker)
+							function := Lower(functionNode, ruleContext.TypeChecker)
 							if function == nil {
 								return
 							}
 							Construct(function)
 							ran = true
-							one := countScopeStages(function, ctx.TypeChecker)
+							one := countScopeStages(function, ruleContext.TypeChecker)
 							total.assigned += one.assigned
 							total.survived += one.survived
 						})

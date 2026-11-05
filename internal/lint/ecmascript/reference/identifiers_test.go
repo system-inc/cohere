@@ -29,7 +29,7 @@ const jsx = <a.b a={a}>{a}</a.b>;
 	compared := 0
 	rule_testing.Run(test, rule.Rule{
 		Name: "identifiers-probe",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					walked := map[string][]*ast.Node{}
@@ -46,7 +46,7 @@ const jsx = <a.b a={a}>{a}</a.b>;
 					visit(node)
 					for name, want := range walked {
 						compared++
-						got := reference.IdentifiersNamed(ctx, name)
+						got := reference.IdentifiersNamed(ruleContext, name)
 						if !slices.Equal(got, want) {
 							mismatches = append(mismatches, name)
 						}
@@ -56,10 +56,10 @@ const jsx = <a.b a={a}>{a}</a.b>;
 							mismatches = append(mismatches, name+" (uncapped)")
 						}
 					}
-					if got := reference.IdentifiersNamed(ctx, "absent"); got != nil {
+					if got := reference.IdentifiersNamed(ruleContext, "absent"); got != nil {
 						mismatches = append(mismatches, "absent")
 					}
-					if fills := ctx.FileCache.Fills()["reference.identifiersByName"]; fills != 1 {
+					if fills := ruleContext.FileCache.Fills()["reference.identifiersByName"]; fills != 1 {
 						test.Errorf("the index was built %d times for one file, want once", fills)
 					}
 				},

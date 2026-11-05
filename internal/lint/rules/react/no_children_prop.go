@@ -100,7 +100,7 @@ var NoChildrenProp = rule.Rule{
 	// inventory entry, lint no files, and still pass every fixture in this file. The first rule in
 	// `internal/rules/next/` shipped that way and was inert, which is why this comment is here.
 	Name: "react/no-children-prop",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's `allowFunctions: false`.
 		settings, _ := rule.OptionsAs[NoChildrenPropOptions](options)
 		isFunction := func(node *ast.Node) bool {
@@ -126,7 +126,7 @@ var NoChildrenProp = rule.Rule{
 					initializer.Kind == ast.KindJsxExpression && isFunction(initializer.AsJsxExpression().Expression) {
 					return
 				}
-				ctx.ReportNode(node.AsJsxAttribute().Name(), messageNoChildrenProp)
+				ruleContext.ReportNode(node.AsJsxAttribute().Name(), messageNoChildrenProp)
 			},
 
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -148,7 +148,7 @@ var NoChildrenProp = rule.Rule{
 					}
 					if name, static := staticKeyName(key); static && name == "children" {
 						if !isFunction(noChildrenPropPropertyValue(property)) {
-							ctx.ReportNode(key, messageNoChildrenProp)
+							ruleContext.ReportNode(key, messageNoChildrenProp)
 						}
 						return
 					}
@@ -156,7 +156,7 @@ var NoChildrenProp = rule.Rule{
 				// No `children` key, so a function as the third and last argument is the other way
 				// round, which upstream reports only under the option.
 				if arguments := node.AsCallExpression().Arguments.Nodes; len(arguments) == 3 && isFunction(arguments[2]) {
-					ctx.ReportNode(node, messageNoChildrenPropPassFunctionAsArgs)
+					ruleContext.ReportNode(node, messageNoChildrenPropPassFunctionAsArgs)
 				}
 			},
 		}
@@ -171,7 +171,7 @@ var NoChildrenProp = rule.Rule{
 				}
 				child := children.Nodes[0]
 				if child.Kind == ast.KindJsxExpression && isFunction(child.AsJsxExpression().Expression) {
-					ctx.ReportNode(node, messageNoChildrenPropNestFunction)
+					ruleContext.ReportNode(node, messageNoChildrenPropNestFunction)
 				}
 			}
 		}

@@ -16,16 +16,16 @@ import (
 // analysis through the same path a real rule will.
 var networkAnalysisProbe = rule.Rule{
 	Name: "network-analysis-probe",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				analysis := NetworkFileAnalysisFor(ctx)
+				analysis := NetworkFileAnalysisFor(ruleContext)
 				for _, hook := range analysis.HookDeclarations {
 					exported := "local"
 					if hook.IsExported {
 						exported = "exported"
 					}
-					ctx.ReportNode(hook.NameNode, rule.Message{
+					ruleContext.ReportNode(hook.NameNode, rule.Message{
 						Id:          "hook",
 						Description: hook.Name + " " + exported + " parameters=" + strconv.Itoa(len(hook.Parameters)),
 					})

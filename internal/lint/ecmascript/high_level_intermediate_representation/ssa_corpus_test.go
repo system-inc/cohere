@@ -61,11 +61,11 @@ func TestSSAOverRealCodebase(test *testing.T) {
 		probe := rule.Rule{
 			Name:             "ssa-corpus-harness",
 			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						forEachFunctionLike(node, func(fnNode *ast.Node) {
-							fn := Lower(fnNode, ctx.TypeChecker)
+							fn := Lower(fnNode, ruleContext.TypeChecker)
 							if fn == nil {
 								return
 							}

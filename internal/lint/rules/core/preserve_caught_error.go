@@ -216,7 +216,7 @@ var PreserveCaughtError = rule.Rule{
 	// symbol questions.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// A rule configured as bare `"error"` is handed nil options, and the zero struct is the
 		// documented default for both options.
 		parsed, _ := rule.OptionsAs[PreserveCaughtErrorOptions](options)
@@ -233,10 +233,10 @@ var PreserveCaughtError = rule.Rule{
 				// Without a checker neither the global test nor the cause comparison can answer, and
 				// a file whose program failed to build should read as a rule that could not run, not
 				// as one complaining only about the findings that need no types. Silence throughout.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				checkThrowInCatch(ctx, node, parsed.RequireCatchParameter, errorClassPositions)
+				checkThrowInCatch(ruleContext, node, parsed.RequireCatchParameter, errorClassPositions)
 			},
 		}
 	},
@@ -316,7 +316,7 @@ func errorClassName(callee *ast.Node) string {
 }
 
 // checkThrowInCatch decides whether one throw statement reports, and with what.
-func checkThrowInCatch(ctx rule.Context, throwStatement *ast.Node, requireCatchParameter bool, errorClassPositions map[string]int) {
+func checkThrowInCatch(ruleContext rule.Context, throwStatement *ast.Node, requireCatchParameter bool, errorClassPositions map[string]int) {
 	construction, isConstruction := thrownConstruction(throwStatement.AsThrowStatement().Expression)
 	if !isConstruction {
 		return
@@ -333,7 +333,7 @@ func checkThrowInCatch(ctx rule.Context, throwStatement *ast.Node, requireCatchP
 	if className == "" {
 		return
 	}
-	builtIn := callee.Kind == ast.KindIdentifier && builtInErrorTypes[className] && resolvesToAGlobal(ctx, callee)
+	builtIn := callee.Kind == ast.KindIdentifier && builtInErrorTypes[className] && resolvesToAGlobal(ruleContext, callee)
 	customPosition, isCustom := errorClassPositions[className]
 	if !builtIn && !isCustom {
 		return
@@ -342,13 +342,13 @@ func checkThrowInCatch(ctx rule.Context, throwStatement *ast.Node, requireCatchP
 	declaration := catchClause.AsCatchClause().VariableDeclaration
 	if declaration == nil {
 		if requireCatchParameter {
-			ctx.ReportNode(throwStatement, messageMissingCatchErrorParam)
+			ruleContext.ReportNode(throwStatement, messageMissingCatchErrorParam)
 		}
 		return
 	}
 	binding := declaration.Name()
 	if binding.Kind != ast.KindIdentifier {
-		ctx.ReportNode(catchClause, messagePartiallyLostError)
+		ruleContext.ReportNode(catchClause, messagePartiallyLostError)
 		return
 	}
 
@@ -366,30 +366,30 @@ func checkThrowInCatch(ctx rule.Context, throwStatement *ast.Node, requireCatchP
 	}
 
 	if causeProperty == nil {
-		fix, hasFix := missingCauseFix(ctx, construction, builtIn, className == "AggregateError", optionsIndex, binding.Text())
+		fix, hasFix := missingCauseFix(ruleContext, construction, builtIn, className == "AggregateError", optionsIndex, binding.Text())
 		if !hasFix {
-			ctx.ReportNode(throwStatement, messageMissingCause)
+			ruleContext.ReportNode(throwStatement, messageMissingCause)
 			return
 		}
-		ctx.ReportNodeWithSuggestions(throwStatement, messageMissingCause,
+		ruleContext.ReportNodeWithSuggestions(throwStatement, messageMissingCause,
 			rule.Suggestion{Message: messageIncludeCause, Fixes: []rule.Fix{fix}})
 		return
 	}
 
 	value := causePropertyValue(causeProperty)
 	if value == nil || value.Kind != ast.KindIdentifier || value.Text() != binding.Text() {
-		reportIncorrectCause(ctx, causeProperty, value, multipleDefinitions, binding.Text())
+		reportIncorrectCause(ruleContext, causeProperty, value, multipleDefinitions, binding.Text())
 		return
 	}
 
 	var valueSymbol *ast.Symbol
 	if causeProperty.Kind == ast.KindShorthandPropertyAssignment {
-		valueSymbol = ctx.TypeChecker.GetShorthandAssignmentValueSymbol(causeProperty)
+		valueSymbol = ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(causeProperty)
 	} else {
-		valueSymbol = ctx.TypeChecker.GetSymbolAtLocation(value)
+		valueSymbol = ruleContext.TypeChecker.GetSymbolAtLocation(value)
 	}
-	if valueSymbol != nil && valueSymbol != ctx.TypeChecker.GetSymbolAtLocation(binding) {
-		ctx.ReportNode(throwStatement, messageCaughtErrorShadowed)
+	if valueSymbol != nil && valueSymbol != ruleContext.TypeChecker.GetSymbolAtLocation(binding) {
+		ruleContext.ReportNode(throwStatement, messageCaughtErrorShadowed)
 	}
 }
 
@@ -441,7 +441,7 @@ func causePropertyValue(causeProperty *ast.Node) *ast.Node {
 
 // reportIncorrectCause reports a `cause` that names something other than the caught error, at its
 // value, with the suggestion to attach the caught one unless there are two `cause` keys.
-func reportIncorrectCause(ctx rule.Context, causeProperty *ast.Node, value *ast.Node, multipleDefinitions bool, caughtName string) {
+func reportIncorrectCause(ruleContext rule.Context, causeProperty *ast.Node, value *ast.Node, multipleDefinitions bool, caughtName string) {
 	var reported core.TextRange
 	var fix rule.Fix
 	switch {
@@ -453,26 +453,26 @@ func reportIncorrectCause(ctx rule.Context, causeProperty *ast.Node, value *ast.
 			start = typeParameters.Pos() - 1
 		}
 		reported = core.NewTextRange(start, causeProperty.End())
-		fix = ctx.ReplaceNode(causeProperty, "cause: "+caughtName)
+		fix = ruleContext.ReplaceNode(causeProperty, "cause: "+caughtName)
 	case causeProperty.Kind == ast.KindShorthandPropertyAssignment:
-		reported = rule.TokenRange(ctx.SourceFile, value)
-		fix = ctx.ReplaceNode(causeProperty, "cause: "+caughtName)
+		reported = rule.TokenRange(ruleContext.SourceFile, value)
+		fix = ruleContext.ReplaceNode(causeProperty, "cause: "+caughtName)
 	default:
-		reported = rule.TokenRange(ctx.SourceFile, value)
-		fix = ctx.ReplaceNode(value, caughtName)
+		reported = rule.TokenRange(ruleContext.SourceFile, value)
+		fix = ruleContext.ReplaceNode(value, caughtName)
 	}
 
 	if multipleDefinitions {
-		ctx.ReportRange(reported, messageIncorrectCause)
+		ruleContext.ReportRange(reported, messageIncorrectCause)
 		return
 	}
-	ctx.ReportRangeWithSuggestions(reported, messageIncorrectCause,
+	ruleContext.ReportRangeWithSuggestions(reported, messageIncorrectCause,
 		rule.Suggestion{Message: messageIncludeCause, Fixes: []rule.Fix{fix}})
 }
 
 // missingCauseFix builds the edit that attaches the caught error to a construction carrying none, or
 // answers false where ESLint offers nothing.
-func missingCauseFix(ctx rule.Context, construction constructedError, builtIn bool, aggregate bool, optionsIndex int, caughtName string) (rule.Fix, bool) {
+func missingCauseFix(ruleContext rule.Context, construction constructedError, builtIn bool, aggregate bool, optionsIndex int, caughtName string) (rule.Fix, bool) {
 	causeObject := "{ cause: " + caughtName + " }"
 	arguments := construction.arguments
 

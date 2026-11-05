@@ -88,8 +88,8 @@ func messageBooleanOutcome(flagName string, declaration string, suggested string
 // No fix. Naming the ways an operation can turn out is the judgment the pattern exists for.
 var ConsistencyNoBooleanOutcome = rule.Rule{
 	Name: "nexus/consistency-no-boolean-outcome",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -118,7 +118,7 @@ var ConsistencyNoBooleanOutcome = rule.Rule{
 			if suggested == "" {
 				suggested = declarationName
 			}
-			ctx.ReportNode(flag, messageBooleanOutcome(
+			ruleContext.ReportNode(flag, messageBooleanOutcome(
 				propertySignatureName(flag), declarationKind+" "+declarationName, suggested))
 		}
 

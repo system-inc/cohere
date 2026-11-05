@@ -59,8 +59,8 @@ type NoUnnecessaryWhitespaceOptions struct {
 // attribute is the author's and this rule has no opinion about whether it should exist.
 var NoUnnecessaryWhitespace = rule.Rule{
 	Name: "better-tailwindcss/no-unnecessary-whitespace",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -73,7 +73,7 @@ var NoUnnecessaryWhitespace = rule.Rule{
 			surfaces = configured.ClassLiteralSurfaces()
 		}
 
-		reader := surfaces.ReaderFor(ctx.FileCache)
+		reader := surfaces.ReaderFor(ruleContext.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, segment := range reader.ClassSegmentsIn(node) {
@@ -85,15 +85,15 @@ var NoUnnecessaryWhitespace = rule.Rule{
 				// A segment whose source is not its decoded value is reported without a fix. Writing the
 				// decoded text back over the source would turn an escaped quote or backtick into a
 				// bare one, the file would stop parsing, and the engine would refuse every fix in it.
-				fixes, scoped := whitespaceFixes(ctx.SourceFile.Text(), segment, allowMultiline)
+				fixes, scoped := whitespaceFixes(ruleContext.SourceFile.Text(), segment, allowMultiline)
 				if !scoped {
 					fixes = nil
 				}
 
-				ctx.Report(rule.Diagnostic{
+				ruleContext.Report(rule.Diagnostic{
 					Range:      segment.Range,
 					Message:    messageUnnecessaryWhitespace(),
-					SourceFile: ctx.SourceFile,
+					SourceFile: ruleContext.SourceFile,
 					Fixes:      fixes,
 				})
 			}

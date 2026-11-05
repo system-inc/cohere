@@ -99,7 +99,7 @@ var JsxNoDuplicateProps = rule.Rule{
 	// strips the namespace on a `/` boundary, so a rule named `react-jsx-no-duplicate-props` would
 	// match no inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/jsx-no-duplicate-props",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's case-sensitive default.
 		settings, _ := rule.OptionsAs[JsxNoDuplicatePropsOptions](options)
 
@@ -131,7 +131,7 @@ var JsxNoDuplicateProps = rule.Rule{
 				}
 				nameNode := property.AsJsxAttribute().Name()
 				if earlier, duplicated := seen[name]; duplicated {
-					ctx.ReportNode(earlier, messageJsxNoDuplicateProps)
+					ruleContext.ReportNode(earlier, messageJsxNoDuplicateProps)
 				}
 				seen[name] = nameNode
 			}

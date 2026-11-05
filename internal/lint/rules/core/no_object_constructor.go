@@ -99,9 +99,9 @@ var NoObjectConstructor = rule.Rule{
 	// Object => new Object()` is whether `Object` is the global, and nothing structural answers it.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		check := func(node *ast.Node) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 
@@ -128,7 +128,7 @@ var NoObjectConstructor = rule.Rule{
 			if arguments != nil && len(arguments.Nodes) > 0 {
 				return
 			}
-			if !resolvesToAGlobal(ctx, callee) {
+			if !resolvesToAGlobal(ruleContext, callee) {
 				return
 			}
 
@@ -136,20 +136,20 @@ var NoObjectConstructor = rule.Rule{
 			message := messageUseLiteral
 			if literalNeedsParentheses(node) {
 				replacement = "({})"
-				if precedingTextCanContinue(ctx, node) {
+				if precedingTextCanContinue(ruleContext, node) {
 					replacement = ";({})"
 					message = messageUseLiteralAfterSemicolon
 				}
 			}
 
-			ctx.ReportNodeWithSuggestions(node, messagePreferLiteral, rule.Suggestion{
+			ruleContext.ReportNodeWithSuggestions(node, messagePreferLiteral, rule.Suggestion{
 				Message: message,
 				Fixes: []rule.Fix{
 					// `rule.TokenRange` rather than `node.Pos()`: a node's Pos includes its leading
 					// trivia, so a fix built from it eats the whitespace and comments before the
 					// call. `const fn = () => Object();` came out as `const fn = () =>({});` before
 					// this, which is a repair that is right and anchored wrong.
-					rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), replacement),
+					rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), replacement),
 				},
 			})
 		}
@@ -209,12 +209,12 @@ func literalNeedsParentheses(node *ast.Node) bool {
 // knows and the character does not: a block, a function or class DECLARATION, or an arrow body
 // closes the statement, while an object literal, a function or class EXPRESSION does not. That is
 // what `statementEndsOpen` answers, and it is consulted only when the character is `}`.
-func precedingTextCanContinue(ctx rule.Context, node *ast.Node) bool {
-	if ctx.SourceFile == nil {
+func precedingTextCanContinue(ruleContext rule.Context, node *ast.Node) bool {
+	if ruleContext.SourceFile == nil {
 		return false
 	}
-	text := ctx.SourceFile.Text()
-	start := rule.TokenRange(ctx.SourceFile, node).Pos()
+	text := ruleContext.SourceFile.Text()
+	start := rule.TokenRange(ruleContext.SourceFile, node).Pos()
 	if start <= 0 || start > len(text) {
 		return false
 	}
@@ -244,27 +244,27 @@ func precedingTextCanContinue(ctx rule.Context, node *ast.Node) bool {
 		// Upstream: `return !STATEMENTS.has(prevNode.type)`, where prevNode is the node CONTAINING
 		// the paren. A closing paren that ends a statement's header is followed by that statement's
 		// body, so nothing is left open; a paren ending a call or a parenthesized expression is.
-		return !closingParenBelongsToAStatementHeader(ctx, index)
+		return !closingParenBelongsToAStatementHeader(ruleContext, index)
 	case '}':
-		return closingBraceEndsAnExpression(ctx, index)
+		return closingBraceEndsAnExpression(ruleContext, index)
 	case '\'', '"':
 		// A string ending an import or export declaration is closed by insertion; any other string
 		// is an expression a `(` would call. Upstream: `!DECLARATIONS.has(prevNode.parent.type)`.
-		return !stringEndsAModuleDeclaration(ctx, index)
+		return !stringEndsAModuleDeclaration(ruleContext, index)
 	}
 
 	// An identifier or keyword. A keyword that ENDS its construct has already been closed by
 	// automatic semicolon insertion; a plain identifier has not.
 	if word, wordStart := wordBefore(text, index); word != "" {
-		return !keywordClosesTheStatement(ctx, word, wordStart)
+		return !keywordClosesTheStatement(ruleContext, word, wordStart)
 	}
 	return true
 }
 
 // stringEndsAModuleDeclaration reports whether the string literal ending at `index` is the specifier
 // of an import or export declaration, which insertion has already closed.
-func stringEndsAModuleDeclaration(ctx rule.Context, index int) bool {
-	node := innermostNodeContaining(ctx.SourceFile.AsNode(), index)
+func stringEndsAModuleDeclaration(ruleContext rule.Context, index int) bool {
+	node := innermostNodeContaining(ruleContext.SourceFile.AsNode(), index)
 	for ; node != nil; node = node.Parent {
 		if node.End() != index+1 {
 			continue
@@ -288,8 +288,8 @@ func stringEndsAModuleDeclaration(ctx rule.Context, index int) bool {
 //
 // Upstream's set, verbatim: do-while, for, for-in, for-of, if, while, with. A `do` is in the list
 // because its own paren comes last, and the corpus writes that case.
-func closingParenBelongsToAStatementHeader(ctx rule.Context, index int) bool {
-	node := innermostNodeContaining(ctx.SourceFile.AsNode(), index)
+func closingParenBelongsToAStatementHeader(ruleContext rule.Context, index int) bool {
+	node := innermostNodeContaining(ruleContext.SourceFile.AsNode(), index)
 	for ; node != nil; node = node.Parent {
 		switch node.Kind {
 		case ast.KindDoStatement,
@@ -350,8 +350,8 @@ func statementHeaderClosesAt(statement *ast.Node, index int) bool {
 // Upstream's three, verbatim: a block that is a FunctionExpression's body and not a method's, a
 // ClassExpression's body, and an object literal. Everything else -- a plain block, a function or
 // class declaration, an arrow body, a loop or conditional body -- closes the statement.
-func closingBraceEndsAnExpression(ctx rule.Context, index int) bool {
-	node := innermostNodeContaining(ctx.SourceFile.AsNode(), index)
+func closingBraceEndsAnExpression(ruleContext rule.Context, index int) bool {
+	node := innermostNodeContaining(ruleContext.SourceFile.AsNode(), index)
 	for ; node != nil; node = node.Parent {
 		if node.End() != index+1 {
 			continue
@@ -427,8 +427,8 @@ func wordBefore(text string, index int) (string, int) {
 //
 // The tree answers it directly: the word closes the statement only when the node containing it is
 // the construct that keyword introduces AND that construct has no operand written after the keyword.
-func keywordClosesTheStatement(ctx rule.Context, word string, wordStart int) bool {
-	node := innermostNodeContaining(ctx.SourceFile.AsNode(), wordStart)
+func keywordClosesTheStatement(ruleContext rule.Context, word string, wordStart int) bool {
+	node := innermostNodeContaining(ruleContext.SourceFile.AsNode(), wordStart)
 	if node == nil {
 		return false
 	}

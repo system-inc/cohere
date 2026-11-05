@@ -75,15 +75,15 @@ var inferOptionsTypeNames = map[string]bool{
 var NetworkRequireHookOptionsParameter = rule.Rule{
 	Name:       "structure/network-require-hook-options-parameter",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		analysis := NetworkFileAnalysisFor(ctx)
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		analysis := NetworkFileAnalysisFor(ruleContext)
 		if len(analysis.HookDeclarations) == 0 {
 			return nil
 		}
 
 		for _, hook := range analysis.HookDeclarations {
 			for _, call := range findNetworkServiceCalls(hook.Body) {
-				checkHookOptionsPattern(ctx, hook, call)
+				checkHookOptionsPattern(ruleContext, hook, call)
 			}
 		}
 		return nil
@@ -91,7 +91,7 @@ var NetworkRequireHookOptionsParameter = rule.Rule{
 }
 
 // checkHookOptionsPattern judges one hook against one of its NetworkService calls.
-func checkHookOptionsPattern(ctx rule.Context, hook NetworkHookDeclaration, call NetworkServiceCall) {
+func checkHookOptionsPattern(ruleContext rule.Context, hook NetworkHookDeclaration, call NetworkServiceCall) {
 	isQuery := call.MethodName == "useGraphQlQuery" || call.MethodName == "useSuspenseGraphQlQuery"
 	isMutation := call.MethodName == "useGraphQlMutation"
 	if !isQuery && !isMutation {
@@ -114,20 +114,20 @@ func checkHookOptionsPattern(ctx rule.Context, hook NetworkHookDeclaration, call
 	hasOptionsParameter := strings.Contains(strings.ToLower(lastParameterName), "option")
 
 	if hasOptionsParameter && !hasInferOptionsType(lastParameter) {
-		ctx.ReportNode(lastParameter, messageIncorrectOptionsParameterType())
+		ruleContext.ReportNode(lastParameter, messageIncorrectOptionsParameterType())
 	}
 
 	if !hasOptionsParameter {
 		// Reported against the function rather than the name, unlike the naming rule: what is wrong
 		// is the signature, so the range should cover the thing that needs changing.
-		ctx.ReportNode(hook.FunctionNode, messageMissingOptionsParameter())
+		ruleContext.ReportNode(hook.FunctionNode, messageMissingOptionsParameter())
 		return
 	}
 
 	if !callForwardsOptions(call, optionsArgumentIndex, lastParameterName) {
 		// Reported against the call rather than the parameter. The parameter is correct; the call
 		// is what fails to use it.
-		ctx.ReportNode(call.Node, messageOptionsParameterNotPassedThrough())
+		ruleContext.ReportNode(call.Node, messageOptionsParameterNotPassedThrough())
 	}
 }
 

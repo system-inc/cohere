@@ -43,15 +43,15 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) 
 		"test-set-enabled": nil, "test-set-off": nil, "test-set-skips": nil,
 	}}
 
-	eachConstant := func(id string, fix bool) func(ctx rule.Context, options any) rule.Listeners {
-		return func(ctx rule.Context, options any) rule.Listeners {
+	eachConstant := func(id string, fix bool) func(ruleContext rule.Context, options any) rule.Listeners {
+		return func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				message := rule.Message{Id: id, Description: id}
 				if fix {
-					ctx.ReportNodeWithFixes(node, message, ctx.RemoveNode(node))
+					ruleContext.ReportNodeWithFixes(node, message, ruleContext.RemoveNode(node))
 					return
 				}
-				ctx.ReportNode(node, message)
+				ruleContext.ReportNode(node, message)
 			}}
 		}
 	}
@@ -59,9 +59,9 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) 
 		{Name: "test-other", Run: eachConstant("other", false)},
 		{Name: "test-set-enabled", Run: eachConstant("enabled", false)},
 		{Name: "test-set-off", Run: eachConstant("off", true)},
-		{Name: "test-set-skips", Run: func(ctx rule.Context, options any) rule.Listeners {
-			if filepath.Base(ctx.SourceFile.FileName().AsString()) == "b.ts" {
-				ctx.Skip("b.ts lacks what this rule needs")
+		{Name: "test-set-skips", Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			if filepath.Base(ruleContext.SourceFile.FileName().AsString()) == "b.ts" {
+				ruleContext.Skip("b.ts lacks what this rule needs")
 				return nil
 			}
 			return nil
@@ -131,8 +131,8 @@ func TestReadinessOffMeasuresNothing(test *testing.T) {
 	}
 	ran := false
 	rules := []rule.Rule{
-		{Name: "test-other", Run: func(ctx rule.Context, options any) rule.Listeners { return nil }, NoListener: rule.NoListenerAnswersInRun},
-		{Name: "test-set-off", Run: func(ctx rule.Context, options any) rule.Listeners { ran = true; return nil }, NoListener: rule.NoListenerAnswersInRun},
+		{Name: "test-other", Run: func(ruleContext rule.Context, options any) rule.Listeners { return nil }, NoListener: rule.NoListenerAnswersInRun},
+		{Name: "test-set-off", Run: func(ruleContext rule.Context, options any) rule.Listeners { ran = true; return nil }, NoListener: rule.NoListenerAnswersInRun},
 	}
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
 	if err != nil {
@@ -164,10 +164,10 @@ func TestReadinessRunsATierEnabledSetRuleOncePerFile(test *testing.T) {
 	graph.Readiness = &program.Readiness{Options: map[string][]json.RawMessage{"test-set-enabled": nil}}
 
 	var runs atomic.Int32
-	rules := []rule.Rule{{Name: "test-set-enabled", Run: func(ctx rule.Context, options any) rule.Listeners {
+	rules := []rule.Rule{{Name: "test-set-enabled", Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		runs.Add(1)
 		return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-			ctx.ReportNode(node, rule.Message{Id: "enabled", Description: "enabled"})
+			ruleContext.ReportNode(node, rule.Message{Id: "enabled", Description: "enabled"})
 		}}
 	}}}
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
@@ -208,16 +208,16 @@ func TestAWarmReplayRunsNoRuleForReadiness(test *testing.T) {
 	var runs atomic.Int32
 	counted := func(subject rule.Rule) rule.Rule {
 		run := subject.Run
-		subject.Run = func(ctx rule.Context, options any) rule.Listeners {
+		subject.Run = func(ruleContext rule.Context, options any) rule.Listeners {
 			runs.Add(1)
-			return run(ctx, options)
+			return run(ruleContext, options)
 		}
 		return subject
 	}
-	eachConstant := func(id string) func(ctx rule.Context, options any) rule.Listeners {
-		return func(ctx rule.Context, options any) rule.Listeners {
+	eachConstant := func(id string) func(ruleContext rule.Context, options any) rule.Listeners {
+		return func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-				ctx.ReportNode(node, rule.Message{Id: id, Description: id})
+				ruleContext.ReportNode(node, rule.Message{Id: id, Description: id})
 			}}
 		}
 	}

@@ -47,8 +47,8 @@ func graduationProject(test *testing.T, names ...string) (*Graph, []*ast.SourceF
 func TestGraduationGivesEachContentKeyedShapeTheSignatureAnEmitComputes(test *testing.T) {
 	test.Parallel()
 	graph, sources := graduationProject(test, "alpha", "beta")
-	ctx := context.Background()
-	shapes, _ := graph.Signatures(ctx, nil)
+	backgroundContext := context.Background()
+	shapes, _ := graph.Signatures(backgroundContext, nil)
 	for _, sourceFile := range sources {
 		if entry := shapes[sourceFile.FileName().AsString()]; entry.Signature != entry.Version {
 			test.Fatalf("%s already has a real signature before graduating, so this proves nothing", sourceFile.FileName())
@@ -59,7 +59,7 @@ func TestGraduationGivesEachContentKeyedShapeTheSignatureAnEmitComputes(test *te
 	if graduated != len(sources) || abandoned != "" {
 		test.Fatalf("graduated %d of %d, abandoned %q; want every one and none abandoned", graduated, len(sources), abandoned)
 	}
-	emitted, _ := graph.Signatures(ctx, RecordedRealSignatures(graph))
+	emitted, _ := graph.Signatures(backgroundContext, RecordedRealSignatures(graph))
 	for _, sourceFile := range sources {
 		entry := shapes[sourceFile.FileName().AsString()]
 		if entry.Signature == entry.Version || entry.Abandoned {

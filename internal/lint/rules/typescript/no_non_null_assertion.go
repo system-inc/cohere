@@ -60,19 +60,19 @@ func messageSuggestOptionalChain() rule.Message {
 // and pinned by a clean fixture, because the two constructs are one keystroke apart in source.
 var NoNonNullAssertion = rule.Rule{
 	Name: "@typescript-eslint/no-non-null-assertion",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		return rule.Listeners{
 			ast.KindNonNullExpression: func(node *ast.Node) {
-				suggestions := optionalChainSuggestions(ctx, node)
+				suggestions := optionalChainSuggestions(ruleContext, node)
 				if len(suggestions) == 0 {
-					ctx.ReportNode(node, messageNoNonNull())
+					ruleContext.ReportNode(node, messageNoNonNull())
 					return
 				}
-				ctx.ReportNodeWithSuggestions(node, messageNoNonNull(), suggestions...)
+				ruleContext.ReportNodeWithSuggestions(node, messageNoNonNull(), suggestions...)
 			},
 		}
 	},
@@ -88,7 +88,7 @@ var NoNonNullAssertion = rule.Rule{
 //
 // A fourth position, where the following link already carries `?.`, needs only the `!` removed:
 // `foo!?.bar` is already guarded and the assertion is the redundant half.
-func optionalChainSuggestions(ctx rule.Context, node *ast.Node) []rule.Suggestion {
+func optionalChainSuggestions(ruleContext rule.Context, node *ast.Node) []rule.Suggestion {
 	parent := node.Parent
 	if parent == nil {
 		return nil
@@ -120,7 +120,7 @@ func optionalChainSuggestions(ctx rule.Context, node *ast.Node) []rule.Suggestio
 		// Dot access. The `.` is a separate token from the `!`, and the two can be separated by a
 		// comment or a newline, so this replaces each in place rather than rewriting the span
 		// between them. Rewriting the span would delete whatever sits in the middle.
-		dot := dotTokenAfter(ctx, node, parent)
+		dot := dotTokenAfter(ruleContext, node, parent)
 		if dot.Pos() == dot.End() {
 			return nil
 		}
@@ -144,8 +144,8 @@ func optionalChainSuggestions(ctx rule.Context, node *ast.Node) []rule.Suggestio
 // It is located by scanning forward from the end of the assertion rather than by arithmetic,
 // because the two tokens need not be adjacent: `foo!\n// why\n.bar` is one property access with a
 // comment inside it, and the original preserves that comment by editing the two tokens separately.
-func dotTokenAfter(ctx rule.Context, node *ast.Node, parent *ast.Node) core.TextRange {
-	text := ctx.SourceFile.Text()
+func dotTokenAfter(ruleContext rule.Context, node *ast.Node, parent *ast.Node) core.TextRange {
+	text := ruleContext.SourceFile.Text()
 	for position := node.End(); position < parent.End() && position < len(text); position++ {
 		if text[position] == '.' {
 			return core.NewTextRange(position, position+1)

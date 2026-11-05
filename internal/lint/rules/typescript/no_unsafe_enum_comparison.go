@@ -89,11 +89,11 @@ var NoUnsafeEnumComparison = rule.Rule{
 	Name:             "@typescript-eslint/no-unsafe-enum-comparison",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Declared AND guarded. `NeedsTypeChecker` governs the registration path; the harness can
 		// still build a `rule.Context` by hand, and `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes`
 		// does exactly that. Guarding in `Run` declines the file once rather than once per node.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -110,10 +110,10 @@ var NoUnsafeEnumComparison = rule.Rule{
 				if !noUnsafeEnumComparisonIsComparisonOperator(expression.OperatorToken.Kind) {
 					return
 				}
-				leftType := ctx.TypeChecker.GetTypeAtLocation(expression.Left)
-				rightType := ctx.TypeChecker.GetTypeAtLocation(expression.Right)
-				if noUnsafeEnumComparisonIsMismatched(ctx.TypeChecker, leftType, rightType) {
-					ctx.ReportNode(node, messageNoUnsafeEnumComparisonMismatchedCondition)
+				leftType := ruleContext.TypeChecker.GetTypeAtLocation(expression.Left)
+				rightType := ruleContext.TypeChecker.GetTypeAtLocation(expression.Right)
+				if noUnsafeEnumComparisonIsMismatched(ruleContext.TypeChecker, leftType, rightType) {
+					ruleContext.ReportNode(node, messageNoUnsafeEnumComparisonMismatchedCondition)
 				}
 			},
 
@@ -130,10 +130,10 @@ var NoUnsafeEnumComparison = rule.Rule{
 				if switchStatement == nil {
 					return
 				}
-				leftType := ctx.TypeChecker.GetTypeAtLocation(switchStatement.Expression)
-				rightType := ctx.TypeChecker.GetTypeAtLocation(clause.Expression)
-				if noUnsafeEnumComparisonIsMismatched(ctx.TypeChecker, leftType, rightType) {
-					ctx.ReportNode(node, messageNoUnsafeEnumComparisonMismatchedCase)
+				leftType := ruleContext.TypeChecker.GetTypeAtLocation(switchStatement.Expression)
+				rightType := ruleContext.TypeChecker.GetTypeAtLocation(clause.Expression)
+				if noUnsafeEnumComparisonIsMismatched(ruleContext.TypeChecker, leftType, rightType) {
+					ruleContext.ReportNode(node, messageNoUnsafeEnumComparisonMismatchedCase)
 				}
 			},
 		}

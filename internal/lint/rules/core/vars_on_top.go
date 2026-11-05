@@ -64,7 +64,7 @@ var messageVarsOnTop = rule.Message{
 // the two container kinds behave differently and it is easy to unify them by accident.
 var VarsOnTop = rule.Rule{
 	Name: "vars-on-top",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Anchored on the declaration LIST rather than on the variable statement, because a `var`
 		// in a loop header has no statement wrapping it.
 		//
@@ -98,7 +98,7 @@ var VarsOnTop = rule.Rule{
 				switch container.Kind {
 				case ast.KindSourceFile:
 					if !varsOnTopIsOnTop(subject, container.AsSourceFile().Statements, false) {
-						ctx.ReportNode(subject, messageVarsOnTop)
+						ruleContext.ReportNode(subject, messageVarsOnTop)
 					}
 				case ast.KindBlock:
 					grandparent := container.Parent
@@ -110,9 +110,9 @@ var VarsOnTop = rule.Rule{
 						varsOnTopIsOnTop(subject, container.AsBlock().Statements, true) {
 						return
 					}
-					ctx.ReportNode(subject, messageVarsOnTop)
+					ruleContext.ReportNode(subject, messageVarsOnTop)
 				default:
-					ctx.ReportNode(subject, messageVarsOnTop)
+					ruleContext.ReportNode(subject, messageVarsOnTop)
 				}
 			},
 		}

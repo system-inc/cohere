@@ -129,7 +129,7 @@ var NoImplicitGlobals = rule.Rule{
 	// follow the tsconfig.
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoImplicitGlobalsSettings](options)
 		if !ok {
 			settings = DefaultNoImplicitGlobalsSettings()
@@ -145,13 +145,13 @@ var NoImplicitGlobals = rule.Rule{
 				// script's top-level var or function is a global whether or not the script is
 				// strict, which is why this half reads module detection and nothing else (#rbvd7sv).
 				if file.ExternalModuleIndicator == nil {
-					reportGlobalDeclarations(ctx, node, settings.LexicalBindings)
+					reportGlobalDeclarations(ruleContext, node, settings.LexicalBindings)
 				}
 				// The leak half is the only one that asks the checker, so it is guarded separately
 				// rather than at the top, and the declaration halves still run in the untyped
 				// harness, which parses a script with no checker.
-				if ctx.TypeChecker != nil {
-					reportGlobalVariableLeaks(ctx, node)
+				if ruleContext.TypeChecker != nil {
+					reportGlobalVariableLeaks(ruleContext, node)
 				}
 			},
 		}
@@ -163,7 +163,7 @@ var NoImplicitGlobals = rule.Rule{
 // Only the file's own statements are considered, deliberately: a declaration inside a function or a
 // block is not global, which is exactly what upstream tells the reader to do about one. So this does
 // not descend, and the absence of a recursive walk here is the rule rather than an omission.
-func reportGlobalDeclarations(ctx rule.Context, node *ast.Node, lexicalBindings bool) {
+func reportGlobalDeclarations(ruleContext rule.Context, node *ast.Node, lexicalBindings bool) {
 	for _, statement := range node.AsSourceFile().Statements.Nodes {
 		switch statement.Kind {
 		case ast.KindFunctionDeclaration:
@@ -172,12 +172,12 @@ func reportGlobalDeclarations(ctx rule.Context, node *ast.Node, lexicalBindings 
 			// not two: the inner name is scoped to the expression itself.
 			name := statement.Name()
 			if name != nil {
-				ctx.ReportNode(statement, messageGlobalNonLexicalBinding)
+				ruleContext.ReportNode(statement, messageGlobalNonLexicalBinding)
 			}
 
 		case ast.KindClassDeclaration:
 			if lexicalBindings && statement.Name() != nil {
-				ctx.ReportNode(statement, messageGlobalLexicalBinding)
+				ruleContext.ReportNode(statement, messageGlobalLexicalBinding)
 			}
 
 		case ast.KindVariableStatement:
@@ -211,10 +211,10 @@ func reportGlobalDeclarations(ctx rule.Context, node *ast.Node, lexicalBindings 
 				// `foo = 1` and not `foo`. Every message-id fixture is satisfied by either reading,
 				// so the span assertion is the only thing that records which one was ported.
 				if name := declaration.Name(); name != nil && name.Kind == ast.KindIdentifier {
-					ctx.ReportNode(declaration, message)
+					ruleContext.ReportNode(declaration, message)
 					continue
 				}
-				reportEachBoundName(ctx, declaration.Name(), message)
+				reportEachBoundName(ruleContext, declaration.Name(), message)
 			}
 		}
 	}
@@ -225,20 +225,20 @@ func reportGlobalDeclarations(ctx rule.Context, node *ast.Node, lexicalBindings 
 // A plain identifier is one name. A pattern is as many as it binds, counting a rest element and
 // recursing through a nested pattern, which is what makes upstream's
 // `let { a, foo: b, bar: { c } } = {};` three findings.
-func reportEachBoundName(ctx rule.Context, name *ast.Node, message rule.Message) {
+func reportEachBoundName(ruleContext rule.Context, name *ast.Node, message rule.Message) {
 	if name == nil {
 		return
 	}
 	switch name.Kind {
 	case ast.KindIdentifier:
-		ctx.ReportNode(name, message)
+		ruleContext.ReportNode(name, message)
 
 	case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
 		for _, element := range name.AsBindingPattern().Elements.Nodes {
 			if element.Kind != ast.KindBindingElement {
 				continue
 			}
-			reportEachBoundName(ctx, element.AsBindingElement().Name(), message)
+			reportEachBoundName(ruleContext, element.AsBindingElement().Name(), message)
 		}
 	}
 }
@@ -252,7 +252,7 @@ func reportEachBoundName(ctx rule.Context, name *ast.Node, message rule.Message)
 //
 // The three assignment forms are upstream's own set: an assignment expression, and the left side of
 // a `for...in` or `for...of`.
-func reportGlobalVariableLeaks(ctx rule.Context, node *ast.Node) {
+func reportGlobalVariableLeaks(ruleContext rule.Context, node *ast.Node) {
 	var visit func(*ast.Node) bool
 	visit = func(current *ast.Node) bool {
 		switch current.Kind {
@@ -260,8 +260,8 @@ func reportGlobalVariableLeaks(ctx rule.Context, node *ast.Node) {
 			binary := current.AsBinaryExpression()
 			if binary != nil && binary.OperatorToken != nil &&
 				binary.OperatorToken.Kind == ast.KindEqualsToken &&
-				!liesInStrictModeCode(ctx, current) {
-				reportIfTargetIsUndeclared(ctx, binary.Left)
+				!liesInStrictModeCode(ruleContext, current) {
+				reportIfTargetIsUndeclared(ruleContext, binary.Left)
 			}
 
 		case ast.KindForInStatement, ast.KindForOfStatement:
@@ -276,8 +276,8 @@ func reportGlobalVariableLeaks(ctx rule.Context, node *ast.Node) {
 			// pattern and an initialized declaration: byte identical findings under both spellings.
 			initializer := current.AsForInOrOfStatement().Initializer
 			if initializer != nil && initializer.Kind != ast.KindVariableDeclarationList &&
-				!liesInStrictModeCode(ctx, current) {
-				reportIfTargetIsUndeclared(ctx, initializer)
+				!liesInStrictModeCode(ruleContext, current) {
+				reportIfTargetIsUndeclared(ruleContext, initializer)
 			}
 		}
 
@@ -291,7 +291,7 @@ func reportGlobalVariableLeaks(ctx rule.Context, node *ast.Node) {
 //
 // A destructuring target binds several names and each one is asked separately, which is what makes
 // upstream's `[foo, bar] = [];` two findings.
-func reportIfTargetIsUndeclared(ctx rule.Context, target *ast.Node) {
+func reportIfTargetIsUndeclared(ruleContext rule.Context, target *ast.Node) {
 	if target == nil {
 		return
 	}
@@ -299,27 +299,27 @@ func reportIfTargetIsUndeclared(ctx rule.Context, target *ast.Node) {
 	case ast.KindIdentifier:
 		// No symbol means no declaration anywhere, which is exactly the implicit global. A symbol
 		// carrying declarations means the name was declared and this is an ordinary write.
-		if symbol := ctx.TypeChecker.GetSymbolAtLocation(target); symbol == nil {
-			ctx.ReportNode(target, messageGlobalVariableLeak)
+		if symbol := ruleContext.TypeChecker.GetSymbolAtLocation(target); symbol == nil {
+			ruleContext.ReportNode(target, messageGlobalVariableLeak)
 		}
 
 	case ast.KindArrayLiteralExpression:
 		for _, element := range target.AsArrayLiteralExpression().Elements.Nodes {
-			reportIfTargetIsUndeclared(ctx, element)
+			reportIfTargetIsUndeclared(ruleContext, element)
 		}
 
 	case ast.KindObjectLiteralExpression:
 		for _, property := range target.AsObjectLiteralExpression().Properties.Nodes {
 			switch property.Kind {
 			case ast.KindShorthandPropertyAssignment:
-				reportIfTargetIsUndeclared(ctx, property.Name())
+				reportIfTargetIsUndeclared(ruleContext, property.Name())
 			case ast.KindPropertyAssignment:
-				reportIfTargetIsUndeclared(ctx, property.AsPropertyAssignment().Initializer)
+				reportIfTargetIsUndeclared(ruleContext, property.AsPropertyAssignment().Initializer)
 			}
 		}
 
 	case ast.KindSpreadElement:
-		reportIfTargetIsUndeclared(ctx, target.AsSpreadElement().Expression)
+		reportIfTargetIsUndeclared(ruleContext, target.AsSpreadElement().Expression)
 	}
 }
 
@@ -345,7 +345,7 @@ func reportIfTargetIsUndeclared(ctx rule.Context, target *ast.Node) {
 // The last two settled #jjfa7qb's 34 leak rows. The port this replaced followed oxc, which reports a
 // leak in a module, and ran ESLint's corpus as modules where ESLint reports nothing. Under the authority
 // rule, and on first principles, an assignment that throws leaks nothing.
-func liesInStrictModeCode(ctx rule.Context, node *ast.Node) bool {
+func liesInStrictModeCode(ruleContext rule.Context, node *ast.Node) bool {
 	for ancestor := node; ancestor != nil; ancestor = ancestor.Parent {
 		// A class body is strict by specification, with no directive to find.
 		if ast.IsClassLike(ancestor) {
@@ -356,7 +356,7 @@ func liesInStrictModeCode(ctx rule.Context, node *ast.Node) bool {
 		switch {
 		case ast.IsSourceFile(ancestor):
 			file := ancestor.AsSourceFile()
-			if file.ExternalModuleIndicator != nil || type_checking.CompilerImpliesStrict(ctx, file) {
+			if file.ExternalModuleIndicator != nil || type_checking.CompilerImpliesStrict(ruleContext, file) {
 				return true
 			}
 			statements = file.Statements.Nodes

@@ -116,7 +116,7 @@ var GraphQlNullableParity = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// checkNullability is the shared comparison: report when the declared flag and the type
 		// disagree, in whichever direction, and on an input, when a nullable type admits undefined
 		// but not the null a client can send.
@@ -128,38 +128,38 @@ var GraphQlNullableParity = rule.Rule{
 			typeIsNullable := decorators.IsNullableType(actualType)
 			if declaredNullable == typeIsNullable {
 				if isInput && declaredNullable && !typeIncludesNull(actualType) {
-					ctx.ReportNode(reportNode, buildDecoratorNullableButInputExcludesNullMessage(
-						ctx.TypeChecker.TypeToString(actualType)))
+					ruleContext.ReportNode(reportNode, buildDecoratorNullableButInputExcludesNullMessage(
+						ruleContext.TypeChecker.TypeToString(actualType)))
 				}
 				return
 			}
 
-			typeText := ctx.TypeChecker.TypeToString(actualType)
+			typeText := ruleContext.TypeChecker.TypeToString(actualType)
 			if declaredNullable {
-				ctx.ReportNode(reportNode, buildDecoratorNullableButTypeNotMessage(typeText))
+				ruleContext.ReportNode(reportNode, buildDecoratorNullableButTypeNotMessage(typeText))
 				return
 			}
-			ctx.ReportNode(reportNode, buildTypeNullableButDecoratorNotMessage(typeText))
+			ruleContext.ReportNode(reportNode, buildTypeNullableButDecoratorNotMessage(typeText))
 		}
 
 		// returnTypeOf reads a method's call-signature return type, with one Promise unwrap.
 		returnTypeOf := func(methodLike *ast.Node) *checker.Type {
-			methodType := ctx.TypeChecker.GetTypeAtLocation(methodLike)
+			methodType := ruleContext.TypeChecker.GetTypeAtLocation(methodLike)
 			if methodType == nil {
 				return nil
 			}
-			signatures := checker.Checker_getSignaturesOfType(ctx.TypeChecker, methodType,
+			signatures := checker.Checker_getSignaturesOfType(ruleContext.TypeChecker, methodType,
 				checker.SignatureKindCall)
 			if len(signatures) == 0 {
 				return nil
 			}
-			returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signatures[0])
-			return unwrapPromiseOnce(ctx, returnType)
+			returnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signatures[0])
+			return unwrapPromiseOnce(ruleContext, returnType)
 		}
 
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -197,7 +197,7 @@ var GraphQlNullableParity = rule.Rule{
 					// the checker answers the same type at both locations for all three, so a
 					// mutant swapping them survives every fixture and no input can separate them.
 					checkNullability(owner, declaredNullable,
-						ctx.TypeChecker.GetTypeAtLocation(owner), true)
+						ruleContext.TypeChecker.GetTypeAtLocation(owner), true)
 					return
 				}
 
@@ -213,7 +213,7 @@ var GraphQlNullableParity = rule.Rule{
 						// A property's class decides whether a client sends it. A field on a
 						// method or getter is computed for output, so only this arm asks.
 						checkNullability(owner.Name(), declaredNullable,
-							ctx.TypeChecker.GetTypeAtLocation(owner.Name()),
+							ruleContext.TypeChecker.GetTypeAtLocation(owner.Name()),
 							decorators.HasDecoratorInSet(owner.Parent,
 								graphQlNullableParityInputClassDecorators))
 					case ast.KindMethodDeclaration, ast.KindGetAccessor:
@@ -254,7 +254,7 @@ var GraphQlNullableParity = rule.Rule{
 // recursive unwrap its sibling rule uses. This rule asks whether the resolved value can be absent,
 // and one level is what an async method produces; a nested promise is not a shape anyone writes and
 // unwrapping further would start answering a different question.
-func unwrapPromiseOnce(ctx rule.Context, subject *checker.Type) *checker.Type {
+func unwrapPromiseOnce(ruleContext rule.Context, subject *checker.Type) *checker.Type {
 	if subject == nil {
 		return nil
 	}
@@ -262,7 +262,7 @@ func unwrapPromiseOnce(ctx rule.Context, subject *checker.Type) *checker.Type {
 	if symbol == nil || symbol.Name != "Promise" {
 		return subject
 	}
-	typeArguments := checker.Checker_getTypeArguments(ctx.TypeChecker, subject)
+	typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, subject)
 	if len(typeArguments) == 0 {
 		return subject
 	}

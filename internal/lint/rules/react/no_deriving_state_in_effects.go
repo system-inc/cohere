@@ -122,28 +122,28 @@ var NoDerivingStateInEffects = rule.Rule{
 	// Same predicate as `set-state-in-effect`: the setter is recognised by its type alias, so a hook
 	// returning `any` takes every finding in the file with it. Declared so the tripwire can name it.
 	ResolvesReactValueTypes: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// The whole file at once, matching `set-state-in-effect` and `static-components`.
 			// Lowering already descends into nested functions through the function arena, so
 			// listening per function kind would lower every inner function twice.
 			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				// A file that cannot hold a component or a hook is not lowered at all; see
 				// high_level_intermediate_representation.MayHoldComponentOrHook for why that is exact.
-				if !high_level_intermediate_representation.MayHoldComponentOrHook(ctx) {
+				if !high_level_intermediate_representation.MayHoldComponentOrHook(ruleContext) {
 					return
 				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
 					// Manual memoization is erased first, because upstream validates a graph where
 					// `useMemo` and `useCallback` are already gone.
-					lowered := high_level_intermediate_representation.ForFunctionWithoutManualMemoization(ctx, functionNode)
+					lowered := high_level_intermediate_representation.ForFunctionWithoutManualMemoization(ruleContext, functionNode)
 					if lowered == nil {
 						return
 					}
-					analyzeDerivedComputationsSubject(ctx, lowered)
+					analyzeDerivedComputationsSubject(ruleContext, lowered)
 				})
 			},
 		}
@@ -155,26 +155,26 @@ var NoDerivingStateInEffects = rule.Rule{
 // The same gate and the same descent as `analyzeSetStateInEffectSubject`, for the same reason: the
 // effect is classified by its type, so only the component-or-hook test keeps this to the functions
 // upstream validates, and it is what makes `hir.MayHoldComponentOrHook` exact for this rule.
-func analyzeDerivedComputationsSubject(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+func analyzeDerivedComputationsSubject(ruleContext rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
 	if function.Node == nil || !utilsreact.IsComponentOrHookLike(function.Node) {
 		for _, nested := range function.Functions {
-			analyzeDerivedComputationsSubject(ctx, nested)
+			analyzeDerivedComputationsSubject(ruleContext, nested)
 		}
 		return
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ctx, function,
+	function = high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunctionWithoutManualMemoization)
-	reportDerivedComputationsInEffects(ctx, function)
+	reportDerivedComputationsInEffects(ruleContext, function)
 }
 
 // reportDerivedComputationsInEffects is upstream's `validateNoDerivedComputationsInEffects` over one
 // compiled function: the gather loop, then a judgment per candidate effect.
-func reportDerivedComputationsInEffects(ctx rule.Context, function *high_level_intermediate_representation.Function) {
+func reportDerivedComputationsInEffects(ruleContext rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
@@ -201,11 +201,11 @@ func reportDerivedComputationsInEffects(ctx rule.Context, function *high_level_i
 			case *high_level_intermediate_representation.FunctionExpression:
 				functions[target] = value
 			case *high_level_intermediate_representation.CallExpression:
-				derivedEffectCandidate(ctx, function, value.Callee, value.Args, candidateDependencies, functions, locals)
+				derivedEffectCandidate(ruleContext, function, value.Callee, value.Args, candidateDependencies, functions, locals)
 			case *high_level_intermediate_representation.MethodCall:
 				// `React.useEffect(...)`. The property Place is the callee, exactly as upstream
 				// selects `instr.value.property` for a MethodCall.
-				derivedEffectCandidate(ctx, function, value.Property, value.Args, candidateDependencies, functions, locals)
+				derivedEffectCandidate(ruleContext, function, value.Property, value.Args, candidateDependencies, functions, locals)
 			}
 		}
 	}
@@ -213,7 +213,7 @@ func reportDerivedComputationsInEffects(ctx rule.Context, function *high_level_i
 	// A nested function is lowered into this function's arena but its own body is a separate graph
 	// the walk above never entered. Same descent as `set-state-in-effect`.
 	for _, nested := range function.Functions {
-		reportDerivedComputationsInEffects(ctx, nested)
+		reportDerivedComputationsInEffects(ruleContext, nested)
 	}
 }
 
@@ -227,7 +227,7 @@ func reportDerivedComputationsInEffects(ctx rule.Context, function *high_level_i
 // array to temporaries first, so both arguments are identifiers by the time the pass sees them.
 // That is why this is not a syntactic test.
 func derivedEffectCandidate(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	callee high_level_intermediate_representation.Place,
 	args []high_level_intermediate_representation.Argument,
@@ -238,7 +238,7 @@ func derivedEffectCandidate(
 	if len(args) != 2 || args[0].Spread || args[1].Spread {
 		return
 	}
-	if !isUseEffectExactly(ctx, function, callee) {
+	if !isUseEffectExactly(ruleContext, function, callee) {
 		return
 	}
 
@@ -303,7 +303,7 @@ func derivedEffectCandidate(
 	if nested == nil {
 		return
 	}
-	validateDerivedEffect(ctx, function, nested, effectFunction, dependencies)
+	validateDerivedEffect(ruleContext, function, nested, effectFunction, dependencies)
 }
 
 // validateDerivedEffect is upstream's `validateEffect`: the capture check, then the taint walk.
@@ -312,7 +312,7 @@ func derivedEffectCandidate(
 // upstream's shape rather than an approximation of it. An effect that does one unrecognised thing
 // is not a pure derivation, so partial credit would report on effects upstream leaves alone.
 func validateDerivedEffect(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	enclosing *high_level_intermediate_representation.Function,
 	effectFunction *high_level_intermediate_representation.Function,
 	effectValue *high_level_intermediate_representation.FunctionExpression,
@@ -327,7 +327,7 @@ func validateDerivedEffect(
 	// Every capture is a setter or a dep. Anything else means the effect reads something the
 	// dependency array did not declare, and upstream leaves it alone.
 	for _, capture := range captures {
-		if isSetterTyped(ctx, enclosing, capture) {
+		if isSetterTyped(ruleContext, enclosing, capture) {
 			continue
 		}
 		if containsIdentifier(effectDeps, capture.Identifier) {
@@ -463,7 +463,7 @@ func validateDerivedEffect(
 				if !isCall || len(call.Args) != 1 || call.Args[0].Spread {
 					break
 				}
-				if !isSetterTyped(ctx, effectFunction, call.Callee) {
+				if !isSetterTyped(ruleContext, effectFunction, call.Callee) {
 					break
 				}
 				deps, hasDeps := values[call.Args[0].Place.Identifier]
@@ -500,7 +500,7 @@ func validateDerivedEffect(
 	}
 
 	for _, location := range setStateLocations {
-		reportDerivedSetter(ctx, effectFunction, location)
+		reportDerivedSetter(ruleContext, effectFunction, location)
 	}
 }
 
@@ -511,13 +511,13 @@ func validateDerivedEffect(
 // through the node points every finding at the `useState` destructure. The range is trimmed of
 // leading trivia because a Place's range starts at the raw start of the reference, which includes
 // the newline and indentation before it.
-func reportDerivedSetter(ctx rule.Context, function *high_level_intermediate_representation.Function, setter high_level_intermediate_representation.Place) {
-	if span := trimmedRange(ctx, setter.Range); span.Pos() < span.End() {
-		ctx.ReportRange(span, messageNoDerivingStateInEffects)
+func reportDerivedSetter(ruleContext rule.Context, function *high_level_intermediate_representation.Function, setter high_level_intermediate_representation.Place) {
+	if span := trimmedRange(ruleContext, setter.Range); span.Pos() < span.End() {
+		ruleContext.ReportRange(span, messageNoDerivingStateInEffects)
 		return
 	}
 	if node := setStateInEffectIdentifierNodeOf(function, setter.Identifier); node != nil {
-		ctx.ReportNode(node, messageNoDerivingStateInEffects)
+		ruleContext.ReportNode(node, messageNoDerivingStateInEffects)
 	}
 }
 
@@ -546,16 +546,16 @@ func reportDerivedSetter(ctx rule.Context, function *high_level_intermediate_rep
 // lines of checker reads; when both rules are settled they want one shared
 // `declaredHookName(ctx, function, place) string` in the package, with each rule keeping only its
 // own accepted set. That is one commit, after, not a unilateral edit now.
-func isUseEffectExactly(ctx rule.Context, function *high_level_intermediate_representation.Function, callee high_level_intermediate_representation.Place) bool {
+func isUseEffectExactly(ruleContext rule.Context, function *high_level_intermediate_representation.Function, callee high_level_intermediate_representation.Place) bool {
 	node := setStateInEffectIdentifierNodeOf(function, callee.Identifier)
-	if node == nil || ctx.TypeChecker == nil {
+	if node == nil || ruleContext.TypeChecker == nil {
 		return false
 	}
 	// The TYPE's symbol, not `GetSymbolAtLocation`'s: for `import {useEffect as useFx}` the latter
 	// returns the local name `useFx` while this returns the declared `useEffect`, which is the name
 	// React's `binding.imported` asks for. Reading the local spelling silently declines every
 	// renamed import, and a namespace member falls out of the same read with no extra case.
-	calleeType := ctx.TypeChecker.GetTypeAtLocation(node)
+	calleeType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 	if calleeType == nil {
 		return false
 	}

@@ -83,10 +83,10 @@ var PreferForOf = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindForStatement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -115,11 +115,11 @@ var PreferForOf = rule.Rule{
 					return
 				}
 
-				if !isIndexOnlyUsedToSubscript(ctx, statement.Statement, declarator, arrayExpression) {
+				if !isIndexOnlyUsedToSubscript(ruleContext, statement.Statement, declarator, arrayExpression) {
 					return
 				}
 
-				ctx.ReportNode(node, preferForOfMessage)
+				ruleContext.ReportNode(node, preferForOfMessage)
 			},
 		}
 	},
@@ -271,7 +271,7 @@ func isIncrementOfIndex(update *ast.Node, indexName string) bool {
 // including the ones in the loop header, and has to skip them. Walking the body reaches only the
 // references inside it, so there is nothing to skip.
 func isIndexOnlyUsedToSubscript(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	body *ast.Node,
 	declarator *ast.Node,
 	arrayExpression *ast.Node,
@@ -280,8 +280,8 @@ func isIndexOnlyUsedToSubscript(
 		return true
 	}
 
-	arrayRange := rule.TokenRange(ctx.SourceFile, arrayExpression)
-	arrayText := ctx.SourceFile.Text()[arrayRange.Pos():arrayRange.End()]
+	arrayRange := rule.TokenRange(ruleContext.SourceFile, arrayExpression)
+	arrayText := ruleContext.SourceFile.Text()[arrayRange.Pos():arrayRange.End()]
 
 	onlySubscripts := true
 	var walk func(node *ast.Node)
@@ -289,8 +289,8 @@ func isIndexOnlyUsedToSubscript(
 		if node == nil || !onlySubscripts {
 			return
 		}
-		if node.Kind == ast.KindIdentifier && resolvesToDeclarator(ctx, node, declarator) {
-			if !isSubscriptOfArray(ctx, node, arrayText) {
+		if node.Kind == ast.KindIdentifier && resolvesToDeclarator(ruleContext, node, declarator) {
+			if !isSubscriptOfArray(ruleContext, node, arrayText) {
 				onlySubscripts = false
 				return
 			}
@@ -310,8 +310,8 @@ func isIndexOnlyUsedToSubscript(
 // is asking: "does ANY declaration of this symbol belong to this loop". Node identity rather than
 // kind comparison, because a kind comparison passes every corpus case and fails on exactly the
 // shadowing shape upstream tests, where both declarations are the same kind.
-func resolvesToDeclarator(ctx rule.Context, identifier *ast.Node, declarator *ast.Node) bool {
-	return rule.HasDeclaration(ctx.TypeChecker.GetSymbolAtLocation(identifier), declarator)
+func resolvesToDeclarator(ruleContext rule.Context, identifier *ast.Node, declarator *ast.Node) bool {
+	return rule.HasDeclaration(ruleContext.TypeChecker.GetSymbolAtLocation(identifier), declarator)
 }
 
 // isSubscriptOfArray answers upstream's condition on one reference.
@@ -323,7 +323,7 @@ func resolvesToDeclarator(ctx rule.Context, identifier *ast.Node, declarator *as
 // The bare-`this` exclusion looks arbitrary and is upstream's: `for (let i = 0; i < test.length; ++i)
 // { this[i]; }` is a passing case there. `this.item[i]` against `this.item.length` reports, so what is
 // excluded is `this` standing alone as the whole receiver rather than `this` appearing in it.
-func isSubscriptOfArray(ctx rule.Context, identifier *ast.Node, arrayText string) bool {
+func isSubscriptOfArray(ruleContext rule.Context, identifier *ast.Node, arrayText string) bool {
 	parent := identifier.Parent
 	if parent == nil || parent.Kind != ast.KindElementAccessExpression {
 		return false
@@ -351,8 +351,8 @@ func isSubscriptOfArray(ctx rule.Context, identifier *ast.Node, arrayText string
 		return false
 	}
 
-	receiverRange := rule.TokenRange(ctx.SourceFile, access.Expression)
-	if ctx.SourceFile.Text()[receiverRange.Pos():receiverRange.End()] != arrayText {
+	receiverRange := rule.TokenRange(ruleContext.SourceFile, access.Expression)
+	if ruleContext.SourceFile.Text()[receiverRange.Pos():receiverRange.End()] != arrayText {
 		return false
 	}
 

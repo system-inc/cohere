@@ -28,8 +28,8 @@ func TestInlineMemoCallbacksRepeatIdentically(test *testing.T) {
 		if !strings.Contains(fixture.source, "useMemo") && !strings.Contains(fixture.source, "useCallback") {
 			continue
 		}
-		prepasses := lowerReactCompilerFixture(test, fixture.source, func(ctx rule.Context, node *ast.Node) *Function {
-			f := Lower(node, ctx.TypeChecker)
+		prepasses := lowerReactCompilerFixture(test, fixture.source, func(ruleContext rule.Context, node *ast.Node) *Function {
+			f := Lower(node, ruleContext.TypeChecker)
 			if f != nil {
 				Construct(f)
 				DropManualMemoization(f)

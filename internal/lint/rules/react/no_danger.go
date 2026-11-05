@@ -162,7 +162,7 @@ const dangerousPropertyName = "dangerouslySetInnerHTML"
 // port that "fixed" it would break an imported clean case.
 var NoDanger = rule.Rule{
 	Name: "react/no-danger",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoDangerOptions](options)
 		if !ok {
 			// A rule configured as a bare severity reaches here with nil rather than with the
@@ -203,7 +203,7 @@ var NoDanger = rule.Rule{
 				if !readable || name != dangerousPropertyName {
 					continue
 				}
-				ctx.ReportNode(property, rule.Message{
+				ruleContext.ReportNode(property, rule.Message{
 					Id: "dangerousProp",
 					Description: fmt.Sprintf(
 						"This element sets %s, which hands React a raw string and tells it to "+

@@ -116,7 +116,7 @@ var NextScriptForGa = rule.Rule{
 	// the namespace on a `/` boundary, so a prefixed name would match no inventory entry and lint no
 	// files while every fixture in this package stayed green.
 	Name: "@next/next/next-script-for-ga",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
 			tagName, attributes := jsx.ElementParts(node)
 			// The tag is compared case-sensitively to the lowercase intrinsic, unlike the two
@@ -129,7 +129,7 @@ var NextScriptForGa = rule.Rule{
 			if source, found := jsx.StringAttributeValue(attributes, "src", jsx.MatchIgnoringCase); found {
 				for _, marker := range googleAnalyticsSourceMarkers {
 					if strings.Contains(source, marker) {
-						ctx.ReportNode(tagName, messageNextScriptForGa)
+						ruleContext.ReportNode(tagName, messageNextScriptForGa)
 						// Upstream returns here, so a matching src suppresses the inline test on
 						// the same element rather than adding a second finding. Measured.
 						return
@@ -138,13 +138,13 @@ var NextScriptForGa = rule.Rule{
 			}
 
 			// The inline bootstrap, which loads Google Analytics from a string of code.
-			inlineHtml, found := firstTemplateHeadRawText(ctx, dangerouslySetInnerHtmlValue(attributes))
+			inlineHtml, found := firstTemplateHeadRawText(ruleContext, dangerouslySetInnerHtmlValue(attributes))
 			if !found {
 				return
 			}
 			for _, marker := range googleAnalyticsInlineMarkers {
 				if strings.Contains(inlineHtml, marker) {
-					ctx.ReportNode(tagName, messageNextScriptForGa)
+					ruleContext.ReportNode(tagName, messageNextScriptForGa)
 					return
 				}
 			}
@@ -256,7 +256,7 @@ func dangerouslySetInnerHtmlValue(attributes *ast.Node) *ast.Node {
 // shim exposes no `RawText`, and typescript-go's own accessor panics on the no-substitution kind, so
 // the node's range over the source text is the route. The delimiters are trimmed off the ends: a
 // leading backtick always, and a trailing backtick or `${` depending on which shape it is.
-func firstTemplateHeadRawText(ctx rule.Context, value *ast.Node) (string, bool) {
+func firstTemplateHeadRawText(ruleContext rule.Context, value *ast.Node) (string, bool) {
 	if value == nil {
 		return "", false
 	}
@@ -273,7 +273,7 @@ func firstTemplateHeadRawText(ctx rule.Context, value *ast.Node) (string, bool) 
 		return "", false
 	}
 
-	sourceText := ctx.SourceFile.Text()
+	sourceText := ruleContext.SourceFile.Text()
 	start, end := chunk.Pos(), chunk.End()
 	if start < 0 || end > len(sourceText) || start >= end {
 		return "", false

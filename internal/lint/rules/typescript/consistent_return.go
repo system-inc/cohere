@@ -180,7 +180,7 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 var ConsistentReturn = rule.Rule{
 	Name:             "@typescript-eslint/consistent-return",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[ConsistentReturnSettings](options)
 		if !ok {
 			settings = ConsistentReturnSettings{}
@@ -197,13 +197,13 @@ var ConsistentReturn = rule.Rule{
 					},
 					consistentreturn.Hooks{
 						SuppressBareReturn: func(scope *ast.Node, _ *ast.Node) bool {
-							return consistentReturnIsVoidOrThenableVoid(ctx, scope)
+							return consistentReturnIsVoidOrThenableVoid(ruleContext, scope)
 						},
 						TreatsArgumentAsUnspecified: func(argument *ast.Node) bool {
-							return consistentReturnArgumentIsExactlyUndefined(ctx, argument)
+							return consistentReturnArgumentIsExactlyUndefined(ruleContext, argument)
 						},
 					},
-					consistentReturnReporter(ctx),
+					consistentReturnReporter(ruleContext),
 					consistentReturnDescribe)
 			},
 		}
@@ -211,16 +211,16 @@ var ConsistentReturn = rule.Rule{
 }
 
 // consistentReturnReporter wires the shared judgment's findings into this rule's context.
-func consistentReturnReporter(ctx rule.Context) consistentreturn.Reporter {
+func consistentReturnReporter(ruleContext rule.Context) consistentreturn.Reporter {
 	return consistentreturn.Reporter{
 		ReportNode: func(node *ast.Node, messageId string, description string) {
-			ctx.ReportNode(node, rule.Message{Id: messageId, Description: description})
+			ruleContext.ReportNode(node, rule.Message{Id: messageId, Description: description})
 		},
 		ReportRange: func(textRange core.TextRange, messageId string, description string) {
-			ctx.ReportRange(textRange, rule.Message{Id: messageId, Description: description})
+			ruleContext.ReportRange(textRange, rule.Message{Id: messageId, Description: description})
 		},
 		TokenRange: func(node *ast.Node) core.TextRange {
-			return rule.TokenRange(ctx.SourceFile, node)
+			return rule.TokenRange(ruleContext.SourceFile, node)
 		},
 	}
 }
@@ -251,29 +251,29 @@ func consistentReturnDescribe(messageId string, name string) string {
 // non-async function declared to return `Promise<void>` therefore takes the plain branch and is NOT
 // suppressed, which upstream's corpus pins directly: `function foo(flag?: boolean): Promise<void>`
 // with a bare return REPORTS, while the same signature with `async` is clean.
-func consistentReturnIsVoidOrThenableVoid(ctx rule.Context, scope *ast.Node) bool {
+func consistentReturnIsVoidOrThenableVoid(ruleContext rule.Context, scope *ast.Node) bool {
 	// The Program is a scope for the judgment but has no type, and upstream's wrapper only ever
 	// receives the three function kinds.
 	if !consistentreturn.IsScope(scope) {
 		return false
 	}
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
 
-	functionType := ctx.TypeChecker.GetTypeAtLocation(scope)
+	functionType := ruleContext.TypeChecker.GetTypeAtLocation(scope)
 	if functionType == nil {
 		return false
 	}
 	isAsync := scope.ModifierFlags()&ast.ModifierFlagsAsync != 0
 
-	for _, signature := range type_checking.GetCallSignatures(ctx.TypeChecker, functionType) {
-		returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
+	for _, signature := range type_checking.GetCallSignatures(ruleContext.TypeChecker, functionType) {
+		returnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature)
 		if returnType == nil {
 			continue
 		}
 		if isAsync {
-			if consistentReturnIsPromiseVoid(ctx, scope, returnType) {
+			if consistentReturnIsPromiseVoid(ruleContext, scope, returnType) {
 				return true
 			}
 			continue
@@ -296,7 +296,7 @@ func consistentReturnIsVoidOrThenableVoid(ctx rule.Context, scope *ast.Node) boo
 // return type, and a panic costs every rule in the package its verdict on that file. Upstream gets
 // the same guard from `tsutils.isTypeReference` and can afford to treat it as a type narrowing;
 // here it is a crash guard as well.
-func consistentReturnIsPromiseVoid(ctx rule.Context, node *ast.Node, subject *checker.Type) bool {
+func consistentReturnIsPromiseVoid(ruleContext rule.Context, node *ast.Node, subject *checker.Type) bool {
 	// A depth bound rather than an unbounded recursion. Upstream has none, because its recursion is
 	// over resolved type arguments which terminate; the bound is here because a self-referential
 	// alias would otherwise be a hang rather than a finding, and 32 is far past any real promise
@@ -305,13 +305,13 @@ func consistentReturnIsPromiseVoid(ctx rule.Context, node *ast.Node, subject *ch
 		if subject == nil {
 			return false
 		}
-		if !type_checking.IsThenableType(ctx.TypeChecker, node, subject) {
+		if !type_checking.IsThenableType(ruleContext.TypeChecker, node, subject) {
 			return false
 		}
 		if !consistentReturnIsTypeReference(subject) {
 			return false
 		}
-		arguments := checker.Checker_getTypeArguments(ctx.TypeChecker, subject)
+		arguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, subject)
 		if len(arguments) == 0 {
 			return false
 		}
@@ -386,11 +386,11 @@ func consistentReturnUnionFlagSet(subject *checker.Type, flags checker.TypeFlags
 // Kept as an equality anyway, because it is upstream's spelling and the two are equivalent only as
 // long as the checker keeps representing unions this way. Nothing is asserted about the difference,
 // since there is none to assert.
-func consistentReturnArgumentIsExactlyUndefined(ctx rule.Context, argument *ast.Node) bool {
-	if ctx.TypeChecker == nil || argument == nil {
+func consistentReturnArgumentIsExactlyUndefined(ruleContext rule.Context, argument *ast.Node) bool {
+	if ruleContext.TypeChecker == nil || argument == nil {
 		return false
 	}
-	argumentType := ctx.TypeChecker.GetTypeAtLocation(argument)
+	argumentType := ruleContext.TypeChecker.GetTypeAtLocation(argument)
 	if argumentType == nil {
 		return false
 	}

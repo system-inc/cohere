@@ -44,47 +44,49 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(test *testing.T) {
 		test.Fatalf("loading the config: %v", err)
 	}
 
-	isA := func(ctx rule.Context) bool { return filepath.Base(ctx.SourceFile.FileName().AsString()) == "a.ts" }
-	reportsEachConstant := func(ctx rule.Context) rule.Listeners {
+	isA := func(ruleContext rule.Context) bool {
+		return filepath.Base(ruleContext.SourceFile.FileName().AsString()) == "a.ts"
+	}
+	reportsEachConstant := func(ruleContext rule.Context) rule.Listeners {
 		return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-			ctx.ReportNode(node, rule.Message{Id: "sawConstant", Description: "saw a constant"})
+			ruleContext.ReportNode(node, rule.Message{Id: "sawConstant", Description: "saw a constant"})
 		}}
 	}
 	runCrashes := rule.Rule{
 		Name: "test-run-crashes-on-a",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
-			if isA(ctx) {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			if isA(ruleContext) {
 				panic("planted in Run")
 			}
-			return reportsEachConstant(ctx)
+			return reportsEachConstant(ruleContext)
 		},
 	}
 	listenerCrashes := rule.Rule{
 		Name: "test-listener-crashes-on-a",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-				if isA(ctx) {
+				if isA(ruleContext) {
 					panic("planted in a listener")
 				}
-				ctx.ReportNode(node, rule.Message{Id: "sawConstant", Description: "saw a constant"})
+				ruleContext.ReportNode(node, rule.Message{Id: "sawConstant", Description: "saw a constant"})
 			}}
 		},
 	}
 	functionsOnlyInA := rule.Rule{
 		Name: "test-functions-only-in-a",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
-			if !isA(ctx) {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			if !isA(ruleContext) {
 				return nil
 			}
 			return rule.Listeners{ast.KindFunctionDeclaration: func(node *ast.Node) {
-				ctx.ReportNode(node, rule.Message{Id: "sawFunction", Description: "saw a function in " + filepath.Base(ctx.SourceFile.FileName().AsString())})
+				ruleContext.ReportNode(node, rule.Message{Id: "sawFunction", Description: "saw a function in " + filepath.Base(ruleContext.SourceFile.FileName().AsString())})
 			}}
 		},
 	}
 	notes := rule.Rule{
 		Name: "test-notes",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
-			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) { ctx.Note("constant") }}
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) { ruleContext.Note("constant") }}
 		},
 	}
 
@@ -141,8 +143,8 @@ func TestAReportKeptPastItsFilePanicsNamingTheRule(test *testing.T) {
 	var kept func(rule.Diagnostic)
 	keeper := rule.Rule{
 		Name: "test-keeps-its-report",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
-			kept = ctx.Report
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			kept = ruleContext.Report
 			return nil
 		},
 	}

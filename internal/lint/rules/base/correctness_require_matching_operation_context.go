@@ -71,10 +71,10 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				if decorators.CallName(node) != "InjectGraphQlOperationContext" {
@@ -112,7 +112,7 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 					return
 				}
 
-				parameterType := ctx.TypeChecker.GetTypeAtLocation(parameterNode)
+				parameterType := ruleContext.TypeChecker.GetTypeAtLocation(parameterNode)
 				if parameterType == nil {
 					return
 				}
@@ -121,22 +121,22 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 				// the reason in the doc comment.
 				symbol := checker.Type_symbol(parameterType)
 				if symbol == nil || symbol.Name != "GraphQlOperationContext" {
-					ctx.ReportNode(parameterNode, buildWrongBaseTypeMessage(
-						ctx.TypeChecker.TypeToString(parameterType)))
+					ruleContext.ReportNode(parameterNode, buildWrongBaseTypeMessage(
+						ruleContext.TypeChecker.TypeToString(parameterType)))
 					return
 				}
 
-				typeArguments := checker.Checker_getTypeArguments(ctx.TypeChecker, parameterType)
+				typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, parameterType)
 				if len(typeArguments) == 0 {
 					return
 				}
-				parameterGenericType := unwrapToElementType(ctx, typeArguments[0])
+				parameterGenericType := unwrapToElementType(ruleContext, typeArguments[0])
 
-				returnType := methodReturnTypeOf(ctx, methodDeclaration)
+				returnType := methodReturnTypeOf(ruleContext, methodDeclaration)
 				if returnType == nil {
 					return
 				}
-				returnType = unwrapToElementType(ctx, returnType)
+				returnType = unwrapToElementType(ruleContext, returnType)
 
 				if parameterGenericType == nil || returnType == nil {
 					return
@@ -144,14 +144,14 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 
 				// Bidirectional assignability. Each direction alone admits a subtype, which is the
 				// case this rule exists to catch.
-				if checker.Checker_isTypeAssignableTo(ctx.TypeChecker, parameterGenericType, returnType) &&
-					checker.Checker_isTypeAssignableTo(ctx.TypeChecker, returnType, parameterGenericType) {
+				if checker.Checker_isTypeAssignableTo(ruleContext.TypeChecker, parameterGenericType, returnType) &&
+					checker.Checker_isTypeAssignableTo(ruleContext.TypeChecker, returnType, parameterGenericType) {
 					return
 				}
 
-				ctx.ReportNode(parameterNode, buildMismatchMessage(
-					ctx.TypeChecker.TypeToString(parameterGenericType),
-					ctx.TypeChecker.TypeToString(returnType)))
+				ruleContext.ReportNode(parameterNode, buildMismatchMessage(
+					ruleContext.TypeChecker.TypeToString(parameterGenericType),
+					ruleContext.TypeChecker.TypeToString(returnType)))
 			},
 		}
 	},
@@ -187,16 +187,16 @@ func enclosingMethodOf(node *ast.Node) *ast.Node {
 //
 // Through the signature rather than off the annotation, because an unannotated method still has a
 // return type the checker inferred and the original reads it the same way.
-func methodReturnTypeOf(ctx rule.Context, methodDeclaration *ast.Node) *checker.Type {
-	methodType := ctx.TypeChecker.GetTypeAtLocation(methodDeclaration)
+func methodReturnTypeOf(ruleContext rule.Context, methodDeclaration *ast.Node) *checker.Type {
+	methodType := ruleContext.TypeChecker.GetTypeAtLocation(methodDeclaration)
 	if methodType == nil {
 		return nil
 	}
-	signatures := checker.Checker_getSignaturesOfType(ctx.TypeChecker, methodType, checker.SignatureKindCall)
+	signatures := checker.Checker_getSignaturesOfType(ruleContext.TypeChecker, methodType, checker.SignatureKindCall)
 	if len(signatures) == 0 {
 		return nil
 	}
-	return checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signatures[0])
+	return checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signatures[0])
 }
 
 // unwrapToElementType strips the wrappers that do not change a value's selection-set element type.
@@ -213,12 +213,12 @@ func methodReturnTypeOf(ctx rule.Context, methodDeclaration *ast.Node) *checker.
 // The union arm requires exactly ONE non-nullish member rather than taking the first: a real union
 // of two object types is a different selection set from either, and collapsing it would compare the
 // wrong thing.
-func unwrapToElementType(ctx rule.Context, subject *checker.Type) *checker.Type {
+func unwrapToElementType(ruleContext rule.Context, subject *checker.Type) *checker.Type {
 	for depth := 0; subject != nil && depth < unwrapDepthLimit; depth++ {
 		symbol := checker.Type_symbol(subject)
 
 		if symbol != nil && symbol.Name == "Promise" {
-			if typeArguments := checker.Checker_getTypeArguments(ctx.TypeChecker, subject); len(typeArguments) > 0 {
+			if typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, subject); len(typeArguments) > 0 {
 				subject = typeArguments[0]
 				continue
 			}
@@ -257,7 +257,7 @@ func unwrapToElementType(ctx rule.Context, subject *checker.Type) *checker.Type 
 		}
 
 		if symbol != nil && (symbol.Name == "Array" || symbol.Name == "ReadonlyArray") {
-			if typeArguments := checker.Checker_getTypeArguments(ctx.TypeChecker, subject); len(typeArguments) > 0 {
+			if typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, subject); len(typeArguments) > 0 {
 				subject = typeArguments[0]
 				continue
 			}

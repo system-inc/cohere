@@ -82,7 +82,7 @@ import (
 var PreferEnumInitializers = rule.Rule{
 	Name: "@typescript-eslint/prefer-enum-initializers",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {
 				// Members is never nil, so there is no guard here.
@@ -104,10 +104,10 @@ var PreferEnumInitializers = rule.Rule{
 					// Upstream interpolates `getText(member)`, which for a member with no
 					// initializer is the key and nothing else. The same text anchors the
 					// replacement, so the two cannot drift apart.
-					memberRange := rule.TokenRange(ctx.SourceFile, member)
-					name := ctx.SourceFile.Text()[memberRange.Pos():memberRange.End()]
+					memberRange := rule.TokenRange(ruleContext.SourceFile, member)
+					name := ruleContext.SourceFile.Text()[memberRange.Pos():memberRange.End()]
 
-					ctx.ReportNodeWithSuggestions(member, buildDefineInitializerMessage(name),
+					ruleContext.ReportNodeWithSuggestions(member, buildDefineInitializerMessage(name),
 						buildEnumInitializerSuggestion(memberRange, name, strconv.Itoa(index)),
 						buildEnumInitializerSuggestion(memberRange, name, strconv.Itoa(index+1)),
 						buildEnumInitializerSuggestion(memberRange, name, "'"+name+"'"),

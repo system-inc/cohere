@@ -56,7 +56,7 @@ func CompileAllowPattern(source string) *regexp.Regexp {
 
 // Listeners is the core rule's listeners under settings: a computed access with a convertible literal
 // key reports useDot, and under AllowKeywords false a keyword after a dot reports useBrackets.
-func Listeners(ctx rule.Context, settings Settings) rule.Listeners {
+func Listeners(ruleContext rule.Context, settings Settings) rule.Listeners {
 	return rule.Listeners{
 		ast.KindElementAccessExpression: func(node *ast.Node) {
 			access := node.AsElementAccessExpression()
@@ -85,7 +85,7 @@ func Listeners(ctx rule.Context, settings Settings) rule.Listeners {
 			if !readable {
 				return
 			}
-			checkComputed(ctx, node, access, argument, key, formatted, settings)
+			checkComputed(ruleContext, node, access, argument, key, formatted, settings)
 		},
 
 		ast.KindPropertyAccessExpression: func(node *ast.Node) {
@@ -103,11 +103,11 @@ func Listeners(ctx rule.Context, settings Settings) rule.Listeners {
 			if !keywords[name.Text()] {
 				return
 			}
-			if fixes, repairable := keywordFix(ctx, node, access, name); repairable {
-				ctx.ReportNodeWithFixes(name, useBracketsMessage(name.Text()), fixes...)
+			if fixes, repairable := keywordFix(ruleContext, node, access, name); repairable {
+				ruleContext.ReportNodeWithFixes(name, useBracketsMessage(name.Text()), fixes...)
 				return
 			}
-			ctx.ReportNode(name, useBracketsMessage(name.Text()))
+			ruleContext.ReportNode(name, useBracketsMessage(name.Text()))
 		},
 	}
 }
@@ -196,7 +196,7 @@ func useBracketsMessage(key string) rule.Message {
 
 // checkComputed is upstream's `checkComputedProperty`.
 func checkComputed(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	access *ast.ElementAccessExpression,
 	keyNode *ast.Node,
@@ -217,11 +217,11 @@ func checkComputed(
 		return
 	}
 
-	if fixes, repairable := computedFix(ctx, node, access, keyNode, key); repairable {
-		ctx.ReportNodeWithFixes(keyNode, useDotMessage(formattedKey), fixes...)
+	if fixes, repairable := computedFix(ruleContext, node, access, keyNode, key); repairable {
+		ruleContext.ReportNodeWithFixes(keyNode, useDotMessage(formattedKey), fixes...)
 		return
 	}
-	ctx.ReportNode(keyNode, useDotMessage(formattedKey))
+	ruleContext.ReportNode(keyNode, useDotMessage(formattedKey))
 }
 
 // computedFix builds the repair that turns `a['b']` into `a.b`.
@@ -235,16 +235,16 @@ func checkComputed(
 // one edit rather than two avoids the overlapping-edit refusal the harness makes when two fixes
 // touch one expression.
 func computedFix(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	access *ast.ElementAccessExpression,
 	keyNode *ast.Node,
 	key string,
 ) ([]rule.Fix, bool) {
-	if ctx.SourceFile == nil || access.Expression == nil {
+	if ruleContext.SourceFile == nil || access.Expression == nil {
 		return nil, false
 	}
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 
 	// The span runs from the `[` that follows the object to the `]` that closes the access.
 	openBracket := strings.IndexByte(source[access.Expression.End():node.End()], '[')
@@ -259,7 +259,7 @@ func computedFix(
 
 	// Upstream: "Don't perform any fixes if there are comments inside the brackets." Applying the
 	// repair would delete them, which is why upstream reports without fixing rather than reformatting.
-	if hasCommentBetween(ctx, openBracket, closeBracket) {
+	if hasCommentBetween(ruleContext, openBracket, closeBracket) {
 		return nil, false
 	}
 
@@ -399,11 +399,11 @@ func jsonQuote(text string) string {
 // reason, and the decline is reproduced rather than improved on.
 //
 // Reads the shared per-file comment list rather than rescanning; see `comments.ForFile`.
-func hasCommentBetween(ctx rule.Context, start int, end int) bool {
+func hasCommentBetween(ruleContext rule.Context, start int, end int) bool {
 	if end <= start {
 		return false
 	}
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= start && comment.Range.End() <= end {
 			return true
 		}
@@ -427,15 +427,15 @@ func hasCommentBetween(ctx rule.Context, start int, end int) bool {
 // with `node.object.name === 'let' && !node.optional`, and both halves are load-bearing -- corpus
 // cases 22 and 37 sit on either side of that `&&`.
 func keywordFix(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	access *ast.PropertyAccessExpression,
 	name *ast.Node,
 ) ([]rule.Fix, bool) {
-	if ctx.SourceFile == nil || access.Expression == nil {
+	if ruleContext.SourceFile == nil || access.Expression == nil {
 		return nil, false
 	}
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 
 	optional := isOptionalAccess(source, access.Expression.End(), name.Pos())
 
@@ -459,7 +459,7 @@ func keywordFix(
 
 	// Upstream: "Don't perform any fixes if there are comments between the dot and the property
 	// name." Applying the repair would delete them.
-	if hasCommentBetween(ctx, access.Expression.End(), name.End()) {
+	if hasCommentBetween(ruleContext, access.Expression.End(), name.End()) {
 		return nil, false
 	}
 

@@ -49,10 +49,10 @@ var messageNonoctalDecimalEscape = rule.Message{
 // change the string half the time.
 var NoNonoctalDecimalEscape = rule.Rule{
 	Name: "no-nonoctal-decimal-escape",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
-			literalRange := rule.TokenRange(ctx.SourceFile, node)
-			raw := ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]
+			literalRange := rule.TokenRange(ruleContext.SourceFile, node)
+			raw := ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]
 
 			// The shortest literal that could hold one is `'\8'`: two quotes, a backslash, a digit.
 			if len(raw) < 4 {
@@ -129,7 +129,7 @@ var NoNonoctalDecimalEscape = rule.Rule{
 					}},
 				})
 
-				ctx.ReportRangeWithSuggestions(
+				ruleContext.ReportRangeWithSuggestions(
 					core.NewTextRange(escapeStart, escapeEnd),
 					messageNonoctalDecimalEscape,
 					suggestions...,

@@ -98,7 +98,7 @@ var NoNonNullAssertedNullishCoalescing = rule.Rule{
 	// answered without types here.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
@@ -132,21 +132,21 @@ var NoNonNullAssertedNullishCoalescing = rule.Rule{
 
 				// A bare identifier is the only shape that gets the assignment test. Everything
 				// else is an unconditional contradiction.
-				if ast.IsIdentifier(inner) && !hasAssignmentBeforeNonNullAssertion(ctx, inner, assertion) {
+				if ast.IsIdentifier(inner) && !hasAssignmentBeforeNonNullAssertion(ruleContext, inner, assertion) {
 					return
 				}
 
-				exclamation, foundExclamation := nonNullExclamationRange(ctx, assertion, inner)
+				exclamation, foundExclamation := nonNullExclamationRange(ruleContext, assertion, inner)
 				if !foundExclamation {
 					// The token has to be there for the node to have parsed as an assertion, so
 					// this cannot be reached from any source that produced this node. Reporting
 					// without the repair rather than reporting a repair over a guessed range,
 					// because a suggestion anchored on the wrong bytes is worse than none.
-					ctx.ReportNode(assertion, buildNoNonNullAssertedNullishCoalescingMessage())
+					ruleContext.ReportNode(assertion, buildNoNonNullAssertedNullishCoalescingMessage())
 					return
 				}
 
-				ctx.ReportNodeWithSuggestions(assertion,
+				ruleContext.ReportNodeWithSuggestions(assertion,
 					buildNoNonNullAssertedNullishCoalescingMessage(),
 					rule.Suggestion{
 						Message: buildSuggestRemovingNonNullMessage(),
@@ -172,12 +172,12 @@ var NoNonNullAssertedNullishCoalescing = rule.Rule{
 // behavior rather than a choice here: `findVariable` returns null for an unresolvable name, the
 // `variable && ...` guard fails, and the early return is skipped. Every one of upstream's failing
 // cases with a bare `foo!` relies on it, since `foo` is declared nowhere in them.
-func hasAssignmentBeforeNonNullAssertion(ctx rule.Context, identifier *ast.Node, assertion *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func hasAssignmentBeforeNonNullAssertion(ruleContext rule.Context, identifier *ast.Node, assertion *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
 
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return true
 	}
@@ -216,7 +216,7 @@ func hasAssignmentBeforeNonNullAssertion(ctx rule.Context, identifier *ast.Node,
 		if current.Kind == ast.KindIdentifier && current.Text() == name &&
 			current.End() < assertion.End() &&
 			reference.WritesToBinding(current) &&
-			ctx.TypeChecker.GetSymbolAtLocation(current) == symbol {
+			ruleContext.TypeChecker.GetSymbolAtLocation(current) == symbol {
 			found = true
 			return
 		}
@@ -236,14 +236,14 @@ func hasAssignmentBeforeNonNullAssertion(ctx rule.Context, identifier *ast.Node,
 // the assertion's last byte. Upstream ships a case with two spaces between the name and the mark:
 // the assertion's whole text is then the name, two spaces and the mark, so deleting a trailing byte
 // happens to work while deleting one at `node.End()-1` on a spaced or commented form does not.
-func nonNullExclamationRange(ctx rule.Context, assertion *ast.Node, inner *ast.Node) (core.TextRange, bool) {
-	position := rule.TokenRange(ctx.SourceFile, inner).End()
+func nonNullExclamationRange(ruleContext rule.Context, assertion *ast.Node, inner *ast.Node) (core.TextRange, bool) {
+	position := rule.TokenRange(ruleContext.SourceFile, inner).End()
 	for position < assertion.End() {
-		tokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, position)
+		tokenRange := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, position)
 		if tokenRange.End() <= tokenRange.Pos() {
 			return core.TextRange{}, false
 		}
-		if ctx.SourceFile.Text()[tokenRange.Pos():tokenRange.End()] == "!" {
+		if ruleContext.SourceFile.Text()[tokenRange.Pos():tokenRange.End()] == "!" {
 			return tokenRange, true
 		}
 		position = tokenRange.End()

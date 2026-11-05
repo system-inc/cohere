@@ -245,7 +245,7 @@ type RulesOfHooksOptions struct {
 	AdditionalHooks string `json:"additionalHooks"`
 }
 
-func runRulesOfHooks(ctx rule.Context, options any) rule.Listeners {
+func runRulesOfHooks(ruleContext rule.Context, options any) rule.Listeners {
 	// One graph per code path root per file, built lazily and only for roots that actually contain a
 	// Hook call. Most functions contain none, and building a graph for them would make this rule pay
 	// per function rather than per Hook.
@@ -266,22 +266,22 @@ func runRulesOfHooks(ctx rule.Context, options any) rule.Listeners {
 
 			enclosing := enclosingFunctionForHook(node)
 			if enclosing == nil {
-				ctx.ReportNode(node, messageRulesOfHooksTopLevel)
+				ruleContext.ReportNode(node, messageRulesOfHooksTopLevel)
 				return
 			}
 
 			if isReactFunctionCall(callee, "useEffectEvent") {
-				reportInlineEffectEventEscape(ctx, node)
+				reportInlineEffectEventEscape(ruleContext, node)
 			}
 
 			// A method, a static block, or a field initializer means the enclosing function is a
 			// class member, and a class never renders through the Hook dispatcher.
 			if isClassMemberFunction(enclosing) {
-				ctx.ReportNode(node, messageRulesOfHooksClassComponent)
+				ruleContext.ReportNode(node, messageRulesOfHooksClassComponent)
 				return
 			}
 
-			if reportEnclosingFunctionShape(ctx, node, callee, enclosing, isUse) {
+			if reportEnclosingFunctionShape(ruleContext, node, callee, enclosing, isUse) {
 				return
 			}
 
@@ -290,7 +290,7 @@ func runRulesOfHooks(ctx rule.Context, options any) rule.Listeners {
 			// suspends by throwing.
 			if isUse {
 				if isInsideTryStatement(node, enclosing) {
-					ctx.ReportNode(node, messageRulesOfHooksTryCatchUse)
+					ruleContext.ReportNode(node, messageRulesOfHooksTryCatchUse)
 				}
 				return
 			}
@@ -313,10 +313,10 @@ func runRulesOfHooks(ctx rule.Context, options any) rule.Listeners {
 			// condition, which is why the cycle test sits inside this arm as well.
 			if isInsideTryStatement(node, enclosing) {
 				if facts.analysis.IsCyclic(block) || isInsideDoWhileStatement(node, enclosing) {
-					ctx.ReportNode(node, messageRulesOfHooksLoop)
+					ruleContext.ReportNode(node, messageRulesOfHooksLoop)
 					return
 				}
-				ctx.ReportNode(node, messageRulesOfHooksConditional)
+				ruleContext.ReportNode(node, messageRulesOfHooksConditional)
 				return
 			}
 
@@ -329,12 +329,12 @@ func runRulesOfHooks(ctx rule.Context, options any) rule.Listeners {
 			}
 
 			if facts.analysis.IsCyclic(block) || isInsideDoWhileStatement(node, enclosing) {
-				ctx.ReportNode(node, messageRulesOfHooksLoop)
+				ruleContext.ReportNode(node, messageRulesOfHooksLoop)
 				return
 			}
 
 			if !facts.analysis.IsOnEveryFinalPath(block) {
-				ctx.ReportNode(node, messageRulesOfHooksConditional)
+				ruleContext.ReportNode(node, messageRulesOfHooksConditional)
 			}
 		},
 	}
@@ -346,18 +346,18 @@ func runRulesOfHooks(ctx rule.Context, options any) rule.Listeners {
 // The arms are ordered the way oxc orders them, because the order is observable: a named function
 // that is neither component nor Hook reports as `notComponent` even when it is also async, and a
 // callback inside a component reports as `callback` even when its own name would qualify.
-func reportEnclosingFunctionShape(ctx rule.Context, hook *ast.Node, callee *ast.Node, enclosing *ast.Node, isUse bool) bool {
+func reportEnclosingFunctionShape(ruleContext rule.Context, hook *ast.Node, callee *ast.Node, enclosing *ast.Node, isUse bool) bool {
 	// A function with its own name that is neither component-shaped nor Hook-shaped. This arm points
 	// at the callee rather than at the whole call, which is upstream's own choice and was measured
 	// on the release binary rather than read: for `useHook(1)` the label covers seven bytes here and
 	// ten in every other arm.
 	if name := ownFunctionName(enclosing); name != "" {
 		if !isComponentOrHookName(name) {
-			ctx.ReportNode(callee, messageRulesOfHooksNotComponent)
+			ruleContext.ReportNode(callee, messageRulesOfHooksNotComponent)
 			return true
 		}
 		if isAsyncFunction(enclosing) && isDirectlyInsideComponentOrHook(enclosing) {
-			ctx.ReportNode(hook, messageRulesOfHooksAsync)
+			ruleContext.ReportNode(hook, messageRulesOfHooksAsync)
 			return true
 		}
 		return false
@@ -368,21 +368,21 @@ func reportEnclosingFunctionShape(ctx rule.Context, hook *ast.Node, callee *ast.
 	// render, so they are not callbacks for this purpose.
 	if isNonReactFunctionArgument(enclosing) {
 		if !isUse && isSomewhereInsideComponentOrHook(enclosing) {
-			ctx.ReportNode(hook, messageRulesOfHooksCallback)
+			ruleContext.ReportNode(hook, messageRulesOfHooksCallback)
 		}
 		return true
 	}
 
 	async := isAsyncFunction(enclosing)
 	if async && isDirectlyInsideComponentOrHook(enclosing) {
-		ctx.ReportNode(hook, messageRulesOfHooksAsync)
+		ruleContext.ReportNode(hook, messageRulesOfHooksAsync)
 		return true
 	}
 
 	// An anonymous function whose surrounding syntax gives it a name — a declarator, an assignment,
 	// an object property, a destructuring default. The name is read syntactically, never resolved.
 	if name, named := declarationIdentifierOf(enclosing); named && !isComponentOrHookName(name) {
-		ctx.ReportNode(callee, messageRulesOfHooksNotComponent)
+		ruleContext.ReportNode(callee, messageRulesOfHooksNotComponent)
 		return true
 	}
 
@@ -393,7 +393,7 @@ func reportEnclosingFunctionShape(ctx rule.Context, hook *ast.Node, callee *ast.
 // something else instead of being bound to a local first.
 //
 // A declarator and a bare expression statement are the two shapes upstream permits.
-func reportInlineEffectEventEscape(ctx rule.Context, call *ast.Node) {
+func reportInlineEffectEventEscape(ruleContext rule.Context, call *ast.Node) {
 	parent := call.Parent
 	if parent == nil {
 		return
@@ -402,7 +402,7 @@ func reportInlineEffectEventEscape(ctx rule.Context, call *ast.Node) {
 	case ast.KindVariableDeclaration, ast.KindExpressionStatement:
 		return
 	}
-	ctx.ReportNode(call, messageRulesOfHooksEffectEventEscape)
+	ruleContext.ReportNode(call, messageRulesOfHooksEffectEventEscape)
 }
 
 // hookPathFacts is one code path root's graph and the analysis over it, plus a map from a Hook call

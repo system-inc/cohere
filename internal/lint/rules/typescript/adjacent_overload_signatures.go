@@ -167,16 +167,16 @@ func messageAdjacentOverloadSignatures(name string) rule.Message {
 // listener for a container that could hold both shapes would void it.
 var AdjacentOverloadSignatures = rule.Rule{
 	Name: "@typescript-eslint/adjacent-overload-signatures",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		checkMembers := func(node *ast.Node) {
-			reportAdjacentOverloadSignatures(ctx, node.Members())
+			reportAdjacentOverloadSignatures(ruleContext, node.Members())
 		}
 		checkStatements := func(node *ast.Node) {
-			reportAdjacentOverloadSignatures(ctx, node.Statements())
+			reportAdjacentOverloadSignatures(ruleContext, node.Statements())
 		}
 
 		return rule.Listeners{
@@ -283,12 +283,12 @@ const (
 // The two pieces of state are upstream's and their difference is the whole algorithm. `seen` is
 // every distinct method met so far in this container and only grows. `previous` is the method
 // immediately before the current one, and it is cleared by any member that is not a method at all.
-func reportAdjacentOverloadSignatures(ctx rule.Context, members []*ast.Node) {
+func reportAdjacentOverloadSignatures(ruleContext rule.Context, members []*ast.Node) {
 	var seen []adjacentOverloadMethod
 	var previous *adjacentOverloadMethod
 
 	for _, member := range members {
-		method, isMethod := adjacentOverloadMethodOf(ctx, member)
+		method, isMethod := adjacentOverloadMethodOf(ruleContext, member)
 		if !isMethod {
 			// Upstream's `lastMethod = null; return;`. Clearing rather than skipping is what makes
 			// a property between two signatures separate them, and it decides several of upstream's
@@ -307,7 +307,7 @@ func reportAdjacentOverloadSignatures(ctx rule.Context, members []*ast.Node) {
 
 		switch {
 		case alreadySeen && (previous == nil || *previous != method):
-			ctx.ReportNode(member, messageAdjacentOverloadSignatures(
+			ruleContext.ReportNode(member, messageAdjacentOverloadSignatures(
 				adjacentOverloadDisplayName(method)))
 		case !alreadySeen:
 			seen = append(seen, method)
@@ -338,7 +338,7 @@ func adjacentOverloadDisplayName(method adjacentOverloadMethod) string {
 // Upstream's export-unwrapping arms have no counterpart here and their absence is explained on the
 // rule: typescript-go carries `export` as a modifier on the declaration rather than as a wrapping
 // node, so there is nothing to unwrap, and `export { a }` is a kind this switch does not name.
-func adjacentOverloadMethodOf(ctx rule.Context, member *ast.Node) (adjacentOverloadMethod, bool) {
+func adjacentOverloadMethodOf(ruleContext rule.Context, member *ast.Node) (adjacentOverloadMethod, bool) {
 	switch member.Kind {
 	// Upstream's `TSDeclareFunction` and `FunctionDeclaration` are one kind here: a body-less
 	// overload signature and an implementation are both `KindFunctionDeclaration`, distinguished by
@@ -403,7 +403,7 @@ func adjacentOverloadMethodOf(ctx rule.Context, member *ast.Node) (adjacentOverl
 			}, true
 		}
 
-		name, nameKind, named := adjacentOverloadNameOf(ctx, member.Name())
+		name, nameKind, named := adjacentOverloadNameOf(ruleContext, member.Name())
 		if !named {
 			return adjacentOverloadMethod{}, false
 		}
@@ -479,7 +479,7 @@ func adjacentOverloadHasModifier(member *ast.Node, keyword ast.Kind) bool {
 // its own rule and the two agree; they are not shared because the helper is small and because
 // sharing would invite a later caller to "fix" one rule's behavior into the other's, and the two
 // rules disagree about `static` on purpose.
-func adjacentOverloadNameOf(ctx rule.Context, key *ast.Node) (string, adjacentOverloadNameKind, bool) {
+func adjacentOverloadNameOf(ruleContext rule.Context, key *ast.Node) (string, adjacentOverloadNameKind, bool) {
 	if key == nil {
 		return "", "", false
 	}
@@ -524,6 +524,6 @@ func adjacentOverloadNameOf(ctx rule.Context, key *ast.Node) (string, adjacentOv
 	// `Pos()` includes leading trivia, which upstream's `range` does not, so a key written after a
 	// newline would carry the whitespace and stop matching the same key written inline.
 	// `rule.TokenRange` is the same token-start walk `ReportNode` uses.
-	trimmed := rule.TokenRange(ctx.SourceFile, key)
-	return ctx.SourceFile.Text()[trimmed.Pos():trimmed.End()], adjacentOverloadNameExpression, true
+	trimmed := rule.TokenRange(ruleContext.SourceFile, key)
+	return ruleContext.SourceFile.Text()[trimmed.Pos():trimmed.End()], adjacentOverloadNameExpression, true
 }

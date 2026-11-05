@@ -262,20 +262,20 @@ func memoBlockObservations(test *testing.T, source string) ([]memoBlockObservati
 	probe := rule.Rule{
 		Name:             "memo-block-scope-oracle",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						return
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
 						lowered = true
-						all = append(all, observeMemoBlocks(function, ctx.TypeChecker)...)
+						all = append(all, observeMemoBlocks(function, ruleContext.TypeChecker)...)
 					})
 				},
 			}

@@ -111,7 +111,7 @@ var securityRequireContextAccessDownstreamResolvers = map[string]struct{}{
 //	                       than a `TSParameterProperty` wrapper, so no unwrapping step is needed.
 var SecurityRequireContextAccess = rule.Rule{
 	Name: "base/security-require-context-access",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, configured := rule.OptionsAs[SecurityRequireContextAccessOptions](options)
 		if !configured || len(settings.Requirements) == 0 {
 			// Nothing configured means nothing to enforce, and the source returns an empty visitor
@@ -131,7 +131,7 @@ var SecurityRequireContextAccess = rule.Rule{
 		return rule.Listeners{
 			ast.KindSourceFile: func(file *ast.Node) {
 				aliases := securityRequireContextAccessImportAliases(file)
-				securityRequireContextAccessWalk(ctx, file, required, aliases)
+				securityRequireContextAccessWalk(ruleContext, file, required, aliases)
 			},
 		}
 	},
@@ -142,7 +142,7 @@ var SecurityRequireContextAccess = rule.Rule{
 // A single walk from the source file rather than two listeners, because the alias map has to be
 // complete before any method is judged and there is no exit hook to order that with.
 func securityRequireContextAccessWalk(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	required map[string][]string,
 	aliases map[string]string,
@@ -156,17 +156,17 @@ func securityRequireContextAccessWalk(
 		// The accessors are included because the source's `MethodDefinition` visitor covers them in
 		// ESTree, where a getter and a setter are method definitions with a `kind`. Measured: a
 		// setter with a decorated parameter reports.
-		checkContextRequiresAccess(ctx, node, required, aliases)
+		checkContextRequiresAccess(ruleContext, node, required, aliases)
 	}
 	node.ForEachChild(func(child *ast.Node) bool {
-		securityRequireContextAccessWalk(ctx, child, required, aliases)
+		securityRequireContextAccessWalk(ruleContext, child, required, aliases)
 		return false
 	})
 }
 
 // checkContextRequiresAccess judges one method or constructor.
 func checkContextRequiresAccess(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	required map[string][]string,
 	aliases map[string]string,
@@ -228,7 +228,7 @@ func checkContextRequiresAccess(
 		for _, decoratorName := range requiresAny {
 			wanted = append(wanted, "`@"+decoratorName+"()`")
 		}
-		ctx.ReportNode(securityRequireContextAccessReportTarget(node), rule.Message{
+		ruleContext.ReportNode(securityRequireContextAccessReportTarget(node), rule.Message{
 			Id: securityRequireContextAccessText.Id,
 			Description: securityRequireContextAccessText.Render(map[string]string{
 				"contextKey": key,

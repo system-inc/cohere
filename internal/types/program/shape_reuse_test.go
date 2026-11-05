@@ -26,11 +26,11 @@ type countingRule struct {
 
 func (counter *countingRule) wrap(subject rule.Rule) rule.Rule {
 	run := subject.Run
-	subject.Run = func(ctx rule.Context, options any) rule.Listeners {
+	subject.Run = func(ruleContext rule.Context, options any) rule.Listeners {
 		counter.mutex.Lock()
-		counter.ran[filepath.Base(ctx.SourceFile.FileName().AsString())]++
+		counter.ran[filepath.Base(ruleContext.SourceFile.FileName().AsString())]++
 		counter.mutex.Unlock()
-		return run(ctx, options)
+		return run(ruleContext, options)
 	}
 	return subject
 }
@@ -252,14 +252,14 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(test *testing.T) 
 	// Enable the option that actually consults Boolean's default-library provenance.
 	nullish := typescript.PreferNullishCoalescing
 	nullishRun := nullish.Run
-	nullish.Run = func(ctx rule.Context, _ any) rule.Listeners {
-		return nullishRun(ctx, typescript.PreferNullishCoalescingOptions{IgnoreBooleanCoercion: true, IgnoreConditionalTests: true})
+	nullish.Run = func(ruleContext rule.Context, _ any) rule.Listeners {
+		return nullishRun(ruleContext, typescript.PreferNullishCoalescingOptions{IgnoreBooleanCoercion: true, IgnoreConditionalTests: true})
 	}
 	logical := core.LogicalAssignmentOperators
 	logicalRun := logical.Run
 	logicalOptions := core.DefaultLogicalAssignmentOperatorsSettings()
 	logicalOptions.EnforceForIfStatements = true
-	logical.Run = func(ctx rule.Context, _ any) rule.Listeners { return logicalRun(ctx, logicalOptions) }
+	logical.Run = func(ruleContext rule.Context, _ any) rule.Listeners { return logicalRun(ruleContext, logicalOptions) }
 	for _, tc := range []struct {
 		subject    rule.Rule
 		source     string

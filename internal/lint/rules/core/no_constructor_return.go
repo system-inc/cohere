@@ -90,7 +90,7 @@ import (
 var NoConstructorReturn = rule.Rule{
 	Name: "no-constructor-return",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindReturnStatement: func(node *ast.Node) {
 				statement := node.AsReturnStatement()
@@ -104,7 +104,7 @@ var NoConstructorReturn = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: "noConstructorReturn",
 					Description: "This returns a value from a constructor, where it is either " +
 						"discarded or worse. `new C()` evaluates to the new instance and throws " +

@@ -85,10 +85,10 @@ func messageImportsNotOrganized() rule.Message {
 // span is that declaration's own text.
 var ConsistencyRequireOrganizedImports = rule.Rule{
 	Name: "structure/consistency-require-organized-imports",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				checkImportOrganization(ctx, node)
+				checkImportOrganization(ruleContext, node)
 			},
 		}
 	},
@@ -99,7 +99,7 @@ var ConsistencyRequireOrganizedImports = rule.Rule{
 // A KindSourceFile listener rather than a per-import one, because the judgment is about the section
 // as a whole: no single import is wrong on its own, and reporting per-import would produce one
 // finding per file times however many imports it holds.
-func checkImportOrganization(ctx rule.Context, sourceFile *ast.Node) {
+func checkImportOrganization(ruleContext rule.Context, sourceFile *ast.Node) {
 	statements := sourceFile.AsSourceFile().Statements
 	if statements == nil {
 		return
@@ -118,9 +118,9 @@ func checkImportOrganization(ctx rule.Context, sourceFile *ast.Node) {
 		return
 	}
 
-	sourceFileNode := ctx.SourceFile
+	sourceFileNode := ruleContext.SourceFile
 	sourceText := sourceFileNode.Text()
-	fileComments := comments.ForFile(ctx)
+	fileComments := comments.ForFile(ruleContext)
 
 	directive, directiveNode := leadingDirective(statements)
 
@@ -154,10 +154,10 @@ func checkImportOrganization(ctx rule.Context, sourceFile *ast.Node) {
 	 * being reordered. Those files are reported without a fix.
 	 */
 	if !canRenderSafely(interleaved) || suppressionPrecedesSection(sourceText, fileComments, sectionStart) {
-		ctx.ReportNode(importDeclarations[0], messageImportsNotOrganized())
+		ruleContext.ReportNode(importDeclarations[0], messageImportsNotOrganized())
 		return
 	}
 
-	ctx.ReportNodeWithFixes(importDeclarations[0], messageImportsNotOrganized(),
+	ruleContext.ReportNodeWithFixes(importDeclarations[0], messageImportsNotOrganized(),
 		rule.ReplaceRange(core.NewTextRange(sectionStart, sectionEnd), expected))
 }

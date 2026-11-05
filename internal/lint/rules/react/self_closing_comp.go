@@ -108,8 +108,8 @@ var messageNotSelfClosing = rule.Message{
 // corpus asserts the resulting text on all twelve reporting cases and every one is reproduced.
 var SelfClosingComp = rule.Rule{
 	Name: "react/self-closing-comp",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -142,7 +142,7 @@ var SelfClosingComp = rule.Rule{
 				// Taking it from the node ends rather than by scanning for the character keeps it
 				// correct when the tag spans lines.
 				replaced := core.NewTextRange(opening.End()-1, closing.End())
-				ctx.ReportNodeWithFixes(opening, messageNotSelfClosing,
+				ruleContext.ReportNodeWithFixes(opening, messageNotSelfClosing,
 					rule.ReplaceRange(replaced, " />"))
 			},
 		}

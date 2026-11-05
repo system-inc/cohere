@@ -40,7 +40,7 @@ var GoogleFontPreconnect = rule.Rule{
 	// No family prefix. The config writes `nextjs/google-font-preconnect` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name: "@next/next/google-font-preconnect",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
 			tagName, attributes := jsx.ElementParts(node)
 			if !jsx.IsIntrinsicElementNamed(tagName, "link") {
@@ -63,7 +63,7 @@ var GoogleFontPreconnect = rule.Rule{
 				return
 			}
 
-			ctx.ReportNode(node, messageGoogleFontPreconnect)
+			ruleContext.ReportNode(node, messageGoogleFontPreconnect)
 		}
 
 		return rule.Listeners{

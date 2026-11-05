@@ -133,7 +133,7 @@ var RequireArraySortCompare = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[RequireArraySortCompareOptions](options)
 		if !isSettings {
 			// A rule configured as a bare "error" is handed nil options, and `options.(T)` on nil
@@ -158,15 +158,15 @@ var RequireArraySortCompare = rule.Rule{
 		// divergence with no observable benefit. Recorded rather than left silent because the next
 		// reader will score the same mutant and needs to know the survival was measured.
 		isStringArrayNode := func(receiver *ast.Node) bool {
-			receiverType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, receiver)
-			if !checker.Checker_isArrayType(ctx.TypeChecker, receiverType) &&
+			receiverType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, receiver)
+			if !checker.Checker_isArrayType(ruleContext.TypeChecker, receiverType) &&
 				!checker.IsTupleType(receiverType) {
 				return false
 			}
 
-			typeArguments := checker.Checker_getTypeArguments(ctx.TypeChecker, receiverType)
+			typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, receiverType)
 			for _, argument := range typeArguments {
-				if type_checking.GetTypeName(ctx.TypeChecker, argument) != "string" {
+				if type_checking.GetTypeName(ruleContext.TypeChecker, argument) != "string" {
 					return false
 				}
 			}
@@ -179,7 +179,7 @@ var RequireArraySortCompare = rule.Rule{
 		// constituent of a union must be an array, and a non-union is its own single constituent.
 		isArrayOrUnionOfArrays := func(receiverType *checker.Type) bool {
 			for constituent := range type_checking.UnionTypePartsSeq(receiverType) {
-				if !checker.Checker_isArrayType(ctx.TypeChecker, constituent) {
+				if !checker.Checker_isArrayType(ruleContext.TypeChecker, constituent) {
 					return false
 				}
 			}
@@ -188,7 +188,7 @@ var RequireArraySortCompare = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -223,13 +223,13 @@ var RequireArraySortCompare = rule.Rule{
 					return
 				}
 
-				if !isArrayOrUnionOfArrays(type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, receiver)) {
+				if !isArrayOrUnionOfArrays(type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, receiver)) {
 					return
 				}
 
 				// Upstream reports `callee.parent`, which is the whole call expression rather than
 				// the member access, so the finding underlines `a.sort()` including the parentheses.
-				ctx.ReportNode(node, buildRequireCompareMessage())
+				ruleContext.ReportNode(node, buildRequireCompareMessage())
 			},
 		}
 	},

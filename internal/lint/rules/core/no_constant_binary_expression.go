@@ -82,9 +82,9 @@ var NoConstantBinaryExpression = rule.Rule{
 	// Whether `undefined`, `Boolean` and the built-in constructors are the globals
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		judge := constantJudge{isGlobal: func(identifier *ast.Node) bool {
-			return ctx.TypeChecker == nil || !rule.IsDeclaredInASourceFile(ctx.TypeChecker.GetSymbolAtLocation(identifier))
+			return ruleContext.TypeChecker == nil || !rule.IsDeclaredInASourceFile(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 		}}
 		checkRelationalComparisons := false
 		if parsed, ok := rule.OptionsAs[NoConstantBinaryExpressionOptions](options); ok {
@@ -107,40 +107,40 @@ var NoConstantBinaryExpression = rule.Rule{
 				case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken:
 					// The left side alone decides whether the operator ever chooses.
 					if isConstantExpression(left, true) {
-						ctx.ReportNode(left, messageConstantShortCircuit)
+						ruleContext.ReportNode(left, messageConstantShortCircuit)
 					}
 
 				case ast.KindQuestionQuestionToken:
 					if judge.hasConstantNullishness(left, false) {
-						ctx.ReportNode(left, messageConstantShortCircuit)
+						ruleContext.ReportNode(left, messageConstantShortCircuit)
 					}
 
 				case ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
 					if operand := judge.constantComparisonOperand(left, right, true); operand != nil {
-						ctx.ReportNode(operand, messageConstantBinaryOperand)
+						ruleContext.ReportNode(operand, messageConstantBinaryOperand)
 					} else if operand := judge.constantComparisonOperand(right, left, true); operand != nil {
-						ctx.ReportNode(operand, messageConstantBinaryOperand)
+						ruleContext.ReportNode(operand, messageConstantBinaryOperand)
 					} else if judge.isAlwaysNew(left) {
-						ctx.ReportNode(left, messageAlwaysNew)
+						ruleContext.ReportNode(left, messageAlwaysNew)
 					} else if judge.isAlwaysNew(right) {
-						ctx.ReportNode(right, messageAlwaysNew)
+						ruleContext.ReportNode(right, messageAlwaysNew)
 					}
 
 				case ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken:
 					if operand := judge.constantComparisonOperand(left, right, false); operand != nil {
-						ctx.ReportNode(operand, messageConstantBinaryOperand)
+						ruleContext.ReportNode(operand, messageConstantBinaryOperand)
 					} else if operand := judge.constantComparisonOperand(right, left, false); operand != nil {
-						ctx.ReportNode(operand, messageConstantBinaryOperand)
+						ruleContext.ReportNode(operand, messageConstantBinaryOperand)
 					} else if judge.isAlwaysNew(left) && judge.isAlwaysNew(right) {
 						// Both sides only. Under loose equality a single fresh object can still
 						// equal a primitive through coercion, so one is not enough.
-						ctx.ReportNode(left, messageBothAlwaysNew)
+						ruleContext.ReportNode(left, messageBothAlwaysNew)
 					}
 
 				case ast.KindLessThanToken, ast.KindLessThanEqualsToken,
 					ast.KindGreaterThanToken, ast.KindGreaterThanEqualsToken:
 					if checkRelationalComparisons && judge.isStaticLiteral(left) && judge.isStaticLiteral(right) {
-						ctx.ReportNode(node, messageConstantRelationalComparison)
+						ruleContext.ReportNode(node, messageConstantRelationalComparison)
 					}
 				}
 			},

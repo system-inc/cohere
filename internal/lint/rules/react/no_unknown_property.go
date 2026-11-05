@@ -1018,7 +1018,7 @@ func noUnknownPropertyStandardName(name string) (string, bool) {
 // the expectation this port started from, and it matters because `data-*` and `aria-*` are two of
 // the rule's four branches. The probe asserted the exact returned string for eight shapes and was
 // mutation-checked by expecting a wrong value and watching it go red.
-func noUnknownPropertyAttributeNameText(ctx rule.Context, node *ast.Node) (string, bool) {
+func noUnknownPropertyAttributeNameText(ruleContext rule.Context, node *ast.Node) (string, bool) {
 	if node == nil || node.Kind != ast.KindJsxAttribute {
 		return "", false
 	}
@@ -1029,8 +1029,8 @@ func noUnknownPropertyAttributeNameText(ctx rule.Context, node *ast.Node) (strin
 	// Source text rather than `Text()`, so a namespaced name arrives with its colon intact the way
 	// upstream's `getText` delivers it. The kinds are guarded above rather than here because the
 	// range read cannot panic on any node.
-	span := rule.TokenRange(ctx.SourceFile, name)
-	sourceText := ctx.SourceFile.Text()
+	span := rule.TokenRange(ruleContext.SourceFile, name)
+	sourceText := ruleContext.SourceFile.Text()
 	if span.Pos() < 0 || span.End() > len(sourceText) || span.Pos() > span.End() {
 		return "", false
 	}
@@ -1160,7 +1160,7 @@ func noUnknownPropertyTagOf(node *ast.Node) noUnknownPropertyTagInfo {
 var NoUnknownProperty = rule.Rule{
 	Name: "react/no-unknown-property",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[NoUnknownPropertyOptions](options)
 		ignored := make(map[string]bool, len(settings.Ignore))
 		for _, name := range settings.Ignore {
@@ -1169,7 +1169,7 @@ var NoUnknownProperty = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindJsxAttribute: func(node *ast.Node) {
-				actualName, readable := noUnknownPropertyAttributeNameText(ctx, node)
+				actualName, readable := noUnknownPropertyAttributeNameText(ruleContext, node)
 				if !readable {
 					return
 				}
@@ -1198,7 +1198,7 @@ var NoUnknownProperty = rule.Rule{
 					// writes and because the equivalence would end the moment a `data-` entry were
 					// added to that list.
 					if settings.RequireDataLowercase && strings.ToLower(name) != name {
-						ctx.ReportNode(node, noUnknownPropertyDataLowercaseRequired(
+						ruleContext.ReportNode(node, noUnknownPropertyDataLowercaseRequired(
 							actualName, strings.ToLower(actualName)))
 					}
 					return
@@ -1229,7 +1229,7 @@ var NoUnknownProperty = rule.Rule{
 							}
 						}
 						if !allowed {
-							ctx.ReportNode(node, noUnknownPropertyInvalidPropOnTag(
+							ruleContext.ReportNode(node, noUnknownPropertyInvalidPropOnTag(
 								actualName, tag.Name, allowedTags))
 						}
 						return
@@ -1245,13 +1245,13 @@ var NoUnknownProperty = rule.Rule{
 					// name is replaced in place. Upstream replaces `node.name`, which is the name
 					// node alone and not the whole attribute, so the value survives untouched.
 					nameNode := node.AsJsxAttribute().Name()
-					ctx.ReportNodeWithFixes(node,
+					ruleContext.ReportNodeWithFixes(node,
 						noUnknownPropertyUnknownPropWithStandardName(actualName, standardName),
-						rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, nameNode), standardName))
+						rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, nameNode), standardName))
 					return
 				}
 
-				ctx.ReportNode(node, noUnknownPropertyUnknownProp(actualName))
+				ruleContext.ReportNode(node, noUnknownPropertyUnknownProp(actualName))
 			},
 		}
 	},

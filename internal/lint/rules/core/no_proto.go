@@ -56,12 +56,12 @@ var messageNoProto = rule.Message{
 // build. Our parser hangs the question off the same two access kinds, so no arm is needed for it.
 var NoProto = rule.Rule{
 	Name: "no-proto",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// Both access kinds, because the shelf helper answers for both and a rule watching only
 			// the dotted form is silent on `test['__proto__']`, which upstream reports.
-			ast.KindPropertyAccessExpression: reportIfProtoAccess(ctx),
-			ast.KindElementAccessExpression:  reportIfProtoAccess(ctx),
+			ast.KindPropertyAccessExpression: reportIfProtoAccess(ruleContext),
+			ast.KindElementAccessExpression:  reportIfProtoAccess(ruleContext),
 		}
 	},
 }
@@ -75,12 +75,12 @@ var NoProto = rule.Rule{
 // A private name cannot collide either, and that is a property of the shelf rather than of this
 // comparison: `Text()` on a `KindPrivateIdentifier` carries the leading hash, so `#__proto__`
 // answers `"#__proto__"`. Upstream's `class C { #__proto__; ... }` clean case pins it.
-func reportIfProtoAccess(ctx rule.Context) func(*ast.Node) {
+func reportIfProtoAccess(ruleContext rule.Context) func(*ast.Node) {
 	return func(node *ast.Node) {
 		name, _ := property.AccessedName(node, property.Static)
 		if name != "__proto__" {
 			return
 		}
-		ctx.ReportNode(node, messageNoProto)
+		ruleContext.ReportNode(node, messageNoProto)
 	}
 }

@@ -176,7 +176,7 @@ var Gating = rule.Rule{
 	// No namespace prefix. The config writes `react/gating`; the parity guard strips the namespace
 	// on a `/` boundary, so `react-gating` would match no inventory entry and lint nothing.
 	Name: "react-hooks/gating",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		gatingOptions, _ := rule.OptionsAs[GatingOptions](options)
 		if gatingOptions.RequireDynamicGatingOption {
 			return nil
@@ -193,7 +193,7 @@ var Gating = rule.Rule{
 				}
 				if !isValidGatingCondition(condition) {
 					// Every invalid directive reports, matching upstream's collect-then-return.
-					ctx.ReportNode(statement, messageInvalidGatingDirective)
+					ruleContext.ReportNode(statement, messageInvalidGatingDirective)
 					invalid = true
 					continue
 				}
@@ -206,7 +206,7 @@ var Gating = rule.Rule{
 				return
 			}
 			// One finding for the body, anchored on the first directive.
-			ctx.ReportNode(matched[0], messageMultipleGatingDirectives)
+			ruleContext.ReportNode(matched[0], messageMultipleGatingDirectives)
 		}
 
 		return rule.Listeners{

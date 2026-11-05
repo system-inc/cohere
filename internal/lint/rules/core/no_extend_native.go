@@ -150,7 +150,7 @@ var NoExtendNative = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// A rule configured as a bare `"error"` is handed NIL rather than a decoded struct, because
 		// `DecodeOptionsInto` errors on empty input and the config turns that into nil. The zero
 		// value is the right default here, and naming it makes that a decision rather than an
@@ -194,14 +194,14 @@ var NoExtendNative = rule.Rule{
 			if !nativePrototypeBuiltins[name] || excepted[name] {
 				return ""
 			}
-			if !resolvesToAGlobal(ctx, receiver) {
+			if !resolvesToAGlobal(ruleContext, receiver) {
 				return ""
 			}
 			return name
 		}
 
 		report := func(node *ast.Node, builtin string) {
-			ctx.ReportNode(node, rule.Message{
+			ruleContext.ReportNode(node, rule.Message{
 				Id: "unexpected",
 				Description: fmt.Sprintf(
 					"This adds a property to `%s.prototype`, which every object of that type in "+
@@ -217,7 +217,7 @@ var NoExtendNative = rule.Rule{
 			// `<Builtin>.prototype.p = 0`. The listener anchors on the assignment so the finding is
 			// the whole assignment, which is where upstream points.
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				binary := node.AsBinaryExpression()
@@ -239,14 +239,14 @@ var NoExtendNative = rule.Rule{
 
 			// `Object.defineProperty(<Builtin>.prototype, ...)` and `defineProperties`.
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				call := node.AsCallExpression()
 				if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 					return
 				}
-				if !isObjectDefinePropertyCallee(ctx, call.Expression) {
+				if !isObjectDefinePropertyCallee(ruleContext, call.Expression) {
 					return
 				}
 				// Only the FIRST argument, which is why `Object.defineProperty(x, Array.prototype)`
@@ -269,7 +269,7 @@ var NoExtendNative = rule.Rule{
 // this declines. No corpus case writes it, and the rule already requires the global for the
 // prototype receiver, so accepting a shadowed `Object` on the callee while rejecting one on the
 // argument would be the inconsistent reading.
-func isObjectDefinePropertyCallee(ctx rule.Context, callee *ast.Node) bool {
+func isObjectDefinePropertyCallee(ruleContext rule.Context, callee *ast.Node) bool {
 	if callee == nil {
 		return false
 	}
@@ -289,5 +289,5 @@ func isObjectDefinePropertyCallee(ctx rule.Context, callee *ast.Node) bool {
 	if receiver == nil || receiver.Kind != ast.KindIdentifier || receiver.Text() != "Object" {
 		return false
 	}
-	return resolvesToAGlobal(ctx, receiver)
+	return resolvesToAGlobal(ruleContext, receiver)
 }

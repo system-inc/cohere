@@ -42,10 +42,10 @@ var messageNoContinueUnexpected = rule.Message{
 // a port which somehow saw only one of them would be caught.
 var NoContinue = rule.Rule{
 	Name: "no-continue",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindContinueStatement: func(node *ast.Node) {
-				ctx.ReportNode(node, messageNoContinueUnexpected)
+				ruleContext.ReportNode(node, messageNoContinueUnexpected)
 			},
 		}
 	},

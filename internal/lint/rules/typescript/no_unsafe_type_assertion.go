@@ -83,17 +83,17 @@ var NoUnsafeTypeAssertion = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		checkAssertion := func(node *ast.Node, expression *ast.Node, assertedTypeNode *ast.Node) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 			if expression == nil || assertedTypeNode == nil {
 				return
 			}
 
-			expressionType := ctx.TypeChecker.GetTypeAtLocation(expression)
-			assertedType := ctx.TypeChecker.GetTypeAtLocation(assertedTypeNode)
+			expressionType := ruleContext.TypeChecker.GetTypeAtLocation(expression)
+			assertedType := ruleContext.TypeChecker.GetTypeAtLocation(assertedTypeNode)
 			if expressionType == nil || assertedType == nil {
 				return
 			}
@@ -111,21 +111,21 @@ var NoUnsafeTypeAssertion = rule.Rule{
 			// off.
 			if type_checking.IsTypeAnyType(assertedType) &&
 				type_checking.IsTypeUnknownType(expressionType) {
-				ctx.ReportNode(node, buildUnsafeToAnyMessage("`any`"))
+				ruleContext.ReportNode(node, buildUnsafeToAnyMessage("`any`"))
 				return
 			}
 
 			// An any flowing OUT of the expression, including one buried in a generic position.
 			if _, sender, isUnsafe := type_checking.IsUnsafeAssignment(expressionType, assertedType,
-				ctx.TypeChecker, expression); isUnsafe {
-				ctx.ReportNode(node, buildUnsafeOfAnyMessage(anyTypeName(sender)))
+				ruleContext.TypeChecker, expression); isUnsafe {
+				ruleContext.ReportNode(node, buildUnsafeOfAnyMessage(anyTypeName(sender)))
 				return
 			}
 
 			// An any flowing IN from the asserted type. Same helper, arguments swapped.
 			if _, sender, isUnsafe := type_checking.IsUnsafeAssignment(assertedType, expressionType,
-				ctx.TypeChecker, assertedTypeNode); isUnsafe {
-				ctx.ReportNode(node, buildUnsafeToAnyMessage(anyTypeName(sender)))
+				ruleContext.TypeChecker, assertedTypeNode); isUnsafe {
+				ruleContext.ReportNode(node, buildUnsafeToAnyMessage(anyTypeName(sender)))
 				return
 			}
 
@@ -134,37 +134,37 @@ var NoUnsafeTypeAssertion = rule.Rule{
 			// that is not this rule's. Widening drops that and asks the question the rule means.
 			expressionWidenedType := expressionType
 			if isObjectLiteralType(expressionType) {
-				expressionWidenedType = checker.Checker_getWidenedType(ctx.TypeChecker, expressionType)
+				expressionWidenedType = checker.Checker_getWidenedType(ruleContext.TypeChecker, expressionType)
 			}
 
 			// Upstream wraps this call in a try for a TypeScript crash it cites by issue number.
 			// Our checker does not signal failure by panicking here, so there is nothing to catch.
-			if checker.Checker_isTypeAssignableTo(ctx.TypeChecker, expressionWidenedType, assertedType) {
+			if checker.Checker_isTypeAssignableTo(ruleContext.TypeChecker, expressionWidenedType, assertedType) {
 				return
 			}
 
 			// A type parameter is unsafe for a reason worth naming: the CALLER picks what it is, so
 			// no amount of local reasoning makes the assertion true.
 			if type_checking.IsTypeParameter(assertedType) {
-				constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, assertedType)
+				constraint := checker.Checker_getBaseConstraintOfType(ruleContext.TypeChecker, assertedType)
 				if constraint == nil {
-					ctx.ReportNode(node, buildUnsafeToUnconstrainedMessage(
-						ctx.TypeChecker.TypeToString(assertedType)))
+					ruleContext.ReportNode(node, buildUnsafeToUnconstrainedMessage(
+						ruleContext.TypeChecker.TypeToString(assertedType)))
 					return
 				}
 
 				// The expression satisfies the constraint, so the assertion is not absurd; it is
 				// merely unprovable, because the caller can still choose a different subtype of
 				// that constraint. Upstream gives this its own message and so does this port.
-				if checker.Checker_isTypeAssignableTo(ctx.TypeChecker, expressionWidenedType, constraint) {
-					ctx.ReportNode(node, buildUnsafeAssignableToConstraintMessage(
-						ctx.TypeChecker.TypeToString(assertedType)))
+				if checker.Checker_isTypeAssignableTo(ruleContext.TypeChecker, expressionWidenedType, constraint) {
+					ruleContext.ReportNode(node, buildUnsafeAssignableToConstraintMessage(
+						ruleContext.TypeChecker.TypeToString(assertedType)))
 					return
 				}
 			}
 
-			ctx.ReportNode(node, buildUnsafeTypeAssertionMessage(
-				ctx.TypeChecker.TypeToString(assertedType)))
+			ruleContext.ReportNode(node, buildUnsafeTypeAssertionMessage(
+				ruleContext.TypeChecker.TypeToString(assertedType)))
 		}
 
 		return rule.Listeners{

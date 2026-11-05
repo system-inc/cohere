@@ -17,7 +17,7 @@ func answerFor(test *testing.T, source string, target string) []bool {
 	var answers []bool
 	rule_testing.Run(test, rule.Rule{
 		Name: "write-probe",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindIdentifier: func(node *ast.Node) {
 					if node.Text() != target {
@@ -275,7 +275,7 @@ func TestShelfAccessorStillDeclinesRestElements(test *testing.T) {
 		var shimAnswers []bool
 		rule_testing.Run(test, rule.Rule{
 			Name: "shim-differential",
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{
 					ast.KindIdentifier: func(node *ast.Node) {
 						if node.Text() != "a" {

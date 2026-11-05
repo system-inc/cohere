@@ -34,12 +34,12 @@ func messageNoUtils() rule.Message {
 var ConsistencyNoUtilsFolder = rule.Rule{
 	Name:       "nexus/consistency-no-utils-folder",
 	NoListener: rule.NoListenerDeclinesIrrelevantFiles,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
-		fileName := ctx.SourceFile.FileName()
+		fileName := ruleContext.SourceFile.FileName()
 		hasUnderscoreUtils := containsPathSegment(fileName.AsString(), "_utils")
 		hasUtils := containsPathSegment(fileName.AsString(), "utils")
 		if !hasUnderscoreUtils && !hasUtils {
@@ -51,10 +51,10 @@ var ConsistencyNoUtilsFolder = rule.Rule{
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				if hasUnderscoreUtils {
-					ctx.ReportRange(node.Loc.WithEnd(node.Loc.Pos()), messageNoUnderscoreUtils())
+					ruleContext.ReportRange(node.Loc.WithEnd(node.Loc.Pos()), messageNoUnderscoreUtils())
 				}
 				if hasUtils {
-					ctx.ReportRange(node.Loc.WithEnd(node.Loc.Pos()), messageNoUtils())
+					ruleContext.ReportRange(node.Loc.WithEnd(node.Loc.Pos()), messageNoUtils())
 				}
 			},
 		}

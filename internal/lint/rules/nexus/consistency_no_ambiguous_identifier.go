@@ -77,7 +77,7 @@ func messageNoUnderscore() rule.Message {
 // scope in front of them.
 var ConsistencyNoAmbiguousIdentifier = rule.Rule{
 	Name: "nexus/consistency-no-ambiguous-identifier",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				name := node.Text()
@@ -107,7 +107,7 @@ var ConsistencyNoAmbiguousIdentifier = rule.Rule{
 				}
 
 				if name == "_" {
-					ctx.ReportNode(node, messageNoUnderscore())
+					ruleContext.ReportNode(node, messageNoUnderscore())
 					return
 				}
 				if alwaysAllowedSingleLetters[name] {
@@ -115,7 +115,7 @@ var ConsistencyNoAmbiguousIdentifier = rule.Rule{
 				}
 				if name == "e" {
 					suggestedName, context := inferEventOrErrorContext(node)
-					ctx.ReportNode(node, messageNoAmbiguousE(context, suggestedName))
+					ruleContext.ReportNode(node, messageNoAmbiguousE(context, suggestedName))
 					return
 				}
 				// A sort comparator is the one place a and b read correctly.
@@ -123,7 +123,7 @@ var ConsistencyNoAmbiguousIdentifier = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(node, messageNoSingleLetter(name))
+				ruleContext.ReportNode(node, messageNoSingleLetter(name))
 			},
 		}
 	},

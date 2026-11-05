@@ -166,8 +166,8 @@ var EnforceConsistentClassOrder = rule.Rule{
 	Name: "better-tailwindcss/enforce-consistent-class-order",
 	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -188,17 +188,17 @@ var EnforceConsistentClassOrder = rule.Rule{
 		// read is the loud case, and it is reported once per file rather than swallowed, because a
 		// rule reporting zero findings over unreadable CSS is indistinguishable from a clean tree
 		// and that is the one failure cohere exists to remove.
-		designSystem := DesignSystemForProgramAt(ctx.Program, configured.Location())
+		designSystem := DesignSystemForProgramAt(ruleContext.Program, configured.Location())
 		if designSystem.Err != nil {
-			if ctx.Program == nil {
+			if ruleContext.Program == nil {
 				return nil
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if skipWithoutTailwind(ctx, designSystem.Err) {
+			if skipWithoutTailwind(ruleContext, designSystem.Err) {
 				return nil
 			}
-			return declineListeners(ctx, "enforce-consistent-class-order", designSystem)
+			return declineListeners(ruleContext, "enforce-consistent-class-order", designSystem)
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
@@ -208,14 +208,14 @@ var EnforceConsistentClassOrder = rule.Rule{
 			surfaces = configured.ClassLiteralSurfaces()
 		}
 
-		reader := surfaces.ReaderFor(ctx.FileCache)
+		reader := surfaces.ReaderFor(ruleContext.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
-				reportClassOrder(ctx, literal, designSystem, ordering)
+				reportClassOrder(ruleContext, literal, designSystem, ordering)
 			}
 			for _, segments := range reader.ClassTemplateSegmentsIn(node) {
-				reportTemplateClassOrder(ctx, segments, designSystem, ordering)
+				reportTemplateClassOrder(ruleContext, segments, designSystem, ordering)
 			}
 		}
 
@@ -234,7 +234,7 @@ var EnforceConsistentClassOrder = rule.Rule{
 // that carries no classes at all. The second half matters more than it looks: a repository whose
 // CSS stopped parsing would otherwise announce the problem only in the files that happen to hold a
 // className, which is the subset a reader is least likely to open first.
-func declineListeners(ctx rule.Context, ruleName string, designSystem DesignSystemResult) rule.Listeners {
+func declineListeners(ruleContext rule.Context, ruleName string, designSystem DesignSystemResult) rule.Listeners {
 	reported := false
 	return rule.Listeners{
 		ast.KindSourceFile: func(node *ast.Node) {
@@ -242,7 +242,7 @@ func declineListeners(ctx rule.Context, ruleName string, designSystem DesignSyst
 				return
 			}
 			reported = true
-			ctx.ReportNode(node, rule.Message{
+			ruleContext.ReportNode(node, rule.Message{
 				Id:          "designSystemUnavailable",
 				Description: DesignSystemDeclineMessage(ruleName, designSystem),
 			})
@@ -256,7 +256,7 @@ func declineListeners(ctx rule.Context, ruleName string, designSystem DesignSyst
 // engine's own ordering requires rather than a convenience. See class_order_key.go: a variant's
 // index is a rank among exactly the variants this list contains, so there is no per-class key to
 // compute and no pairwise comparator that could compute one.
-func reportClassOrder(ctx rule.Context, literal ClassLiteral, designSystem DesignSystemResult, ordering classOrderOptions) {
+func reportClassOrder(ruleContext rule.Context, literal ClassLiteral, designSystem DesignSystemResult, ordering classOrderOptions) {
 	classes := SplitClasses(literal.Text)
 	if len(classes) < 2 {
 		return
@@ -285,16 +285,16 @@ func reportClassOrder(ctx rule.Context, literal ClassLiteral, designSystem Desig
 
 	message := messageInconsistentClassOrder(strings.Join(ordered, " "))
 
-	fixes, fixable := reorderFixes(ctx.SourceFile.Text(), literal, classes, ordered)
+	fixes, fixable := reorderFixes(ruleContext.SourceFile.Text(), literal, classes, ordered)
 	if !fixable {
-		ctx.ReportRange(literal.Range, message)
+		ruleContext.ReportRange(literal.Range, message)
 		return
 	}
 
-	ctx.Report(rule.Diagnostic{
+	ruleContext.Report(rule.Diagnostic{
 		Range:      literal.Range,
 		Message:    message,
-		SourceFile: ctx.SourceFile,
+		SourceFile: ruleContext.SourceFile,
 		Fixes:      fixes,
 	})
 }
@@ -360,8 +360,8 @@ func reorderFixes(sourceText string, literal ClassLiteral, classes []string, ord
 // removes it, the plugin's own order of operations: it dedupes a run, then sorts it. The repeat is
 // that rule's finding meanwhile, so the run is never left unordered in silence. A repeat split
 // across a hole is no repeat within either run and does not hold the ordering back.
-func reportTemplateClassOrder(ctx rule.Context, segments []ClassSegment, designSystem DesignSystemResult, ordering classOrderOptions) {
-	sourceText := ctx.SourceFile.Text()
+func reportTemplateClassOrder(ruleContext rule.Context, segments []ClassSegment, designSystem DesignSystemResult, ordering classOrderOptions) {
+	sourceText := ruleContext.SourceFile.Text()
 	for index, segment := range segments {
 		if strings.ContainsRune(segment.Text, '\v') {
 			continue
@@ -415,10 +415,10 @@ func reportTemplateClassOrder(ctx rule.Context, segments []ClassSegment, designS
 			shown = append(shown, slot.Text)
 		}
 
-		ctx.Report(rule.Diagnostic{
+		ruleContext.Report(rule.Diagnostic{
 			Range:      segment.Range,
 			Message:    messageInconsistentClassOrder(strings.Join(shown, " ")),
-			SourceFile: ctx.SourceFile,
+			SourceFile: ruleContext.SourceFile,
 			Fixes:      slotFixes(sortable, ordered),
 		})
 	}

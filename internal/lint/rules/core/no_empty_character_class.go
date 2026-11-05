@@ -50,7 +50,7 @@ var messageEmptyCharacterClass = rule.Message{
 // on a file that does not compile.
 var NoEmptyCharacterClass = rule.Rule{
 	Name: "no-empty-character-class",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				text := node.Text()
@@ -82,7 +82,7 @@ var NoEmptyCharacterClass = rule.Rule{
 					if !classIsEmpty(start, end) {
 						return
 					}
-					ctx.ReportRange(
+					ruleContext.ReportRange(
 						core.NewTextRange(patternStart+start, patternStart+end),
 						messageEmptyCharacterClass,
 					)

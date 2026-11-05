@@ -46,10 +46,10 @@ func TestEffectHookSignaturesFollowImportOrigin(test *testing.T) {
 				prefix := strings.ReplaceAll(testCase.prefix, "%s", hook)
 				source := prefix + ` function Component(` + testCase.parameters + `) { return ` + testCase.callee + `(() => {}, []); }`
 				visited := 0
-				probe := rule.Rule{Name: "effect-hook-signature", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
+				probe := rule.Rule{Name: "effect-hook-signature", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
 					return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 						forEachFunctionLike(node, func(node *ast.Node) {
-							function := Lower(node, ctx.TypeChecker)
+							function := Lower(node, ruleContext.TypeChecker)
 							if function == nil {
 								return
 							}
@@ -168,15 +168,15 @@ return <div onClick={callback}>{items.map(item => <span>{item}</span>)}</div>;
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			findings, markers := 0, 0
-			probe := rule.Rule{Name: "effect-hook-memoization", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
+			probe := rule.Rule{Name: "effect-hook-memoization", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(node *ast.Node) {
-						function := Lower(node, ctx.TypeChecker)
+						function := Lower(node, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
-						findings += len(AnalyzePreservedManualMemoization(function, ctx.TypeChecker))
+						findings += len(AnalyzePreservedManualMemoization(function, ruleContext.TypeChecker))
 						for _, instruction := range function.Instructions {
 							if instruction != nil {
 								if _, ok := instruction.Value.(*StartMemoize); ok {
