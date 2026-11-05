@@ -15,11 +15,20 @@ import (
 type fixture struct {
 	// repository holds the go.work. Beside the modules it uses it holds what neither the gate nor the census
 	// may take for ours: testdata, a dot directory, an underscore directory, nested (a module go.work does not
-	// use), and files its ignore files exclude.
+	// use), and files its ignore files exclude. Its root go.mod's `ignore` directives name ./generated,
+	// anchored, tools/scripts, at any depth, and ./deep/inside, a nested path; deep/generated is kept.
 	repository string
 
 	// lone is a go.mod with no go.work around it, outside the repository.
 	lone string
+
+	// outside is a go.work of two modules in no repository, as a fresh `go work init` in a temporary
+	// directory is.
+	outside string
+
+	// broken is a go.work whose `.git` is a file pointing at a git directory that is not there, so it is in a
+	// repository git cannot read.
+	broken string
 }
 
 // fixtureBase is the temporary directory the fixture is built in, removed once every test is done.
@@ -55,7 +64,12 @@ func readFixture(test *testing.T) fixture {
 }
 
 func buildFixture(base string) (fixture, error) {
-	built := fixture{repository: filepath.Join(base, "repository"), lone: filepath.Join(base, "lone")}
+	built := fixture{
+		repository: filepath.Join(base, "repository"),
+		lone:       filepath.Join(base, "lone"),
+		outside:    filepath.Join(base, "outside"),
+		broken:     filepath.Join(base, "broken"),
+	}
 	library := filepath.Join(base, "library")
 	libraryFiles := map[string]string{
 		"mod/go.mod":     "module example.com/library/mod\n\ngo 1.21\n",
@@ -73,8 +87,9 @@ func buildFixture(base string) (fixture, error) {
 	}
 
 	repositoryFiles := map[string]string{
-		"go.work":                          "go 1.21\n\nuse (\n\t.\n\t./inner\n\t./library/mod\n)\n",
-		"go.mod":                           "module example.com/root\n\ngo 1.21\n",
+		"go.work": "go 1.25\n\nuse (\n\t.\n\t./inner\n\t./library/mod\n)\n",
+		"go.mod": "module example.com/root\n\ngo 1.25\n\n" +
+			"ignore (\n\t./generated\n\ttools/scripts\n\t./deep/inside\n)\n",
 		".gitignore":                       "scratch.go\nbuild/\n",
 		"main.go":                          "package root\n",
 		"notes.txt":                        "not go\n",
@@ -95,6 +110,16 @@ func buildFixture(base string) (fixture, error) {
 		"inner/local.go":                   "package inner\n",
 		"inner/deeper/deeper.go":           "package deeper\n",
 		"inner/deeper/testdata/skipped.go": "package skipped\n",
+		"vendor/vendored.go":               "package vendor\n",
+		"vendor/library/library.go":        "package library\n",
+		"generated/generated.go":           "package generated\n",
+		"deep/deep.go":                     "package deep\n",
+		"deep/generated/kept.go":           "package generated\n",
+		"deep/inside/inside.go":            "package inside\n",
+		"deep/inside/below/below.go":       "package below\n",
+		"tools/tool.go":                    "package tools\n",
+		"tools/scripts/script.go":          "package scripts\n",
+		"deep/tools/scripts/script.go":     "package scripts\n",
 	}
 	if writeError := writeFiles(built.repository, repositoryFiles); writeError != nil {
 		return fixture{}, writeError
@@ -110,6 +135,22 @@ func buildFixture(base string) (fixture, error) {
 
 	loneFiles := map[string]string{"go.mod": "module example.com/lone\n\ngo 1.21\n", "lone.go": "package lone\n"}
 	if writeError := writeFiles(built.lone, loneFiles); writeError != nil {
+		return fixture{}, writeError
+	}
+	outsideFiles := map[string]string{
+		"go.work":     "go 1.25\n\nuse (\n\t.\n\t./tool\n)\n",
+		"go.mod":      "module example.com/outside\n\ngo 1.25\n",
+		"tool/go.mod": "module example.com/outside/tool\n\ngo 1.25\n",
+	}
+	if writeError := writeFiles(built.outside, outsideFiles); writeError != nil {
+		return fixture{}, writeError
+	}
+	brokenFiles := map[string]string{
+		"go.work": "go 1.25\n\nuse .\n",
+		"go.mod":  "module example.com/broken\n\ngo 1.25\n",
+		".git":    "gitdir: " + filepath.Join(base, "missing-git-directory") + "\n",
+	}
+	if writeError := writeFiles(built.broken, brokenFiles); writeError != nil {
 		return fixture{}, writeError
 	}
 	return built, nil

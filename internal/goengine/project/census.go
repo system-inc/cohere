@@ -2,12 +2,16 @@ package project
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"golang.org/x/mod/modfile"
 
 	"github.com/system-inc/cohere/internal/gitignore"
 )
@@ -33,10 +37,11 @@ type Exclusion struct {
 	Reason string
 }
 
-// TakeCensus lists every `.go` file the workspace's modules hold, the way go itself sees packages: under each
-// owned module's directory, never entering testdata, a directory whose name starts with `.` or `_`, a
-// directory with a go.mod of its own (an owned one is walked as itself, and an unowned one is another
-// project), or a repository of its own, a submodule's checkout included. A file git ignores is excluded, by the ignore
+// TakeCensus lists every `.go` file the workspace's modules hold, the way ./... sees packages: under each
+// owned module's directory, never entering testdata, a directory whose name starts with `.` or `_`, one
+// below a `vendor` directory, one the module's go.mod names in an `ignore` directive, a directory with a
+// go.mod of its own (an owned one is walked as itself, and an unowned one is another project), or a
+// repository of its own, a submodule's checkout included. A file git ignores is excluded, by the ignore
 // files of the nearest repository at or above the root; a root in no repository ignores nothing. Generated
 // files are counted as ours here: the format and lint phases decide about those.
 func TakeCensus(workspace Workspace) (Census, error) {
@@ -56,39 +61,49 @@ func TakeCensus(workspace Workspace) (Census, error) {
 
 	for _, module := range workspace.Modules {
 		moduleDirectory := filepath.Join(workspace.Root, filepath.FromSlash(module.Directory))
-		walkError := filepath.WalkDir(moduleDirectory, func(path string, entry fs.DirEntry, walkError error) error {
+		directives, directivesError := readIgnoreDirectives(moduleDirectory)
+		if directivesError != nil {
+			return Census{}, directivesError
+		}
+		walkError := filepath.WalkDir(moduleDirectory, func(visited string, entry fs.DirEntry, walkError error) error {
 			if walkError != nil {
 				return walkError
 			}
 			if entry.IsDir() {
-				if path != moduleDirectory && !partOfModule(path, entry.Name()) {
-					return filepath.SkipDir
+				if visited != moduleDirectory {
+					moduleRelative, relativeError := filepath.Rel(moduleDirectory, visited)
+					if relativeError != nil {
+						return relativeError
+					}
+					if !partOfModule(visited, filepath.ToSlash(moduleRelative), directives) {
+						return filepath.SkipDir
+					}
 				}
 				if rootMatcher == nil {
 					return nil
 				}
-				return enterScope(rootMatcher, scopes, repositoryRoot, path)
+				return enterScope(rootMatcher, scopes, repositoryRoot, visited)
 			}
 			if !strings.HasSuffix(entry.Name(), ".go") {
 				return nil
 			}
-			census.Files = append(census.Files, path)
+			census.Files = append(census.Files, visited)
 			if rootMatcher != nil {
-				relative, relativeError := repositoryRelative(repositoryRoot, path)
+				relative, relativeError := repositoryRelative(repositoryRoot, visited)
 				if relativeError != nil {
 					return relativeError
 				}
 				scope, entered := scopes[parentOf(relative)]
 				if !entered {
 					// Invariant: WalkDir visits a directory before its files, and every visit enters it.
-					panic(fmt.Sprintf("project: %s was reached before its directory was entered", path))
+					panic(fmt.Sprintf("project: %s was reached before its directory was entered", visited))
 				}
 				if ignored, _ := scope.Ignored(relative, false); ignored {
-					census.Excluded = append(census.Excluded, Exclusion{File: path, Reason: IgnoredByGit})
+					census.Excluded = append(census.Excluded, Exclusion{File: visited, Reason: IgnoredByGit})
 					return nil
 				}
 			}
-			census.Ours = append(census.Ours, path)
+			census.Ours = append(census.Ours, visited)
 			return nil
 		})
 		if walkError != nil {
@@ -107,8 +122,15 @@ func TakeCensus(workspace Workspace) (Census, error) {
 // directory with a `.git` of its own is another repository, found by that rather than by the index's
 // gitlinks, which only a go.work root reads: a checked-out submodule, or a clone that no ignore file of ours
 // governs. A submodule never checked out is an empty directory, with nothing to count.
-func partOfModule(directory string, name string) bool {
+//
+// A `vendor` directory's own files are a package ./... matches, which go keeps for historical reasons, and
+// nothing below it is, so the walk stops one level in (go 1.27, cmd/go/internal/modload/search.go).
+func partOfModule(directory string, moduleRelative string, directives []string) bool {
+	name := path.Base(moduleRelative)
 	if name == "testdata" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
+		return false
+	}
+	if path.Base(path.Dir(moduleRelative)) == "vendor" || ignoredByDirective(moduleRelative, directives) {
 		return false
 	}
 	for _, marker := range []string{"go.mod", ".git"} {
@@ -117,6 +139,44 @@ func partOfModule(directory string, name string) bool {
 		}
 	}
 	return true
+}
+
+// readIgnoreDirectives is the paths a module's go.mod names in `ignore` directives, read leniently as go
+// reads a go.mod's other directives for the module's path. A module directory with no go.mod ignores
+// nothing.
+func readIgnoreDirectives(moduleDirectory string) ([]string, error) {
+	goModPath := filepath.Join(moduleDirectory, "go.mod")
+	contents, readError := os.ReadFile(goModPath)
+	if errors.Is(readError, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if readError != nil {
+		return nil, fmt.Errorf("reading %s: %w", goModPath, readError)
+	}
+	goMod, parseError := modfile.ParseLax(goModPath, contents, nil)
+	if parseError != nil {
+		return nil, fmt.Errorf("parsing %s: %w", goModPath, parseError)
+	}
+	directives := make([]string, 0, len(goMod.Ignore))
+	for _, ignore := range goMod.Ignore {
+		directives = append(directives, ignore.Path)
+	}
+	return directives, nil
+}
+
+// ignoredByDirective reports whether a directory, relative to its module, is one an `ignore` directive
+// names or is inside one, as go matches them (cmd/go/internal/search, IgnorePatterns): a path starting
+// `./` is anchored at the module's root, and any other names that path at any depth.
+func ignoredByDirective(moduleRelative string, directives []string) bool {
+	directory := "/" + strings.Trim(moduleRelative, "/") + "/"
+	for _, directive := range directives {
+		directivePath, anchored := strings.CutPrefix(directive, "./")
+		pattern := "/" + strings.Trim(directivePath, "/") + "/"
+		if (anchored && strings.HasPrefix(directory, pattern)) || (!anchored && strings.Contains(directory, pattern)) {
+			return true
+		}
+	}
+	return false
 }
 
 // enterScope records the matcher for a directory the walk enters, from its parent's when the walk came
@@ -142,10 +202,10 @@ func enterScope(
 
 // repositoryRelative is a path relative to the repository root, slash separated, "" for the root itself, as
 // the matcher keys on.
-func repositoryRelative(repositoryRoot string, path string) (string, error) {
-	relative, relativeError := filepath.Rel(repositoryRoot, path)
+func repositoryRelative(repositoryRoot string, entryPath string) (string, error) {
+	relative, relativeError := filepath.Rel(repositoryRoot, entryPath)
 	if relativeError != nil {
-		return "", fmt.Errorf("placing %s in the repository at %s: %w", path, repositoryRoot, relativeError)
+		return "", fmt.Errorf("placing %s in the repository at %s: %w", entryPath, repositoryRoot, relativeError)
 	}
 	if relative == "." {
 		return "", nil
