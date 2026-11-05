@@ -92,18 +92,19 @@ var ConsistencyNoConsole = rule.Rule{
 			//
 			// Written as a loop with its own nil check rather than `ast.SkipParentheses`, which
 			// dereferences its argument, and because `((console))` nests.
-			for receiver != nil && receiver.Kind == ast.KindParenthesizedExpression {
-				inner := receiver.AsParenthesizedExpression().Expression
+			unwrapped := receiver
+			for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+				inner := unwrapped.AsParenthesizedExpression().Expression
 				if inner == nil {
 					break
 				}
-				receiver = inner
+				unwrapped = inner
 			}
 
 			// The receiver must be the bare identifier `console`. A name comparison rather than a
 			// resolved binding, matching upstream, which is what keeps this rule free of the
 			// checker.
-			if receiver == nil || receiver.Kind != ast.KindIdentifier || receiver.Text() != "console" {
+			if unwrapped == nil || unwrapped.Kind != ast.KindIdentifier || unwrapped.Text() != "console" {
 				return
 			}
 			ruleContext.ReportNode(node, buildNoConsoleMessage(methodName))

@@ -133,6 +133,8 @@ func (selectors *dependencySelectors) UnmarshalJSON(raw []byte) error {
 // UnmarshalJSON that calls json.Unmarshal drops the outer decoder's strictness for everything beneath
 // it. A selector key this port does not implement, `captured` or `file` or `parent`, would then load
 // clean and be ignored, which is a policy narrower than the one written with nothing saying so.
+//
+// Mutates: into it is the slice an UnmarshalJSON receiver decodes into, so the selectors land on the receiver
 func decodeOneOrMany[Item any](raw []byte, into *[]Item, shape string) error {
 	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	trimmed := bytes.TrimSpace(raw)

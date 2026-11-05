@@ -199,6 +199,14 @@ func methodReturnTypeOf(ruleContext rule.Context, methodDeclaration *ast.Node) *
 	return checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signatures[0])
 }
 
+// unwrapDepthLimit bounds the unwrap loop.
+//
+// The original recurses without one and relies on types being finite, which they are for every
+// shape this rule sees. The bound is here because a rule that loops forever takes the whole run
+// down rather than reporting badly, and a type deeper than this is not a selection set anybody
+// wrote by hand.
+const unwrapDepthLimit = 64
+
 // unwrapToElementType strips the wrappers that do not change a value's selection-set element type.
 //
 //	Promise<T>              -> T
@@ -214,12 +222,13 @@ func methodReturnTypeOf(ruleContext rule.Context, methodDeclaration *ast.Node) *
 // of two object types is a different selection set from either, and collapsing it would compare the
 // wrong thing.
 func unwrapToElementType(ruleContext rule.Context, subject *checker.Type) *checker.Type {
-	for depth := 0; subject != nil && depth < unwrapDepthLimit; depth++ {
-		symbol := checker.Type_symbol(subject)
+	element := subject
+	for depth := 0; element != nil && depth < unwrapDepthLimit; depth++ {
+		symbol := checker.Type_symbol(element)
 
 		if symbol != nil && symbol.Name == "Promise" {
-			if typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, subject); len(typeArguments) > 0 {
-				subject = typeArguments[0]
+			if typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, element); len(typeArguments) > 0 {
+				element = typeArguments[0]
 				continue
 			}
 		}
@@ -233,48 +242,40 @@ func unwrapToElementType(ruleContext rule.Context, subject *checker.Type) *check
 		// Worth stating precisely, because the obvious fixture does not reach here at all: the
 		// checker resolves `Readonly<T[]>` to `ReadonlyArray<T>`, symbol `ReadonlyArray` and no
 		// alias, so the array arm handles it. Only `Readonly<T>` over a non-array keeps the alias.
-		if aliasSymbol := checker.Type_alias(subject); aliasSymbol != nil {
+		if aliasSymbol := checker.Type_alias(element); aliasSymbol != nil {
 			if aliasSymbol.Symbol() != nil && aliasSymbol.Symbol().Name == "Readonly" {
 				if aliasArguments := aliasSymbol.TypeArguments(); len(aliasArguments) > 0 {
-					subject = aliasArguments[0]
+					element = aliasArguments[0]
 					continue
 				}
 			}
 		}
 
-		if subject.IsUnion() {
+		if element.IsUnion() {
 			var nonNullish []*checker.Type
-			for _, member := range subject.AsUnionType().Types() {
+			for _, member := range element.AsUnionType().Types() {
 				if !type_checking.IsTypeFlagSet(member,
 					checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
 					nonNullish = append(nonNullish, member)
 				}
 			}
 			if len(nonNullish) == 1 {
-				subject = nonNullish[0]
+				element = nonNullish[0]
 				continue
 			}
 		}
 
 		if symbol != nil && (symbol.Name == "Array" || symbol.Name == "ReadonlyArray") {
-			if typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, subject); len(typeArguments) > 0 {
-				subject = typeArguments[0]
+			if typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, element); len(typeArguments) > 0 {
+				element = typeArguments[0]
 				continue
 			}
 		}
 
-		return subject
+		return element
 	}
-	return subject
+	return element
 }
-
-// unwrapDepthLimit bounds the unwrap loop.
-//
-// The original recurses without one and relies on types being finite, which they are for every
-// shape this rule sees. The bound is here because a rule that loops forever takes the whole run
-// down rather than reporting badly, and a type deeper than this is not a selection set anybody
-// wrote by hand.
-const unwrapDepthLimit = 64
 
 // The rule's messages, whose wording lives in `policy/messages/correctness-require-matching-operation-context.json`.
 var (

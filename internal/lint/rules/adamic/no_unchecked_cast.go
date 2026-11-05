@@ -192,6 +192,7 @@ func typeofClass(valueType *checker.Type) string {
 }
 
 func isUnitLiteral(valueType *checker.Type) bool {
-	return valueType.Flags()&(checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|checker.TypeFlagsBooleanLiteral|
-		checker.TypeFlagsEnumLiteral|checker.TypeFlagsUndefined|checker.TypeFlagsNull) != 0
+	return valueType.Flags()&(checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|
+		checker.TypeFlagsBooleanLiteral|checker.TypeFlagsEnumLiteral|checker.TypeFlagsUndefined|
+		checker.TypeFlagsNull) != 0
 }
