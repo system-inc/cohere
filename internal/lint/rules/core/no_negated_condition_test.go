@@ -52,6 +52,72 @@ func runNoNegatedCondition(test *testing.T, source string) rule_testing.Result {
 	return rule_testing.Run(test, NoNegatedCondition, noNegatedConditionFile, source)
 }
 
+// noNegatedConditionCleanCases are upstream's `valid` list, verbatim.
+var noNegatedConditionCleanCases = []noNegatedConditionCase{
+	{name: "upstream valid[0]", source: `if (a) {}`},
+	{name: "upstream valid[1]", source: `if (a) {} else {}`},
+	{name: "upstream valid[2]", source: `if (!a) {}`},
+	{name: "upstream valid[3]", source: `if (!a) {} else if (b) {}`},
+	{name: "upstream valid[4]", source: `if (!a) {} else if (b) {} else {}`},
+	{name: "upstream valid[5]", source: `if (a == b) {}`},
+	{name: "upstream valid[6]", source: `if (a == b) {} else {}`},
+	{name: "upstream valid[7]", source: `if (a != b) {}`},
+	{name: "upstream valid[8]", source: `if (a != b) {} else if (b) {}`},
+	{name: "upstream valid[9]", source: `if (a != b) {} else if (b) {} else {}`},
+	{name: "upstream valid[10]", source: `if (a !== b) {}`},
+	{name: "upstream valid[11]", source: `if (a === b) {} else {}`},
+	{name: "upstream valid[12]", source: `a ? b : c`},
+}
+
+// noNegatedConditionReportingCases are upstream's `invalid` list, verbatim.
+//
+// Upstream asserts only a count on every one of these, so the spans were measured by driving
+// the installed 10.8.1 build rather than copied.
+var noNegatedConditionReportingCases = []noNegatedConditionCase{
+	{
+		name:   "upstream invalid[0]",
+		source: `if (!a) {;} else {;}`,
+		findings: []noNegatedConditionExpectation{
+			{line: 1, column: 1, endLine: 1, endColumn: 21},
+		},
+	},
+	{
+		name:   "upstream invalid[1]",
+		source: `if (a != b) {;} else {;}`,
+		findings: []noNegatedConditionExpectation{
+			{line: 1, column: 1, endLine: 1, endColumn: 25},
+		},
+	},
+	{
+		name:   "upstream invalid[2]",
+		source: `if (a !== b) {;} else {;}`,
+		findings: []noNegatedConditionExpectation{
+			{line: 1, column: 1, endLine: 1, endColumn: 26},
+		},
+	},
+	{
+		name:   "upstream invalid[3]",
+		source: `!a ? b : c`,
+		findings: []noNegatedConditionExpectation{
+			{line: 1, column: 1, endLine: 1, endColumn: 11},
+		},
+	},
+	{
+		name:   "upstream invalid[4]",
+		source: `a != b ? c : d`,
+		findings: []noNegatedConditionExpectation{
+			{line: 1, column: 1, endLine: 1, endColumn: 15},
+		},
+	},
+	{
+		name:   "upstream invalid[5]",
+		source: `a !== b ? c : d`,
+		findings: []noNegatedConditionExpectation{
+			{line: 1, column: 1, endLine: 1, endColumn: 16},
+		},
+	},
+}
+
 // TestNoNegatedConditionStaysSilent runs upstream's whole `valid` list.
 func TestNoNegatedConditionStaysSilent(test *testing.T) {
 	test.Parallel()
@@ -203,72 +269,6 @@ func TestNoNegatedConditionCompoundNegationReports(test *testing.T) {
 	test.Parallel()
 	result := runNoNegatedCondition(test, `if (!(a && b)) { f(); } else { g(); }`)
 	rule_testing.ExpectFindings(test, result, messageNoNegatedCondition.Id)
-}
-
-// noNegatedConditionCleanCases are upstream's `valid` list, verbatim.
-var noNegatedConditionCleanCases = []noNegatedConditionCase{
-	{name: "upstream valid[0]", source: `if (a) {}`},
-	{name: "upstream valid[1]", source: `if (a) {} else {}`},
-	{name: "upstream valid[2]", source: `if (!a) {}`},
-	{name: "upstream valid[3]", source: `if (!a) {} else if (b) {}`},
-	{name: "upstream valid[4]", source: `if (!a) {} else if (b) {} else {}`},
-	{name: "upstream valid[5]", source: `if (a == b) {}`},
-	{name: "upstream valid[6]", source: `if (a == b) {} else {}`},
-	{name: "upstream valid[7]", source: `if (a != b) {}`},
-	{name: "upstream valid[8]", source: `if (a != b) {} else if (b) {}`},
-	{name: "upstream valid[9]", source: `if (a != b) {} else if (b) {} else {}`},
-	{name: "upstream valid[10]", source: `if (a !== b) {}`},
-	{name: "upstream valid[11]", source: `if (a === b) {} else {}`},
-	{name: "upstream valid[12]", source: `a ? b : c`},
-}
-
-// noNegatedConditionReportingCases are upstream's `invalid` list, verbatim.
-//
-// Upstream asserts only a count on every one of these, so the spans were measured by driving
-// the installed 10.8.1 build rather than copied.
-var noNegatedConditionReportingCases = []noNegatedConditionCase{
-	{
-		name:   "upstream invalid[0]",
-		source: `if (!a) {;} else {;}`,
-		findings: []noNegatedConditionExpectation{
-			{line: 1, column: 1, endLine: 1, endColumn: 21},
-		},
-	},
-	{
-		name:   "upstream invalid[1]",
-		source: `if (a != b) {;} else {;}`,
-		findings: []noNegatedConditionExpectation{
-			{line: 1, column: 1, endLine: 1, endColumn: 25},
-		},
-	},
-	{
-		name:   "upstream invalid[2]",
-		source: `if (a !== b) {;} else {;}`,
-		findings: []noNegatedConditionExpectation{
-			{line: 1, column: 1, endLine: 1, endColumn: 26},
-		},
-	},
-	{
-		name:   "upstream invalid[3]",
-		source: `!a ? b : c`,
-		findings: []noNegatedConditionExpectation{
-			{line: 1, column: 1, endLine: 1, endColumn: 11},
-		},
-	},
-	{
-		name:   "upstream invalid[4]",
-		source: `a != b ? c : d`,
-		findings: []noNegatedConditionExpectation{
-			{line: 1, column: 1, endLine: 1, endColumn: 15},
-		},
-	},
-	{
-		name:   "upstream invalid[5]",
-		source: `a !== b ? c : d`,
-		findings: []noNegatedConditionExpectation{
-			{line: 1, column: 1, endLine: 1, endColumn: 16},
-		},
-	},
 }
 
 // TestNoNegatedConditionOnlyTheBangOperatorCounts pins the unary arm against every other prefix.

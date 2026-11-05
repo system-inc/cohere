@@ -123,6 +123,8 @@ var NoUnusedLabels = rule.Rule{
 // or class boundary, since a jump cannot name a label outside the function holding it: without that
 // stop, the inner `label` in `label: while (true) { (() => { label: while (false) {} })(); }` would
 // mark the outer one and the rule would report one finding where upstream reports two.
+//
+// Mutates: usedLabels the walk records each jump's label in it, so one set gathers every jump in the file
 func markTargetLabelUsed(jump *ast.Node, label *ast.Node, usedLabels map[int]bool) {
 	if label == nil {
 		return

@@ -12,7 +12,11 @@ import (
 const irregularWhitespaceFile = "/repository/source/IrregularWhitespace.tsx"
 
 // boolOf exists because the options are pointers and Go has no address-of for a literal.
-func boolOf(value bool) *bool { return &value }
+// The pointer is to a local copy, so nothing the caller passed is reachable through it.
+func boolOf(value bool) *bool {
+	held := value
+	return &held
+}
 
 // The corpus is oxc's, copied rather than rewritten, and it needed reconciling before it could be
 // copied at all.

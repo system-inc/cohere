@@ -22,6 +22,11 @@ var messagePreferObjectSpreadUseLiteral = rule.Message{
 		"an object literal into a fresh object achieves nothing the literal did not already do.",
 }
 
+// objectAssignCallTraceMap asks the tracker for every call of the global Object's assign.
+var objectAssignCallTraceMap = map[string]*reference.TraceMap{
+	"Object": {Members: map[string]*reference.TraceMap{"assign": {Call: true}}},
+}
+
 // PreferObjectSpread flags `Object.assign` called with an object literal first argument.
 //
 //	valid:   Object.assign(foo, bar)          (first argument is not a literal, so it mutates foo)
@@ -87,11 +92,6 @@ var PreferObjectSpread = rule.Rule{
 			},
 		}
 	},
-}
-
-// objectAssignCallTraceMap asks the tracker for every call of the global Object's assign.
-var objectAssignCallTraceMap = map[string]*reference.TraceMap{
-	"Object": {Members: map[string]*reference.TraceMap{"assign": {Call: true}}},
 }
 
 // checkPreferObjectSpread judges one call expression.
@@ -554,8 +554,8 @@ func preferObjectSpreadIsAssignmentOperator(kind ast.Kind) bool {
 }
 
 // preferObjectSpreadIsSpace says whether a byte is whitespace.
-func preferObjectSpreadIsSpace(b byte) bool {
-	switch b {
+func preferObjectSpreadIsSpace(character byte) bool {
+	switch character {
 	case ' ', '\t', '\n', '\r', '\v', '\f':
 		return true
 	}
@@ -618,12 +618,13 @@ func preferObjectSpreadStartsParent(ruleContext rule.Context, node *ast.Node) bo
 // `ast.SkipParentheses`, which dereferences its argument and would panic on a recovered parse whose
 // parenthesized expression has no inner expression.
 func preferObjectSpreadUnwrap(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		inner := node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		inner := current.AsParenthesizedExpression().Expression
 		if inner == nil {
-			return node
+			return current
 		}
-		node = inner
+		current = inner
 	}
-	return node
+	return current
 }

@@ -23,7 +23,7 @@ import (
  * pattern ESLint evaluates by calling String.raw, and which reference.ConstantStringIn declines, as it
  * declines every built-in call. Its own test says what the rule does instead.
  */
-func TestNoUselessBackreferenceAgreesWithESLint(test *testing.T) {
+func TestNoUselessBackreferenceAgreesWithEsLint(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {

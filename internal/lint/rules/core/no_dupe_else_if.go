@@ -149,18 +149,18 @@ func isAndSubset(sourceFile *ast.SourceFile, subset []*ast.Node, superset []*ast
 // `a?.b` distinct and two differently written literals distinct, while ignoring comments and
 // whitespace.
 func conditionsAreEqual(sourceFile *ast.SourceFile, left *ast.Node, right *ast.Node) bool {
-	left = ast.SkipParentheses(left)
-	right = ast.SkipParentheses(right)
-	if left == nil || right == nil {
+	unwrappedLeft := ast.SkipParentheses(left)
+	unwrappedRight := ast.SkipParentheses(right)
+	if unwrappedLeft == nil || unwrappedRight == nil {
 		return false
 	}
-	if left.Kind != right.Kind {
+	if unwrappedLeft.Kind != unwrappedRight.Kind {
 		return false
 	}
 
-	if left.Kind == ast.KindBinaryExpression {
-		leftBinary := left.AsBinaryExpression()
-		rightBinary := right.AsBinaryExpression()
+	if unwrappedLeft.Kind == ast.KindBinaryExpression {
+		leftBinary := unwrappedLeft.AsBinaryExpression()
+		rightBinary := unwrappedRight.AsBinaryExpression()
 		if leftBinary.OperatorToken != nil && rightBinary.OperatorToken != nil &&
 			leftBinary.OperatorToken.Kind == rightBinary.OperatorToken.Kind &&
 			(leftBinary.OperatorToken.Kind == ast.KindBarBarToken ||
@@ -172,7 +172,7 @@ func conditionsAreEqual(sourceFile *ast.SourceFile, left *ast.Node, right *ast.N
 		}
 	}
 
-	return hasSameTokens(sourceFile, left, right)
+	return hasSameTokens(sourceFile, unwrappedLeft, unwrappedRight)
 }
 
 // splitByOperator flattens a chain of one logical operator into its operands.
@@ -181,26 +181,26 @@ func conditionsAreEqual(sourceFile *ast.SourceFile, left *ast.Node, right *ast.N
 // than three and misses `else if(b)`. Flattening is what makes the group comparison work on the
 // operands people actually wrote.
 func splitByOperator(node *ast.Node, operator ast.Kind) []*ast.Node {
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return nil
 	}
-	if isLogicalOperator(node, operator) {
-		binary := node.AsBinaryExpression()
+	if isLogicalOperator(unwrapped, operator) {
+		binary := unwrapped.AsBinaryExpression()
 		return append(
 			splitByOperator(binary.Left, operator),
 			splitByOperator(binary.Right, operator)...,
 		)
 	}
-	return []*ast.Node{node}
+	return []*ast.Node{unwrapped}
 }
 
 // isLogicalOperator reports a binary expression joined by exactly this operator.
 func isLogicalOperator(node *ast.Node, operator ast.Kind) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil || node.Kind != ast.KindBinaryExpression {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil || unwrapped.Kind != ast.KindBinaryExpression {
 		return false
 	}
-	binary := node.AsBinaryExpression()
+	binary := unwrapped.AsBinaryExpression()
 	return binary.OperatorToken != nil && binary.OperatorToken.Kind == operator
 }

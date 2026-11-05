@@ -32,7 +32,7 @@ import (
  * Each finding is its text and byte offset. The fixed column is the whole file after ESLint's fixes,
  * or empty where ESLint offers none.
  */
-func TestPreferConstAgreesWithESLint(test *testing.T) {
+func TestPreferConstAgreesWithEsLint(test *testing.T) {
 	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[PreferConstOptions]()

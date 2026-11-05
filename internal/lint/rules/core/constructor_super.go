@@ -5,6 +5,36 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
+// superClassKind is what an `extends` clause names, from this rule's point of view.
+type superClassKind int
+
+const (
+	// superClassAbsent is a base class: no `extends` at all.
+	superClassAbsent superClassKind = iota
+	// superClassNotConstructable is an `extends` naming something that cannot be constructed,
+	// including `null`. Every `super()` under one is wrong.
+	superClassNotConstructable
+	// superClassConstructable is an `extends` naming something that might hold a constructor.
+	superClassConstructable
+)
+
+// superState is how much a construct establishes about `super()` having been called.
+//
+// Three values rather than two, and the middle one is the reason. A boolean can say whether a call
+// is guaranteed; it cannot separate "on some paths" from "on none", and those are two different
+// findings with two different message ids. This is the lattice from upstream's `SuperCallState`
+// with its duplicate-tracking states dropped, since duplicates are found by a separate walk here.
+type superState int
+
+const (
+	// superNever is no path through this construct calling `super()`.
+	superNever superState = iota
+	// superSometimes is some but not all.
+	superSometimes
+	// superAlways is every path.
+	superAlways
+)
+
 // ConstructorSuper requires a derived class constructor to call `super()` on every path, and
 // forbids a `super()` call where there is no constructable superclass to call.
 //
@@ -270,19 +300,6 @@ func reportMissingSuper(ruleContext rule.Context, constructor *ast.Node, message
 	})
 }
 
-// superClassKind is what an `extends` clause names, from this rule's point of view.
-type superClassKind int
-
-const (
-	// superClassAbsent is a base class: no `extends` at all.
-	superClassAbsent superClassKind = iota
-	// superClassNotConstructable is an `extends` naming something that cannot be constructed,
-	// including `null`. Every `super()` under one is wrong.
-	superClassNotConstructable
-	// superClassConstructable is an `extends` naming something that might hold a constructor.
-	superClassConstructable
-)
-
 // classifySuperClass decides which of the three worlds a class lives in.
 //
 // `extends null` is its own case in the language and it is neither of the other two. Such a class
@@ -449,23 +466,6 @@ func isSuperCall(node *ast.Node) bool {
 	callee := node.AsCallExpression().Expression
 	return callee != nil && callee.Kind == ast.KindSuperKeyword
 }
-
-// superState is how much a construct establishes about `super()` having been called.
-//
-// Three values rather than two, and the middle one is the reason. A boolean can say whether a call
-// is guaranteed; it cannot separate "on some paths" from "on none", and those are two different
-// findings with two different message ids. This is the lattice from upstream's `SuperCallState`
-// with its duplicate-tracking states dropped, since duplicates are found by a separate walk here.
-type superState int
-
-const (
-	// superNever is no path through this construct calling `super()`.
-	superNever superState = iota
-	// superSometimes is some but not all.
-	superSometimes
-	// superAlways is every path.
-	superAlways
-)
 
 // superFlow is what one statement establishes: how much it calls, and whether control leaves.
 type superFlow struct {

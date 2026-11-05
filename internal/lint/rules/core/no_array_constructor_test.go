@@ -164,7 +164,7 @@ func TestNoArrayConstructorStaysSilent(test *testing.T) {
 
 		// The optional family. `Array?.(x)` and `Array?.(9)` would pass on argument count anyway,
 		// but `Array?.<Foo>(1, 2, 3)` and the bare optional forms are exempt only because upstream
-		// marks optional chaining "TODO: Catch optional chaining cases".
+		// marks optional chaining `TODO: Catch optional chaining cases`.
 		{"an optional call with one argument", "Array?.(x);"},
 		{"an optional call with a length", "Array?.(9);"},
 		{"an optional property of foo", "foo?.Array();"},
@@ -338,7 +338,7 @@ func TestNoArrayConstructorSuggestsAnArrayLiteral(test *testing.T) {
 
 // What the suggestion does to comments, measured rather than assumed.
 //
-// Upstream carries these three under "TODO: Preserve comments around callee" and does not assert
+// Upstream carries these three under `TODO: Preserve comments around callee` and does not assert
 // them, so this is the part of the corpus with no expected answer to copy and the part a porter is
 // most likely to get wrong by writing down what they expected.
 //

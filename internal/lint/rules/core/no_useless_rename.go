@@ -250,14 +250,15 @@ func checkUselessRenameInObjectLiteral(ruleContext rule.Context, node *ast.Node)
 // It looks through parentheses, since `({foo: (foo)} = obj)` is a rename to the same name and one of
 // upstream's failing cases, and through a default, since `({foo: foo = 1} = obj)` is too.
 func localNameOfDestructuringValue(value *ast.Node) *ast.Node {
-	for value != nil && value.Kind == ast.KindParenthesizedExpression {
-		value = value.AsParenthesizedExpression().Expression
+	unwrapped := value
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if value == nil {
+	if unwrapped == nil {
 		return nil
 	}
-	if value.Kind == ast.KindBinaryExpression {
-		binary := value.AsBinaryExpression()
+	if unwrapped.Kind == ast.KindBinaryExpression {
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken {
 			return nil
 		}
@@ -270,8 +271,8 @@ func localNameOfDestructuringValue(value *ast.Node) *ast.Node {
 		}
 		return nil
 	}
-	if value.Kind == ast.KindIdentifier {
-		return value
+	if unwrapped.Kind == ast.KindIdentifier {
+		return unwrapped
 	}
 	return nil
 }
