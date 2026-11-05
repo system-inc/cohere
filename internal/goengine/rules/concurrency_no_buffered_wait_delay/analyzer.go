@@ -57,7 +57,15 @@ func NewAnalyzer() *analysis.Analyzer {
 var Analyzer = NewAnalyzer()
 
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{
+	Name:      Name,
+	Origin:    rule.OriginHouse,
+	TypeAware: true,
+	Analyzer:  Analyzer,
+	// ConfiguredBy lets the engine list the rule as not configured rather than quiet, since it reports nothing
+	// until cure names the cure package.
+	ConfiguredBy: []string{cureFlag},
+}
 
 var bufferedWaitDelayMessage = policy.MessageOf(Name, "bufferedWaitDelay")
 

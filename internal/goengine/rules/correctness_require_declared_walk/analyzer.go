@@ -52,7 +52,15 @@ const Name = "cohere-go/correctness-require-declared-walk"
 var Analyzer = newAnalyzer()
 
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{
+	Name:      Name,
+	Origin:    rule.OriginHouse,
+	TypeAware: true,
+	Analyzer:  Analyzer,
+	// ConfiguredBy lets the engine list the rule as not configured rather than quiet, since it reports nothing
+	// until readsFile names the reads file.
+	ConfiguredBy: []string{readsFileOption},
+}
 
 var undeclaredWalkMessage = policy.MessageOf(Name, "undeclaredWalk")
 
