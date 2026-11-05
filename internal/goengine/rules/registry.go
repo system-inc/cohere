@@ -3,12 +3,15 @@
 package rules
 
 import (
+	"slices"
+
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/nilness"
 	"golang.org/x/tools/go/analysis/passes/unusedwrite"
 	"golang.org/x/tools/go/analysis/suite/vet"
 	"honnef.co/go/tools/simple"
 	"honnef.co/go/tools/staticcheck"
+	"honnef.co/go/tools/stylecheck"
 	"honnef.co/go/tools/unused"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
@@ -31,6 +34,37 @@ var syntaxOnly = map[string]bool{
 	"unreachable": true,
 	// SA9009 reads comments for a directive indented out of effect.
 	"SA9009": true,
+	// ST1001 reads import declarations for a dot import, and of a file only its name, to allow one in a test.
+	"ST1001": true,
+	// ST1015 reads the order of a switch's clauses for a default in the middle.
+	"ST1015": true,
+	// ST1018 reads string literals for control and format characters.
+	"ST1018": true,
+	// ST1019 reads import declarations for a package imported twice.
+	"ST1019": true,
+}
+
+// stylecheckRuledOn is the ST checks ruled on for cohere, from a census of what each found in cohere's own
+// code. ST1016 is among them although staticcheck leaves it off by default.
+//
+// Ruled off: ST1003, whose initialisms (`ID`, `JSON`) contradict the house's `Id` and `Json` and whose
+// underscores are this repository's package names, and ST1005.
+//
+// Off until ruled: ST1000, ST1020, ST1021 and ST1022, the form of package and exported declarations'
+// comments, and ST1023, a declared type the right-hand side would infer. Comment form and declared types
+// are style no one has judged yet.
+var stylecheckRuledOn = map[string]bool{
+	"ST1001": true,
+	"ST1006": true,
+	"ST1008": true,
+	"ST1011": true,
+	"ST1012": true,
+	"ST1013": true,
+	"ST1015": true,
+	"ST1016": true,
+	"ST1017": true,
+	"ST1018": true,
+	"ST1019": true,
 }
 
 // All is every rule the Go engine knows, in the order `--rules` lists them before sorting.
@@ -39,9 +73,12 @@ var syntaxOnly = map[string]bool{
 // never weaker than `go vet`, and a newer x/tools that adds a pass adds its rule here with no edit. Then
 // two of x/tools' own passes that vet leaves out, which find real bugs: a nil dereference or a comparison
 // with nil whose answer is already known, and a write to a struct or array nothing reads again. Then
-// staticcheck's SA and S checks under their own codes, and U1000 through an analyzer that reports what it
-// finds. staticcheck's ST checks wait on a census of what they would find in cohere's own code, and its QF
-// checks are quick fixes an editor offers, not findings.
+// staticcheck's SA and S checks under their own codes, the ST checks ruled on, and U1000 through an
+// analyzer that reports what it finds. staticcheck's QF checks are quick fixes an editor offers, not
+// findings.
+//
+// An SA or S check staticcheck leaves off by default (its documentation's NonDefault) is left off here
+// too, until it is ruled on: at staticcheck v0.8.1 that is SA9003, an empty if or else branch.
 func All() []rule.Rule {
 	registered := []rule.Rule{}
 	for _, analyzer := range vet.Suite {
@@ -49,11 +86,16 @@ func All() []rule.Rule {
 	}
 	registered = append(registered, portedRule(nilness.Analyzer, rule.OriginTools))
 	registered = append(registered, portedRule(unusedwrite.Analyzer, rule.OriginTools))
-	for _, wrapped := range staticcheck.Analyzers {
+	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers) {
+		if wrapped.Doc != nil && wrapped.Doc.NonDefault {
+			continue
+		}
 		registered = append(registered, portedRule(wrapped.Analyzer, rule.OriginStaticcheck))
 	}
-	for _, wrapped := range simple.Analyzers {
-		registered = append(registered, portedRule(wrapped.Analyzer, rule.OriginStaticcheck))
+	for _, wrapped := range stylecheck.Analyzers {
+		if stylecheckRuledOn[wrapped.Analyzer.Name] {
+			registered = append(registered, portedRule(wrapped.Analyzer, rule.OriginStaticcheck))
+		}
 	}
 	registered = append(registered, rule.Rule{
 		Name:         rule.Namespace + unused.Analyzer.Analyzer.Name,

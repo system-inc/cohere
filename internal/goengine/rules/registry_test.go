@@ -13,6 +13,7 @@ import (
 	"golang.org/x/tools/go/analysis/suite/vet"
 	"honnef.co/go/tools/simple"
 	"honnef.co/go/tools/staticcheck"
+	"honnef.co/go/tools/stylecheck"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
 )
@@ -112,12 +113,33 @@ func expectBlock(test *testing.T, offset int, analyzers []*analysis.Analyzer, or
 	}
 }
 
-// staticcheckAnalyzers is every SA and S check, in staticcheck's order, which is the order they follow the
-// x/tools passes in.
+// ruledStylecheck is the ST checks ruled on, written out here rather than read from the registry's own
+// table, so a check added to or dropped from that table by mistake fails the test.
+var ruledStylecheck = []string{
+	"ST1001", "ST1006", "ST1008", "ST1011", "ST1012", "ST1013", "ST1015", "ST1016", "ST1017", "ST1018", "ST1019",
+}
+
+// staticcheckAnalyzers is every SA and S check staticcheck runs by default, in its order, which is the order
+// they follow the x/tools passes in.
 func staticcheckAnalyzers() []*analysis.Analyzer {
 	analyzers := []*analysis.Analyzer{}
 	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers) {
+		if wrapped.Doc != nil && wrapped.Doc.NonDefault {
+			continue
+		}
 		analyzers = append(analyzers, wrapped.Analyzer)
+	}
+	return analyzers
+}
+
+// stylecheckAnalyzers is the ruled ST checks, in stylecheck's order, which is the order they follow the SA
+// and S checks in.
+func stylecheckAnalyzers() []*analysis.Analyzer {
+	analyzers := []*analysis.Analyzer{}
+	for _, wrapped := range stylecheck.Analyzers {
+		if slices.Contains(ruledStylecheck, wrapped.Analyzer.Name) {
+			analyzers = append(analyzers, wrapped.Analyzer)
+		}
 	}
 	return analyzers
 }
@@ -143,17 +165,20 @@ func TestNilnessAndUnusedwriteFollowVetsSuite(test *testing.T) {
 	}
 }
 
-// TestStaticcheckFollowsTheToolsPasses holds every SA and S check to the registry after the x/tools passes,
-// then U1000 last through the analyzer that reports it, and nothing else: no ST check until its census is
-// judged, and no QF check, since a quick fix is not a finding.
+// TestStaticcheckFollowsTheToolsPasses holds the registry, after the x/tools passes, to every default SA
+// and S check, then the ruled ST checks, then U1000 last through the analyzer that reports it, and nothing
+// else, which also keeps out every QF check, since a quick fix is not a finding.
 func TestStaticcheckFollowsTheToolsPasses(test *testing.T) {
 	test.Parallel()
 	offset := len(vet.Suite) + 2
 	checks := staticcheckAnalyzers()
 	expectBlock(test, offset, checks, rule.OriginStaticcheck)
+	styleChecks := stylecheckAnalyzers()
+	expectBlock(test, offset+len(checks), styleChecks, rule.OriginStaticcheck)
 
-	if len(registry) != offset+len(checks)+1 {
-		test.Fatalf("the registry has %d rules, expected %d", len(registry), offset+len(checks)+1)
+	expectedCount := offset + len(checks) + len(styleChecks) + 1
+	if len(registry) != expectedCount {
+		test.Fatalf("the registry has %d rules, expected %d", len(registry), expectedCount)
 	}
 	expectedUnused := rule.Rule{
 		Name:         "cohere-go/U1000",
@@ -166,10 +191,41 @@ func TestStaticcheckFollowsTheToolsPasses(test *testing.T) {
 	if last := registry[len(registry)-1]; !reflect.DeepEqual(last, expectedUnused) {
 		test.Errorf("the last rule is %+v, expected %+v", last, expectedUnused)
 	}
+}
+
+// TestExactlyTheRuledStylecheckChecksAreRegistered holds the ST rules to the ruling, both ways: every ruled
+// check is registered, and no other ST check is, the ruled-off ST1003 and ST1005 above all.
+func TestExactlyTheRuledStylecheckChecksAreRegistered(test *testing.T) {
+	test.Parallel()
+	registeredStylecheck := []string{}
 	for _, registeredRule := range registry {
-		if strings.HasPrefix(registeredRule.UpstreamName, "ST") ||
-			strings.HasPrefix(registeredRule.UpstreamName, "QF") {
-			test.Errorf("%s is registered, and no ST or QF check is yet", registeredRule.Name)
+		if strings.HasPrefix(registeredRule.UpstreamName, "ST") {
+			registeredStylecheck = append(registeredStylecheck, registeredRule.UpstreamName)
+		}
+	}
+	slices.Sort(registeredStylecheck)
+	if !slices.Equal(registeredStylecheck, ruledStylecheck) {
+		test.Errorf("the registered ST checks are %q, expected exactly %q", registeredStylecheck, ruledStylecheck)
+	}
+}
+
+// TestNoDefaultOffSAOrSCheckIsRegistered holds the registry to staticcheck's own defaults for SA and S: a
+// check its documentation marks NonDefault stays off until it is ruled on. SA9003 is named, so the test
+// cannot pass by staticcheck marking nothing.
+func TestNoDefaultOffSAOrSCheckIsRegistered(test *testing.T) {
+	test.Parallel()
+	nonDefault := []string{}
+	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers) {
+		if wrapped.Doc != nil && wrapped.Doc.NonDefault {
+			nonDefault = append(nonDefault, wrapped.Analyzer.Name)
+		}
+	}
+	if !slices.Contains(nonDefault, "SA9003") {
+		test.Errorf("staticcheck's default-off SA and S checks are %q, which no longer holds SA9003", nonDefault)
+	}
+	for _, code := range nonDefault {
+		if _, found := registeredRuleNamed(rule.Namespace + code); found {
+			test.Errorf("%s is registered, and staticcheck leaves it off by default", code)
 		}
 	}
 }
@@ -198,6 +254,8 @@ func TestTypeAwareFollowsTheSyntaxOnlyTable(test *testing.T) {
 		"cohere-go/buildtag": false,
 		"cohere-go/SA4006":   true,
 		"cohere-go/SA9009":   false,
+		"cohere-go/ST1008":   true,
+		"cohere-go/ST1018":   false,
 	}
 	for name, typeAware := range expected {
 		registeredRule, found := registeredRuleNamed(name)

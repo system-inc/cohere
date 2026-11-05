@@ -66,7 +66,7 @@ require (
 	// depends on the type it decodes into, which a regex over the source cannot see.
 	golang.org/x/tools v0.49.0
 
-	// staticcheck's SA, S and U1000 checks, which the Go engine registers as rules under their own codes
+	// staticcheck's SA, S, ST and U1000 checks, which the Go engine registers as rules under their own codes
 	// (internal/goengine/rules). They are go/analysis analyzers already, so they run in the engine's one
 	// load with no runner of staticcheck's own. Minimal version selection keeps our x/tools over the older
 	// one staticcheck asks for, and the registry's tests prove its analyzers validate against ours.
@@ -74,6 +74,9 @@ require (
 )
 
 require (
+	// staticcheck's configuration reader parses staticcheck.conf with it, and the ST checks require that
+	// reader for their options (dot import and HTTP status code allow lists).
+	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c // indirect
 	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
