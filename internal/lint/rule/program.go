@@ -126,7 +126,7 @@ type Program interface {
 // ViewProgram gives one rule its view of program while it runs on sourceFile: every method outside the
 // rule's ProgramReads panics, naming the rule and the read it did not declare. A nil program is a nil
 // Program, so `ctx.Program == nil` still says the program could not be built.
-func ViewProgram(program *compiler.Program, sourceFile *ast.SourceFile, subject Rule) Program {
+func ViewProgram(program *compiler.Program, sourceFile *ast.SourceFile, subject Traits) Program {
 	if program == nil {
 		return nil
 	}
@@ -150,7 +150,7 @@ type ProgramViewSlot struct {
 
 // Point aims the slot at sourceFile for subject and returns the view as the rule's Program. A nil program
 // is a nil Program, as ViewProgram's is.
-func (slot *ProgramViewSlot) Point(program *compiler.Program, sourceFile *ast.SourceFile, subject Rule) Program {
+func (slot *ProgramViewSlot) Point(program *compiler.Program, sourceFile *ast.SourceFile, subject Traits) Program {
 	if program == nil {
 		return nil
 	}
