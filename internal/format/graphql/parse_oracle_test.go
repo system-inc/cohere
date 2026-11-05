@@ -256,9 +256,9 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 			home, _ := os.UserHomeDir()
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git") {
 				return filepath.SkipDir
@@ -266,9 +266,9 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 			if entry.IsDir() || (filepath.Ext(path) != ".graphql" && filepath.Ext(path) != ".gql") {
 				return nil
 			}
-			source, err := os.ReadFile(path)
-			if err != nil {
-				return err
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				return readError
 			}
 			if !utf8.Valid(source) {
 				return fmt.Errorf("%s is not UTF-8, which the comparison cannot carry through JSON", path)
@@ -388,9 +388,9 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 // dumpParse parses one text and renders it the way the oracle script does, through JSON, so both sides
 // compare as the same Go values.
 func dumpParse(text string) (map[string]any, error) {
-	document, comments, err := Parse(text)
-	if err != nil {
-		return nil, err
+	document, comments, parseError := Parse(text)
+	if parseError != nil {
+		return nil, parseError
 	}
 	offsets := utf16OffsetsOf(text)
 	dumped := make([]any, len(comments))
@@ -403,13 +403,13 @@ func dumpParse(text string) (map[string]any, error) {
 			"value": comment.String("value"),
 		}
 	}
-	encoded, err := json.Marshal(map[string]any{"ast": dumpParseValue(document, offsets), "comments": dumped})
-	if err != nil {
-		return nil, err
+	encoded, encodeError := json.Marshal(map[string]any{"ast": dumpParseValue(document, offsets), "comments": dumped})
+	if encodeError != nil {
+		return nil, encodeError
 	}
 	var result map[string]any
-	err = json.Unmarshal(encoded, &result)
-	return result, err
+	decodeError := json.Unmarshal(encoded, &result)
+	return result, decodeError
 }
 
 func dumpParseValue(value any, offsets []int) any {

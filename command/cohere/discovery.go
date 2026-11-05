@@ -275,11 +275,11 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	// xcodeCandidates are the directories that could be an Xcode project's root, relative to root. The claim
 	// after the walk decides which are projects.
 	xcodeCandidates := map[string]bool{}
-	fail := func(err error) {
+	fail := func(sourceError error) {
 		lock.Lock()
 		defer lock.Unlock()
 		if firstError == nil {
-			firstError = err
+			firstError = sourceError
 		}
 	}
 	// visit reads one directory. Below the root, a directory holding a .git is a repository of its own and

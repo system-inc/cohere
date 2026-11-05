@@ -147,10 +147,10 @@ func printToDoc(
 	textToDoc printing.TextToDoc,
 	nodes *estree.Arena,
 	docs *docMemory,
-) (document doc.Doc, err error) {
+) (document doc.Doc, printToDocError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			document, err = nil, fmt.Errorf("formatting %s: %v", fileName, recovered)
+			document, printToDocError = nil, fmt.Errorf("formatting %s: %v", fileName, recovered)
 		}
 	}()
 
@@ -160,21 +160,21 @@ func printToDoc(
 	printer := estreePrinter
 	switch parser {
 	case "typescript":
-		root, comments, strippedText, err = estree.ParseTypeScriptFrom(fileName, text, parsed, nodes)
+		root, comments, strippedText, printToDocError = estree.ParseTypeScriptFrom(fileName, text, parsed, nodes)
 	case "babel":
-		root, comments, strippedText, err = estree.ParseJavaScript(fileName, text, nodes)
+		root, comments, strippedText, printToDocError = estree.ParseJavaScript(fileName, text, nodes)
 	case "json":
-		root, comments, err = estree.ParseJSON(text, true)
+		root, comments, printToDocError = estree.ParseJSON(text, true)
 		// main/normalize-format-options.js: the json parser never prints a trailing comma.
 		options.TrailingComma = "none"
 	case "json-stringify":
-		root, comments, err = estree.ParseJSON(text, false)
+		root, comments, printToDocError = estree.ParseJSON(text, false)
 		printer = estreeJSONPrinter
 	default:
-		err = fmt.Errorf("no parser %q", parser)
+		printToDocError = fmt.Errorf("no parser %q", parser)
 	}
-	if err != nil {
-		return nil, err
+	if printToDocError != nil {
+		return nil, printToDocError
 	}
 	printOptions := &Options{
 		Printer:      printer,

@@ -225,15 +225,15 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 		}
 		return true
 	}
-	i := 0
+	index := 0
 	// upstream's do { ... } while (...).
 	for {
 		previousParent = currentParent
 		if previousParent == nil {
 			previousParent = current
 		}
-		currentParent, _ = path.GetParentNode(i)
-		i++
+		currentParent, _ = path.GetParentNode(index)
+		index++
 		if !(currentParent != nil && currentParent.Is(current.Type()) &&
 			everyPropertyIsNot()) {
 			break

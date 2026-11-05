@@ -146,18 +146,18 @@ func Resolve(searchRoots []string) (string, error) {
 // as coming from their build. A stale export in a shell profile is exactly how that happens, which
 // is why a missing path says what was asked for and which variable asked for it.
 func resolveOverride(path string) (string, error) {
-	absolutePath, err := filepath.Abs(path)
-	if err != nil {
-		return "", fmt.Errorf("%s is set to %q, which is not a usable path: %w", BinaryOverrideVariable, path, err)
+	absolutePath, absolutePathError := filepath.Abs(path)
+	if absolutePathError != nil {
+		return "", fmt.Errorf("%s is set to %q, which is not a usable path: %w", BinaryOverrideVariable, path, absolutePathError)
 	}
 
-	information, err := os.Stat(absolutePath)
-	if err != nil {
+	information, statError := os.Stat(absolutePath)
+	if statError != nil {
 		return "", fmt.Errorf(
 			"%s points at %s, and there is nothing there: %w",
 			BinaryOverrideVariable,
 			absolutePath,
-			err,
+			statError,
 		)
 	}
 	if information.IsDir() {

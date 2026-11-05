@@ -51,9 +51,9 @@ func run(output string) (string, error) {
 		return "", fmt.Errorf("creating the package directory: %w", createDirectoryError)
 	}
 
-	manifest, err := release.DispatcherManifest("0.1.0")
-	if err != nil {
-		return "", fmt.Errorf("building the package manifest: %w", err)
+	manifest, dispatcherManifestError := release.DispatcherManifest("0.1.0")
+	if dispatcherManifestError != nil {
+		return "", fmt.Errorf("building the package manifest: %w", dispatcherManifestError)
 	}
 	if writeError := os.WriteFile(filepath.Join(directory, "package.json"), manifest, 0o644); writeError != nil {
 		return "", fmt.Errorf("writing package.json: %w", writeError)
@@ -82,9 +82,9 @@ func run(output string) (string, error) {
 			output,
 		)
 	}
-	checksums, err := release.Checksums(output, platformDirectories)
-	if err != nil {
-		return "", fmt.Errorf("listing the platform binaries' checksums: %w", err)
+	checksums, checksumsError := release.Checksums(output, platformDirectories)
+	if checksumsError != nil {
+		return "", fmt.Errorf("listing the platform binaries' checksums: %w", checksumsError)
 	}
 	if writeError := os.WriteFile(
 		filepath.Join(directory, release.ChecksumsFileName),

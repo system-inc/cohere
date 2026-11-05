@@ -18,7 +18,7 @@ func dedentBlockStringLines(lines []string) []string {
 	firstNonEmptyLine := -1     // null
 	lastNonEmptyLine := -1
 
-	for i, line := range lines {
+	for index, line := range lines {
 		indent := leadingWhitespace(line)
 
 		if indent == len(line) {
@@ -26,11 +26,11 @@ func dedentBlockStringLines(lines []string) []string {
 		}
 
 		if firstNonEmptyLine == -1 {
-			firstNonEmptyLine = i
+			firstNonEmptyLine = index
 		}
-		lastNonEmptyLine = i
+		lastNonEmptyLine = index
 
-		if i != 0 && indent < commonIndent {
+		if index != 0 && indent < commonIndent {
 			commonIndent = indent
 		}
 	}
@@ -38,11 +38,11 @@ func dedentBlockStringLines(lines []string) []string {
 	// Remove common indentation from all lines but first. JavaScript's slice clamps an index past the
 	// end, so a blank line shorter than the indent (or an indent that is still MAX_SAFE_INTEGER) gives "".
 	dedented := make([]string, len(lines))
-	for i, line := range lines {
-		if i == 0 {
-			dedented[i] = line
+	for index, line := range lines {
+		if index == 0 {
+			dedented[index] = line
 		} else {
-			dedented[i] = line[min(commonIndent, len(line)):]
+			dedented[index] = line[min(commonIndent, len(line)):]
 		}
 	}
 	// Remove leading and trailing blank lines.
@@ -53,9 +53,9 @@ func dedentBlockStringLines(lines []string) []string {
 }
 
 func leadingWhitespace(text string) int {
-	i := 0
-	for i < len(text) && isWhiteSpace(int(text[i])) {
-		i++
+	index := 0
+	for index < len(text) && isWhiteSpace(int(text[index])) {
+		index++
 	}
-	return i
+	return index
 }

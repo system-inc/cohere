@@ -267,9 +267,9 @@ func run() error {
 	//
 	// Decided before the listings rather than after them, because inside a Swift package every one of
 	// them is the Swift engine's question: `cohere --rules` there lists the rules that would run there.
-	workingDirectory, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("resolving the working directory: %w", err)
+	workingDirectory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		return fmt.Errorf("resolving the working directory: %w", workingDirectoryError)
 	}
 	given := map[string]bool{}
 	flag.Visit(func(set *flag.Flag) { given[set.Name] = true })
@@ -375,7 +375,7 @@ func run() error {
 			lintConfigPath = absoluteFrom(absoluteFrom(workingDirectory, *directory), *lintConfigFileName)
 		}
 		if locateError == nil && usesHouseSets(location) {
-			return errHouseSetsPerFile
+			return errorHouseSetsPerFile
 		}
 		lintConfiguration, loadForError := configuration.LoadFor(lintConfigPath, registeredRuleNames())
 		if loadForError != nil {
@@ -569,7 +569,7 @@ func run() error {
 		// is the file's text. --fix is required rather than implied, so the command line says what the
 		// output means.
 		if !*fixOnly || *noFix || *typesOnly || *lintOnly || len(flag.Args()) > 0 {
-			return errStdinNeedsFix
+			return errorStdinNeedsFix
 		}
 		return runStdin(backgroundContext, stdinRequest{
 			Location:         location,
@@ -582,9 +582,9 @@ func run() error {
 	}
 
 	// The repository's own way of printing, from its settings, under whatever the command line named.
-	block, err := readOutputBlock(location.LintConfigFileName)
-	if err != nil {
-		return err
+	block, readOutputBlockError := readOutputBlock(location.LintConfigFileName)
+	if readOutputBlockError != nil {
+		return readOutputBlockError
 	}
 	if block.Phases != nil && !given["phases"] {
 		activeOutput.Phases = *block.Phases
@@ -631,9 +631,9 @@ func run() error {
 	}
 
 	// What this run leaves to nearer projects, when it is one project of several (see ownership.go).
-	yield, err := activeProjectYield()
-	if err != nil {
-		return err
+	yield, activeProjectYieldError := activeProjectYield()
+	if activeProjectYieldError != nil {
+		return activeProjectYieldError
 	}
 
 	// Under --timing the build says what it was made of, not only how long it took (#cazsft3).
@@ -1411,7 +1411,7 @@ func run() error {
 			// the walk's bare "the file set is empty", which could not say that the file was left out
 			// by the tsconfig or ignored by git. See explainNamedPathsOutsideProgram.
 			if len(projectFiles) == 0 && !lintScope.Everything && len(flag.Args()) > 0 {
-				return errNamedPathsOutsideProgram(location, flag.Args())
+				return namedPathsOutsideProgramError(location, flag.Args())
 			}
 			walked, walkError := graph.Walk(backgroundContext, projectFiles, rules)
 			if walkError != nil {

@@ -19,12 +19,12 @@ func TestOptionDecodersRefuseAnUnknownKey(test *testing.T) {
 	for name, decode := range decoders {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			if _, err := decode([]byte(`{}`)); err != nil {
-				test.Fatalf("baseline: an empty options object was refused: %v", err)
+			if _, decodeError := decode([]byte(`{}`)); decodeError != nil {
+				test.Fatalf("baseline: an empty options object was refused: %v", decodeError)
 			}
-			_, err := decode([]byte(`{"somethingElse": 1}`))
-			if err == nil || !strings.Contains(err.Error(), "somethingElse") {
-				test.Fatalf("want a refusal naming the key, got %v", err)
+			_, decodeError := decode([]byte(`{"somethingElse": 1}`))
+			if decodeError == nil || !strings.Contains(decodeError.Error(), "somethingElse") {
+				test.Fatalf("want a refusal naming the key, got %v", decodeError)
 			}
 		})
 	}

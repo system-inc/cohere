@@ -32,7 +32,7 @@ var ErrLoopsForever = errors.New(
 // offset into selector, converted from upstream's UTF-16 index; source's lines and columns stay as
 // upstream computes them, columns in UTF-16 units. Every node's Range is [0, 0]: upstream records a
 // start (sourceIndex) and no end, and Prettier's loc.js computes positions from those fields.
-func Parse(selector string) (root *estree.Node, err error) {
+func Parse(selector string) (root *estree.Node, parseError error) {
 	defer func() {
 		recovered := recover()
 		if recovered == nil {
@@ -41,11 +41,11 @@ func Parse(selector string) (root *estree.Node, err error) {
 		root = nil
 		switch thrown := recovered.(type) {
 		case thrownError:
-			err = printing.Syntax(errors.New(thrown.message))
+			parseError = printing.Syntax(errors.New(thrown.message))
 		case loopsForever:
-			err = printing.Syntax(ErrLoopsForever)
+			parseError = printing.Syntax(ErrLoopsForever)
 		default:
-			err = fmt.Errorf("css selector parser: %v", recovered)
+			parseError = fmt.Errorf("css selector parser: %v", recovered)
 		}
 	}()
 

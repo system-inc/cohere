@@ -254,9 +254,9 @@ func TestRenderRefusesAFirstReleaseSetItCannotRead(test *testing.T) {
 // names and the same bytes, so a diff between HEAD and the tree is empty.
 func TestSetsAtACommitMatchTheTree(test *testing.T) {
 	test.Parallel()
-	module, err := filepath.Abs(filepath.Join("..", "..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	module, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	if status, outputError := exec.Command(
 		"git",
@@ -272,13 +272,13 @@ func TestSetsAtACommitMatchTheTree(test *testing.T) {
 			bytes.TrimSpace(status),
 		)
 	}
-	committed, err := SetsAt(module, "HEAD")
-	if err != nil {
-		test.Fatal(err)
+	committed, setsAtError := SetsAt(module, "HEAD")
+	if setsAtError != nil {
+		test.Fatal(setsAtError)
 	}
-	tree, err := SetsAt(module, "")
-	if err != nil {
-		test.Fatal(err)
+	tree, setsAtError := SetsAt(module, "")
+	if setsAtError != nil {
+		test.Fatal(setsAtError)
 	}
 	if len(committed) < 2 || len(committed) != len(tree) {
 		test.Fatalf("read %d sets at HEAD and %d in the tree", len(committed), len(tree))

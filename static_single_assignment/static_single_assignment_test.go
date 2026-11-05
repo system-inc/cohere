@@ -115,27 +115,27 @@ func (function *testFunction) use(block *testBlock, name string) *testInstructio
 
 type testGraph struct{}
 
-func (testGraph) Entry(f *testFunction) ssa.BlockId { return f.entry }
-func (testGraph) BlockBound(f *testFunction) int    { return int(f.next) }
-func (testGraph) Block(f *testFunction, id ssa.BlockId) (*testBlock, bool) {
-	block, ok := f.table[id]
+func (testGraph) Entry(function *testFunction) ssa.BlockId { return function.entry }
+func (testGraph) BlockBound(function *testFunction) int    { return int(function.next) }
+func (testGraph) Block(function *testFunction, id ssa.BlockId) (*testBlock, bool) {
+	block, ok := function.table[id]
 	return block, ok
 }
-func (testGraph) Blocks(f *testFunction) []*testBlock { return f.blocks }
+func (testGraph) Blocks(function *testFunction) []*testBlock { return function.blocks }
 
-// Mutates: f the passes hand their new block order back through this setter, as through a real IR's
-func (testGraph) SetBlocks(f *testFunction, blocks []*testBlock) { f.blocks = blocks }
-func (testGraph) Retain(f *testFunction, keep func(ssa.BlockId) bool) {
-	for id := range f.table {
+// Mutates: function the passes hand their new block order back through this setter, as through a real IR's
+func (testGraph) SetBlocks(function *testFunction, blocks []*testBlock) { function.blocks = blocks }
+func (testGraph) Retain(function *testFunction, keep func(ssa.BlockId) bool) {
+	for id := range function.table {
 		if !keep(id) {
-			delete(f.table, id)
+			delete(function.table, id)
 		}
 	}
 }
-func (testGraph) Placeholder(f *testFunction, block *testBlock) *testBlock {
+func (testGraph) Placeholder(function *testFunction, block *testBlock) *testBlock {
 	placeholder := &testBlock{id: block.id, placeholder: true,
 		predecessors: append([]ssa.BlockId(nil), block.predecessors...)}
-	f.table[block.id] = placeholder
+	function.table[block.id] = placeholder
 	return placeholder
 }
 func (testGraph) Id(block *testBlock) ssa.BlockId             { return block.id }
@@ -155,26 +155,26 @@ func (testGraph) EachEdge(block *testBlock, visit func(ssa.BlockId, ssa.Edge)) {
 	}
 }
 func (testGraph) EndsInReturn(block *testBlock) bool { return block.returns }
-func (testGraph) InstructionCount(f *testFunction, block *testBlock) int {
+func (testGraph) InstructionCount(function *testFunction, block *testBlock) int {
 	return len(block.instructions)
 }
-func (testGraph) EachInstructionPlace(f *testFunction, block *testBlock, index int,
+func (testGraph) EachInstructionPlace(function *testFunction, block *testBlock, index int,
 	visit func(*testPlace, ssa.Role)) {
 	instruction := block.instructions[index]
-	for i := range instruction.uses {
-		visit(&instruction.uses[i], ssa.Use)
+	for index := range instruction.uses {
+		visit(&instruction.uses[index], ssa.Use)
 	}
-	for i := range instruction.defines {
-		visit(&instruction.defines[i], ssa.Define)
+	for index := range instruction.defines {
+		visit(&instruction.defines[index], ssa.Define)
 	}
 }
-func (testGraph) IsContextStore(f *testFunction, block *testBlock, index int) bool {
+func (testGraph) IsContextStore(function *testFunction, block *testBlock, index int) bool {
 	return block.instructions[index].contextStore
 }
-func (testGraph) ContextStoreDefines(f *testFunction, block *testBlock, index int, place testPlace) bool {
+func (testGraph) ContextStoreDefines(function *testFunction, block *testBlock, index int, place testPlace) bool {
 	return place.id == block.instructions[index].result
 }
-func (testGraph) SetInstructionOrder(f *testFunction, block *testBlock, index int, order ssa.EvaluationOrder) {
+func (testGraph) SetInstructionOrder(function *testFunction, block *testBlock, index int, order ssa.EvaluationOrder) {
 	block.instructions[index].order = order
 }
 func (testGraph) EachTerminalPlace(block *testBlock, visit func(*testPlace, ssa.Role)) {
@@ -185,27 +185,27 @@ func (testGraph) EachTerminalPlace(block *testBlock, visit func(*testPlace, ssa.
 func (testGraph) SetTerminalOrder(block *testBlock, order ssa.EvaluationOrder) {
 	block.terminalOrder = order
 }
-func (testGraph) Params(f *testFunction) []testPlace { return f.params }
-func (testGraph) Returns(f *testFunction) *testPlace { return f.returns }
-func (testGraph) Declaration(f *testFunction, id ssa.IdentifierId) ssa.DeclarationId {
-	return f.identifiers[id].declaration
+func (testGraph) Params(function *testFunction) []testPlace { return function.params }
+func (testGraph) Returns(function *testFunction) *testPlace { return function.returns }
+func (testGraph) Declaration(function *testFunction, id ssa.IdentifierId) ssa.DeclarationId {
+	return function.identifiers[id].declaration
 }
-func (testGraph) Contextual(f *testFunction, declaration ssa.DeclarationId) bool {
-	return f.contextual[declaration]
+func (testGraph) Contextual(function *testFunction, declaration ssa.DeclarationId) bool {
+	return function.contextual[declaration]
 }
 
-// Mutates: f construction mints each renamed value through this, which records it in the test function's table
-func (testGraph) Mint(f *testFunction, original ssa.IdentifierId) ssa.IdentifierId {
-	source := f.identifiers[original]
-	id := ssa.IdentifierId(len(f.identifiers))
-	f.identifiers = append(f.identifiers, source)
+// Mutates: function construction mints each renamed value through this, which records it in the test function's table
+func (testGraph) Mint(function *testFunction, original ssa.IdentifierId) ssa.IdentifierId {
+	source := function.identifiers[original]
+	id := ssa.IdentifierId(len(function.identifiers))
+	function.identifiers = append(function.identifiers, source)
 	return id
 }
-func (testGraph) Named(f *testFunction, id ssa.IdentifierId) bool {
-	return f.identifiers[id].name != ""
+func (testGraph) Named(function *testFunction, id ssa.IdentifierId) bool {
+	return function.identifiers[id].name != ""
 }
-func (testGraph) PlaceString(f *testFunction, id ssa.IdentifierId) string {
-	return fmt.Sprintf("%s$%d", f.identifiers[id].name, id)
+func (testGraph) PlaceString(function *testFunction, id ssa.IdentifierId) string {
+	return fmt.Sprintf("%s$%d", function.identifiers[id].name, id)
 }
 func (testGraph) IdentifierOf(place testPlace) ssa.IdentifierId { return place.id }
 func (testGraph) WithIdentifier(place testPlace, id ssa.IdentifierId) testPlace {
@@ -214,17 +214,17 @@ func (testGraph) WithIdentifier(place testPlace, id ssa.IdentifierId) testPlace 
 }
 
 // finalize and construct are the sequence both real IRs run.
-func finalize(f *testFunction) {
-	ssa.ReversePostorder(testGraph{}, f)
-	ssa.MarkPredecessors(testGraph{}, f)
-	ssa.MarkEvaluationOrder(testGraph{}, f)
+func finalize(function *testFunction) {
+	ssa.ReversePostorder(testGraph{}, function)
+	ssa.MarkPredecessors(testGraph{}, function)
+	ssa.MarkEvaluationOrder(testGraph{}, function)
 }
 
-func construct(test *testing.T, f *testFunction) {
+func construct(test *testing.T, function *testFunction) {
 	test.Helper()
-	finalize(f)
-	ssa.Construct(testGraph{}, f)
-	if violations := ssa.VerifySSA(testGraph{}, f); len(violations) != 0 {
+	finalize(function)
+	ssa.Construct(testGraph{}, function)
+	if violations := ssa.VerifySSA(testGraph{}, function); len(violations) != 0 {
 		test.Fatalf("not in single assignment form: %v", violations)
 	}
 }
@@ -242,17 +242,17 @@ func goTo(from *testBlock, to ...*testBlock) {
 // values, and the read after it names the phi.
 func TestDiamondPlacesOnePhiAtTheJoin(test *testing.T) {
 	test.Parallel()
-	f := newTestFunction()
-	entry, left, right, join := f.block(), f.block(), f.block(), f.block()
-	f.entry = entry.id
-	f.define(entry, "x")
-	f.define(left, "x")
-	read := f.use(join, "x")
+	function := newTestFunction()
+	entry, left, right, join := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	function.define(entry, "x")
+	function.define(left, "x")
+	read := function.use(join, "x")
 	goTo(entry, left, right)
 	goTo(left, join)
 	goTo(right, join)
 
-	construct(test, f)
+	construct(test, function)
 
 	if len(join.phis) != 1 {
 		test.Fatalf("join has %d phis, want 1", len(join.phis))
@@ -282,18 +282,18 @@ func TestDiamondPlacesOnePhiAtTheJoin(test *testing.T) {
 // entry's value with the back edge's, an incomplete phi filled when the body is sealed.
 func TestLoopPhiTakesTheBackEdge(t *testing.T) {
 	t.Parallel()
-	f := newTestFunction()
-	entry, header, body, exit := f.block(), f.block(), f.block(), f.block()
-	f.entry = entry.id
-	f.define(entry, "i")
-	test := f.use(header, "i")
-	f.define(body, "i")
-	after := f.use(exit, "i")
+	function := newTestFunction()
+	entry, header, body, exit := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	function.define(entry, "i")
+	test := function.use(header, "i")
+	function.define(body, "i")
+	after := function.use(exit, "i")
 	goTo(entry, header)
 	goTo(header, body, exit)
 	goTo(body, header)
 
-	construct(t, f)
+	construct(t, function)
 
 	if len(header.phis) != 1 {
 		t.Fatalf("header has %d phis, want 1", len(header.phis))
@@ -311,17 +311,17 @@ func TestLoopPhiTakesTheBackEdge(t *testing.T) {
 // result, which is redundant, and elimination removes it and rewrites its reads.
 func TestLoopThatNeverWritesLeavesNoPhi(t *testing.T) {
 	t.Parallel()
-	f := newTestFunction()
-	entry, header, body, exit := f.block(), f.block(), f.block(), f.block()
-	f.entry = entry.id
-	f.define(entry, "i")
-	test := f.use(header, "i")
-	f.use(body, "i")
+	function := newTestFunction()
+	entry, header, body, exit := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	function.define(entry, "i")
+	test := function.use(header, "i")
+	function.use(body, "i")
 	goTo(entry, header)
 	goTo(header, body, exit)
 	goTo(body, header)
 
-	construct(t, f)
+	construct(t, function)
 
 	if len(header.phis) != 0 {
 		t.Fatalf("header kept %d phis, want none", len(header.phis))
@@ -334,20 +334,20 @@ func TestLoopThatNeverWritesLeavesNoPhi(t *testing.T) {
 // TestUnreachableBlockIsDropped: a block no edge reaches leaves the slice and the table.
 func TestUnreachableBlockIsDropped(test *testing.T) {
 	test.Parallel()
-	f := newTestFunction()
-	entry, exit, orphan := f.block(), f.block(), f.block()
-	f.entry = entry.id
+	function := newTestFunction()
+	entry, exit, orphan := function.block(), function.block(), function.block()
+	function.entry = entry.id
 	goTo(entry, exit)
 	goTo(orphan, exit)
 
-	finalize(f)
+	finalize(function)
 
-	for _, block := range f.blocks {
+	for _, block := range function.blocks {
 		if block.id == orphan.id {
 			test.Fatalf("the unreachable block is still in the slice")
 		}
 	}
-	if _, ok := (testGraph{}).Block(f, orphan.id); ok {
+	if _, ok := (testGraph{}).Block(function, orphan.id); ok {
 		test.Errorf("the unreachable block is still in the table")
 	}
 	if !slices.Equal(exit.predecessors, []ssa.BlockId{entry.id}) {
@@ -359,16 +359,16 @@ func TestUnreachableBlockIsDropped(test *testing.T) {
 // real edge reaches, so it stays, empty, and is nobody's successor.
 func TestFallthroughNothingReachesBecomesAPlaceholder(test *testing.T) {
 	test.Parallel()
-	f := newTestFunction()
-	entry, body, continuation := f.block(), f.block(), f.block()
-	f.entry = entry.id
+	function := newTestFunction()
+	entry, body, continuation := function.block(), function.block(), function.block()
+	function.entry = entry.id
 	entry.edges = []testEdge{{to: continuation.id, kind: ssa.Fallthrough}, {to: body.id, kind: ssa.Real}}
 	body.returns = true
 
-	finalize(f)
+	finalize(function)
 
 	var kept *testBlock
-	for _, block := range f.blocks {
+	for _, block := range function.blocks {
 		if block.id == continuation.id {
 			kept = block
 		}
@@ -389,16 +389,16 @@ func TestFallthroughNothingReachesBecomesAPlaceholder(test *testing.T) {
 // result alone.
 func TestContextStoreReusesItsDefinition(test *testing.T) {
 	test.Parallel()
-	f := newTestFunction()
-	entry := f.block()
-	f.entry = entry.id
-	first := f.define(entry, "n")
+	function := newTestFunction()
+	entry := function.block()
+	function.entry = entry.id
+	first := function.define(entry, "n")
 	first.contextStore = true
-	f.contextual[f.variables["n"]] = true
-	second := f.define(entry, "n")
+	function.contextual[function.variables["n"]] = true
+	second := function.define(entry, "n")
 	second.contextStore = true
 
-	construct(test, f)
+	construct(test, function)
 
 	if first.defines[0].id != second.defines[0].id {
 		test.Errorf("the context stores define $%d and $%d, want one value", first.defines[0].id, second.defines[0].id)
@@ -413,15 +413,15 @@ func TestContextStoreReusesItsDefinition(test *testing.T) {
 // every lookup across an edge now goes, and flips the want below to the write before the throw.
 func TestExceptionalEdgeIsAnEdge(test *testing.T) {
 	test.Parallel()
-	f := newTestFunction()
-	entry, next, handler := f.block(), f.block(), f.block()
-	f.entry = entry.id
-	before := f.define(entry, "x")
-	throwing := f.define(entry, "x")
-	read := f.use(handler, "x")
+	function := newTestFunction()
+	entry, next, handler := function.block(), function.block(), function.block()
+	function.entry = entry.id
+	before := function.define(entry, "x")
+	throwing := function.define(entry, "x")
+	read := function.use(handler, "x")
 	entry.edges = []testEdge{{to: next.id, kind: ssa.Real}, {to: handler.id, kind: ssa.Exceptional}}
 
-	construct(test, f)
+	construct(test, function)
 
 	if !slices.Equal(handler.predecessors, []ssa.BlockId{entry.id}) {
 		test.Fatalf("the handler's predecessors are %v, want the throwing block", handler.predecessors)
@@ -436,17 +436,17 @@ func TestExceptionalEdgeIsAnEdge(test *testing.T) {
 // postorder, with nothing left at zero.
 func TestEvaluationOrderFollowsTheSlice(test *testing.T) {
 	test.Parallel()
-	f := newTestFunction()
-	entry, exit := f.block(), f.block()
-	f.entry = entry.id
-	f.define(entry, "a")
-	f.use(exit, "a")
+	function := newTestFunction()
+	entry, exit := function.block(), function.block()
+	function.entry = entry.id
+	function.define(entry, "a")
+	function.use(exit, "a")
 	goTo(entry, exit)
 
-	finalize(f)
+	finalize(function)
 
 	var orders []ssa.EvaluationOrder
-	for _, block := range f.blocks {
+	for _, block := range function.blocks {
 		for _, instruction := range block.instructions {
 			orders = append(orders, instruction.order)
 		}
@@ -461,20 +461,20 @@ func TestEvaluationOrderFollowsTheSlice(test *testing.T) {
 // a value written on the other, is a violation, so a clean result elsewhere is a real one.
 func TestVerifierCatchesAnUndominatedUse(test *testing.T) {
 	test.Parallel()
-	f := newTestFunction()
-	entry, left, right := f.block(), f.block(), f.block()
-	f.entry = entry.id
-	write := f.define(left, "x")
-	read := f.use(right, "x")
+	function := newTestFunction()
+	entry, left, right := function.block(), function.block(), function.block()
+	function.entry = entry.id
+	write := function.define(left, "x")
+	read := function.use(right, "x")
 	read.uses[0].id = write.defines[0].id
 	goTo(entry, left, right)
-	finalize(f)
+	finalize(function)
 
-	violations := ssa.VerifySSA(testGraph{}, f)
+	violations := ssa.VerifySSA(testGraph{}, function)
 	if len(violations) != 1 || violations[0].Kind != ssa.SSAViolationUseNotDominated {
 		test.Fatalf("violations are %v, want one undominated use", violations)
 	}
-	if stats := ssa.CollectSSAStats(testGraph{}, f); stats.Uses != 1 || stats.NamedValues != 1 {
+	if stats := ssa.CollectSSAStats(testGraph{}, function); stats.Uses != 1 || stats.NamedValues != 1 {
 		test.Errorf("stats are %+v, want one use and one named value", stats)
 	}
 }
@@ -483,15 +483,15 @@ func TestVerifierCatchesAnUndominatedUse(test *testing.T) {
 // neither the other arm nor the join.
 func TestDominanceIsTheEntrysAndTheJoins(test *testing.T) {
 	test.Parallel()
-	f := newTestFunction()
-	entry, left, right, join := f.block(), f.block(), f.block(), f.block()
-	f.entry = entry.id
+	function := newTestFunction()
+	entry, left, right, join := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
 	goTo(entry, left, right)
 	goTo(left, join)
 	goTo(right, join)
-	finalize(f)
+	finalize(function)
 
-	dominance := ssa.ComputeDominance(testGraph{}, f)
+	dominance := ssa.ComputeDominance(testGraph{}, function)
 	for _, block := range []*testBlock{entry, left, right, join} {
 		if !dominance.Dominates(entry.id, block.id) {
 			test.Errorf("the entry does not dominate bb%d", block.id)
@@ -508,24 +508,24 @@ func TestDominanceIsTheEntrysAndTheJoins(test *testing.T) {
 // (#6v4a54x, Adamic's generated-631).
 func TestDominanceFollowsRealEdgesPastAFallthrough(test *testing.T) {
 	test.Parallel()
-	f := newTestFunction()
-	entry, a, b, c, d := f.block(), f.block(), f.block(), f.block(), f.block()
-	f.entry = entry.id
+	function := newTestFunction()
+	entry, a, b, c, d := function.block(), function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
 	goTo(entry, a)
 	a.edges = []testEdge{{to: d.id, kind: ssa.Fallthrough}, {to: b.id, kind: ssa.Real}}
 	goTo(b, a, c)
 	goTo(c, d)
 	goTo(d, d, b)
-	finalize(f)
+	finalize(function)
 
 	var order []ssa.BlockId
-	for _, block := range f.blocks {
+	for _, block := range function.blocks {
 		order = append(order, block.id)
 	}
 	if !slices.Equal(order, []ssa.BlockId{entry.id, a.id, d.id, b.id, c.id}) {
 		test.Fatalf("the block order is %v; the test needs d ahead of its real predecessors", order)
 	}
-	dominance := ssa.ComputeDominance(testGraph{}, f)
+	dominance := ssa.ComputeDominance(testGraph{}, function)
 	for _, dominator := range []*testBlock{entry, a, b, c, d} {
 		if !dominance.Dominates(dominator.id, d.id) {
 			test.Errorf("bb%d doesn't dominate bb%d, which every path reaches through it", dominator.id, d.id)
@@ -545,16 +545,16 @@ func TestDominanceAgreesWithSetIntersection(test *testing.T) {
 	const graphs = 4000
 	behind := 0
 	for graph := 0; graph < graphs; graph++ {
-		f := newTestFunction()
+		function := newTestFunction()
 		count := 1 + random.Intn(12)
 		blocks := make([]*testBlock, 0, count)
 		for index := 0; index < count; index++ {
-			blocks = append(blocks, f.block())
+			blocks = append(blocks, function.block())
 		}
-		f.entry = blocks[0].id
+		function.entry = blocks[0].id
 		target := func() ssa.BlockId {
 			if random.Intn(25) == 0 {
-				return ssa.BlockId(int(f.next) + 3)
+				return ssa.BlockId(int(function.next) + 3)
 			}
 			return blocks[random.Intn(len(blocks))].id
 		}
@@ -569,19 +569,19 @@ func TestDominanceAgreesWithSetIntersection(test *testing.T) {
 				block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Exceptional})
 			}
 		}
-		finalize(f)
+		finalize(function)
 
-		want := setIntersectionDominators(f)
-		dominance := ssa.ComputeDominance(testGraph{}, f)
-		for _, block := range f.blocks {
-			for _, dominator := range f.blocks {
+		want := setIntersectionDominators(function)
+		dominance := ssa.ComputeDominance(testGraph{}, function)
+		for _, block := range function.blocks {
+			for _, dominator := range function.blocks {
 				if got := dominance.Dominates(dominator.id, block.id); got != want[block.id][dominator.id] {
 					test.Fatalf("graph %d: Dominates(bb%d, bb%d) is %t, set intersection says %t\n%s",
-						graph, dominator.id, block.id, got, !got, describeTestGraph(f))
+						graph, dominator.id, block.id, got, !got, describeTestGraph(function))
 				}
 			}
 		}
-		if reachedFromBehind(f) {
+		if reachedFromBehind(function) {
 			behind++
 		}
 	}
@@ -592,11 +592,11 @@ func TestDominanceAgreesWithSetIntersection(test *testing.T) {
 }
 
 // reachedBlocks is the blocks the entry reaches by real edges.
-func reachedBlocks(f *testFunction) map[ssa.BlockId]bool {
+func reachedBlocks(function *testFunction) map[ssa.BlockId]bool {
 	reached := map[ssa.BlockId]bool{}
 	var walk func(id ssa.BlockId)
 	walk = func(id ssa.BlockId) {
-		block, ok := f.table[id]
+		block, ok := function.table[id]
 		if !ok || reached[id] {
 			return
 		}
@@ -607,20 +607,20 @@ func reachedBlocks(f *testFunction) map[ssa.BlockId]bool {
 			}
 		}
 	}
-	walk(f.entry)
+	walk(function.entry)
 	return reached
 }
 
 // setIntersectionDominators is dominance computed the plain way, over the real predecessors
 // MarkPredecessors set: the entry dominates itself, a block the entry reaches is dominated by itself and
 // every block that dominates all its reached predecessors, and a block it doesn't reach only by itself.
-func setIntersectionDominators(f *testFunction) map[ssa.BlockId]map[ssa.BlockId]bool {
-	reached := reachedBlocks(f)
+func setIntersectionDominators(function *testFunction) map[ssa.BlockId]map[ssa.BlockId]bool {
+	reached := reachedBlocks(function)
 	dominators := map[ssa.BlockId]map[ssa.BlockId]bool{}
-	for _, block := range f.blocks {
+	for _, block := range function.blocks {
 		set := map[ssa.BlockId]bool{block.id: true}
-		if reached[block.id] && block.id != f.entry {
-			for _, other := range f.blocks {
+		if reached[block.id] && block.id != function.entry {
+			for _, other := range function.blocks {
 				set[other.id] = true
 			}
 		}
@@ -628,8 +628,8 @@ func setIntersectionDominators(f *testFunction) map[ssa.BlockId]map[ssa.BlockId]
 	}
 	for changed := true; changed; {
 		changed = false
-		for _, block := range f.blocks {
-			if !reached[block.id] || block.id == f.entry {
+		for _, block := range function.blocks {
+			if !reached[block.id] || block.id == function.entry {
 				continue
 			}
 			var next map[ssa.BlockId]bool
@@ -665,14 +665,14 @@ func setIntersectionDominators(f *testFunction) map[ssa.BlockId]map[ssa.BlockId]
 
 // reachedFromBehind reports whether a block the entry reaches, other than the entry, sits in the block
 // slice ahead of every real predecessor it has.
-func reachedFromBehind(f *testFunction) bool {
-	reached := reachedBlocks(f)
+func reachedFromBehind(function *testFunction) bool {
+	reached := reachedBlocks(function)
 	position := map[ssa.BlockId]int{}
-	for index, block := range f.blocks {
+	for index, block := range function.blocks {
 		position[block.id] = index
 	}
-	for index, block := range f.blocks {
-		if block.id == f.entry || !reached[block.id] {
+	for index, block := range function.blocks {
+		if block.id == function.entry || !reached[block.id] {
 			continue
 		}
 		ahead := false
@@ -689,10 +689,10 @@ func reachedFromBehind(f *testFunction) bool {
 }
 
 // describeTestGraph renders a function's blocks, edges and predecessors for a failure message.
-func describeTestGraph(f *testFunction) string {
+func describeTestGraph(function *testFunction) string {
 	var out strings.Builder
-	fmt.Fprintf(&out, "entry bb%d\n", f.entry)
-	for _, block := range f.blocks {
+	fmt.Fprintf(&out, "entry bb%d\n", function.entry)
+	for _, block := range function.blocks {
 		fmt.Fprintf(&out, "bb%d predecessors %v edges", block.id, block.predecessors)
 		for _, edge := range block.edges {
 			fmt.Fprintf(&out, " %d:%d", edge.to, edge.kind)
@@ -708,16 +708,16 @@ func describeTestGraph(f *testFunction) string {
 // predecessor, and around again until the stack runs out.
 func TestAnEntryWithPredecessorsIsReportedAndRefused(test *testing.T) {
 	test.Parallel()
-	f := newTestFunction()
-	entry, a, b, c := f.block(), f.block(), f.block(), f.block()
-	f.entry = entry.id
-	f.use(c, "x")
+	function := newTestFunction()
+	entry, a, b, c := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	function.use(c, "x")
 	goTo(entry, a)
 	goTo(a, b)
 	goTo(b, entry, c)
-	finalize(f)
+	finalize(function)
 
-	violations := ssa.VerifySSA(testGraph{}, f)
+	violations := ssa.VerifySSA(testGraph{}, function)
 	if len(violations) == 0 ||
 		violations[0].Kind != ssa.SSAViolationEntryHasPredecessors ||
 		violations[0].Block != entry.id {
@@ -728,7 +728,7 @@ func TestAnEntryWithPredecessorsIsReportedAndRefused(test *testing.T) {
 		defer func() {
 			message = fmt.Sprint(recover())
 		}()
-		ssa.Construct(testGraph{}, f)
+		ssa.Construct(testGraph{}, function)
 		return "no refusal"
 	}()
 	if want := fmt.Sprintf(

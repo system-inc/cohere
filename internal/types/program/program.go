@@ -268,9 +268,9 @@ const (
 // four flavors of an empty result, because the whole point of this package is that a run which
 // checked nothing must not be able to look like a run that found nothing.
 func Build(options Options) (*Graph, error) {
-	graph, err := buildOnce(options)
-	if err != nil {
-		return nil, err
+	graph, buildOnceError := buildOnce(options)
+	if buildOnceError != nil {
+		return nil, buildOnceError
 	}
 
 	// The config's file list and the program's loaded files are two reads of the tree, a moment
@@ -281,9 +281,9 @@ func Build(options Options) (*Graph, error) {
 	// panicked and blamed path casing.
 	verdict, missing := graph.timedVerify(options)
 	if verdict == rootsMoved {
-		graph, err = buildOnce(options)
-		if err != nil {
-			return nil, err
+		graph, buildOnceError = buildOnce(options)
+		if buildOnceError != nil {
+			return nil, buildOnceError
 		}
 		verdict, missing = graph.timedVerify(options)
 		if verdict == rootsMoved {

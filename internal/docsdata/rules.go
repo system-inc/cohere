@@ -125,9 +125,9 @@ const corePackage = "github.com/system-inc/cohere/internal/lint/rules/core"
 
 // buildRules renders one row per registration, in name order.
 func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
-	verdicts, err := swiftVerdicts(inputs.SwiftVerdicts)
-	if err != nil {
-		return Rules{}, err
+	verdicts, swiftVerdictsError := swiftVerdicts(inputs.SwiftVerdicts)
+	if swiftVerdictsError != nil {
+		return Rules{}, swiftVerdictsError
 	}
 	enabledBy := map[string][]RuleSetSeverity{}
 	for _, set := range sets {
@@ -182,14 +182,14 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 		}
 		rows = append(rows, row)
 	}
-	swiftRows, err := buildSwiftRows(inputs.SwiftRules, verdicts)
-	if err != nil {
-		return Rules{}, err
+	swiftRows, buildSwiftRowsError := buildSwiftRows(inputs.SwiftRules, verdicts)
+	if buildSwiftRowsError != nil {
+		return Rules{}, buildSwiftRowsError
 	}
 	rows = append(rows, swiftRows...)
-	goRows, err := buildGoRows(inputs.GoRules)
-	if err != nil {
-		return Rules{}, err
+	goRows, buildGoRowsError := buildGoRows(inputs.GoRules)
+	if buildGoRowsError != nil {
+		return Rules{}, buildGoRowsError
 	}
 	rows = append(rows, goRows...)
 	sort.Slice(rows, func(left, right int) bool { return rows[left].Name < rows[right].Name })

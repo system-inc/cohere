@@ -123,10 +123,10 @@ func main() {
 		os.Exit(2)
 	}
 
-	inputBytes, err := os.ReadFile(*inputPath)
-	if err != nil {
+	inputBytes, readError := os.ReadFile(*inputPath)
+	if readError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintf(os.Stderr, "generate_descriptor_table: reading input: %v\n", err)
+		fmt.Fprintf(os.Stderr, "generate_descriptor_table: reading input: %v\n", readError)
 		os.Exit(1)
 	}
 
@@ -153,10 +153,10 @@ func main() {
 		os.Exit(3)
 	}
 
-	contextBytes, err := os.ReadFile(*contextPath)
-	if err != nil {
+	contextBytes, readError := os.ReadFile(*contextPath)
+	if readError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintf(os.Stderr, "generate_descriptor_table: reading context: %v\n", err)
+		fmt.Fprintf(os.Stderr, "generate_descriptor_table: reading context: %v\n", readError)
 		os.Exit(1)
 	}
 
@@ -194,10 +194,10 @@ func main() {
 
 	generated, stats := generate(&table, &tableContext, *packageName, *variableName)
 
-	formatted, err := format.Source(generated)
-	if err != nil {
+	formatted, formatError := format.Source(generated)
+	if formatError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintf(os.Stderr, "generate_descriptor_table: generated file does not parse: %v\n", err)
+		fmt.Fprintf(os.Stderr, "generate_descriptor_table: generated file does not parse: %v\n", formatError)
 		os.Exit(1)
 	}
 

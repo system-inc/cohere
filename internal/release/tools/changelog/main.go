@@ -39,9 +39,9 @@ func run() error {
 	if *version == "" {
 		return fmt.Errorf("--version is required")
 	}
-	after, err := changelog.SetsAt(*module, *to)
-	if err != nil {
-		return err
+	after, setsAtError := changelog.SetsAt(*module, *to)
+	if setsAtError != nil {
+		return setsAtError
 	}
 	if *previous == "" {
 		section, renderError := changelog.Render(*version, *date, nil, after)
@@ -55,13 +55,13 @@ func run() error {
 	if *from == "" {
 		*from = "v" + *previous
 	}
-	before, err := changelog.SetsAt(*module, *from)
-	if err != nil {
-		return fmt.Errorf("reading the sets at the last release's tag: %w", err)
+	before, setsAtError := changelog.SetsAt(*module, *from)
+	if setsAtError != nil {
+		return fmt.Errorf("reading the sets at the last release's tag: %w", setsAtError)
 	}
-	changed, bump, err := changelog.Diff(before, after)
-	if err != nil {
-		return err
+	changed, bump, diffError := changelog.Diff(before, after)
+	if diffError != nil {
+		return diffError
 	}
 	if requireBumpError := changelog.RequireBump(*previous, *version, bump); requireBumpError != nil {
 		return requireBumpError

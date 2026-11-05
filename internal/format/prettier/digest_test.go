@@ -34,17 +34,17 @@ func TestDigestDetectsOneChangedByte(test *testing.T) {
 
 	files := embeddedBundleCopy(test)
 
-	before, err := DigestBundles(files)
-	if err != nil {
-		test.Fatalf("digesting before: %v", err)
+	before, digestBundlesError := DigestBundles(files)
+	if digestBundlesError != nil {
+		test.Fatalf("digesting before: %v", digestBundlesError)
 	}
 
 	last := BundleFiles[len(BundleFiles)-1]
 	files[last][0] ^= 0x01
 
-	after, err := DigestBundles(files)
-	if err != nil {
-		test.Fatalf("digesting after: %v", err)
+	after, digestBundlesError := DigestBundles(files)
+	if digestBundlesError != nil {
+		test.Fatalf("digesting after: %v", digestBundlesError)
 	}
 
 	if after == before {
@@ -86,14 +86,14 @@ func TestDigestKeysByName(test *testing.T) {
 
 	content := []byte("the same bytes under either name")
 
-	before, err := digestNamedBundles([]string{"plugins/yaml.js"}, map[string][]byte{"plugins/yaml.js": content})
-	if err != nil {
-		test.Fatalf("digesting under the first name: %v", err)
+	before, digestNamedBundlesError := digestNamedBundles([]string{"plugins/yaml.js"}, map[string][]byte{"plugins/yaml.js": content})
+	if digestNamedBundlesError != nil {
+		test.Fatalf("digesting under the first name: %v", digestNamedBundlesError)
 	}
 
-	after, err := digestNamedBundles([]string{"plugins/yml.js"}, map[string][]byte{"plugins/yml.js": content})
-	if err != nil {
-		test.Fatalf("digesting under the second name: %v", err)
+	after, digestNamedBundlesError := digestNamedBundles([]string{"plugins/yml.js"}, map[string][]byte{"plugins/yml.js": content})
+	if digestNamedBundlesError != nil {
+		test.Fatalf("digesting under the second name: %v", digestNamedBundlesError)
 	}
 
 	if before == after {

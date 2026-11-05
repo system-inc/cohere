@@ -209,12 +209,12 @@ func TestSelectorValidationSkipsTheSetsOwnOverrides(test *testing.T) {
 	directory := writeConfigs(test, map[string]string{
 		"CohereSettings.json": `{"overrides": [{"files": ["missing/**"], "rules": {"no-var": "warn"}}]}`,
 	})
-	loaded, err := LoadHouse(filepath.Join(directory, "CohereSettings.json"), nil, HouseDetection{})
-	if err != nil {
-		test.Fatal(err)
+	loaded, loadHouseError := LoadHouse(filepath.Join(directory, "CohereSettings.json"), nil, HouseDetection{})
+	if loadHouseError != nil {
+		test.Fatal(loadHouseError)
 	}
-	err = loaded.ValidateSelectors([]string{filepath.Join(directory, "index.ts")})
-	if err == nil || strings.Contains(err.Error(), "generated") || !strings.Contains(err.Error(), "missing/**") {
-		test.Errorf("want only the project's own vacuous selector refused, got %v", err)
+	validateSelectorsError := loaded.ValidateSelectors([]string{filepath.Join(directory, "index.ts")})
+	if validateSelectorsError == nil || strings.Contains(validateSelectorsError.Error(), "generated") || !strings.Contains(validateSelectorsError.Error(), "missing/**") {
+		test.Errorf("want only the project's own vacuous selector refused, got %v", validateSelectorsError)
 	}
 }

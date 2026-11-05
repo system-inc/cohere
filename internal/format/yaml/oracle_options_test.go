@@ -150,8 +150,8 @@ func TestProseWrapMatchesOracle(test *testing.T) {
 	for _, proseWrap := range []string{"always", "never"} {
 		for variantIndex, options := range formatVariants[:3] {
 			for index, input := range inputs {
-				expected, err := oracle.format(input, "fixture.yaml", "yaml", options, proseWrap)
-				if err != nil {
+				expected, formatError := oracle.format(input, "fixture.yaml", "yaml", options, proseWrap)
+				if formatError != nil {
 					continue
 				}
 				compared++
@@ -182,7 +182,7 @@ func TestProseWrapMatchesOracle(test *testing.T) {
 						)
 					}
 				}
-				actual, err := formatParsed(
+				actual, formatParsedError := formatParsed(
 					"fixture.yaml",
 					trees[index],
 					texts[index],
@@ -191,9 +191,9 @@ func TestProseWrapMatchesOracle(test *testing.T) {
 					proseWrap,
 					nil,
 				)
-				if err != nil {
+				if formatParsedError != nil {
 					failures++
-					test.Errorf("%s, variant %d, %q: %v", proseWrap, variantIndex, input, err)
+					test.Errorf("%s, variant %d, %q: %v", proseWrap, variantIndex, input, formatParsedError)
 					continue
 				}
 				if actual != expected {
@@ -254,24 +254,24 @@ func TestPrettierRcEmbedsJSON(test *testing.T) {
 		textToDoc := jsonTextToDoc(test, oracle, options)
 		for _, fileName := range fileNames {
 			for index, input := range inputs {
-				expected, err := oracle.format(input, fileName, "yaml", options, "preserve")
-				if err != nil {
+				expected, formatError := oracle.format(input, fileName, "yaml", options, "preserve")
+				if formatError != nil {
 					if trees[index].err == "" {
-						test.Errorf("%s, %q: the oracle failed (%v) but the parser did not", fileName, input, err)
+						test.Errorf("%s, %q: the oracle failed (%v) but the parser did not", fileName, input, formatError)
 					}
-					if _, fullStackErr := formatFullStack(
+					if _, fullStackError := formatFullStack(
 						fileName,
 						input,
 						options,
 						"preserve",
 						textToDoc,
-					); !printing.IsSyntax(fullStackErr) {
+					); !printing.IsSyntax(fullStackError) {
 						test.Errorf(
 							"%s, %q: the oracle failed (%v) but Format gave %v",
 							fileName,
 							input,
-							err,
-							fullStackErr,
+							formatError,
+							fullStackError,
 						)
 					}
 					continue
@@ -292,7 +292,7 @@ func TestPrettierRcEmbedsJSON(test *testing.T) {
 						differential.FirstDifference(expected, fullStack),
 					)
 				}
-				actual, err := formatParsed(
+				actual, formatParsedError := formatParsed(
 					fileName,
 					trees[index],
 					texts[index],
@@ -301,8 +301,8 @@ func TestPrettierRcEmbedsJSON(test *testing.T) {
 					"preserve",
 					textToDoc,
 				)
-				if err != nil {
-					test.Errorf("%s, %q: %v", fileName, input, err)
+				if formatParsedError != nil {
+					test.Errorf("%s, %q: %v", fileName, input, formatParsedError)
 					continue
 				}
 				if actual != expected {

@@ -119,17 +119,17 @@ func parseTrees(test testing.TB, texts []string) []parsed {
 
 func parseBatch(test testing.TB, script string, texts []string) []parsed {
 	test.Helper()
-	encoded, err := json.Marshal(texts)
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(texts)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	command := exec.Command("node", "--stack-size=65500", script)
 	command.Stdin = bytes.NewReader(encoded)
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
-	output, err := command.Output()
-	if err != nil {
-		test.Fatalf("the parser oracle failed: %v\n%s", err, stderr.String())
+	output, outputError := command.Output()
+	if outputError != nil {
+		test.Fatalf("the parser oracle failed: %v\n%s", outputError, stderr.String())
 	}
 	var raw []parseResult
 	if decodeError := json.Unmarshal(output, &raw); decodeError != nil {

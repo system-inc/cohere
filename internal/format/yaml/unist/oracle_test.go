@@ -142,17 +142,17 @@ func oracleParse(test testing.TB, texts []string) []oracleResult {
 			size += len(texts[end])
 			end++
 		}
-		encoded, err := json.Marshal(texts[start:end])
-		if err != nil {
-			test.Fatal(err)
+		encoded, encodeError := json.Marshal(texts[start:end])
+		if encodeError != nil {
+			test.Fatal(encodeError)
 		}
 		command := exec.Command("node", "--stack-size=65500", script)
 		command.Stdin = bytes.NewReader(encoded)
 		var stderr bytes.Buffer
 		command.Stderr = &stderr
-		output, err := command.Output()
-		if err != nil {
-			test.Fatalf("the parse oracle failed: %v\n%s", err, stderr.String())
+		output, outputError := command.Output()
+		if outputError != nil {
+			test.Fatalf("the parse oracle failed: %v\n%s", outputError, stderr.String())
 		}
 		var batch []oracleResult
 		if decodeError := json.Unmarshal(output, &batch); decodeError != nil {

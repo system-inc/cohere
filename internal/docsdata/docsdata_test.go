@@ -100,9 +100,9 @@ func TestCheckSeesATierChange(test *testing.T) {
 	var changedRule string
 	loadSet := inputs.LoadSet
 	inputs.LoadSet = func(name string) (*configuration.Config, error) {
-		resolved, err := loadSet(name)
-		if err != nil || name != changedSet {
-			return resolved, err
+		resolved, loadSetError := loadSet(name)
+		if loadSetError != nil || name != changedSet {
+			return resolved, loadSetError
 		}
 		names := make([]string, 0, len(resolved.Rules))
 		for ruleName := range resolved.Rules {
@@ -131,17 +131,17 @@ func TestCheckSeesATierChange(test *testing.T) {
 // Swift test holds to the Swift engine's registry.
 func TestEveryRegisteredRuleHasOneRow(test *testing.T) {
 	test.Parallel()
-	committed, err := os.ReadFile(filepath.Join(moduleRoot, RulesPath))
-	if err != nil {
-		test.Fatal(err)
+	committed, readError := os.ReadFile(filepath.Join(moduleRoot, RulesPath))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	var rules Rules
 	if decodeError := json.Unmarshal(committed, &rules); decodeError != nil {
 		test.Fatal(decodeError)
 	}
-	swiftRegistry, err := os.ReadFile(filepath.Join(moduleRoot, "swift", "Rules.json"))
-	if err != nil {
-		test.Fatal(err)
+	swiftRegistry, readError := os.ReadFile(filepath.Join(moduleRoot, "swift", "Rules.json"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	var swiftEntries []struct {
 		Name string `json:"name"`
@@ -430,13 +430,13 @@ func TestTheVerbHelpKeepsItsSynopsis(test *testing.T) {
 // second-level heading that is not a release refuses the parse.
 func TestTheChangelogParsesEveryRelease(test *testing.T) {
 	test.Parallel()
-	changelog, err := os.ReadFile(filepath.Join(moduleRoot, "CHANGELOG.md"))
-	if err != nil {
-		test.Fatal(err)
+	changelog, readError := os.ReadFile(filepath.Join(moduleRoot, "CHANGELOG.md"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
-	entries, err := parseChangelog(changelog)
-	if err != nil {
-		test.Fatal(err)
+	entries, parseChangelogError := parseChangelog(changelog)
+	if parseChangelogError != nil {
+		test.Fatal(parseChangelogError)
 	}
 	if want := strings.Count("\n"+string(changelog), "\n## "); len(entries) != want {
 		test.Errorf("%d entries for %d release headings", len(entries), want)

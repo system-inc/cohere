@@ -33,9 +33,9 @@ func TestRuleBudgetRejectsCpuWorkAndDoesNotBillWaiting(test *testing.T) {
 	sleeper := rule.Rule{Name: "planted-waiter", Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) { time.Sleep(350 * time.Millisecond) }}
 	}}
-	rows, err := checkRuleBudget(test, graph, []rule.Rule{sleeper}, 250*time.Millisecond)
-	if err != nil || len(rows) != 1 || rows[0].NodesOffered != 1 || rows[0].TotalCPU() > 25*time.Millisecond {
-		test.Fatalf("waiter was billed CPU or not run: %v %+v", err, rows)
+	rows, checkRuleBudgetError := checkRuleBudget(test, graph, []rule.Rule{sleeper}, 250*time.Millisecond)
+	if checkRuleBudgetError != nil || len(rows) != 1 || rows[0].NodesOffered != 1 || rows[0].TotalCPU() > 25*time.Millisecond {
+		test.Fatalf("waiter was billed CPU or not run: %v %+v", checkRuleBudgetError, rows)
 	}
 	spinner := rule.Rule{Name: "planted-spinner", Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
@@ -44,11 +44,11 @@ func TestRuleBudgetRejectsCpuWorkAndDoesNotBillWaiting(test *testing.T) {
 			}
 		}}
 	}}
-	rows, err = checkRuleBudget(test, graph, []rule.Rule{spinner}, 250*time.Millisecond)
-	if err == nil || !strings.Contains(err.Error(), "rule CPU budget exceeded: planted-spinner") {
-		test.Fatalf("spinner was not refused: %v %+v", err, rows)
+	rows, checkRuleBudgetError = checkRuleBudget(test, graph, []rule.Rule{spinner}, 250*time.Millisecond)
+	if checkRuleBudgetError == nil || !strings.Contains(checkRuleBudgetError.Error(), "rule CPU budget exceeded: planted-spinner") {
+		test.Fatalf("spinner was not refused: %v %+v", checkRuleBudgetError, rows)
 	}
-	test.Logf("waiter passed; spinner refused: %v", err)
+	test.Logf("waiter passed; spinner refused: %v", checkRuleBudgetError)
 }
 
 // A rule that never returns must not hang the gate. Its dedicated subprocess is
@@ -70,9 +70,9 @@ func TestRuleBudgetBoundsANonReturningListener(test *testing.T) {
 		}
 		return
 	}
-	binary, err := os.Executable()
-	if err != nil {
-		test.Fatal(err)
+	binary, executableError := os.Executable()
+	if executableError != nil {
+		test.Fatal(executableError)
 	}
 	command := exec.Command(
 		binary,
@@ -81,12 +81,12 @@ func TestRuleBudgetBoundsANonReturningListener(test *testing.T) {
 		"-test.timeout=5s",
 	)
 	command.Env = append(os.Environ(), helper+"=1")
-	output, err := command.CombinedOutput()
+	output, outputError := command.CombinedOutput()
 	text := string(output)
-	if err == nil ||
+	if outputError == nil ||
 		!strings.Contains(text, "rule CPU budget exceeded: planted-nonreturning reached deadline 60.000ms") ||
 		!strings.Contains(text, "rules run=0 registered=1 corpus nodes=8 files=1") {
-		test.Fatalf("unbounded or unnamed refusal (%v):\n%s", err, text)
+		test.Fatalf("unbounded or unnamed refusal (%v):\n%s", outputError, text)
 	}
 	test.Logf("bounded listener refused:\n%s", text)
 }
@@ -97,9 +97,9 @@ func TestRuleBudgetBoundsANonReturningListener(test *testing.T) {
 // When the fixed rule is present only its implementation moves.
 func TestRuleBudgetRefuses6911526cThroughGoOverlay(test *testing.T) {
 	test.Parallel()
-	root, err := filepath.Abs("../../..")
-	if err != nil {
-		test.Fatal(err)
+	root, absolutePathError := filepath.Abs("../../..")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	directory := test.TempDir()
 	replacements := map[string]string{}
@@ -111,9 +111,9 @@ func TestRuleBudgetRefuses6911526cThroughGoOverlay(test *testing.T) {
 		}
 		replacements[filepath.Join(root, target)] = path
 	}
-	source, err := os.ReadFile("testdata/rule-budget/6911526c.go.txt")
-	if err != nil {
-		test.Fatal(err)
+	source, readError := os.ReadFile("testdata/rule-budget/6911526c.go.txt")
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	target := "internal/lint/rules/adamic/no_cross_enum_narrowing.go"
 	if _, statError := os.Stat(filepath.Join(root, target)); os.IsNotExist(statError) {
@@ -128,9 +128,9 @@ func init() { rule.Register(rule.Registration{Rule: NoCrossEnumNarrowing}) }
 		test.Fatal(statError)
 	}
 	add(target, source)
-	overlay, err := json.Marshal(map[string]any{"Replace": replacements})
-	if err != nil {
-		test.Fatal(err)
+	overlay, encodeError := json.Marshal(map[string]any{"Replace": replacements})
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	overlayPath := filepath.Join(directory, "overlay.json")
 	if writeError := os.WriteFile(overlayPath, overlay, 0o644); writeError != nil {
@@ -149,12 +149,12 @@ func init() { rule.Register(rule.Registration{Rule: NoCrossEnumNarrowing}) }
 		"-v",
 	)
 	command.Dir = root
-	output, err := command.CombinedOutput()
+	output, outputError := command.CombinedOutput()
 	text := string(output)
-	if err == nil ||
+	if outputError == nil ||
 		!strings.Contains(text, "rule CPU budget exceeded: adamic/no-cross-enum-narrowing") ||
 		!strings.Contains(text, "rule CPU coverage:") {
-		test.Fatalf("historical rule was not refused by name (%v):\n%s", err, text)
+		test.Fatalf("historical rule was not refused by name (%v):\n%s", outputError, text)
 	}
 	test.Logf("6911526c refused:\n%s", text)
 }

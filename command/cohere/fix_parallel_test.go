@@ -52,24 +52,24 @@ func TestTheParallelFormatPassMatchesTheSerialOne(test *testing.T) {
 		if _, configureLintError := configureLint(graph, location, nil); configureLintError != nil {
 			test.Fatal(configureLintError)
 		}
-		engine, err := native.NewResolving(directory)
-		if err != nil {
-			test.Fatal(err)
+		engine, newResolvingError := native.NewResolving(directory)
+		if newResolvingError != nil {
+			test.Fatal(newResolvingError)
 		}
-		enumeration, err := engine.Enumerate(directory)
-		if err != nil {
-			test.Fatal(err)
+		enumeration, enumerateError := engine.Enumerate(directory)
+		if enumerateError != nil {
+			test.Fatal(enumerateError)
 		}
 
 		previous := parallelFormatWorkers
 		parallelFormatWorkers = func() int { return workers }
 		defer func() { parallelFormatWorkers = previous }()
 
-		summary, _, _, err := applyProposedFixes(context.Background(), graph, graph.ProjectFiles(), registry.All(),
+		summary, _, _, applyProposedFixesError := applyProposedFixes(context.Background(), graph, graph.ProjectFiles(), registry.All(),
 			func() (edit.Transform, []string) { return formatTransform(engine), enumeration.Files }, wholeTreeScope(),
 			graph.Anchor.Root(), 0, write, nil)
-		if err != nil {
-			test.Fatal(err)
+		if applyProposedFixesError != nil {
+			test.Fatal(applyProposedFixesError)
 		}
 		described := summary.String()
 		for _, changed := range summary.ChangedFiles {
@@ -147,7 +147,7 @@ func TestFormatInParallelLeavesTheRulesToTheSerialPath(test *testing.T) {
 			return edit.FileResult{}, fmt.Errorf(
 				"collecting fixes for %s after formatting: %w",
 				fileName,
-				errRelintRefused,
+				errorRelintRefused,
 			)
 		case "/c.ts":
 			return edit.FileResult{FileName: fileName}, failure

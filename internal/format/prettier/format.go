@@ -113,14 +113,14 @@ func (engine *Engine) Format(fileName string, text string) (string, error) {
 	engine.runtime.Set("__arrowParens", engine.options.ArrowParens)
 	engine.runtime.Set("__endOfLine", engine.options.EndOfLine)
 
-	value, err := engine.runtime.RunString(formatScript)
-	if err != nil {
-		return "", fmt.Errorf("formatting %s: %w", fileName, err)
+	value, runStringError := engine.runtime.RunString(formatScript)
+	if runStringError != nil {
+		return "", fmt.Errorf("formatting %s: %w", fileName, runStringError)
 	}
 
-	formatted, err := drainPromise(engine.runtime, value)
-	if err != nil {
-		return "", fmt.Errorf("formatting %s: %w", fileName, err)
+	formatted, drainPromiseError := drainPromise(engine.runtime, value)
+	if drainPromiseError != nil {
+		return "", fmt.Errorf("formatting %s: %w", fileName, drainPromiseError)
 	}
 	return formatted, nil
 }

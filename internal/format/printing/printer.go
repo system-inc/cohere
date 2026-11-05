@@ -350,8 +350,8 @@ func printEmbeddedLanguages[N Node[N]](path *AstPath[N], print PrintFunc, option
 				return nil, fmt.Errorf("printing: no TextToDoc is configured for embedded languages")
 			}
 		}
-		embedded, err := call.print(textToDoc, print, path, options)
-		if err == nil && embedded != nil {
+		embedded, printError := call.print(textToDoc, print, path, options)
+		if printError == nil && embedded != nil {
 			embeds[call.node] = embedded
 		}
 	}

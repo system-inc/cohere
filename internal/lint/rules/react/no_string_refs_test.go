@@ -688,10 +688,10 @@ func TestNoStringRefsPointsAtTheRightNode(test *testing.T) {
 			if len(result.Diagnostics) != len(testCase.reported) {
 				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
 			}
-			for i, want := range testCase.reported {
-				got := testCase.sourceText[result.Diagnostics[i].Range.Pos():result.Diagnostics[i].Range.End()]
+			for index, want := range testCase.reported {
+				got := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if got != want {
-					test.Errorf("finding %d underlines %q, want %q", i, got, want)
+					test.Errorf("finding %d underlines %q, want %q", index, got, want)
 				}
 			}
 		})
@@ -736,9 +736,9 @@ func TestNoStringRefsMessagesReadCorrectly(test *testing.T) {
 func TestNoStringRefsRefusesUnknownOptionKeys(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeNoStringRefsOptions([]byte(`{"noTemplateLiterals":true}`))
-	if err != nil {
-		test.Fatalf("baseline: %v", err)
+	decoded, decodeNoStringRefsOptionsError := DecodeNoStringRefsOptions([]byte(`{"noTemplateLiterals":true}`))
+	if decodeNoStringRefsOptionsError != nil {
+		test.Fatalf("baseline: %v", decodeNoStringRefsOptionsError)
 	}
 	got, ok := decoded.(NoStringRefsOptions)
 	if !ok {
@@ -747,8 +747,8 @@ func TestNoStringRefsRefusesUnknownOptionKeys(test *testing.T) {
 	if got != (NoStringRefsOptions{NoTemplateLiterals: true}) {
 		test.Errorf("decoded to %+v", got)
 	}
-	_, err = DecodeNoStringRefsOptions([]byte(`{"bogus":true,"noTemplateLiterals":true}`))
-	if err == nil || !strings.Contains(err.Error(), "bogus") {
-		test.Fatalf("want a refusal naming the unknown key, got %v", err)
+	_, decodeNoStringRefsOptionsError = DecodeNoStringRefsOptions([]byte(`{"bogus":true,"noTemplateLiterals":true}`))
+	if decodeNoStringRefsOptionsError == nil || !strings.Contains(decodeNoStringRefsOptionsError.Error(), "bogus") {
+		test.Fatalf("want a refusal naming the unknown key, got %v", decodeNoStringRefsOptionsError)
 	}
 }

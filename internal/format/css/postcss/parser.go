@@ -202,8 +202,8 @@ func (parser *parser) checkMissedSemicolon(tokens []token) {
 
 	founded := 0
 	var each token
-	for j := colon - 1; j >= 0; j-- {
-		each = tokens[j]
+	for index := colon - 1; index >= 0; index-- {
+		each = tokens[index]
 		if each.kind != "space" {
 			founded += 1
 			if founded == 2 {

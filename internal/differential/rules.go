@@ -68,14 +68,14 @@ func rulesFromRulesFlag(callerContext context.Context, command GateCommand) (map
 	probe := command
 	probe.Arguments = []string{"-rules"}
 
-	output, err := runGate(callerContext, probe)
-	if err != nil {
-		return nil, fmt.Errorf("%s does not answer -rules: %w", command.Program, err)
+	output, runGateError := runGate(callerContext, probe)
+	if runGateError != nil {
+		return nil, fmt.Errorf("%s does not answer -rules: %w", command.Program, runGateError)
 	}
 
-	names, err := namesFromRuleLines(output)
-	if err != nil {
-		return nil, fmt.Errorf("%s %w", command.Program, err)
+	names, namesFromRuleLinesError := namesFromRuleLines(output)
+	if namesFromRuleLinesError != nil {
+		return nil, fmt.Errorf("%s %w", command.Program, namesFromRuleLinesError)
 	}
 	return names, nil
 }

@@ -101,13 +101,13 @@ var keyFixtures = map[string]map[string]string{
 func TestTheSchemaHasExactlyTheKeysTheLoaderAccepts(test *testing.T) {
 	test.Parallel()
 	files := built(test)
-	nexusKeys, err := SchemaKeys(files[NexusSchemaPath])
-	if err != nil {
-		test.Fatal(err)
+	nexusKeys, schemaKeysError := SchemaKeys(files[NexusSchemaPath])
+	if schemaKeysError != nil {
+		test.Fatal(schemaKeysError)
 	}
-	projectKeys, err := SchemaKeys(files[ProjectSchemaPath])
-	if err != nil {
-		test.Fatal(err)
+	projectKeys, schemaKeysError := SchemaKeys(files[ProjectSchemaPath])
+	if schemaKeysError != nil {
+		test.Fatal(schemaKeysError)
 	}
 
 	for _, key := range nexusKeys {

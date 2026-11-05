@@ -502,9 +502,9 @@ func goSourceFilesUnder(test *testing.T, root string) []string {
 	test.Helper()
 
 	var found []string
-	walkError := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.Walk(root, func(path string, info os.FileInfo, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if info.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil

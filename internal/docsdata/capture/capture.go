@@ -72,9 +72,9 @@ func Write(record Record) error {
 	if directory == "" {
 		return nil
 	}
-	encoded, err := json.Marshal(record)
-	if err != nil {
-		return err
+	encoded, encodeError := json.Marshal(record)
+	if encodeError != nil {
+		return encodeError
 	}
 	writeMutex.Lock()
 	defer writeMutex.Unlock()
@@ -92,6 +92,6 @@ func Write(record Record) error {
 		}
 		output = file
 	}
-	_, err = output.Write(append(encoded, '\n'))
-	return err
+	_, writeError := output.Write(append(encoded, '\n'))
+	return writeError
 }

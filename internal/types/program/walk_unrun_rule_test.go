@@ -38,9 +38,9 @@ func TestADirectiveNamingARuleCohereDoesNotRunIsANoteAndATypoStaysAnError(test *
 		"",
 	}, "\n")
 	directory := writeProject(test, map[string]string{"tsconfig.json": minimalConfig, "main.ts": source})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 	graph.RegisteredRuleNames = []string{"no-console", "react/no-array-index-key", "nexus/consistency-no-enum"}
 	listening := rule.Rule{
@@ -52,9 +52,9 @@ func TestADirectiveNamingARuleCohereDoesNotRunIsANoteAndATypoStaysAnError(test *
 		},
 	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{listening})
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{listening})
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 
 	reported := []string{}

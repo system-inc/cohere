@@ -197,14 +197,14 @@ func TestSwiftPMSpeaksOnlyUnderVerboseOrOnFailure(test *testing.T) {
 		return out.String(), buildSwiftProductWithSwiftPMError
 	}
 
-	if output, err := build(false); err != nil || output != "" {
-		test.Fatalf("a default build printed %q (%v)", output, err)
+	if output, buildError := build(false); buildError != nil || output != "" {
+		test.Fatalf("a default build printed %q (%v)", output, buildError)
 	}
-	if output, err := build(true); err != nil || !strings.Contains(output, "Building for production...") {
-		test.Fatalf("a --verbose build did not stream SwiftPM's lines: %q (%v)", output, err)
+	if output, buildError := build(true); buildError != nil || !strings.Contains(output, "Building for production...") {
+		test.Fatalf("a --verbose build did not stream SwiftPM's lines: %q (%v)", output, buildError)
 	}
 	test.Setenv("FAKE_SWIFT_EXIT", "1")
-	if _, err := build(false); err == nil || !strings.Contains(err.Error(), "[Computing dependencies]") {
-		test.Fatalf("a failed build does not quote what SwiftPM said: %v", err)
+	if _, buildError := build(false); buildError == nil || !strings.Contains(buildError.Error(), "[Computing dependencies]") {
+		test.Fatalf("a failed build does not quote what SwiftPM said: %v", buildError)
 	}
 }

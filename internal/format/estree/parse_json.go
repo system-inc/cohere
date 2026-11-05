@@ -233,9 +233,9 @@ func (reader *jsonReader) parseProperty() (*Node, error) {
 		return nil, reader.errorf("Shorthand property is not allowed in JSON")
 	}
 	reader.position++
-	value, err := reader.parseValue()
-	if err != nil {
-		return nil, err
+	value, parseValueError := reader.parseValue()
+	if parseValueError != nil {
+		return nil, parseValueError
 	}
 	return New("ObjectProperty", start, value.End(), "method", false, "key", key, "computed", false,
 		"shorthand", false, "value", value), nil
@@ -429,8 +429,8 @@ func separatorsBetweenDigits(text string, start int, end int, radix int) bool {
 	return true
 }
 
-func isRangeError(err error) bool {
-	numberError, isNumberError := err.(*strconv.NumError)
+func isRangeError(parseError error) bool {
+	numberError, isNumberError := parseError.(*strconv.NumError)
 	return isNumberError && numberError.Err == strconv.ErrRange
 }
 

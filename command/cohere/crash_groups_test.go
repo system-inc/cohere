@@ -103,18 +103,18 @@ func renderContractCrashes(test *testing.T, language engineLanguage, crashes []r
 	for _, crash := range crashes {
 		records = append(records, map[string]string{"file": crash.Path, "error": crash.Cause})
 	}
-	encoded, err := json.Marshal(records)
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(records)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	stream := contractFixture(test, "LintOnly.jsonl")
 	for index, line := range stream {
 		line = strings.Replace(line, `"crashes":[]`, `"crashes":`+string(encoded), 1)
 		stream[index] = strings.Replace(line, `"complete":true`, `"complete":false`, 1)
 	}
-	output, exitCode, err := renderRecordsIn(test, language, engineModeCheck, stream, 1, nil)
-	if err != nil || exitCode != 1 {
-		test.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
+	output, exitCode, renderRecordsInError := renderRecordsIn(test, language, engineModeCheck, stream, 1, nil)
+	if renderRecordsInError != nil || exitCode != 1 {
+		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsInError, output)
 	}
 	return output
 }

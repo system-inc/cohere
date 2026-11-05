@@ -49,10 +49,10 @@ import (
 // The error is cached alongside the graph so a fixture that cannot build fails the same way for
 // every caller instead of being rebuilt on each attempt.
 type programCacheEntry struct {
-	once      sync.Once
-	graph     *program.Graph
-	buildErr  error
-	directory string
+	once       sync.Once
+	graph      *program.Graph
+	buildError error
+	directory  string
 
 	// key is the entry's key in programCache, and recency its place in programCacheRecency.
 	key     string
@@ -146,7 +146,7 @@ func buildCachedProgram(
 	// Outside the map lock, so one slow build does not stall every other fixture, and `sync.Once`
 	// still guarantees exactly one build per key even when several tests race for the same one.
 	entry.once.Do(func() {
-		entry.graph, entry.directory, entry.buildErr = buildProgramInto(
+		entry.graph, entry.directory, entry.buildError = buildProgramInto(
 			entry.directory,
 			files,
 			subjectFileName,
@@ -154,7 +154,7 @@ func buildCachedProgram(
 		)
 	})
 
-	return entry.graph, entry.directory, entry.buildErr
+	return entry.graph, entry.directory, entry.buildError
 }
 
 // evictBeyondCapacity drops the least recently used entries until the cache is within its capacity.

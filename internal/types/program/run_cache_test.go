@@ -229,9 +229,9 @@ func TestRunCacheKeySeparatesRuns(test *testing.T) {
 			return program.RunCacheKey([]string{"--li", "nt"}, root)
 		},
 	} {
-		key, err := other()
-		if err != nil {
-			test.Fatalf("%s: %v", name, err)
+		key, otherError := other()
+		if otherError != nil {
+			test.Fatalf("%s: %v", name, otherError)
 		}
 		if key == lint {
 			test.Errorf("%s produced the same key, so one run would replay the other", name)

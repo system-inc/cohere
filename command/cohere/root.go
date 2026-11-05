@@ -269,13 +269,13 @@ func goModuleRoot(module string) (string, error) {
 // under the directory is there.
 func workspaceUses(directory string) ([]string, error) {
 	workspaceFile := filepath.Join(directory, goWorkspaceMarker)
-	contents, err := os.ReadFile(workspaceFile)
-	if err != nil {
-		return nil, fmt.Errorf("reading the Go workspace %s: %w", workspaceFile, err)
+	contents, readError := os.ReadFile(workspaceFile)
+	if readError != nil {
+		return nil, fmt.Errorf("reading the Go workspace %s: %w", workspaceFile, readError)
 	}
-	work, err := modfile.ParseWork(goWorkspaceMarker, contents, nil)
-	if err != nil {
-		return nil, fmt.Errorf("the Go workspace %s does not parse: %w", workspaceFile, err)
+	work, parseWorkError := modfile.ParseWork(goWorkspaceMarker, contents, nil)
+	if parseWorkError != nil {
+		return nil, fmt.Errorf("the Go workspace %s does not parse: %w", workspaceFile, parseWorkError)
 	}
 	uses := make([]string, 0, len(work.Use))
 	for _, use := range work.Use {

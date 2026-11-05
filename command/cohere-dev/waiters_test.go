@@ -102,14 +102,14 @@ func TestStatusShowsTheLandLock(test *testing.T) {
 		!strings.Contains(output, "land line: 0 waiting") {
 		test.Errorf("status does not show a free land lock:\n%s", output)
 	}
-	held, err := takeSlot(land, 1, "landing 1234abcd from a worktree")
-	if err != nil || held == nil {
-		test.Fatalf("taking the land lock: %v", err)
+	held, takeSlotError := takeSlot(land, 1, "landing 1234abcd from a worktree")
+	if takeSlotError != nil || held == nil {
+		test.Fatalf("taking the land lock: %v", takeSlotError)
 	}
 	defer held.release()
-	ticket, err := joinQueue(land)
-	if err != nil {
-		test.Fatal(err)
+	ticket, joinQueueError := joinQueue(land)
+	if joinQueueError != nil {
+		test.Fatal(joinQueueError)
 	}
 	defer ticket.leave()
 	if output := status(); !strings.Contains(output, "land lock: pid") ||

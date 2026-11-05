@@ -21,13 +21,13 @@ func idMatchOf(pattern string, flags map[string]bool) any {
 	if flags != nil {
 		tuple = append(tuple, flags)
 	}
-	encoded, err := json.Marshal(tuple)
-	if err != nil {
-		panic(err)
+	encoded, encodeError := json.Marshal(tuple)
+	if encodeError != nil {
+		panic(encodeError)
 	}
-	settings, err := DecodeIdMatchOptions(encoded)
-	if err != nil {
-		panic(err)
+	settings, decodeIdMatchOptionsError := DecodeIdMatchOptions(encoded)
+	if decodeIdMatchOptionsError != nil {
+		panic(decodeIdMatchOptionsError)
 	}
 	return settings
 }
@@ -581,11 +581,11 @@ func TestIdMatchSpansAndMessages(test *testing.T) {
 func TestIdMatchDecoderReadsBothTupleElements(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeIdMatchOptions([]byte(
+	decoded, decodeIdMatchOptionsError := DecodeIdMatchOptions([]byte(
 		`["^[a-z]+$", {"properties": true, "classFields": true, "onlyDeclarations": true, "ignoreDestructuring": true}]`,
 	))
-	if err != nil {
-		test.Fatalf("decoding a full option tuple: %v", err)
+	if decodeIdMatchOptionsError != nil {
+		test.Fatalf("decoding a full option tuple: %v", decodeIdMatchOptionsError)
 	}
 	settings, ok := decoded.(IdMatchSettings)
 	if !ok {
@@ -600,9 +600,9 @@ func TestIdMatchDecoderReadsBothTupleElements(test *testing.T) {
 	}
 
 	// A pattern alone leaves every flag off, which is upstream's defaultOptions.
-	decoded, err = DecodeIdMatchOptions([]byte(`["^[a-z]+$"]`))
-	if err != nil {
-		test.Fatalf("decoding a pattern-only tuple: %v", err)
+	decoded, decodeIdMatchOptionsError = DecodeIdMatchOptions([]byte(`["^[a-z]+$"]`))
+	if decodeIdMatchOptionsError != nil {
+		test.Fatalf("decoding a pattern-only tuple: %v", decodeIdMatchOptionsError)
 	}
 	settings, _ = decoded.(IdMatchSettings)
 	if settings.CheckProperties || settings.CheckClassFields ||

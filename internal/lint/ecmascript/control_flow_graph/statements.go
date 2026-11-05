@@ -328,28 +328,28 @@ func (builder *Builder[E]) switchStatement(node *ast.Node) {
 	bodies := make([]*Block[E], len(clauses))
 	dispatchFrom := make([]*Block[E], len(clauses))
 	dispatchEdge := make([]int, len(clauses))
-	for i := range dispatchEdge {
-		dispatchEdge[i] = -1
+	for index := range dispatchEdge {
+		dispatchEdge[index] = -1
 	}
-	for i := range clauses {
-		bodies[i] = builder.newBlock()
+	for index := range clauses {
+		bodies[index] = builder.newBlock()
 	}
 
 	defaultIndex := -1
 	firstCaseIndex := -1
 	testCur := builder.cur
-	for i, clause := range clauses {
+	for index, clause := range clauses {
 		if clause.Kind == ast.KindDefaultClause {
-			defaultIndex = i
+			defaultIndex = index
 			continue
 		}
 		if firstCaseIndex == -1 {
-			firstCaseIndex = i
+			firstCaseIndex = index
 		}
 		builder.cur = testCur
 		builder.expr(clause.AsCaseOrDefaultClause().Expression)
-		dispatchFrom[i] = builder.cur
-		dispatchEdge[i] = builder.linkWithCycleBarrier(builder.cur, bodies[i], false)
+		dispatchFrom[index] = builder.cur
+		dispatchEdge[index] = builder.linkWithCycleBarrier(builder.cur, bodies[index], false)
 		nextTest := builder.newBlock()
 		builder.link(builder.cur, nextTest)
 		builder.enter(nextTest)
@@ -366,17 +366,17 @@ func (builder *Builder[E]) switchStatement(node *ast.Node) {
 	switchJump := len(builder.jumps) - 1
 	hadSwitchBreak := false
 	var fallthroughFrom *Block[E]
-	for i, clause := range clauses {
-		beforeFirstCase := firstCaseIndex == -1 || clause.Kind == ast.KindDefaultClause && i < firstCaseIndex
+	for index, clause := range clauses {
+		beforeFirstCase := firstCaseIndex == -1 || clause.Kind == ast.KindDefaultClause && index < firstCaseIndex
 		barrier := hadSwitchBreak || beforeFirstCase
-		if from := dispatchFrom[i]; from != nil && dispatchEdge[i] >= 0 {
-			builder.setCycleBarrier(from, dispatchEdge[i], barrier)
+		if from := dispatchFrom[index]; from != nil && dispatchEdge[index] >= 0 {
+			builder.setCycleBarrier(from, dispatchEdge[index], barrier)
 		}
-		builder.linkWithCycleBarrier(fallthroughFrom, bodies[i], barrier)
-		builder.enter(bodies[i])
+		builder.linkWithCycleBarrier(fallthroughFrom, bodies[index], barrier)
+		builder.enter(bodies[index])
 		builder.statements(clause.AsCaseOrDefaultClause().Statements)
 		fallthroughFrom = builder.cur
-		if i >= firstCaseIndex && firstCaseIndex != -1 {
+		if index >= firstCaseIndex && firstCaseIndex != -1 {
 			hadSwitchBreak = builder.jumps[switchJump].broken
 		}
 	}
@@ -457,8 +457,8 @@ func (builder *Builder[E]) tryStatement(node *ast.Node) {
 			// enclosing `finally` on its way out, not just this one — so this
 			// second copy's own abrupt exit must keep propagating outward.
 			if frame.returnedAny {
-				if i := builder.returnFrame(); i >= 0 {
-					outer := builder.tryStack[i]
+				if index := builder.returnFrame(); index >= 0 {
+					outer := builder.tryStack[index]
 					outer.returnedAny = true
 					builder.link(builder.cur, outer.finallyEntry)
 				} else {
@@ -466,8 +466,8 @@ func (builder *Builder[E]) tryStatement(node *ast.Node) {
 				}
 			}
 			if frame.thrownAny {
-				if i := builder.throwFrame(); i >= 0 {
-					outer := builder.tryStack[i]
+				if index := builder.throwFrame(); index >= 0 {
+					outer := builder.tryStack[index]
 					outer.thrownAny = true
 					builder.link(builder.cur, throwTarget(outer))
 				} else {
@@ -515,8 +515,8 @@ func (builder *Builder[E]) makeBreak(label *ast.Node) {
 	if label != nil {
 		name = label.Text()
 	}
-	for i := len(builder.jumps) - 1; i >= 0; i-- {
-		target := builder.jumps[i]
+	for index := len(builder.jumps) - 1; index >= 0; index-- {
+		target := builder.jumps[index]
 		if name == "" {
 			if !target.breakable {
 				continue
@@ -524,7 +524,7 @@ func (builder *Builder[E]) makeBreak(label *ast.Node) {
 		} else if !slices.Contains(target.labels, name) {
 			continue
 		}
-		builder.jumps[i].broken = true
+		builder.jumps[index].broken = true
 		builder.link(builder.cur, target.breakTo)
 		break
 	}
@@ -539,8 +539,8 @@ func (builder *Builder[E]) makeContinue(label *ast.Node) {
 	if label != nil {
 		name = label.Text()
 	}
-	for i := len(builder.jumps) - 1; i >= 0; i-- {
-		target := builder.jumps[i]
+	for index := len(builder.jumps) - 1; index >= 0; index-- {
+		target := builder.jumps[index]
 		if target.continueTo == nil {
 			continue
 		}
@@ -557,8 +557,8 @@ func (builder *Builder[E]) makeReturn() {
 	if !builder.cur.Reachable {
 		return
 	}
-	if i := builder.returnFrame(); i >= 0 {
-		frame := builder.tryStack[i]
+	if index := builder.returnFrame(); index >= 0 {
+		frame := builder.tryStack[index]
 		frame.returnedAny = true
 		builder.link(builder.cur, frame.finallyEntry)
 	} else {
@@ -571,8 +571,8 @@ func (builder *Builder[E]) makeThrow() {
 	if !builder.cur.Reachable {
 		return
 	}
-	if i := builder.throwFrame(); i >= 0 {
-		frame := builder.tryStack[i]
+	if index := builder.throwFrame(); index >= 0 {
+		frame := builder.tryStack[index]
 		frame.thrownAny = true
 		builder.link(builder.cur, throwTarget(frame))
 	} else {
@@ -588,15 +588,15 @@ func (builder *Builder[E]) makeYield() {
 	if !builder.cur.Reachable {
 		return
 	}
-	if i := builder.returnFrame(); i >= 0 {
-		frame := builder.tryStack[i]
+	if index := builder.returnFrame(); index >= 0 {
+		frame := builder.tryStack[index]
 		frame.returnedAny = true
 		builder.link(builder.cur, frame.finallyEntry)
 	} else {
 		builder.markFinal(builder.cur)
 	}
-	if i := builder.throwFrame(); i >= 0 {
-		frame := builder.tryStack[i]
+	if index := builder.throwFrame(); index >= 0 {
+		frame := builder.tryStack[index]
 		frame.thrownAny = true
 		builder.link(builder.cur, throwTarget(frame))
 	} else {

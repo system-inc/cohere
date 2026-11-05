@@ -388,13 +388,13 @@ func TestApplyProducesATreeThatStillTypechecks(test *testing.T) {
 	working := test.TempDir()
 	copyTree(test, source, working)
 
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   working + "/tsconfig.json",
 		CurrentDirectory: working,
 		SingleThreaded:   true,
 	})
-	if err != nil {
-		test.Fatalf("building the copied fixture: %v", err)
+	if buildError != nil {
+		test.Fatalf("building the copied fixture: %v", buildError)
 	}
 
 	// The baseline has to be clean, or "still typechecks" afterwards proves nothing. A fixture that
@@ -406,31 +406,31 @@ func TestApplyProducesATreeThatStillTypechecks(test *testing.T) {
 		)
 	}
 
-	plan, err := Build(context.Background(), graph, Position{
+	plan, buildError := Build(context.Background(), graph, Position{
 		FileName: filepath.Join(working, "src/origin.ts"), Line: 1, Column: 17,
 	}, "reportError")
-	if err != nil {
-		test.Fatalf("building the plan: %v", err)
+	if buildError != nil {
+		test.Fatalf("building the plan: %v", buildError)
 	}
 	if len(plan.Refusals) > 0 {
 		test.Fatalf("the plan was refused: %v", plan.Refusals)
 	}
 
-	written, err := Apply(plan)
-	if err != nil {
-		test.Fatalf("applying the rename: %v", err)
+	written, applyError := Apply(plan)
+	if applyError != nil {
+		test.Fatalf("applying the rename: %v", applyError)
 	}
 	if written != 2 {
 		test.Fatalf("wrote %d files, want 2", written)
 	}
 
-	rebuilt, err := program.Build(program.Options{
+	rebuilt, buildError := program.Build(program.Options{
 		ConfigFileName:   working + "/tsconfig.json",
 		CurrentDirectory: working,
 		SingleThreaded:   true,
 	})
-	if err != nil {
-		test.Fatalf("rebuilding after the rename: %v", err)
+	if buildError != nil {
+		test.Fatalf("rebuilding after the rename: %v", buildError)
 	}
 	if after := typeDiagnostics(test, rebuilt); len(after) != 0 {
 		test.Fatalf("the renamed tree does not typecheck: %v", after)
@@ -438,9 +438,9 @@ func TestApplyProducesATreeThatStillTypechecks(test *testing.T) {
 
 	// The bytes themselves, because "it compiles" is necessary and not sufficient. A rename that
 	// collapsed the shorthand or rewrote the local alias would still compile here.
-	consumer, err := os.ReadFile(filepath.Join(working, "src/consumer.ts"))
-	if err != nil {
-		test.Fatalf("reading the renamed consumer: %v", err)
+	consumer, readError := os.ReadFile(filepath.Join(working, "src/consumer.ts"))
+	if readError != nil {
+		test.Fatalf("reading the renamed consumer: %v", readError)
 	}
 	text := string(consumer)
 	if !strings.Contains(text, "import { reportError as failure }") {
@@ -527,9 +527,9 @@ func typeDiagnostics(test *testing.T, graph *program.Graph) []string {
 // copyTree copies a fixture so a writing test never touches the checked-in one.
 func copyTree(test *testing.T, source string, destination string) {
 	test.Helper()
-	walkError := filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.Walk(source, func(path string, info os.FileInfo, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		relative, relativeError := filepath.Rel(source, path)
 		if relativeError != nil {

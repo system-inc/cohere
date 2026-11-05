@@ -126,11 +126,11 @@ func TestTheUnseenRepositorysFunctionalRootIsDeclinedByTheTable(test *testing.T)
 func unseenDesignSystem(test *testing.T) *LoadedDesignSystem {
 	test.Helper()
 
-	entryPoint, err := filepath.Abs(
+	entryPoint, absolutePathError := filepath.Abs(
 		filepath.Join("..", "tools", "generate_descriptor_base", "testdata", "independent_theme.css"),
 	)
-	if err != nil {
-		test.Fatalf("resolving the unseen system's path: %v", err)
+	if absolutePathError != nil {
+		test.Fatalf("resolving the unseen system's path: %v", absolutePathError)
 	}
 	if _, statError := os.Stat(entryPoint); statError != nil {
 		test.Skipf("the unseen design system is not present at %s", entryPoint)
@@ -139,9 +139,9 @@ func unseenDesignSystem(test *testing.T) *LoadedDesignSystem {
 	// The vendored snapshot of tailwindcss, so the unseen system resolves on any machine (#sycrdr6).
 	packageRoot := vendored.TailwindPackageRootForTest(test)
 
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		test.Fatalf("loading the unseen design system: %v", err)
+	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading the unseen design system: %v", loadDesignSystemError)
 	}
 	return system
 }

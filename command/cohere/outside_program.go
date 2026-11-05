@@ -20,9 +20,9 @@ var programExtensions = map[string]bool{
 	sourcename.AdamicExtension: true,
 }
 
-// errNamedPathsOutsideProgram is the refusal for a named-path run that reached no program file,
+// namedPathsOutsideProgramError is the refusal for a named-path run that reached no program file,
 // carrying explainNamedPathsOutsideProgram's reason.
-func errNamedPathsOutsideProgram(location projectLocation, names []string) error {
+func namedPathsOutsideProgramError(location projectLocation, names []string) error {
 	return errors.New(explainNamedPathsOutsideProgram(location, names))
 }
 
@@ -82,17 +82,17 @@ func explainNamedPathsOutsideProgram(location projectLocation, names []string) s
 // excluded a directory above the path. Only the user's global excludes file is not read. The clause is
 // part of an explanation and decides nothing.
 func ignoreSource(root string, path string) string {
-	relative, err := filepath.Rel(root, path)
-	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+	relative, relativePathError := filepath.Rel(root, path)
+	if relativePathError != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		return ""
 	}
-	matcher, err := gitignore.New(root)
-	if err != nil {
+	matcher, newGitignoreError := gitignore.New(root)
+	if newGitignoreError != nil {
 		return ""
 	}
 	information, statError := os.Lstat(path)
-	ignored, source, err := matcher.IgnoredPath(filepath.ToSlash(relative), statError == nil && information.IsDir())
-	if err != nil || !ignored {
+	ignored, source, ignoredPathError := matcher.IgnoredPath(filepath.ToSlash(relative), statError == nil && information.IsDir())
+	if ignoredPathError != nil || !ignored {
 		return ""
 	}
 	return fmt.Sprintf("%s line %d, `%s`", source.File, source.Line, source.Pattern)

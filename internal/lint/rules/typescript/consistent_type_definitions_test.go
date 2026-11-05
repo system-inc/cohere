@@ -34,13 +34,13 @@ func runConsistentTypeDefinitions(
 ) rule_testing.Result {
 	test.Helper()
 
-	encoded, err := json.Marshal(testCase.style)
-	if err != nil {
-		test.Fatalf("could not encode options: %v", err)
+	encoded, encodeError := json.Marshal(testCase.style)
+	if encodeError != nil {
+		test.Fatalf("could not encode options: %v", encodeError)
 	}
-	decoded, err := DecodeConsistentTypeDefinitionsOptions(encoded)
-	if err != nil {
-		test.Fatalf("could not decode options %q: %v", testCase.style, err)
+	decoded, decodeConsistentTypeDefinitionsOptionsError := DecodeConsistentTypeDefinitionsOptions(encoded)
+	if decodeConsistentTypeDefinitionsOptionsError != nil {
+		test.Fatalf("could not decode options %q: %v", testCase.style, decodeConsistentTypeDefinitionsOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, ConsistentTypeDefinitions,
 		consistentTypeDefinitionsFile, testCase.sourceText, decoded)

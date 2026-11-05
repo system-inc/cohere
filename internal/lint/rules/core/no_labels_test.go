@@ -251,9 +251,9 @@ func TestNoLabelsDecodesItsOptionNames(test *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		decoded, err := decode([]byte(testCase.raw))
-		if err != nil {
-			test.Fatalf("decoding %s: %v", testCase.raw, err)
+		decoded, decodeError := decode([]byte(testCase.raw))
+		if decodeError != nil {
+			test.Fatalf("decoding %s: %v", testCase.raw, decodeError)
 		}
 		if decoded != any(testCase.want) {
 			test.Fatalf("decoding %s gave %+v, wanted %+v", testCase.raw, decoded, testCase.want)

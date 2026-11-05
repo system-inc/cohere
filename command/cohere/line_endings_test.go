@@ -29,8 +29,8 @@ func TestCRLFFilesAreNamedOnceWithTheFix(test *testing.T) {
 		group.Add(1)
 		go func() {
 			defer group.Done()
-			if _, err := transform(file.name, file.text, nil); err != nil {
-				test.Error(err)
+			if _, transformError := transform(file.name, file.text, nil); transformError != nil {
+				test.Error(transformError)
 			}
 		}()
 	}

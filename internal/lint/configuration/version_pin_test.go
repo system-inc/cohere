@@ -122,33 +122,33 @@ func writeSettingsFiles(test *testing.T, files map[string]string) string {
 func TestOnlyTheProjectsOwnFilePinsCohere(test *testing.T) {
 	test.Parallel()
 	// The baseline: the project's own pin is read.
-	loaded, err := Load(writeSettingsFiles(test, map[string]string{"CohereSettings.json": `{"cohere": "^1.0.0"}`}))
-	if err != nil {
-		test.Fatal(err)
+	loaded, loadError := Load(writeSettingsFiles(test, map[string]string{"CohereSettings.json": `{"cohere": "^1.0.0"}`}))
+	if loadError != nil {
+		test.Fatal(loadError)
 	}
 	if loaded.CohereVersion == nil || loaded.CohereVersion.Text != "^1.0.0" {
 		test.Fatalf("the project's pin was not read: %+v", loaded.CohereVersion)
 	}
 
-	unpinned, err := Load(writeSettingsFiles(test, map[string]string{"CohereSettings.json": `{"rules": {}}`}))
-	if err != nil {
-		test.Fatal(err)
+	unpinned, loadError := Load(writeSettingsFiles(test, map[string]string{"CohereSettings.json": `{"rules": {}}`}))
+	if loadError != nil {
+		test.Fatal(loadError)
 	}
 	if unpinned.CohereVersion != nil {
 		test.Fatalf("a file with no pin read as pinned: %+v", unpinned.CohereVersion)
 	}
 
-	_, err = Load(writeSettingsFiles(test, map[string]string{
+	_, loadError = Load(writeSettingsFiles(test, map[string]string{
 		"Base.json":           `{"cohere": "^1.0.0"}`,
 		"CohereSettings.json": `{"extends": "./Base.json"}`,
 	}))
-	if err == nil || !strings.Contains(err.Error(), "only the project's own file may pin") {
-		test.Fatalf("a pin in an extended file should be refused, got %v", err)
+	if loadError == nil || !strings.Contains(loadError.Error(), "only the project's own file may pin") {
+		test.Fatalf("a pin in an extended file should be refused, got %v", loadError)
 	}
 
-	_, err = Load(writeSettingsFiles(test, map[string]string{"CohereSettings.json": `{"cohere": "1.x"}`}))
-	if err == nil || !strings.Contains(err.Error(), "CohereSettings.json") {
-		test.Fatalf("a malformed pin should be refused naming the file, got %v", err)
+	_, loadError = Load(writeSettingsFiles(test, map[string]string{"CohereSettings.json": `{"cohere": "1.x"}`}))
+	if loadError == nil || !strings.Contains(loadError.Error(), "CohereSettings.json") {
+		test.Fatalf("a malformed pin should be refused naming the file, got %v", loadError)
 	}
 }
 

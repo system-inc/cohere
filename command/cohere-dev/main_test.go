@@ -108,7 +108,7 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(test *testing.T) {
 				defer close(firstEnded)
 			}
 			if index == 1 {
-				for _, err := os.Stat(started); err != nil; _, err = os.Stat(started) {
+				for _, statError := os.Stat(started); statError != nil; _, statError = os.Stat(started) {
 					select {
 					case <-firstEnded:
 						if _, statError := os.Stat(started); statError != nil {
@@ -119,9 +119,9 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(test *testing.T) {
 					}
 				}
 			}
-			output, err := run("./...")
-			if err != nil {
-				test.Errorf("run %d failed: %v\n%s", index, err, output)
+			output, runError := run("./...")
+			if runError != nil {
+				test.Errorf("run %d failed: %v\n%s", index, runError, output)
 			}
 			outputs[index] = output
 		}()
@@ -139,15 +139,15 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(test *testing.T) {
 		test.Errorf("the first run waited:\n%s", outputs[0])
 	}
 
-	output, err := run("-count=1", "./...")
-	if err == nil || !strings.Contains(output, "never passes -count=1") || strings.Contains(output, "tested") {
+	output, runError := run("-count=1", "./...")
+	if runError == nil || !strings.Contains(output, "never passes -count=1") || strings.Contains(output, "tested") {
 		test.Errorf("a -count=1 whole-module run was not refused before running:\n%s", output)
 	}
-	if output, err := run(
+	if output, runError := run(
 		"-count=1",
 		"./internal/edit",
-	); err != nil || !strings.Contains(output, "tested test -vet=all -count=1 ./internal/edit") {
-		test.Errorf("a -count=1 run of one package was held back:\n%s (%v)", output, err)
+	); runError != nil || !strings.Contains(output, "tested test -vet=all -count=1 ./internal/edit") {
+		test.Errorf("a -count=1 run of one package was held back:\n%s (%v)", output, runError)
 	}
 }
 
@@ -285,9 +285,9 @@ func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 		command := exec.Command(wrapper, append([]string{"test"}, arguments...)...)
 		command.Env = append(outsideThePool(os.Environ()), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 			homeVariable+"="+home, nicenessVariable+"=19")
-		output, err := command.CombinedOutput()
-		if err != nil {
-			test.Fatalf("cohere-dev test %v: %v\n%s", arguments, err, output)
+		output, outputError := command.CombinedOutput()
+		if outputError != nil {
+			test.Fatalf("cohere-dev test %v: %v\n%s", arguments, outputError, output)
 		}
 		// The stand-in's own line; the wrapper's notes, such as the corpora a private home leaves uncovered,
 		// are around it.
@@ -301,18 +301,18 @@ func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 		if len(fields) == 0 {
 			test.Fatalf("the stand-in go printed no nice line: %q", output)
 		}
-		nice, err := strconv.Atoi(fields[0])
-		if err != nil {
+		nice, parseError := strconv.Atoi(fields[0])
+		if parseError != nil {
 			test.Fatalf("the stand-in go printed %q", output)
 		}
 		return nice, strings.Join(fields[1:], " ")
 	}
-	output, err := exec.Command("ps", "-o", "nice=", "-p", strconv.Itoa(os.Getpid())).Output()
-	if err != nil {
-		test.Fatal(err)
+	output, outputError := exec.Command("ps", "-o", "nice=", "-p", strconv.Itoa(os.Getpid())).Output()
+	if outputError != nil {
+		test.Fatal(outputError)
 	}
-	own, err := strconv.Atoi(strings.TrimSpace(string(output)))
-	if err != nil {
+	own, parseError := strconv.Atoi(strings.TrimSpace(string(output)))
+	if parseError != nil {
 		test.Fatalf("ps printed %q for this test's nice", output)
 	}
 
@@ -560,9 +560,9 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(test *testing.T) {
 		"GOCACHE="+cache, tokensVariable+"=2", cacheCapVariable+"="+capGigabytes)
 
 	// A run holds a token, so the trim must wait for it before it touches the cache.
-	held, err := takeSlot(slots, 2, "a run that holds a token")
-	if err != nil || held == nil || held.number != 1 {
-		test.Fatalf("taking a token for the test: %v", err)
+	held, takeSlotError := takeSlot(slots, 2, "a run that holds a token")
+	if takeSlotError != nil || held == nil || held.number != 1 {
+		test.Fatalf("taking a token for the test: %v", takeSlotError)
 	}
 	trim := exec.Command(wrapper, trimCacheVerb)
 	trim.Env = environment
@@ -590,11 +590,11 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(test *testing.T) {
 
 	status := exec.Command(wrapper, "status")
 	status.Env = environment
-	output, err := status.CombinedOutput()
-	if err != nil ||
+	output, outputError := status.CombinedOutput()
+	if outputError != nil ||
 		!strings.Contains(string(output), "trimmed from") ||
 		!strings.Contains(string(output), "Go build cache: cap") {
-		test.Errorf("cohere-dev status does not report the trim (%v):\n%s", err, output)
+		test.Errorf("cohere-dev status does not report the trim (%v):\n%s", outputError, output)
 	}
 
 	if !claimCacheLook(test.TempDir(), time.Now()) {
@@ -710,13 +710,13 @@ func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(test *testing.T) {
 	}
 
 	// The long job holds token 2: take token 1 for a moment to reach it, then give token 1 back.
-	first, err := takeSlot(slots, 2, "reaching token 2")
-	if err != nil || first == nil || first.number != 1 {
-		test.Fatalf("taking token 1: %v", err)
+	first, takeSlotError := takeSlot(slots, 2, "reaching token 2")
+	if takeSlotError != nil || first == nil || first.number != 1 {
+		test.Fatalf("taking token 1: %v", takeSlotError)
 	}
-	job, err := takeSlot(slots, 2, "a long land gate")
-	if err != nil || job == nil || job.number != 2 {
-		test.Fatalf("taking token 2: %v", err)
+	job, takeSlotError := takeSlot(slots, 2, "a long land gate")
+	if takeSlotError != nil || job == nil || job.number != 2 {
+		test.Fatalf("taking token 2: %v", takeSlotError)
 	}
 	first.release()
 

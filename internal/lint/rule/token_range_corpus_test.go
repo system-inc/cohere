@@ -105,8 +105,8 @@ func corpusFiles(test *testing.T, roots []string) []*ast.SourceFile {
 	for _, root := range roots {
 		// Ignored: the callback skips every path it cannot read and never returns an error, so the walk has
 		// none to return.
-		filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
+		filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
 				return nil
 			}
 			if entry.IsDir() {

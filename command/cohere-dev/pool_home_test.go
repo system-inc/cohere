@@ -23,16 +23,16 @@ func TestARunUnderAScratchHomeUsesTheMachinesPool(test *testing.T) {
 	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
 		test.Fatalf("building: %v\n%s", outputError, output)
 	}
-	account, err := user.Current()
-	if err != nil {
-		test.Fatal(err)
+	account, currentError := user.Current()
+	if currentError != nil {
+		test.Fatal(currentError)
 	}
 	scratch := scratchHome(test)
 	status := exec.Command(wrapper, "status")
 	status.Env = append(outsideThePool(os.Environ()), "HOME="+scratch)
-	output, err := status.CombinedOutput()
-	if err != nil {
-		test.Fatalf("cohere-dev status: %v\n%s", err, output)
+	output, outputError := status.CombinedOutput()
+	if outputError != nil {
+		test.Fatalf("cohere-dev status: %v\n%s", outputError, output)
 	}
 	machine := filepath.Join(userCacheDirectoryIn(account.HomeDir), "cohere", "test-slots")
 	if !strings.Contains(string(output), "("+machine+")") {
@@ -92,11 +92,11 @@ func TestATrimRefusesACacheItsPoolDoesNotGuard(test *testing.T) {
 		test.Errorf("the trim of a cache its pool does not guard did not exit 2 (%v):\n%s", outputError, output)
 	}
 	remaining := 0
-	walkError := filepath.WalkDir(cache, func(path string, entry os.DirEntry, err error) error {
-		if err == nil && !entry.IsDir() && entry.Name() != "README" {
+	walkError := filepath.WalkDir(cache, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError == nil && !entry.IsDir() && entry.Name() != "README" {
 			remaining++
 		}
-		return err
+		return pathError
 	})
 	if walkError != nil {
 		test.Fatalf("counting the cache's entries: %v", walkError)

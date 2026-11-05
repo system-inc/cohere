@@ -88,13 +88,13 @@ func TestPackagesShipBothLicenseTextsAsCommitted(test *testing.T) {
 
 	for _, directory := range []string{dispatcher.Directory, platform} {
 		for _, name := range LegalFileNames {
-			committed, err := os.ReadFile(filepath.Join(module, name))
-			if err != nil {
-				test.Fatal(err)
+			committed, readError := os.ReadFile(filepath.Join(module, name))
+			if readError != nil {
+				test.Fatal(readError)
 			}
-			shipped, err := os.ReadFile(filepath.Join(directory, name))
-			if err != nil {
-				test.Fatalf("%s does not ship %s: %v", directory, name, err)
+			shipped, readError := os.ReadFile(filepath.Join(directory, name))
+			if readError != nil {
+				test.Fatalf("%s does not ship %s: %v", directory, name, readError)
 			}
 			if !bytes.Equal(shipped, committed) {
 				test.Fatalf("%s ships a %s that differs from the committed one", directory, name)
@@ -118,9 +118,9 @@ func TestTheLicenseTextsAreTheStandardOnes(test *testing.T) {
 
 	// The Apache text verbatim from apache.org/licenses/LICENSE-2.0.txt, whose SHA-256 this is. A hand edit
 	// to a license is a change of terms, so any byte that moves fails here.
-	apache, err := os.ReadFile(filepath.Join(module, "LICENSE-APACHE"))
-	if err != nil {
-		test.Fatal(err)
+	apache, readError := os.ReadFile(filepath.Join(module, "LICENSE-APACHE"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if got := sha256Hex(apache); got != "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30" {
 		test.Errorf("LICENSE-APACHE hashes to %s, not apache.org's Apache License 2.0 text", got)
@@ -128,13 +128,13 @@ func TestTheLicenseTextsAreTheStandardOnes(test *testing.T) {
 
 	// MIT's text is the same everywhere but its copyright line, so the rest is compared against the
 	// tsgolint license this repository already carries, which is the standard text.
-	mit, err := os.ReadFile(filepath.Join(module, "LICENSE-MIT"))
-	if err != nil {
-		test.Fatal(err)
+	mit, readError := os.ReadFile(filepath.Join(module, "LICENSE-MIT"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
-	reference, err := os.ReadFile(filepath.Join(module, "internal", "lint", "checking", "LICENSE"))
-	if err != nil {
-		test.Fatal(err)
+	reference, readError := os.ReadFile(filepath.Join(module, "internal", "lint", "checking", "LICENSE"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if mitTerms(mit) != mitTerms(reference) || mitTerms(mit) == "" {
 		test.Errorf("LICENSE-MIT's terms differ from the standard MIT text:\n%s", mit)
@@ -154,9 +154,9 @@ func TestTheCopyrightHolderIsSystemInc(test *testing.T) {
 	}
 
 	// The line itself, so a placeholder or a stray edit in the license fails here by what it says.
-	mit, err := os.ReadFile(filepath.Join(moduleRoot(test), "LICENSE-MIT"))
-	if err != nil {
-		test.Fatal(err)
+	mit, readError := os.ReadFile(filepath.Join(moduleRoot(test), "LICENSE-MIT"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if lines := strings.Split(string(mit), "\n"); len(lines) < 3 || lines[2] != "Copyright (c) 2026 "+wanted {
 		test.Fatalf("LICENSE-MIT's copyright line is not %q:\n%s", "Copyright (c) 2026 "+wanted, mit)
@@ -174,9 +174,9 @@ func TestTheCopyrightHolderIsSystemInc(test *testing.T) {
 		}
 	}
 
-	contents, err := os.ReadFile(filepath.Join(moduleRoot(test), "editors", "vscode", "package.json"))
-	if err != nil {
-		test.Fatal(err)
+	contents, readError := os.ReadFile(filepath.Join(moduleRoot(test), "editors", "vscode", "package.json"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	var extension struct {
 		Author string `json:"author"`

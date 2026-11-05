@@ -244,16 +244,16 @@ func normalizeUpstream(tree any) {
 
 // compareTree reports the first difference between upstream's tree and the Go tree for a text.
 func compareTree(oracle *treeOracle, text string) string {
-	expected, err := oracle.parse(text)
-	if err != nil {
-		return "upstream failed: " + err.Error()
+	expected, parseError := oracle.parse(text)
+	if parseError != nil {
+		return "upstream failed: " + parseError.Error()
 	}
 	convertOffsets(expected, byteOffsets(text, nil))
 	normalizeUpstream(expected)
 
-	root, err := ParseMarkdown(text, nil)
-	if err != nil {
-		return "the port failed: " + err.Error()
+	root, parseMarkdownError := ParseMarkdown(text, nil)
+	if parseMarkdownError != nil {
+		return "the port failed: " + parseMarkdownError.Error()
 	}
 	// Round-trip through JSON so both sides hold the same Go types.
 	encoded, _ := json.Marshal(describe(root))
@@ -383,9 +383,9 @@ func TestCorpusTreesMatchUpstream(test *testing.T) {
 	oracle := newLiveTreeOracle(test)
 	total, failures := 0, 0
 	byDifference := map[string]int{}
-	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git") {
 			return filepath.SkipDir
@@ -393,9 +393,9 @@ func TestCorpusTreesMatchUpstream(test *testing.T) {
 		if entry.IsDir() || !strings.EqualFold(filepath.Ext(path), ".md") {
 			return nil
 		}
-		source, err := os.ReadFile(path)
-		if err != nil {
-			return err
+		source, readError := os.ReadFile(path)
+		if readError != nil {
+			return readError
 		}
 		text := strings.ReplaceAll(strings.ReplaceAll(string(source), "\r\n", "\n"), "\r", "\n")
 		text = strings.TrimPrefix(text, "\uFEFF")

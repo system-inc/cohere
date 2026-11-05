@@ -40,17 +40,17 @@ func messageIdTexts(test *testing.T) (staticTexts map[string]map[string]struct{}
 
 	root := filepath.Join("..", "..", "lint", "rules")
 	walked := 0
-	walkError := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.Walk(root, func(path string, info os.FileInfo, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if info.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
 		walked++
-		contents, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return readErr
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			return readError
 		}
 		source := string(contents)
 		for _, match := range staticMessagePattern.FindAllStringSubmatch(source, -1) {

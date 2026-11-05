@@ -78,7 +78,7 @@ func runNoFloatingPromises(test *testing.T, sourceText string, options any) rule
 func applyNoFloatingPromisesSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
 	test.Helper()
 	fixes := append([]rule.Fix(nil), suggestion.Fixes...)
-	sort.SliceStable(fixes, func(i, j int) bool { return fixes[i].Range.Pos() > fixes[j].Range.Pos() })
+	sort.SliceStable(fixes, func(left, right int) bool { return fixes[left].Range.Pos() > fixes[right].Range.Pos() })
 	for _, fix := range fixes {
 		start, end := fix.Range.Pos(), fix.Range.End()
 		if start < 0 || end > len(source) || start > end {

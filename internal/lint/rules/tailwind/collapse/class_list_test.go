@@ -79,15 +79,15 @@ func TestClassListAgreesWithTailwind(test *testing.T) {
 // modifiers, space-joined and sorted.
 func readClassListOracle(test *testing.T, name string) (string, map[string]string) {
 	test.Helper()
-	file, err := os.Open(filepath.Join("testdata", name))
-	if err != nil {
-		test.Fatalf("open %s: %v", name, err)
+	file, openError := os.Open(filepath.Join("testdata", name))
+	if openError != nil {
+		test.Fatalf("open %s: %v", name, openError)
 	}
 	// Ignored: the capture is only read, so a failed close loses nothing.
 	defer file.Close()
-	reader, err := gzip.NewReader(file)
-	if err != nil {
-		test.Fatalf("%s is not gzip: %v", name, err)
+	reader, gzipError := gzip.NewReader(file)
+	if gzipError != nil {
+		test.Fatalf("%s is not gzip: %v", name, gzipError)
 	}
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -105,8 +105,8 @@ func readClassListOracle(test *testing.T, name string) (string, map[string]strin
 		className, modifiers, _ := strings.Cut(line, "\t")
 		classes[className] = modifiers
 	}
-	if err := scanner.Err(); err != nil {
-		test.Fatalf("read %s: %v", name, err)
+	if scanError := scanner.Err(); scanError != nil {
+		test.Fatalf("read %s: %v", name, scanError)
 	}
 	if len(classes) == 0 {
 		test.Fatalf("%s holds no classes", name)

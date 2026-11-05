@@ -112,19 +112,19 @@ func parseFlags(flags string) (flagSet, error) {
 // Compile compiles source under the given JavaScript flags, as
 // `new RegExp(source, flags)` would. Pass "" for no flags.
 func Compile(source string, flags string) (*RegExp, error) {
-	set, err := parseFlags(flags)
-	if err != nil {
-		return nil, err
+	set, parseFlagsError := parseFlags(flags)
+	if parseFlagsError != nil {
+		return nil, parseFlagsError
 	}
 
-	rewritten, exact, err := rewrite(source, rewriteOptions{
+	rewritten, exact, rewriteError := rewrite(source, rewriteOptions{
 		multiline:  set.multiline,
 		dotAll:     set.dotAll,
 		ignoreCase: set.ignoreCase,
 		unicode:    set.unicode,
 	})
-	if err != nil {
-		return nil, err
+	if rewriteError != nil {
+		return nil, rewriteError
 	}
 	if set.sticky {
 		// A sticky regexp matches only at `lastIndex`, which is 0 for one just
@@ -144,12 +144,12 @@ func Compile(source string, flags string) (*RegExp, error) {
 		options |= regexp2.IgnoreCase
 	}
 
-	re, err := regexp2.Compile(rewritten, options)
-	if err != nil {
+	re, compileError := regexp2.Compile(rewritten, options)
+	if compileError != nil {
 		// regexp2 quotes back the pattern it was handed, which is the
 		// rewritten one. A message naming `[Oo][Kk]` where its author wrote
 		// `ok` is no help, so the source goes back in as written.
-		return nil, errors.New(strings.ReplaceAll(err.Error(), rewritten, source))
+		return nil, errors.New(strings.ReplaceAll(compileError.Error(), rewritten, source))
 	}
 	re.MatchTimeout = MatchTimeout
 
@@ -168,17 +168,17 @@ func MustCompile(source string, flags string) *RegExp {
 	return re
 }
 
-// Test reports whether the regexp matches anywhere in s, as
+// Test reports whether the regexp matches anywhere in `text`, as
 // `RegExp.prototype.test` does.
 //
 // A match that overruns MatchTimeout counts as no match: the alternative is
 // making every caller handle an error that only ever means "this pattern is
 // pathological", and a lint rule has nothing better to do with that than skip.
-func (exp *RegExp) Test(s string) bool {
+func (exp *RegExp) Test(text string) bool {
 	if exp == nil || exp.re == nil {
 		return false
 	}
-	matched, matchStringError := exp.re.MatchString(s)
+	matched, matchStringError := exp.re.MatchString(text)
 	return matchStringError == nil && matched
 }
 
@@ -187,19 +187,19 @@ func (exp *RegExp) Test(s string) bool {
 // match. Reading a bound match as no match would turn a skipped report into a
 // false positive there, so a match that overruns MatchTimeout counts as a
 // match and the report is skipped.
-func (exp *RegExp) TestOrTimeout(s string) bool {
-	matched, testOrError := exp.TestOrError(s)
+func (exp *RegExp) TestOrTimeout(text string) bool {
+	matched, testOrError := exp.TestOrError(text)
 	return matched || testOrError != nil
 }
 
 // TestOrError is Test for a caller that has to tell "no match" apart from "the
 // match ran into MatchTimeout", and that has somewhere other than a match to
 // send the second answer.
-func (exp *RegExp) TestOrError(s string) (bool, error) {
+func (exp *RegExp) TestOrError(text string) (bool, error) {
 	if exp == nil || exp.re == nil {
 		return false, nil
 	}
-	return exp.re.MatchString(s)
+	return exp.re.MatchString(text)
 }
 
 // Source returns the pattern as it was written, the way `RegExp.prototype

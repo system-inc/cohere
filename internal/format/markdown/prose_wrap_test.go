@@ -119,13 +119,13 @@ func TestProseWrapFixturesMatchOracle(test *testing.T) {
 				if dependsOnEmbed(input) {
 					continue
 				}
-				expected, err := oracle.format(input, options, proseWrap)
-				if err != nil {
-					test.Fatalf("the oracle failed on %q: %v", input, err)
+				expected, formatError := oracle.format(input, options, proseWrap)
+				if formatError != nil {
+					test.Fatalf("the oracle failed on %q: %v", input, formatError)
 				}
-				actual, err := formatWithProseWrap(input, options, proseWrap, nil)
-				if err != nil {
-					test.Errorf("%s, variant %d, %q: %v", proseWrap, variantIndex, input, err)
+				actual, formatWithProseWrapError := formatWithProseWrap(input, options, proseWrap, nil)
+				if formatWithProseWrapError != nil {
+					test.Errorf("%s, variant %d, %q: %v", proseWrap, variantIndex, input, formatWithProseWrapError)
 					continue
 				}
 				if actual != expected {

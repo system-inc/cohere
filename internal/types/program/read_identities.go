@@ -53,15 +53,15 @@ func (identities *readIdentities) identity(path string) (fileIdentity, bool) {
  * counts as marked, so the caller reads the disk.
  */
 func startsWithByteOrderMark(path string) bool {
-	file, err := os.Open(path)
-	if err != nil {
+	file, openError := os.Open(path)
+	if openError != nil {
 		return true
 	}
 	// Ignored: the file is opened read-only, so closing it loses nothing.
 	defer file.Close()
 	var head [3]byte
-	count, err := io.ReadFull(file, head[:])
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+	count, readError := io.ReadFull(file, head[:])
+	if readError != nil && readError != io.EOF && readError != io.ErrUnexpectedEOF {
 		return true
 	}
 	switch {

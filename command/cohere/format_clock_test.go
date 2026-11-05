@@ -49,8 +49,8 @@ func TestTheFormatClockKeepsATransformsAnswer(test *testing.T) {
 	timed := clock.timing(
 		func(fileName string, text string, _ *ast.SourceFile) (string, error) { return text + "!", refused },
 	)
-	if text, err := timed("a.ts", "x", nil); text != "x!" || !errors.Is(err, refused) {
-		test.Errorf("the timed transform answered %q, %v", text, err)
+	if text, timedError := timed("a.ts", "x", nil); text != "x!" || !errors.Is(timedError, refused) {
+		test.Errorf("the timed transform answered %q, %v", text, timedError)
 	}
 }
 

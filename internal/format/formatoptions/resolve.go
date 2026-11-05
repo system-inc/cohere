@@ -217,9 +217,9 @@ func chainOf(path string) (Resolution, error) {
 		return entry.resolution, nil
 	}
 
-	sources, err := configuration.SourcesOf(path)
-	if err != nil {
-		return Resolution{}, err
+	sources, sourcesOfError := configuration.SourcesOf(path)
+	if sourcesOfError != nil {
+		return Resolution{}, sourcesOfError
 	}
 	files := map[string][]byte{}
 	for _, source := range configuration.SourcesOnDisk(sources) {
@@ -229,9 +229,9 @@ func chainOf(path string) (Resolution, error) {
 		}
 		files[source] = contents
 	}
-	resolution, err := resolveChain(path)
-	if err != nil {
-		return Resolution{}, err
+	resolution, resolveChainError := resolveChain(path)
+	if resolveChainError != nil {
+		return Resolution{}, resolveChainError
 	}
 	chains.mutex.Lock()
 	chains.byPath[path] = chainEntry{resolution: resolution, files: files}
@@ -368,9 +368,9 @@ func resolveChain(path string) (Resolution, error) {
 // houseResolution is the house format and ignore list, from the block cohere:typescript carries: what
 // zero config formats with. It names no Source, since no settings file chose it.
 func houseResolution() (Resolution, error) {
-	contents, err := configuration.SourceContents(NexusTierSetName)
-	if err != nil {
-		return Resolution{}, err
+	contents, sourceContentsError := configuration.SourceContents(NexusTierSetName)
+	if sourceContentsError != nil {
+		return Resolution{}, sourceContentsError
 	}
 	var settings map[string]json.RawMessage
 	if decodeError := json.Unmarshal(contents, &settings); decodeError != nil {
@@ -383,9 +383,9 @@ func houseResolution() (Resolution, error) {
 			NexusTierSetName,
 		)
 	}
-	resolution, err := blockResolution(NexusTierSetName, block)
-	if err != nil {
-		return Resolution{}, err
+	resolution, blockResolutionError := blockResolution(NexusTierSetName, block)
+	if blockResolutionError != nil {
+		return Resolution{}, blockResolutionError
 	}
 	// The house always declares its list, an empty one included, so the walk never treats zero config as
 	// a chain that forgot to say.

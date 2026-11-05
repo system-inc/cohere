@@ -74,11 +74,11 @@ func TestFormattingFromTheGuardsTreePrintsWhatParsingAgainPrints(test *testing.T
 	}
 }
 
-func errorText(err error) string {
-	if err == nil {
+func errorText(sourceError error) string {
+	if sourceError == nil {
 		return ""
 	}
-	return err.Error()
+	return sourceError.Error()
 }
 
 // moduleRootOf is the module's root, where the fixtures are.
@@ -113,8 +113,8 @@ func typeScriptFilesUnder(roots []string) []string {
 	}
 	var files []string
 	for _, root := range roots {
-		filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
+		filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
 				return nil
 			}
 			if entry.IsDir() {

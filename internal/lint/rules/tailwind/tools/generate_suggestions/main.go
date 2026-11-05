@@ -76,9 +76,9 @@ func main() {
 	if *input == "" || *output == "" {
 		fail("-input and -output are both required")
 	}
-	raw, err := os.ReadFile(*input)
-	if err != nil {
-		fail("read %s: %v", *input, err)
+	raw, readError := os.ReadFile(*input)
+	if readError != nil {
+		fail("read %s: %v", *input, readError)
 	}
 	var file suggestionsFile
 	if decodeError := json.Unmarshal(raw, &file); decodeError != nil {
@@ -94,9 +94,9 @@ func main() {
 		)
 	}
 
-	source, err := render(file)
-	if err != nil {
-		fail("render: %v", err)
+	source, renderError := render(file)
+	if renderError != nil {
+		fail("render: %v", renderError)
 	}
 
 	if *check {

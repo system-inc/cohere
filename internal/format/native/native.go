@@ -135,9 +135,9 @@ func TextToDoc(options formatoptions.Options, parentParser string, docs *arena.S
 		printDoc, raw := docPrinters[extension], rawDocPrinters[extension]
 		mutex.RUnlock()
 		if printDoc != nil {
-			printed, err := printDoc(fileName, text, options, parser, parentParser, TextToDoc(options, parser, docs))
-			if err != nil || !raw {
-				return printed, err
+			printed, printDocError := printDoc(fileName, text, options, parser, parentParser, TextToDoc(options, parser, docs))
+			if printDocError != nil || !raw {
+				return printed, printDocError
 			}
 			return doc.StripTrailingHardlineWith(printed, docs), nil
 		}

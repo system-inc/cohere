@@ -51,9 +51,9 @@ func buildSwiftEngine(
 	destination string,
 	commit string,
 ) error {
-	architecture, err := swiftArchitecture(target.GoArchitecture)
-	if err != nil {
-		return err
+	architecture, swiftArchitectureError := swiftArchitecture(target.GoArchitecture)
+	if swiftArchitectureError != nil {
+		return swiftArchitectureError
 	}
 
 	packageDirectory := filepath.Join(moduleDirectory, "swift")
@@ -103,15 +103,15 @@ func buildSwiftEngine(
 		)
 	}
 
-	binPath, err := exec.Command("swift", append(arguments, "--show-bin-path")...).Output()
-	if err != nil {
-		return fmt.Errorf("asking SwiftPM where it put the Swift engine for %s: %w", target, err)
+	binPath, outputError := exec.Command("swift", append(arguments, "--show-bin-path")...).Output()
+	if outputError != nil {
+		return fmt.Errorf("asking SwiftPM where it put the Swift engine for %s: %w", target, outputError)
 	}
 	product := filepath.Join(strings.TrimSpace(string(binPath)), SwiftEngineFileName)
 
-	contents, err := os.ReadFile(product)
-	if err != nil {
-		return fmt.Errorf("swift build reported success but left no engine at %s: %w", product, err)
+	contents, readError := os.ReadFile(product)
+	if readError != nil {
+		return fmt.Errorf("swift build reported success but left no engine at %s: %w", product, readError)
 	}
 	if writeError := os.WriteFile(destination, contents, 0o755); writeError != nil {
 		return fmt.Errorf("staging the Swift engine: %w", writeError)
@@ -147,12 +147,12 @@ func requireSwiftContract(coherePath string, enginePath string, commit string) e
 	var cohereError bytes.Buffer
 	versionCommand := exec.Command(coherePath, "--version")
 	versionCommand.Stderr = &cohereError
-	versionOutput, err := versionCommand.Output()
-	if err != nil {
+	versionOutput, outputError := versionCommand.Output()
+	if outputError != nil {
 		return fmt.Errorf(
 			"running the staged %s --version to read its Swift contract: %w: %s",
 			coherePath,
-			err,
+			outputError,
 			strings.TrimSpace(cohereError.String()),
 		)
 	}
@@ -163,8 +163,8 @@ func requireSwiftContract(coherePath string, enginePath string, commit string) e
 			contract = strings.TrimSpace(after)
 		}
 	}
-	expected, err := strconv.Atoi(contract)
-	if err != nil {
+	expected, parseError := strconv.Atoi(contract)
+	if parseError != nil {
 		return fmt.Errorf(
 			"the staged %s names no Swift contract in --version (it printed %q), so whether %s speaks it cannot be checked",
 			coherePath,
@@ -176,10 +176,10 @@ func requireSwiftContract(coherePath string, enginePath string, commit string) e
 	var engineError bytes.Buffer
 	engineCommand := exec.Command(enginePath, "--contract", contract, "--version")
 	engineCommand.Stderr = &engineError
-	engineOutput, err := engineCommand.Output()
-	if err != nil {
+	engineOutput, outputError := engineCommand.Output()
+	if outputError != nil {
 		return fmt.Errorf("the staged %s refused contract %d, which the cohere beside it speaks: %w: %s",
-			enginePath, expected, err, strings.TrimSpace(engineError.String()))
+			enginePath, expected, outputError, strings.TrimSpace(engineError.String()))
 	}
 
 	firstLine, _, _ := strings.Cut(strings.TrimSpace(string(engineOutput)), "\n")
@@ -252,9 +252,9 @@ func requireArchitecture(path string, architecture string) error {
 // It reads `minos` from the load commands with vtool, which is what the loader enforces, rather than
 // trusting Package.swift to say what it built.
 func requireMinimumMacOS(path string, allowed string) error {
-	output, err := exec.Command("vtool", "-show-build", path).Output()
-	if err != nil {
-		return fmt.Errorf("reading the minimum macOS of %s: %w", path, err)
+	output, outputError := exec.Command("vtool", "-show-build", path).Output()
+	if outputError != nil {
+		return fmt.Errorf("reading the minimum macOS of %s: %w", path, outputError)
 	}
 
 	minimum := ""
@@ -271,9 +271,9 @@ func requireMinimumMacOS(path string, allowed string) error {
 		)
 	}
 
-	newer, err := macOSVersionIsNewer(minimum, allowed)
-	if err != nil {
-		return err
+	newer, macOsVersionIsNewerError := macOSVersionIsNewer(minimum, allowed)
+	if macOsVersionIsNewerError != nil {
+		return macOsVersionIsNewerError
 	}
 	if newer {
 		return fmt.Errorf(
@@ -302,13 +302,13 @@ func macOSVersionIsNewer(version string, than string) (bool, error) {
 		return parts, nil
 	}
 
-	left, err := parse(version)
-	if err != nil {
-		return false, err
+	left, parseError := parse(version)
+	if parseError != nil {
+		return false, parseError
 	}
-	right, err := parse(than)
-	if err != nil {
-		return false, err
+	right, parseError := parse(than)
+	if parseError != nil {
+		return false, parseError
 	}
 	if left[0] != right[0] {
 		return left[0] > right[0], nil

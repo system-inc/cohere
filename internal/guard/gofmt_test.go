@@ -32,15 +32,15 @@ func TestEveryGoFileCohereOwnsIsGofmtClean(test *testing.T) {
 	test.Parallel()
 
 	// This package sits two directories below the module root.
-	module, err := filepath.Abs(filepath.Join("..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	module, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 
 	var files []string
-	err = filepath.WalkDir(module, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(module, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() {
 			if path != module && (path == filepath.Join(module, "TypeScript") ||
@@ -54,8 +54,8 @@ func TestEveryGoFileCohereOwnsIsGofmtClean(test *testing.T) {
 		}
 		return nil
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	// The same guard the release keeps: a walk that found nothing would pass over a tree nobody examined.
 	// The release's own set is required in particular, so a walk that lost it cannot pass on the rest.
@@ -117,13 +117,13 @@ func TestEveryGoFileCohereOwnsIsGofmtClean(test *testing.T) {
 
 // gofmtProblem says what is wrong with one file, or nothing when gofmt would leave it as it is.
 func gofmtProblem(path string) string {
-	source, err := os.ReadFile(path)
-	if err != nil {
-		return " (unreadable: " + err.Error() + ")"
+	source, readError := os.ReadFile(path)
+	if readError != nil {
+		return " (unreadable: " + readError.Error() + ")"
 	}
-	formatted, err := format.Source(source)
-	if err != nil {
-		return " (does not parse: " + err.Error() + ")"
+	formatted, formatError := format.Source(source)
+	if formatError != nil {
+		return " (does not parse: " + formatError.Error() + ")"
 	}
 	if !bytes.Equal(source, formatted) {
 		return " (not formatted)"

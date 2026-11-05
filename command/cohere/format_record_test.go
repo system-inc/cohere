@@ -86,8 +86,8 @@ func (fixture recordFixture) formatEverything(test *testing.T) {
 	scope, universe := unformattedScope(fixture.engine, record, fixture.root)
 	transform := record.observe(formatTransform(fixture.engine), fixture.engine.OptionsFingerprint)
 	for _, fileName := range scope.FileNames {
-		if _, err := transform(fileName, readForTest(test, fileName), nil); err != nil {
-			test.Fatal(err)
+		if _, transformError := transform(fileName, readForTest(test, fileName), nil); transformError != nil {
+			test.Fatal(transformError)
 		}
 	}
 	if saveError := record.save(universe); saveError != nil {

@@ -119,9 +119,9 @@ func TestUnionWriteNodeProbes(test *testing.T) {
 	for _, path := range paths {
 		test.Run(filepath.Base(path), func(test *testing.T) {
 			test.Parallel()
-			bytes, err := os.ReadFile(path)
-			if err != nil {
-				test.Fatal(err)
+			bytes, readError := os.ReadFile(path)
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			run := func(source string) ([]byte, error) {
 				file := filepath.Join(test.TempDir(), "probe.mts")
@@ -130,16 +130,16 @@ func TestUnionWriteNodeProbes(test *testing.T) {
 				}
 				return exec.Command("node", file).CombinedOutput()
 			}
-			output, err := run(string(bytes))
-			if err == nil || !strings.Contains(string(output), "TypeError") {
-				test.Fatalf("want Node TypeError, got %v: %s", err, output)
+			output, runError := run(string(bytes))
+			if runError == nil || !strings.Contains(string(output), "TypeError") {
+				test.Fatalf("want Node TypeError, got %v: %s", runError, output)
 			}
 			control := strings.Replace(string(bytes), "\nprobe();", "", 1)
 			if control == string(bytes) {
 				test.Fatal("probe control did not change the source")
 			}
-			if output, err := run(control); err != nil {
-				test.Fatalf("control: %v: %s", err, output)
+			if output, runError := run(control); runError != nil {
+				test.Fatalf("control: %v: %s", runError, output)
 			}
 		})
 	}

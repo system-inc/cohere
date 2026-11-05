@@ -75,9 +75,9 @@ func decodeCorpusOptions(registration rule.Registration, options []json.RawMessa
 				return nil, "options did not encode: " + encodeError.Error()
 			}
 		}
-		decoded, err := registration.DecodeOptionList(list)
-		if err != nil {
-			return nil, "options refused: " + err.Error()
+		decoded, decodeOptionListError := registration.DecodeOptionList(list)
+		if decodeOptionListError != nil {
+			return nil, "options refused: " + decodeOptionListError.Error()
 		}
 		return decoded, ""
 	case registration.Decode != nil:
@@ -87,9 +87,9 @@ func decodeCorpusOptions(registration rule.Registration, options []json.RawMessa
 		if len(options) == 0 {
 			return nil, ""
 		}
-		decoded, err := registration.Decode(options[0])
-		if err != nil {
-			return nil, "options refused: " + err.Error()
+		decoded, decodeError := registration.Decode(options[0])
+		if decodeError != nil {
+			return nil, "options refused: " + decodeError.Error()
 		}
 		return decoded, ""
 	case registration.DecodeAt != nil:

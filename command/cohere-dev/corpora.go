@@ -20,13 +20,13 @@ import (
 // the corpora that stay uncovered.
 func testEnvironment(base []string) ([]string, []corpus.Corpus, error) {
 	environment := slices.Clone(base)
-	path, err := corpus.ConfigPath()
-	if err != nil {
-		return nil, nil, err
+	path, configurationPathError := corpus.ConfigPath()
+	if configurationPathError != nil {
+		return nil, nil, configurationPathError
 	}
-	configuration, err := corpus.ReadConfig(path)
-	if err != nil {
-		return nil, nil, err
+	configuration, readConfigurationError := corpus.ReadConfig(path)
+	if readConfigurationError != nil {
+		return nil, nil, readConfigurationError
 	}
 	added := corpus.Environment(configuration, os.Getenv)
 	environment = append(environment, added...)

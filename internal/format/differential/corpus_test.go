@@ -41,13 +41,13 @@ func TestCorpora(test *testing.T) {
 
 	candidateName := os.Getenv("COHERE_FORMAT_CANDIDATE")
 
-	bundles, err := prettier.Bundles()
-	if err != nil {
-		test.Fatal(err)
+	bundles, bundlesError := prettier.Bundles()
+	if bundlesError != nil {
+		test.Fatal(bundlesError)
 	}
-	digest, err := prettier.DigestBundles(bundles.Files)
-	if err != nil {
-		test.Fatal(err)
+	digest, digestBundlesError := prettier.DigestBundles(bundles.Files)
+	if digestBundlesError != nil {
+		test.Fatal(digestBundlesError)
 	}
 	directory := os.Getenv("COHERE_FORMAT_CACHE")
 	if directory == "" {
@@ -59,9 +59,9 @@ func TestCorpora(test *testing.T) {
 	}
 	test.Logf("oracle cache %s, bundles %s from %s", directory, digest[:12], bundles.Origin)
 
-	enumerator, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		test.Fatal(err)
+	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 
 	pending := strings.Split(roots, ":")
@@ -86,9 +86,9 @@ func TestCorpora(test *testing.T) {
 		// skip root: a repository under a path root never formats (ahra's projects/**) is still evidence
 		// for the printers, and dropping it shrank the corpus by about 1,950 files with every line still
 		// reading 100% (#k6vebep).
-		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
-		if err != nil {
-			test.Fatalf("finding the repositories nested in %s: %v", root, err)
+		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(root)
+		if nestedRepositoriesBelowError != nil {
+			test.Fatalf("finding the repositories nested in %s: %v", root, nestedRepositoriesBelowError)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(root, nested))
@@ -100,26 +100,26 @@ func TestCorpora(test *testing.T) {
 		// A nested repository still carrying Prettier config is one pinned to its own adoption (www-ahra-ai,
 		// #j3nk2zk): measuring it would mean guessing its options, so it is named and skipped. A named
 		// corpus refusing is a migration that did not happen, and stops the run.
-		resolution, err := formatoptions.Resolve(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) && !named[root] {
-			test.Logf("skipping %s, a nested repository not yet adopted: %v", root, err)
+		resolution, resolveError := formatoptions.Resolve(root)
+		if errors.Is(resolveError, formatoptions.ErrPrettierConfigRemains) && !named[root] {
+			test.Logf("skipping %s, a nested repository not yet adopted: %v", root, resolveError)
 			skipped = append(skipped, root)
 			continue
 		}
-		if err != nil {
-			test.Fatalf("resolving the format options for %s: %v", root, err)
+		if resolveError != nil {
+			test.Fatalf("resolving the format options for %s: %v", root, resolveError)
 		}
 
 		// A leftover .prettierignore is Prettier config too, refused by the walk rather than the resolver,
 		// and skipped or fatal on the same terms.
-		enumeration, err := enumerator.Enumerate(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) && !named[root] {
-			test.Logf("skipping %s, a nested repository not yet adopted: %v", root, err)
+		enumeration, enumerateError := enumerator.Enumerate(root)
+		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) && !named[root] {
+			test.Logf("skipping %s, a nested repository not yet adopted: %v", root, enumerateError)
 			skipped = append(skipped, root)
 			continue
 		}
-		if err != nil {
-			test.Fatalf("enumerating %s: %v", root, err)
+		if enumerateError != nil {
+			test.Fatalf("enumerating %s: %v", root, enumerateError)
 		}
 
 		options := resolution.Options
@@ -132,9 +132,9 @@ func TestCorpora(test *testing.T) {
 			Identity: digest + "|" + string(bundles.Origin) + "|filepath|" + describeOptions(options),
 		}
 
-		report, err := Compare(root, enumeration.Files, newOracle, newCandidate, runtime.NumCPU(), cache)
-		if err != nil {
-			test.Fatalf("comparing %s: %v", root, err)
+		report, compareError := Compare(root, enumeration.Files, newOracle, newCandidate, runtime.NumCPU(), cache)
+		if compareError != nil {
+			test.Fatalf("comparing %s: %v", root, compareError)
 		}
 		test.Logf("walked %d, offered %d, nested repositories %v\nconfig %s\n%s",
 			enumeration.Walked, len(enumeration.Files), nestedRepositories,

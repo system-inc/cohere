@@ -27,18 +27,18 @@ import (
 // root.comments before printing, and the printer never reads it.
 //
 // The nodes come from nodes, which may be nil; the tree is valid until it is Reset.
-func Parse(text string, nodes *arena.Arena[Node]) (root *Node, err error) {
+func Parse(text string, nodes *arena.Arena[Node]) (root *Node, parseError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			if thrown, isThrown := recovered.(*ThrownError); isThrown {
-				root, err = nil, thrown
+				root, parseError = nil, thrown
 				return
 			}
 			if runtimeError, isRuntimeError := recovered.(runtime.Error); isRuntimeError {
-				root, err = nil, fmt.Errorf("unist: %w", runtimeError)
+				root, parseError = nil, fmt.Errorf("unist: %w", runtimeError)
 				return
 			}
-			root, err = nil, fmt.Errorf("unist: %v", recovered)
+			root, parseError = nil, fmt.Errorf("unist: %v", recovered)
 		}
 	}()
 
@@ -78,8 +78,8 @@ func Parse(text string, nodes *arena.Arena[Node]) (root *Node, err error) {
 	// different comments the comparator says the earlier one goes first either way round: it orders them
 	// by start offset, which any sort reproduces.
 	comments := context.comments
-	sort.SliceStable(comments, func(i int, j int) bool {
-		return context.position(comments[i]).start.offset < context.position(comments[j]).start.offset
+	sort.SliceStable(comments, func(left int, right int) bool {
+		return context.position(comments[left]).start.offset < context.position(comments[right]).start.offset
 	})
 	root = context.createRoot(context.transformRange(0, len(units)), documents, comments)
 	context.attachComments(root)

@@ -211,7 +211,7 @@ func sortedDeclarations(set map[static_single_assignment.DeclarationId]bool) []s
 	for key := range set {
 		keys = append(keys, key)
 	}
-	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	sort.Slice(keys, func(left, right int) bool { return keys[left] < keys[right] })
 	return keys
 }
 
@@ -221,7 +221,7 @@ func sortedScopes(set map[ScopeId]bool) []ScopeId {
 	for key := range set {
 		keys = append(keys, key)
 	}
-	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	sort.Slice(keys, func(left, right int) bool { return keys[left] < keys[right] })
 	return keys
 }
 

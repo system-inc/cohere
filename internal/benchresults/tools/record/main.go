@@ -76,17 +76,17 @@ func record(
 	stoppedEarly bool,
 	edit, out string,
 ) (string, error) {
-	cohere, err := engineProvenance(engine)
-	if err != nil {
-		return "", err
+	cohere, engineProvenanceError := engineProvenance(engine)
+	if engineProvenanceError != nil {
+		return "", engineProvenanceError
 	}
-	machine, err := thisMachine()
-	if err != nil {
-		return "", err
+	machine, thisMachineError := thisMachine()
+	if thisMachineError != nil {
+		return "", thisMachineError
 	}
-	runs, err := readRuns(runsPath)
-	if err != nil {
-		return "", err
+	runs, readRunsError := readRuns(runsPath)
+	if readRunsError != nil {
+		return "", readRunsError
 	}
 	result := benchresults.Record{
 		Schema:        benchresults.SchemaVersion,
@@ -104,9 +104,9 @@ func record(
 		Runs:          runs,
 		Modes:         benchresults.Summarize(measured, runs),
 	}
-	encoded, err := benchresults.Encode(result)
-	if err != nil {
-		return "", err
+	encoded, encodeError := benchresults.Encode(result)
+	if encodeError != nil {
+		return "", encodeError
 	}
 	if createDirectoryError := os.MkdirAll(out, 0o755); createDirectoryError != nil {
 		return "", createDirectoryError
@@ -127,9 +127,9 @@ func record(
 // the `commit:` line, lengthened to the full commit by this repository, and the tree was modified when the
 // `source:` line is printed or the binary's own vcs.modified stamp says so.
 func engineProvenance(engine string) (benchresults.Cohere, error) {
-	output, err := exec.Command(engine, "--version").Output()
-	if err != nil {
-		return benchresults.Cohere{}, fmt.Errorf("%s --version: %w", engine, err)
+	output, outputError := exec.Command(engine, "--version").Output()
+	if outputError != nil {
+		return benchresults.Cohere{}, fmt.Errorf("%s --version: %w", engine, outputError)
 	}
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	cohere := benchresults.Cohere{Version: strings.TrimSpace(lines[0])}
@@ -149,8 +149,8 @@ func engineProvenance(engine string) (benchresults.Cohere, error) {
 	if short == "" {
 		return cohere, fmt.Errorf("%s names no commit, so nothing reproduces its numbers", engine)
 	}
-	full, err := exec.Command("git", "rev-parse", "--verify", "--quiet", short+"^{commit}").Output()
-	if err != nil {
+	full, outputError := exec.Command("git", "rev-parse", "--verify", "--quiet", short+"^{commit}").Output()
+	if outputError != nil {
 		return cohere, fmt.Errorf("%s was built from %s, which this repository does not have", engine, short)
 	}
 	cohere.Commit = strings.TrimSpace(string(full))

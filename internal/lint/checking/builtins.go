@@ -13,12 +13,12 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-func ComparePaths(a string, b string, program rule.Program) int {
+func ComparePaths(left string, right string, program rule.Program) int {
 	caseSensitivity := tspath.CaseInsensitive
 	if program.UseCaseSensitiveFileNames() {
 		caseSensitivity = tspath.CaseSensitive
 	}
-	return tspath.ComparePaths(a, b, caseSensitivity)
+	return tspath.ComparePaths(left, right, caseSensitivity)
 }
 
 /**
@@ -32,8 +32,8 @@ func ComparePaths(a string, b string, program rule.Program) int {
 func IsPromiseLike(
 	program rule.Program,
 	typeChecker *checker.Checker,
-	t *checker.Type) bool {
-	return IsBuiltinSymbolLike(program, typeChecker, t, "Promise")
+	subjectType *checker.Type) bool {
+	return IsBuiltinSymbolLike(program, typeChecker, subjectType, "Promise")
 }
 
 /**
@@ -47,9 +47,9 @@ func IsPromiseLike(
 func IsPromiseConstructorLike(
 	program rule.Program,
 	typeChecker *checker.Checker,
-	t *checker.Type,
+	subjectType *checker.Type,
 ) bool {
-	return IsBuiltinSymbolLike(program, typeChecker, t, "PromiseConstructor")
+	return IsBuiltinSymbolLike(program, typeChecker, subjectType, "PromiseConstructor")
 }
 
 /**
@@ -63,8 +63,8 @@ func IsPromiseConstructorLike(
 func IsErrorLike(
 	program rule.Program,
 	typeChecker *checker.Checker,
-	t *checker.Type) bool {
-	return IsBuiltinSymbolLike(program, typeChecker, t, "Error")
+	subjectType *checker.Type) bool {
+	return IsBuiltinSymbolLike(program, typeChecker, subjectType, "Error")
 }
 
 /**
@@ -77,9 +77,9 @@ func IsErrorLike(
 func IsReadonlyErrorLike(
 	program rule.Program,
 	typeChecker *checker.Checker,
-	t *checker.Type,
+	subjectType *checker.Type,
 ) bool {
-	return IsReadonlyTypeLike(program, typeChecker, t, func(subtype *checker.Type) bool {
+	return IsReadonlyTypeLike(program, typeChecker, subjectType, func(subtype *checker.Type) bool {
 		checker.Type_alias(subtype).TypeArguments()
 		typeArgument := checker.Type_alias(subtype).TypeArguments()[0]
 
@@ -98,10 +98,10 @@ func IsReadonlyErrorLike(
 func IsReadonlyTypeLike(
 	program rule.Program,
 	typeChecker *checker.Checker,
-	t *checker.Type,
+	subjectType *checker.Type,
 	predicate func(subType *checker.Type) bool,
 ) bool {
-	return IsBuiltinTypeAliasLike(program, typeChecker, t, func(subtype *checker.Type) bool {
+	return IsBuiltinTypeAliasLike(program, typeChecker, subjectType, func(subtype *checker.Type) bool {
 		return checker.Type_alias(subtype).Symbol().Name == "Readonly" && predicate(subtype)
 	})
 }
@@ -117,10 +117,10 @@ const (
 func IsBuiltinTypeAliasLike(
 	program rule.Program,
 	typeChecker *checker.Checker,
-	t *checker.Type,
+	subjectType *checker.Type,
 	predicate func(subType *checker.Type) bool,
 ) bool {
-	return IsBuiltinSymbolLikeRecurser(program, typeChecker, t, func(subtype *checker.Type) builtinPredicateMatches {
+	return IsBuiltinSymbolLikeRecurser(program, typeChecker, subjectType, func(subtype *checker.Type) builtinPredicateMatches {
 		aliasSymbol := checker.Type_alias(subtype)
 		if aliasSymbol == nil || len(aliasSymbol.TypeArguments()) == 0 {
 			return builtinPredicateMatchesFalse
@@ -137,10 +137,10 @@ func IsBuiltinTypeAliasLike(
 func IsBuiltinSymbolLike(
 	program rule.Program,
 	typeChecker *checker.Checker,
-	t *checker.Type,
+	subjectType *checker.Type,
 	symbolNames ...string,
 ) bool {
-	return IsBuiltinSymbolLikeRecurser(program, typeChecker, t, func(subType *checker.Type) builtinPredicateMatches {
+	return IsBuiltinSymbolLikeRecurser(program, typeChecker, subjectType, func(subType *checker.Type) builtinPredicateMatches {
 		symbol := checker.Type_symbol(subType)
 		if symbol == nil {
 			return builtinPredicateMatchesFalse
@@ -160,9 +160,9 @@ func IsBuiltinSymbolLike(
 func IsAnyBuiltinSymbolLike(
 	program rule.Program,
 	typeChecker *checker.Checker,
-	t *checker.Type,
+	subjectType *checker.Type,
 ) bool {
-	return IsBuiltinSymbolLikeRecurser(program, typeChecker, t, func(subType *checker.Type) builtinPredicateMatches {
+	return IsBuiltinSymbolLikeRecurser(program, typeChecker, subjectType, func(subType *checker.Type) builtinPredicateMatches {
 		symbol := checker.Type_symbol(subType)
 		if symbol == nil {
 			return builtinPredicateMatchesFalse
@@ -179,21 +179,21 @@ func IsAnyBuiltinSymbolLike(
 func IsBuiltinSymbolLikeRecurser(
 	program rule.Program,
 	typeChecker *checker.Checker,
-	t *checker.Type,
+	subjectType *checker.Type,
 	predicate func(subType *checker.Type) builtinPredicateMatches,
 ) bool {
-	if IsIntersectionType(t) {
-		return Some(IntersectionTypeParts(t), func(t *checker.Type) bool {
-			return IsBuiltinSymbolLikeRecurser(program, typeChecker, t, predicate)
+	if IsIntersectionType(subjectType) {
+		return Some(IntersectionTypeParts(subjectType), func(part *checker.Type) bool {
+			return IsBuiltinSymbolLikeRecurser(program, typeChecker, part, predicate)
 		})
 	}
-	if IsUnionType(t) {
-		return Every(UnionTypeParts(t), func(t *checker.Type) bool {
-			return IsBuiltinSymbolLikeRecurser(program, typeChecker, t, predicate)
+	if IsUnionType(subjectType) {
+		return Every(UnionTypeParts(subjectType), func(part *checker.Type) bool {
+			return IsBuiltinSymbolLikeRecurser(program, typeChecker, part, predicate)
 		})
 	}
-	if IsTypeParameter(t) {
-		constraint := checker.Checker_getBaseConstraintOfType(typeChecker, t)
+	if IsTypeParameter(subjectType) {
+		constraint := checker.Checker_getBaseConstraintOfType(typeChecker, subjectType)
 
 		if constraint != nil {
 			return IsBuiltinSymbolLikeRecurser(program, typeChecker, constraint, predicate)
@@ -202,14 +202,14 @@ func IsBuiltinSymbolLikeRecurser(
 		return false
 	}
 
-	predicateResult := predicate(t)
+	predicateResult := predicate(subjectType)
 	if predicateResult == builtinPredicateMatchesTrue {
 		return true
 	} else if predicateResult == builtinPredicateMatchesFalse {
 		return false
 	}
 
-	symbol := checker.Type_symbol(t)
+	symbol := checker.Type_symbol(subjectType)
 	if symbol != nil && symbol.Flags&(ast.SymbolFlagsClass|ast.SymbolFlagsInterface) != 0 {
 		declaredType := checker.Checker_getDeclaredTypeOfSymbol(typeChecker, symbol)
 		for _, baseType := range checker.Checker_getBaseTypes(typeChecker, declaredType) {

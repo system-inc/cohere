@@ -256,17 +256,17 @@ func compareFormat(test *testing.T, inputs []string) int {
 	for variantIndex, options := range formatVariants {
 		engine := golden.Engine(options)
 		for _, input := range inputs {
-			expected, err := engine.Format("fixture.md", input)
-			if err != nil {
-				test.Fatalf("the oracle failed on %q: %v", input, err)
+			expected, formatError := engine.Format("fixture.md", input)
+			if formatError != nil {
+				test.Fatalf("the oracle failed on %q: %v", input, formatError)
 			}
 			if dependsOnEmbed(input) {
 				continue
 			}
-			actual, err := Format(input, options, nil)
-			if err != nil {
+			actual, formatError := Format(input, options, nil)
+			if formatError != nil {
 				failures++
-				test.Errorf("variant %d, %q: %v", variantIndex, input, err)
+				test.Errorf("variant %d, %q: %v", variantIndex, input, formatError)
 				continue
 			}
 			if actual != expected {
@@ -289,13 +289,13 @@ func TestFormatOracleCanFail(test *testing.T) {
 	test.Parallel()
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
 	engine := oracletest.Open(test, test.Name()).Engine(formatoptions.Default())
-	expected, err := engine.Format("fixture.md", "* a")
-	if err != nil {
-		test.Fatal(err)
+	expected, formatError := engine.Format("fixture.md", "* a")
+	if formatError != nil {
+		test.Fatal(formatError)
 	}
-	actual, err := Format("1. a", formatoptions.Default(), nil)
-	if err != nil {
-		test.Fatal(err)
+	actual, formatError := Format("1. a", formatoptions.Default(), nil)
+	if formatError != nil {
+		test.Fatal(formatError)
 	}
 	if strings.EqualFold(expected, actual) {
 		test.Fatal("the comparison found no difference between a bullet list and an ordered one")
@@ -334,15 +334,15 @@ func TestExhaustiveDelimitersMatchOracle(test *testing.T) {
 	}
 	failures := 0
 	for _, input := range inputs {
-		expected, err := engine.Format("fixture.md", input)
-		if err != nil {
+		expected, formatError := engine.Format("fixture.md", input)
+		if formatError != nil {
 			continue
 		}
-		actual, err := Format(input, formatoptions.Default(), nil)
-		if err != nil || actual != expected {
+		actual, formatError := Format(input, formatoptions.Default(), nil)
+		if formatError != nil || actual != expected {
 			failures++
 			if failures <= 20 {
-				test.Errorf("%q: %v %s", input, err, differential.FirstDifference(expected, actual))
+				test.Errorf("%q: %v %s", input, formatError, differential.FirstDifference(expected, actual))
 			}
 		}
 	}

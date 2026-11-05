@@ -70,10 +70,10 @@ func (context *compileContext) point(point micromark.Point) Point {
 // FromMarkdown parses markdown the way the fork's parseMarkdown does with the given source, and returns
 // the tree. source is the text micromark reads (front matter already blanked by the caller); original is
 // the text positions refer to, which has the same UTF-16 length.
-func FromMarkdown(source string, original string, nodes *arena.Arena[Node]) (root *Node, err error) {
+func FromMarkdown(source string, original string, nodes *arena.Arena[Node]) (root *Node, fromMarkdownError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf("markdown: %v", recovered)
+			fromMarkdownError = fmt.Errorf("markdown: %v", recovered)
 		}
 	}()
 	memory := parseMemories.Get().(*parseMemory)

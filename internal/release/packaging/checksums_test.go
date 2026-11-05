@@ -31,18 +31,18 @@ func TestChecksumsCheckWithShasumAndFailOnAFlippedByte(test *testing.T) {
 
 	// shasum is what the README tells a reader to run, so the format is proven by shasum rather than by a
 	// parser of ours, which would agree with whatever this package wrote.
-	shasum, err := exec.LookPath("shasum")
-	if err != nil {
-		test.Fatalf("shasum is not installed, and it is the checker these sums are written for: %v", err)
+	shasum, lookPathError := exec.LookPath("shasum")
+	if lookPathError != nil {
+		test.Fatalf("shasum is not installed, and it is the checker these sums are written for: %v", lookPathError)
 	}
 
 	output := test.TempDir()
 	stageFixturePlatform(test, output, Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"})
 	stageFixturePlatform(test, output, Target{GoOperatingSystem: "linux", GoArchitecture: "amd64"})
 
-	checksums, err := Checksums(output, []string{"cohere-linux-x64", "cohere-darwin-arm64"})
-	if err != nil {
-		test.Fatal(err)
+	checksums, checksumsError := Checksums(output, []string{"cohere-linux-x64", "cohere-darwin-arm64"})
+	if checksumsError != nil {
+		test.Fatal(checksumsError)
 	}
 	writeFile(test, filepath.Join(output, ChecksumsFileName), string(checksums))
 
@@ -71,8 +71,8 @@ func TestChecksumsCheckWithShasumAndFailOnAFlippedByte(test *testing.T) {
 	flipByte(test, filepath.Join(output, "cohere-linux-x64", "bin", "cohere"))
 	check = exec.Command(shasum, "-a", "256", "-c", ChecksumsFileName)
 	check.Dir = output
-	result, err := check.CombinedOutput()
-	if err == nil {
+	result, outputError := check.CombinedOutput()
+	if outputError == nil {
 		test.Fatalf("shasum passed a binary with a flipped byte:\n%s", result)
 	}
 	if !strings.Contains(string(result), "cohere-linux-x64/bin/cohere: FAILED") {
@@ -129,20 +129,20 @@ func TestDispatcherPublishesItsChecksums(test *testing.T) {
 		test.Fatalf("the dispatcher's files are %v, so npm publish would leave %s out", files, ChecksumsFileName)
 	}
 
-	module, err := filepath.Abs(filepath.Join("..", "..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	module, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
-	staged, err := buildDispatcherPackage(
+	staged, buildDispatcherPackageError := buildDispatcherPackage(
 		Options{ModuleDirectory: module, OutputDirectory: test.TempDir(), Version: "1.0.0"},
 		placeholderChecksums,
 	)
-	if err != nil {
-		test.Fatal(err)
+	if buildDispatcherPackageError != nil {
+		test.Fatal(buildDispatcherPackageError)
 	}
-	shipped, err := os.ReadFile(filepath.Join(staged.Directory, ChecksumsFileName))
-	if err != nil {
-		test.Fatalf("the dispatcher package does not hold %s: %v", ChecksumsFileName, err)
+	shipped, readError := os.ReadFile(filepath.Join(staged.Directory, ChecksumsFileName))
+	if readError != nil {
+		test.Fatalf("the dispatcher package does not hold %s: %v", ChecksumsFileName, readError)
 	}
 	if !bytes.Equal(shipped, placeholderChecksums) {
 		test.Fatalf("the dispatcher holds %q, not the sums it was given", shipped)
@@ -193,9 +193,9 @@ func TestLauncherRefusesATamperAfterAVerdictIsRemembered(test *testing.T) {
 	installation := stageInstalledRelease(test)
 	installation.run(test, "--version").requireRan(test, "--version")
 
-	before, err := os.Stat(installation.binary)
-	if err != nil {
-		test.Fatal(err)
+	before, statError := os.Stat(installation.binary)
+	if statError != nil {
+		test.Fatal(statError)
 	}
 	flipByte(test, installation.binary)
 	if changeTimesError := os.Chtimes(
@@ -205,9 +205,9 @@ func TestLauncherRefusesATamperAfterAVerdictIsRemembered(test *testing.T) {
 	); changeTimesError != nil {
 		test.Fatal(changeTimesError)
 	}
-	after, err := os.Stat(installation.binary)
-	if err != nil {
-		test.Fatal(err)
+	after, statError := os.Stat(installation.binary)
+	if statError != nil {
+		test.Fatal(statError)
 	}
 	if !after.ModTime().Equal(before.ModTime()) || after.Size() != before.Size() {
 		test.Fatalf("the tamper changed the modification time or the size, so this would not test the change time")
@@ -228,9 +228,9 @@ func TestLauncherHonorsARememberedVerdictOnlyForTheChecksumItWasReachedOn(test *
 	installation := stageInstalledRelease(test)
 	installation.run(test, "--version").requireRan(test, "--version")
 
-	checksums, err := os.ReadFile(installation.checksums)
-	if err != nil {
-		test.Fatal(err)
+	checksums, readError := os.ReadFile(installation.checksums)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	actual := sha256Hex([]byte(fixtureScript))
 	other := sha256Hex([]byte("another release's binary"))
@@ -241,9 +241,9 @@ func TestLauncherHonorsARememberedVerdictOnlyForTheChecksumItWasReachedOn(test *
 
 	installation.run(test, "--version").requireRefused(test, installation.binary, "does not match the checksum")
 
-	verdict, err := os.ReadFile(installation.verdictPath(test))
-	if err != nil {
-		test.Fatal(err)
+	verdict, readError := os.ReadFile(installation.verdictPath(test))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if !bytes.Contains(verdict, []byte(actual)) {
 		test.Fatalf("the remembered verdict does not name the hash it was reached on:\n%s", verdict)
@@ -341,28 +341,28 @@ func stageInstalledRelease(test *testing.T) installedRelease {
 
 	// Through every link, as Node resolves the launcher and the package, so the paths its messages name
 	// are the paths this test holds (macOS's temporary directory is under a link).
-	root, err := filepath.EvalSymlinks(test.TempDir())
-	if err != nil {
-		test.Fatal(err)
+	root, resolveSymlinksError := filepath.EvalSymlinks(test.TempDir())
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
 	}
 	output := filepath.Join(root, "node_modules", PackageScope)
 	target := Target{GoOperatingSystem: runtime.GOOS, GoArchitecture: runtime.GOARCH}
 	stageFixturePlatform(test, output, target)
 
-	checksums, err := Checksums(output, []string{target.DirectoryName()})
-	if err != nil {
-		test.Fatal(err)
+	checksums, checksumsError := Checksums(output, []string{target.DirectoryName()})
+	if checksumsError != nil {
+		test.Fatal(checksumsError)
 	}
-	module, err := filepath.Abs(filepath.Join("..", "..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	module, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
-	dispatcher, err := buildDispatcherPackage(
+	dispatcher, buildDispatcherPackageError := buildDispatcherPackage(
 		Options{ModuleDirectory: module, OutputDirectory: output, Version: "1.0.0"},
 		checksums,
 	)
-	if err != nil {
-		test.Fatal(err)
+	if buildDispatcherPackageError != nil {
+		test.Fatal(buildDispatcherPackageError)
 	}
 
 	return installedRelease{

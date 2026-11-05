@@ -70,9 +70,9 @@ func TestDiscoveryLetsAGoWorkspaceClaimTheModulesItUses(test *testing.T) {
 		"vendored/module/go.mod":    "module example.com/vendored\n",
 		"vendored/module/vendor.go": "package module\n",
 	})
-	found, err := discoverProjects(root, nil)
-	if err != nil {
-		test.Fatal(err)
+	found, discoverProjectsError := discoverProjects(root, nil)
+	if discoverProjectsError != nil {
+		test.Fatal(discoverProjectsError)
 	}
 	want := []discoveredProject{
 		{Directory: ".", Engine: engineGo},
@@ -93,9 +93,9 @@ func TestDiscoveryLetsAGoWorkspaceClaimTheModulesItUses(test *testing.T) {
 	if removeError := os.Remove(filepath.Join(root, "go.work")); removeError != nil {
 		test.Fatal(removeError)
 	}
-	unclaimed, err := discoverProjects(root, nil)
-	if err != nil {
-		test.Fatal(err)
+	unclaimed, discoverProjectsError := discoverProjects(root, nil)
+	if discoverProjectsError != nil {
+		test.Fatal(discoverProjectsError)
 	}
 	if len(unclaimed.Projects) != 4 || len(unclaimed.notes()) != 0 {
 		test.Errorf("without the workspace found %+v and notes %q, want four modules and no note",
@@ -207,9 +207,9 @@ func TestDiscoveryNeverEntersWhatItMustNot(test *testing.T) {
 		test.Fatal(createDirectoryError)
 	}
 
-	found, err := discoverProjects(root, []string{"refused/**"})
-	if err != nil {
-		test.Fatal(err)
+	found, discoverProjectsError := discoverProjects(root, []string{"refused/**"})
+	if discoverProjectsError != nil {
+		test.Fatal(discoverProjectsError)
 	}
 	if want := []discoveredProject{{Directory: ".", Engine: engineSwift}}; !reflect.DeepEqual(found.Projects, want) {
 		test.Fatalf("found %+v, want only the root's package", found.Projects)
@@ -235,9 +235,9 @@ func TestDiscoveryNeverEntersWhatItMustNot(test *testing.T) {
 	test.Cleanup(func() { neverDescended, newIgnoreScope = previousNames, previousScope })
 	neverDescended = map[string]bool{".git": true}
 	newIgnoreScope = func(string) (ignoreScope, error) { return ignoresNothing{}, nil }
-	lifted, err := discoverProjects(root, nil)
-	if err != nil {
-		test.Fatal(err)
+	lifted, discoverProjectsError := discoverProjects(root, nil)
+	if discoverProjectsError != nil {
+		test.Fatal(discoverProjectsError)
 	}
 	directories := map[string]bool{}
 	for _, project := range lifted.Projects {

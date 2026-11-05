@@ -43,10 +43,10 @@ func main() {
 	check := flag.Bool("check", false, "regenerate and fail if a committed file disagrees")
 	flag.Parse()
 
-	toolDirectory, err := toolDirectory()
-	if err != nil {
+	toolDirectory, toolDirectoryError := toolDirectory()
+	if toolDirectoryError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintf(os.Stderr, "locating this tool: %v\n", err)
+		fmt.Fprintf(os.Stderr, "locating this tool: %v\n", toolDirectoryError)
 		os.Exit(1)
 	}
 	packageDirectory := filepath.Join(toolDirectory, "..", "..")
@@ -74,27 +74,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	defaults, err := indent(extracted.DefaultSelectors)
-	if err != nil {
+	defaults, indentError := indent(extracted.DefaultSelectors)
+	if indentError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintf(os.Stderr, "default selectors: %v\n", err)
+		fmt.Fprintf(os.Stderr, "default selectors: %v\n", indentError)
 		os.Exit(1)
 	}
 	// The oracle leaves the defaults out: they are default_selectors.json's to hold, and a copy here
 	// would be a second place for them to drift.
-	withoutDefaults, err := json.Marshal(struct {
+	withoutDefaults, encodeError := json.Marshal(struct {
 		Plugin string          `json:"plugin"`
 		Cases  json.RawMessage `json:"cases"`
 	}{extracted.Plugin, extracted.Cases})
-	if err != nil {
+	if encodeError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintf(os.Stderr, "oracle: %v\n", err)
+		fmt.Fprintf(os.Stderr, "oracle: %v\n", encodeError)
 		os.Exit(1)
 	}
-	oracle, err := indent(withoutDefaults)
-	if err != nil {
+	oracle, indentError := indent(withoutDefaults)
+	if indentError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintf(os.Stderr, "oracle: %v\n", err)
+		fmt.Fprintf(os.Stderr, "oracle: %v\n", indentError)
 		os.Exit(1)
 	}
 	outputs := []struct {

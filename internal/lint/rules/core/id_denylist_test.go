@@ -16,13 +16,13 @@ const idDenylistFile = "/repository/source/IdDenylist.ts"
 // Routed through the rule's own exported decoder rather than filling the struct, so a defect in
 // the decoder is under test rather than bypassed by every fixture.
 func idDenylistOf(names ...string) any {
-	encoded, err := json.Marshal(names)
-	if err != nil {
-		panic(err)
+	encoded, encodeError := json.Marshal(names)
+	if encodeError != nil {
+		panic(encodeError)
 	}
-	settings, err := DecodeIdDenylistOptions(encoded)
-	if err != nil {
-		panic(err)
+	settings, decodeIdDenylistOptionsError := DecodeIdDenylistOptions(encoded)
+	if decodeIdDenylistOptionsError != nil {
+		panic(decodeIdDenylistOptionsError)
 	}
 	return settings
 }
@@ -791,9 +791,9 @@ func TestIdDenylistSpansAndMessages(test *testing.T) {
 func TestIdDenylistDecoderReadsTheNameArray(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeIdDenylistOptions([]byte(`["data", "err", "cb"]`))
-	if err != nil {
-		test.Fatalf("decoding a name array: %v", err)
+	decoded, decodeIdDenylistOptionsError := DecodeIdDenylistOptions([]byte(`["data", "err", "cb"]`))
+	if decodeIdDenylistOptionsError != nil {
+		test.Fatalf("decoding a name array: %v", decodeIdDenylistOptionsError)
 	}
 	settings, ok := decoded.(IdDenylistSettings)
 	if !ok {
@@ -810,9 +810,9 @@ func TestIdDenylistDecoderReadsTheNameArray(test *testing.T) {
 
 	// An empty array denies nothing rather than erroring, which is what an explicitly empty
 	// configuration means.
-	decoded, err = DecodeIdDenylistOptions([]byte(`[]`))
-	if err != nil {
-		test.Fatalf("decoding an empty array: %v", err)
+	decoded, decodeIdDenylistOptionsError = DecodeIdDenylistOptions([]byte(`[]`))
+	if decodeIdDenylistOptionsError != nil {
+		test.Fatalf("decoding an empty array: %v", decodeIdDenylistOptionsError)
 	}
 	settings, _ = decoded.(IdDenylistSettings)
 	if len(settings.Denied) != 0 {

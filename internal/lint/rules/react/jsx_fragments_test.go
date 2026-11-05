@@ -520,13 +520,13 @@ func TestJsxFragmentsVersionArmIsNotPorted(test *testing.T) {
 
 	// The decoder receives the bare enum, not upstream's array. Spelled through the JSON layer so
 	// the assertion is about the wire shape rather than about a Go literal.
-	raw, err := json.Marshal("element")
-	if err != nil {
-		test.Fatalf("marshal returned %v", err)
+	raw, encodeError := json.Marshal("element")
+	if encodeError != nil {
+		test.Fatalf("marshal returned %v", encodeError)
 	}
-	decoded, err := DecodeJsxFragmentsOptions(raw)
-	if err != nil {
-		test.Fatalf("decode returned %v", err)
+	decoded, decodeJsxFragmentsOptionsError := DecodeJsxFragmentsOptions(raw)
+	if decodeJsxFragmentsOptionsError != nil {
+		test.Fatalf("decode returned %v", decodeJsxFragmentsOptionsError)
 	}
 	options, ok := decoded.(JsxFragmentsOptions)
 	if !ok {

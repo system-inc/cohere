@@ -75,9 +75,9 @@ func TestTheLeastRecentlyUsedEntriesGoFirstDownToTheTarget(test *testing.T) {
 	trimFile := put(test, directory, "trim.txt", 400, now.Add(-96*time.Hour))
 
 	// 1,600 bytes of entries against a cap of 1,000 and a target of 900: the two oldest go.
-	trimmed, err := Trim(directory, Limit{Cap: 1000, Target: 900, Spare: InUseWindow}, now)
-	if err != nil {
-		test.Fatal(err)
+	trimmed, trimError := Trim(directory, Limit{Cap: 1000, Target: 900, Spare: InUseWindow}, now)
+	if trimError != nil {
+		test.Fatal(trimError)
 	}
 	if trimmed.Before != 1600 || trimmed.After != 800 || trimmed.Removed != 2 || trimmed.InUse != 400 {
 		test.Fatalf("trimmed %+v, want 1600 to 800 bytes in 2 entries, with 400 in use", trimmed)
@@ -94,9 +94,9 @@ func TestTheLeastRecentlyUsedEntriesGoFirstDownToTheTarget(test *testing.T) {
 	}
 
 	// Under its cap, nothing is touched.
-	trimmed, err = Trim(directory, Limit{Cap: 1000, Target: 0, Spare: InUseWindow}, now)
-	if err != nil || trimmed.Removed != 0 || trimmed.Before != 800 {
-		test.Fatalf("a cache under its cap was trimmed: %+v, %v", trimmed, err)
+	trimmed, trimError = Trim(directory, Limit{Cap: 1000, Target: 0, Spare: InUseWindow}, now)
+	if trimError != nil || trimmed.Removed != 0 || trimmed.Before != 800 {
+		test.Fatalf("a cache under its cap was trimmed: %+v, %v", trimmed, trimError)
 	}
 }
 

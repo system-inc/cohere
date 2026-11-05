@@ -19,8 +19,8 @@ import (
 // CaseClass widens one literal character to the class of characters a `/i`
 // comparison accepts for it, reporting false when the character stands alone
 // and needs no widening.
-func CaseClass(r rune, unicode bool) (string, bool) {
-	members := CaseEquivalents(r, unicode)
+func CaseClass(character rune, unicode bool) (string, bool) {
+	members := CaseEquivalents(character, unicode)
 	if len(members) == 0 {
 		return "", false
 	}
@@ -57,11 +57,11 @@ func CaseCloseClass(body string, unicode bool) string {
 
 // EscapeClassRune escapes a character that would carry a meaning of its own
 // inside a character class.
-func EscapeClassRune(r rune) string {
-	if strings.ContainsRune(`\]^-[`, r) {
-		return `\` + string(r)
+func EscapeClassRune(character rune) string {
+	if strings.ContainsRune(`\]^-[`, character) {
+		return `\` + string(character)
 	}
-	return string(r)
+	return string(character)
 }
 
 // escapeTrailingDash escapes the `-` that stands for itself at the end of a
@@ -72,7 +72,7 @@ func escapeTrailingDash(body string) string {
 		return body
 	}
 	backslashes := 0
-	for i := len(body) - 2; i >= 0 && body[i] == '\\'; i-- {
+	for index := len(body) - 2; index >= 0 && body[index] == '\\'; index-- {
 		backslashes++
 	}
 	if backslashes%2 == 1 {

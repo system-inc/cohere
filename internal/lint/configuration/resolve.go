@@ -65,34 +65,34 @@ type configGlobs struct {
 
 // globs returns the Config's compiled patterns, compiling them on first use. Two goroutines racing to
 // compile build the same answer, and the first one stored wins.
-func (c *Config) globs() *configGlobs {
-	if compiled := c.compiledGlobs.Load(); compiled != nil {
+func (configuration *Config) globs() *configGlobs {
+	if compiled := configuration.compiledGlobs.Load(); compiled != nil {
 		return compiled
 	}
 	compiled := &configGlobs{
-		ignore:    make([]glob, len(c.IgnorePatterns)),
-		overrides: make([][]glob, len(c.Overrides)),
+		ignore:    make([]glob, len(configuration.IgnorePatterns)),
+		overrides: make([][]glob, len(configuration.Overrides)),
 	}
-	for index, pattern := range c.IgnorePatterns {
+	for index, pattern := range configuration.IgnorePatterns {
 		compiled.ignore[index] = compileGlob(pattern)
 	}
-	for index, override := range c.Overrides {
+	for index, override := range configuration.Overrides {
 		compiled.overrides[index] = make([]glob, len(override.Files))
 		for fileIndex, pattern := range override.Files {
 			compiled.overrides[index][fileIndex] = compileGlob(pattern)
 		}
 	}
-	c.compiledGlobs.CompareAndSwap(nil, compiled)
-	return c.compiledGlobs.Load()
+	configuration.compiledGlobs.CompareAndSwap(nil, compiled)
+	return configuration.compiledGlobs.Load()
 }
 
 // resolutions returns the Config's memo, creating it on first use.
-func (c *Config) resolutions() *resolutionMemo {
-	if memo := c.resolutionMemo.Load(); memo != nil {
+func (configuration *Config) resolutions() *resolutionMemo {
+	if memo := configuration.resolutionMemo.Load(); memo != nil {
 		return memo
 	}
-	c.resolutionMemo.CompareAndSwap(nil, &resolutionMemo{byMatch: map[string]Resolved{}})
-	return c.resolutionMemo.Load()
+	configuration.resolutionMemo.CompareAndSwap(nil, &resolutionMemo{byMatch: map[string]Resolved{}})
+	return configuration.resolutionMemo.Load()
 }
 
 // Status is why a rule did or did not run on a file.
@@ -278,17 +278,17 @@ func KeyReachesRule(key string, ruleName string) bool {
 //
 // Resolutions are memoized by which overrides a path matched (see resolutionMemo), so the result is
 // shared with every other path that matched the same ones.
-func (c *Config) Resolve(path string) Resolved {
-	if c.house != nil {
-		return c.house.variantFor(path).Resolve(path)
+func (configuration *Config) Resolve(path string) Resolved {
+	if configuration.house != nil {
+		return configuration.house.variantFor(path).Resolve(path)
 	}
 	// Split once, and asked of every compiled pattern.
-	segments := splitPath(c.relativePath(path))
-	globs := c.globs()
+	segments := splitPath(configuration.relativePath(path))
+	globs := configuration.globs()
 
 	for index, pattern := range globs.ignore {
 		if pattern.matches(segments) {
-			return Resolved{Ignored: true, IgnoredBy: c.IgnorePatterns[index]}
+			return Resolved{Ignored: true, IgnoredBy: configuration.IgnorePatterns[index]}
 		}
 	}
 
@@ -303,31 +303,31 @@ func (c *Config) Resolve(path string) Resolved {
 		}
 	}
 
-	memo := c.resolutions()
+	memo := configuration.resolutions()
 	memo.mutex.Lock()
 	defer memo.mutex.Unlock()
 	if resolved, found := memo.byMatch[string(match)]; found {
 		return resolved
 	}
-	resolved := c.resolveMatch(match)
+	resolved := configuration.resolveMatch(match)
 	memo.byMatch[string(match)] = resolved
 	return resolved
 }
 
 // resolveMatch builds the resolution for one match: the base rules, then each override the match names,
 // in order.
-func (c *Config) resolveMatch(match []byte) Resolved {
+func (configuration *Config) resolveMatch(match []byte) Resolved {
 	// The base map is copied rather than shared, because an override writes into the result and a
 	// shared map would leak one file's overrides into every later file.
-	effective := make(map[string]RuleSetting, len(c.Rules))
-	for name, setting := range c.Rules {
+	effective := make(map[string]RuleSetting, len(configuration.Rules))
+	for name, setting := range configuration.Rules {
 		effective[name] = setting
 	}
 
 	for remaining := match; len(remaining) > 0; {
 		index, width := binary.Uvarint(remaining)
 		remaining = remaining[width:]
-		override := c.Overrides[index]
+		override := configuration.Overrides[index]
 		for name, setting := range override.Rules {
 			// A bare severity re-states the rule's level and keeps its options, as ESLint does and as a
 			// bare severity across `extends` already does. Dropping them changed what a rule checked on
@@ -365,11 +365,11 @@ func (resolved Resolved) MatchedOverrideIndices() []int {
 // Getting this wrong is silent in the dangerous direction. An absolute path never matches
 // `modules/**`, so every override quietly stops applying and the rules they scoped off come back —
 // which is exactly the 336 findings this package exists to remove.
-func (c *Config) relativePath(path string) string {
+func (configuration *Config) relativePath(path string) string {
 	normalized := filepath.ToSlash(path)
 
-	if c.Root != "" && filepath.IsAbs(path) {
-		if relative, relativePathError := filepath.Rel(c.Root, path); relativePathError == nil {
+	if configuration.Root != "" && filepath.IsAbs(path) {
+		if relative, relativePathError := filepath.Rel(configuration.Root, path); relativePathError == nil {
 			normalized = filepath.ToSlash(relative)
 		}
 	}

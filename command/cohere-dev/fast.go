@@ -108,9 +108,9 @@ func fastTest(base []string, arguments []string) int {
 	// Listing the module's packages takes a moment, and a person watches for the run to begin.
 	streams.Show(streams.Errors)
 
-	packages, err := modulePackages(base)
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
+	packages, modulePackagesError := modulePackages(base)
+	if modulePackagesError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", modulePackagesError)
 		return 1
 	}
 	skippedPackages := map[string]bool{}
@@ -137,9 +137,9 @@ func fastTest(base []string, arguments []string) int {
 	}
 	sort.Strings(selected)
 
-	environment, uncovered, err := testEnvironment(base)
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
+	environment, uncovered, testEnvironmentError := testEnvironment(base)
+	if testEnvironmentError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", testEnvironmentError)
 		return 2
 	}
 	command := exec.Command("go", append(append([]string{"test"}, arguments...), selected...)...)

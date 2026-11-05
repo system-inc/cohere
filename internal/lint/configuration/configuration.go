@@ -162,17 +162,17 @@ type OffReason struct {
 
 // OffReasonFor returns why the rule named ruleName is off, found by its own key or by a key that reaches
 // it, the way the resolver lets a key spelled differently configure a rule.
-func (c *Config) OffReasonFor(ruleName string) (OffReason, bool) {
-	if c == nil {
+func (configuration *Config) OffReasonFor(ruleName string) (OffReason, bool) {
+	if configuration == nil {
 		return OffReason{}, false
 	}
-	if offReason, found := lookupByReach(c.OffReasons, ruleName); found {
+	if offReason, found := lookupByReach(configuration.OffReasons, ruleName); found {
 		return offReason, true
 	}
 	// Under zero config, a rule a per-file set turns on is off wherever the set does not fit, and the set
 	// says why. Asked only after the chain's own reasons, so a project's own off keeps its own.
-	if c.house != nil && !c.TurnsOffAtTopLevel(ruleName) {
-		return lookupByReach(c.house.gatedReasons, ruleName)
+	if configuration.house != nil && !configuration.TurnsOffAtTopLevel(ruleName) {
+		return lookupByReach(configuration.house.gatedReasons, ruleName)
 	}
 	return OffReason{}, false
 }
@@ -197,14 +197,14 @@ func lookupByReach(reasons map[string]OffReason, ruleName string) (OffReason, bo
 
 // TurnsOffAtTopLevel reports whether the chain's top-level rules turn the rule named ruleName off, by its
 // own key or, when no key names it exactly, by a key that reaches it.
-func (c *Config) TurnsOffAtTopLevel(ruleName string) bool {
-	if c == nil {
+func (configuration *Config) TurnsOffAtTopLevel(ruleName string) bool {
+	if configuration == nil {
 		return false
 	}
-	if setting, found := c.Rules[ruleName]; found {
+	if setting, found := configuration.Rules[ruleName]; found {
 		return setting.Severity == SeverityOff
 	}
-	for key, setting := range c.Rules {
+	for key, setting := range configuration.Rules {
 		if setting.Severity == SeverityOff && KeyReachesRule(key, ruleName) {
 			return true
 		}
@@ -218,15 +218,15 @@ func (c *Config) TurnsOffAtTopLevel(ruleName string) bool {
 // A key is evidence the rule exists somewhere even when cohere has not ported it: someone wrote a
 // decision about it. That is what lets a suppression naming an unported rule be told apart from one
 // naming a rule that exists nowhere.
-func (c *Config) RuleKeys() []string {
-	if c == nil {
+func (configuration *Config) RuleKeys() []string {
+	if configuration == nil {
 		return nil
 	}
-	keys := make([]string, 0, len(c.Rules))
-	for key := range c.Rules {
+	keys := make([]string, 0, len(configuration.Rules))
+	for key := range configuration.Rules {
 		keys = append(keys, key)
 	}
-	for _, override := range c.Overrides {
+	for _, override := range configuration.Overrides {
 		for key := range override.Rules {
 			keys = append(keys, key)
 		}
@@ -369,14 +369,14 @@ func Load(path string) (*Config, error) {
 // LoadFor is Load knowing the registered rule names, so a key spelled differently from the one it
 // inherits is matched to it by the rules the two actually reach rather than by the shape of the names.
 func LoadFor(path string, registeredNames []string) (*Config, error) {
-	root, err := filepath.Abs(filepath.Dir(path))
-	if err != nil {
-		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, err)
+	root, absolutePathError := filepath.Abs(filepath.Dir(path))
+	if absolutePathError != nil {
+		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, absolutePathError)
 	}
 
-	layers, err := readConfigLayers(path, nil)
-	if err != nil {
-		return nil, err
+	layers, readConfigurationLayersError := readConfigLayers(path, nil)
+	if readConfigurationLayersError != nil {
+		return nil, readConfigurationLayersError
 	}
 	return loadLayers(layers, root, registeredNames)
 }

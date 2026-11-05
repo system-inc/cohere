@@ -309,9 +309,9 @@ func TestParseAgreesWithPostcss(test *testing.T) {
 			home, _ := os.UserHomeDir()
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git") {
 				return filepath.SkipDir
@@ -320,9 +320,9 @@ func TestParseAgreesWithPostcss(test *testing.T) {
 				return nil
 			}
 			seen[path] = true
-			source, err := os.ReadFile(path)
-			if err != nil {
-				return err
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				return readError
 			}
 			if !utf8.Valid(source) {
 				return fmt.Errorf("%s is not UTF-8, which the comparison cannot carry through JSON", path)
@@ -445,11 +445,11 @@ func dumpParse(text string) (any, any) {
 // dumpParseWith is dumpParse with the parser named, Parse or ParseSCSS.
 func dumpParseWith(parse func(string) (*estree.Node, error), text string) (any, any) {
 	offsets := utf16OffsetsOf(stripByteOrderMark(text))
-	root, err := parse(text)
-	if err != nil {
+	root, parseError := parse(text)
+	if parseError != nil {
 		var syntaxError *CssSyntaxError
-		if !errors.As(err, &syntaxError) {
-			return nil, map[string]any{"notCssSyntaxError": err.Error()}
+		if !errors.As(parseError, &syntaxError) {
+			return nil, map[string]any{"notCssSyntaxError": parseError.Error()}
 		}
 		dumped := map[string]any{
 			"name":   syntaxError.Name(),

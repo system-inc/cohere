@@ -71,11 +71,11 @@ func findIntentionalMarker(text string) intentionalReason {
 }
 
 // isMarkerBoundary reports whether a rune ends the marker word.
-func isMarkerBoundary(r rune) bool {
+func isMarkerBoundary(character rune) bool {
 	switch {
-	case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+	case character >= 'a' && character <= 'z', character >= 'A' && character <= 'Z', character >= '0' && character <= '9':
 		return false
-	case r == '-', r == '_':
+	case character == '-', character == '_':
 		return false
 	}
 	return true

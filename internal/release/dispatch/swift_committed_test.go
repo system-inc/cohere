@@ -21,9 +21,9 @@ const testToolchain = "swiftlang-6.4.0.34.1"
 func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *testing.T) {
 	fixture := newSwiftFixture(test)
 
-	first, built, err := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
-	if err != nil {
-		test.Fatalf("building from the first commit: %v", err)
+	first, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
+	if resolveCommittedSwiftEngineError != nil {
+		test.Fatalf("building from the first commit: %v", resolveCommittedSwiftEngineError)
 	}
 	if !built {
 		test.Fatal("an empty cache reported no build")
@@ -34,9 +34,9 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *test
 
 	// An uncommitted edit in the checkout is not part of the commit, so the same engine serves.
 	writeFile(test, fixture.rule(), "one, uncommitted\n")
-	again, built, err := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
-	if err != nil {
-		test.Fatalf("resolving with an uncommitted edit on disk: %v", err)
+	again, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
+	if resolveCommittedSwiftEngineError != nil {
+		test.Fatalf("resolving with an uncommitted edit on disk: %v", resolveCommittedSwiftEngineError)
 	}
 	if built || again != first {
 		test.Fatalf("an uncommitted Swift edit changed the engine (built=%v)", built)
@@ -47,9 +47,9 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *test
 	writeFile(test, fixture.rule(), "two\n")
 	fixture.commit(test, "swift")
 	writeFile(test, fixture.rule(), "two, uncommitted\n")
-	second, built, err := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
-	if err != nil {
-		test.Fatalf("building from the second commit: %v", err)
+	second, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
+	if resolveCommittedSwiftEngineError != nil {
+		test.Fatalf("building from the second commit: %v", resolveCommittedSwiftEngineError)
 	}
 	if !built || second == first {
 		test.Fatalf("a committed Swift edit did not build a new engine (built=%v)", built)
@@ -61,9 +61,9 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *test
 	// A commit that changes only the engine's tests changes nothing compiled in, so it reuses the engine.
 	writeFile(test, filepath.Join(fixture.repository, "swift", "Tests", "RuleTests.swift"), "// a new test\n")
 	fixture.commit(test, "swift/Tests")
-	third, built, err := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
-	if err != nil {
-		test.Fatalf("resolving a tests-only commit: %v", err)
+	third, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
+	if resolveCommittedSwiftEngineError != nil {
+		test.Fatalf("resolving a tests-only commit: %v", resolveCommittedSwiftEngineError)
 	}
 	if built || third != second {
 		test.Fatalf("a tests-only commit rebuilt the engine (built=%v)", built)
@@ -123,8 +123,8 @@ func TestADirtySwiftWorktreeIsRefusedNotForced(test *testing.T) {
 		!strings.Contains(resolveCommittedSwiftEngineError.Error(), "changes nobody should have made") {
 		test.Fatalf("a dirty worktree was moved or built from: %v", resolveCommittedSwiftEngineError)
 	}
-	if _, statErr := os.Stat(stray); statErr != nil {
-		test.Fatalf("the refusal discarded the stray file, which forcing would do: %v", statErr)
+	if _, statError := os.Stat(stray); statError != nil {
+		test.Fatalf("the refusal discarded the stray file, which forcing would do: %v", statError)
 	}
 }
 
@@ -188,13 +188,13 @@ func newSwiftFixture(test *testing.T) *swiftFixture {
 // fakeBuild writes an engine that prints the rule it was built from and the provenance the real
 // manifest would compute for packageDirectory.
 func (fixture *swiftFixture) fakeBuild(packageDirectory string, scratchDirectory string, binaryPath string) error {
-	rule, err := os.ReadFile(filepath.Join(packageDirectory, "Sources", "Rule.swift"))
-	if err != nil {
-		return err
+	rule, readError := os.ReadFile(filepath.Join(packageDirectory, "Sources", "Rule.swift"))
+	if readError != nil {
+		return readError
 	}
-	status, err := gitOutput(packageDirectory, "status", "--porcelain")
-	if err != nil {
-		return err
+	status, gitOutputError := gitOutput(packageDirectory, "status", "--porcelain")
+	if gitOutputError != nil {
+		return gitOutputError
 	}
 	modified := strings.TrimSpace(status) != "" || fixture.reportModified
 

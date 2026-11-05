@@ -78,13 +78,13 @@ func TestCrossEnumNarrowingRefused(test *testing.T) {
 
 func TestCrossEnumNarrowingLegal(test *testing.T) {
 	test.Parallel()
-	data, err := os.ReadFile("testdata/cross-enum/t98a.ts")
-	if err != nil {
-		test.Fatal(err)
+	data, readError := os.ReadFile("testdata/cross-enum/t98a.ts")
+	if readError != nil {
+		test.Fatal(readError)
 	}
-	literal, err := os.ReadFile("testdata/cross-enum-j.ts")
-	if err != nil {
-		test.Fatal(err)
+	literal, readError := os.ReadFile("testdata/cross-enum-j.ts")
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	quiet := map[string]string{}
 	for _, name := range []string{

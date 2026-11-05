@@ -62,9 +62,9 @@ type Golden struct {
 // it starts empty and writes what the test asked for when the test ends.
 func Open(test testing.TB, name string) *Golden {
 	test.Helper()
-	digest, err := BundlesDigest()
-	if err != nil {
-		test.Fatal(err)
+	digest, bundlesDigestError := BundlesDigest()
+	if bundlesDigestError != nil {
+		test.Fatal(bundlesDigestError)
 	}
 	golden := &Golden{
 		t:       test,
@@ -77,9 +77,9 @@ func Open(test testing.TB, name string) *Golden {
 		test.Cleanup(golden.write)
 		return golden
 	}
-	answers, err := read(golden.path, digest)
-	if err != nil {
-		test.Fatalf("%v: record them with %s=1 go test -run '^%s$' in this package", err, UpdateVariable, test.Name())
+	answers, readError := read(golden.path, digest)
+	if readError != nil {
+		test.Fatalf("%v: record them with %s=1 go test -run '^%s$' in this package", readError, UpdateVariable, test.Name())
 	}
 	golden.answers = answers
 	return golden
@@ -87,14 +87,14 @@ func Open(test testing.TB, name string) *Golden {
 
 // read is a golden's answers, refused when the bundles that recorded them are not these.
 func read(path string, digest string) (map[string]Answer, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("%s holds no recorded oracle answers (%v)", path, err)
+	file, openError := os.Open(path)
+	if openError != nil {
+		return nil, fmt.Errorf("%s holds no recorded oracle answers (%v)", path, openError)
 	}
 	defer file.Close()
-	unzipped, err := gzip.NewReader(file)
-	if err != nil {
-		return nil, fmt.Errorf("%s is not a golden: %v", path, err)
+	unzipped, gzipError := gzip.NewReader(file)
+	if gzipError != nil {
+		return nil, fmt.Errorf("%s is not a golden: %v", path, gzipError)
 	}
 	var contents record
 	if decodeError := json.NewDecoder(unzipped).Decode(&contents); decodeError != nil {
@@ -156,15 +156,15 @@ func Key(parts ...string) string {
 // error and all. An answer the golden never recorded fails the test and returns ErrNotRecorded.
 func (golden *Golden) Answer(key string, compute func() (string, error)) (string, error) {
 	if golden.update {
-		output, err := compute()
+		output, computeError := compute()
 		answer := Answer{Output: output}
-		if err != nil {
-			answer = Answer{Error: err.Error()}
+		if computeError != nil {
+			answer = Answer{Error: computeError.Error()}
 		}
 		golden.mutex.Lock()
 		golden.answers[key] = answer
 		golden.mutex.Unlock()
-		return output, err
+		return output, computeError
 	}
 	golden.mutex.Lock()
 	answer, recorded := golden.answers[key]

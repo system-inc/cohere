@@ -381,16 +381,16 @@ func TestNoMisleadingCharacterClassDecodesItsOption(test *testing.T) {
 		`{"allowEscape":false}`: {},
 		`{"allowEscape":true}`:  {AllowEscape: true},
 	} {
-		decoded, err := decode([]byte(raw))
-		if err != nil {
-			test.Fatalf("decoding %s: %v", raw, err)
+		decoded, decodeError := decode([]byte(raw))
+		if decodeError != nil {
+			test.Fatalf("decoding %s: %v", raw, decodeError)
 		}
 		if decoded != any(want) {
 			test.Fatalf("decoding %s gave %+v, wanted %+v", raw, decoded, want)
 		}
 	}
 	for _, raw := range []string{`{"allowescape":true}`, `{"allowEscapes":true}`, `{"allowEscape":"yes"}`} {
-		if _, err := decode([]byte(raw)); err == nil {
+		if _, decodeError := decode([]byte(raw)); decodeError == nil {
 			test.Fatalf("decoding %s was accepted", raw)
 		}
 	}

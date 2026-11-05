@@ -58,18 +58,18 @@ func run() error {
 		return fmt.Errorf("--version is required: a release that cannot name itself is not a release")
 	}
 
-	moduleRoot, err := filepath.Abs(*moduleDirectory)
-	if err != nil {
-		return fmt.Errorf("resolving the module directory: %w", err)
+	moduleRoot, absolutePathError := filepath.Abs(*moduleDirectory)
+	if absolutePathError != nil {
+		return fmt.Errorf("resolving the module directory: %w", absolutePathError)
 	}
-	outputRoot, err := filepath.Abs(*outputDirectory)
-	if err != nil {
-		return fmt.Errorf("resolving the output directory: %w", err)
+	outputRoot, absolutePathError := filepath.Abs(*outputDirectory)
+	if absolutePathError != nil {
+		return fmt.Errorf("resolving the output directory: %w", absolutePathError)
 	}
 
-	targets, err := selectTargets(*only)
-	if err != nil {
-		return err
+	targets, selectTargetsError := selectTargets(*only)
+	if selectTargetsError != nil {
+		return selectTargetsError
 	}
 
 	if _, printError := fmt.Printf("staging cohere %s into %s\n", *version, outputRoot); printError != nil {
@@ -82,7 +82,7 @@ func run() error {
 		NotaryKeychain:  *notaryKeychain,
 	}
 
-	result, err := release.Build(release.Options{
+	result, buildError := release.Build(release.Options{
 		ModuleDirectory: moduleRoot,
 		OutputDirectory: outputRoot,
 		Version:         *version,
@@ -92,8 +92,8 @@ func run() error {
 		SwiftScratchDirectory: *swiftScratch,
 		Progress:              os.Stdout,
 	})
-	if err != nil {
-		return err
+	if buildError != nil {
+		return buildError
 	}
 
 	if printSummaryError := printSummary(result, targets, signing); printSummaryError != nil {

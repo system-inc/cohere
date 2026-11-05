@@ -444,9 +444,9 @@ func compareFormat(test *testing.T, inputs []string) int {
 	for variantIndex, options := range formatVariants {
 		engine := golden.Engine(options)
 		for index, input := range inputs {
-			expected, oracleErr := engine.Format("fixture.yaml", input)
-			fullStack, fullStackErr := formatFullStack("fixture.yaml", input, options, "preserve", nil)
-			if oracleErr != nil {
+			expected, oracleError := engine.Format("fixture.yaml", input)
+			fullStack, fullStackError := formatFullStack("fixture.yaml", input, options, "preserve", nil)
+			if oracleError != nil {
 				// Prettier cannot format it; the parser must refuse it too.
 				oracleFailures++
 				if trees[index].err == "" {
@@ -455,26 +455,26 @@ func compareFormat(test *testing.T, inputs []string) int {
 						"variant %d, %q: the oracle failed (%v) but the parser did not",
 						variantIndex,
 						input,
-						oracleErr,
+						oracleError,
 					)
 				}
-				if fullStackErr == nil || !printing.IsSyntax(fullStackErr) {
+				if fullStackError == nil || !printing.IsSyntax(fullStackError) {
 					fullStackFailures++
 					test.Errorf(
 						"variant %d, %q: the oracle failed (%v) but Format gave %q, %v",
 						variantIndex,
 						input,
-						oracleErr,
+						oracleError,
 						fullStack,
-						fullStackErr,
+						fullStackError,
 					)
 				}
 				continue
 			}
 			compared++
-			if fullStackErr != nil {
+			if fullStackError != nil {
 				fullStackFailures++
-				test.Errorf("variant %d, %q: Format: %v", variantIndex, input, fullStackErr)
+				test.Errorf("variant %d, %q: Format: %v", variantIndex, input, fullStackError)
 			} else if fullStack != expected {
 				fullStackFailures++
 				test.Errorf(
@@ -526,17 +526,17 @@ func TestFormatFixturesMatchOracle(test *testing.T) {
 func TestFormatOracleCanFail(test *testing.T) {
 	test.Parallel()
 	engine := oracletest.Open(test, test.Name()).Engine(formatoptions.Default())
-	expected, err := engine.Format("fixture.yaml", "a: [b]")
-	if err != nil {
-		test.Fatal(err)
+	expected, formatError := engine.Format("fixture.yaml", "a: [b]")
+	if formatError != nil {
+		test.Fatal(formatError)
 	}
 	texts, byteOrderMarks, trees := parseInputs(test, []string{"a: [b, c]"})
 	if byteOrderMarks[0] {
 		test.Fatal("the fixture has no byte order mark")
 	}
-	actual, err := Print(trees[0].root, texts[0], formatoptions.Default(), nil)
-	if err != nil {
-		test.Fatal(err)
+	actual, printError := Print(trees[0].root, texts[0], formatoptions.Default(), nil)
+	if printError != nil {
+		test.Fatal(printError)
 	}
 	if actual == expected {
 		test.Fatalf("the comparison found no difference: both printed %q", actual)

@@ -168,7 +168,7 @@ func TestCacheServesTheSameAnswerAndKeysOnIdentity(test *testing.T) {
 	calls := &atomic.Int64{}
 	oracle := factory(trimmingOracle{calls: calls})
 
-	first, err := Compare(
+	first, compareError := Compare(
 		root,
 		files,
 		oracle,
@@ -176,12 +176,12 @@ func TestCacheServesTheSameAnswerAndKeysOnIdentity(test *testing.T) {
 		2,
 		&OracleCache{Directory: directory, Identity: "bundles-1"},
 	)
-	if err != nil {
-		test.Fatal(err)
+	if compareError != nil {
+		test.Fatal(compareError)
 	}
 	afterFirst := calls.Load()
 
-	second, err := Compare(
+	second, compareError := Compare(
 		root,
 		files,
 		oracle,
@@ -189,8 +189,8 @@ func TestCacheServesTheSameAnswerAndKeysOnIdentity(test *testing.T) {
 		2,
 		&OracleCache{Directory: directory, Identity: "bundles-1"},
 	)
-	if err != nil {
-		test.Fatal(err)
+	if compareError != nil {
+		test.Fatal(compareError)
 	}
 	if served := calls.Load() - afterFirst; served != 1 {
 		test.Fatalf("second run called the oracle %d times, want 1 (only the uncacheable failure)", served)

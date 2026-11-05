@@ -164,12 +164,12 @@ func formatTransform(engine formatEngine) edit.Transform {
 // Matched on the message because the engine is behind an interface and its error types are its own.
 // A false negative here costs a refusal where a skip was meant, which is the safe direction: it is
 // reported and counted rather than hidden.
-func isUnparseable(err error) bool {
+func isUnparseable(candidateError error) bool {
 	// The native printers mark their parse failures, so their wording never has to be guessed.
-	if printing.IsSyntax(err) {
+	if printing.IsSyntax(candidateError) {
 		return true
 	}
-	message := strings.ToLower(err.Error())
+	message := strings.ToLower(candidateError.Error())
 	for _, marker := range []string{"does not parse", "parse error", "syntaxerror", "unexpected token"} {
 		if strings.Contains(message, marker) {
 			return true
@@ -207,16 +207,16 @@ func configuredFormatter(enabled bool) (formatEngine, error) {
 	// Resolving, not one formatter built from formatoptions.Default: each file formats with the config
 	// its own directory resolves to. Default is ahra's block, and running it over api-phi-health
 	// rewrote every multi-line JSX opening tag, because that repository sets bracketSameLine.
-	workingDirectory, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("finding where to resolve the format options from: %w", err)
+	workingDirectory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		return nil, fmt.Errorf("finding where to resolve the format options from: %w", workingDirectoryError)
 	}
-	engine, err := native.NewResolving(workingDirectory)
-	if err != nil {
+	engine, newResolvingError := native.NewResolving(workingDirectory)
+	if newResolvingError != nil {
 		// Not a nil engine. Nil already means "nobody asked for a formatter", and the coverage line
 		// reports that as a deliberate absence. A formatter that was asked for and could not resolve its
 		// options is a different fact, and collapsing the two would print a failure as a choice.
-		return nil, fmt.Errorf("loading the formatter: %w", err)
+		return nil, fmt.Errorf("loading the formatter: %w", newResolvingError)
 	}
 	return engine, nil
 }

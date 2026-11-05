@@ -78,9 +78,9 @@ var (
 )
 
 func generate() ([]byte, error) {
-	bundles, err := prettier.Bundles()
-	if err != nil {
-		return nil, err
+	bundles, bundlesError := prettier.Bundles()
+	if bundlesError != nil {
+		return nil, bundlesError
 	}
 	markdown := string(bundles.Files["plugins/markdown.js"])
 
@@ -97,30 +97,30 @@ func generate() ([]byte, error) {
 		}
 		return match[1], nil
 	}
-	cjkName, err := name(cjkUse, "CJK_REGEXP")
-	if err != nil {
-		return nil, err
+	cjkName, nameError := name(cjkUse, "CJK_REGEXP")
+	if nameError != nil {
+		return nil, nameError
 	}
-	punctuationName, err := name(punctuationUse, "PUNCTUATION_REGEXP")
-	if err != nil {
-		return nil, err
+	punctuationName, nameError := name(punctuationUse, "PUNCTUATION_REGEXP")
+	if nameError != nil {
+		return nil, nameError
 	}
-	hangulName, err := name(hangulUse, "the Hangul regex")
-	if err != nil {
-		return nil, err
+	hangulName, nameError := name(hangulUse, "the Hangul regex")
+	if nameError != nil {
+		return nil, nameError
 	}
 
-	cjkLiteral, err := literal(markdown, cjkName)
-	if err != nil {
-		return nil, err
+	cjkLiteral, literalError := literal(markdown, cjkName)
+	if literalError != nil {
+		return nil, literalError
 	}
-	punctuationLiteral, err := literal(markdown, punctuationName)
-	if err != nil {
-		return nil, err
+	punctuationLiteral, literalError := literal(markdown, punctuationName)
+	if literalError != nil {
+		return nil, literalError
 	}
-	hangulLiteral, err := literal(markdown, hangulName)
-	if err != nil {
-		return nil, err
+	hangulLiteral, literalError := literal(markdown, hangulName)
+	if literalError != nil {
+		return nil, literalError
 	}
 
 	// CJK_REGEXP is `(?:[cjk])(?:[variation selectors])?`: the two classes are asked about separately.

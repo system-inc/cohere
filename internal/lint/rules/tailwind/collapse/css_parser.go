@@ -547,11 +547,11 @@ func ParseAtRule(buffer string, nodes ...*Node) *Node {
 	name := buffer
 	parameters := ""
 
-	for i := 5; i < len(buffer); i++ {
-		currentCharacter := buffer[i]
+	for index := 5; index < len(buffer); index++ {
+		currentCharacter := buffer[index]
 		if currentCharacter == byteSpace || currentCharacter == byteTab || currentCharacter == byteOpenParen {
-			name = buffer[:i]
-			parameters = buffer[i:]
+			name = buffer[:index]
+			parameters = buffer[index:]
 			break
 		}
 	}
@@ -595,30 +595,30 @@ func parseCSSDeclaration(buffer string, colonIndex int) *Node {
 // value is content. An unterminated string is an error rather than a value running to end of input,
 // which is what stops a missing quote from swallowing the rest of the stylesheet.
 func parseCSSString(input string, startIndex int, quoteCharacter byte) (int, error) {
-	for i := startIndex + 1; i < len(input); i++ {
-		peekCharacter := input[i]
+	for index := startIndex + 1; index < len(input); index++ {
+		peekCharacter := input[index]
 
 		switch {
 		case peekCharacter == byteBackslash:
-			i++
+			index++
 
 		case peekCharacter == quoteCharacter:
-			return i, nil
+			return index, nil
 
 		// A `;` at the end of the line inside an unterminated string. Reported separately from the
 		// bare line break below because upstream includes the `;` in the message.
 		case peekCharacter == byteSemicolon &&
-			(peekByte(input, i+1) == byteLineBreak ||
-				(peekByte(input, i+1) == byteCarriageReturn && peekByte(input, i+2) == byteLineBreak)):
+			(peekByte(input, index+1) == byteLineBreak ||
+				(peekByte(input, index+1) == byteCarriageReturn && peekByte(input, index+2) == byteLineBreak)):
 			return 0, &CSSSyntaxError{
-				Message: fmt.Sprintf("Unterminated string: %s%c", input[startIndex:i+1], quoteCharacter),
+				Message: fmt.Sprintf("Unterminated string: %s%c", input[startIndex:index+1], quoteCharacter),
 				Offset:  startIndex,
 			}
 
 		case peekCharacter == byteLineBreak ||
-			(peekCharacter == byteCarriageReturn && peekByte(input, i+1) == byteLineBreak):
+			(peekCharacter == byteCarriageReturn && peekByte(input, index+1) == byteLineBreak):
 			return 0, &CSSSyntaxError{
-				Message: fmt.Sprintf("Unterminated string: %s%c", input[startIndex:i], quoteCharacter),
+				Message: fmt.Sprintf("Unterminated string: %s%c", input[startIndex:index], quoteCharacter),
 				Offset:  startIndex,
 			}
 		}

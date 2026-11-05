@@ -114,9 +114,9 @@ func TestSwiftRequestedPhasesReadTheFlagsAsTheTypeScriptRunDoes(test *testing.T)
 func TestALintRunThatSkipsWhatItWasNotAskedForIsComplete(test *testing.T) {
 	lint := engineRequestedPhases(flagsOf("lint"))
 
-	output, exitCode, err := renderRequested(test, contractFixture(test, "LintOnly.jsonl"), lint, 1)
-	if err != nil || exitCode != 1 {
-		test.Fatalf("a --lint run with two findings: exit %d, err %v\n%s", exitCode, err, output)
+	output, exitCode, renderRequestedError := renderRequested(test, contractFixture(test, "LintOnly.jsonl"), lint, 1)
+	if renderRequestedError != nil || exitCode != 1 {
+		test.Fatalf("a --lint run with two findings: exit %d, err %v\n%s", exitCode, renderRequestedError, output)
 	}
 	requireLines(test, output,
 		"[cohere-swift/toolchain-require-upcoming-features/upcomingFeatureMissing]",
@@ -136,9 +136,9 @@ func TestALintRunThatSkipsWhatItWasNotAskedForIsComplete(test *testing.T) {
 		}
 		return true
 	})
-	output, exitCode, err = renderRequested(test, clean, lint, 0)
-	if err != nil || exitCode != 0 {
-		test.Fatalf("a clean --lint run: exit %d, err %v\n%s", exitCode, err, output)
+	output, exitCode, renderRequestedError = renderRequested(test, clean, lint, 0)
+	if renderRequestedError != nil || exitCode != 0 {
+		test.Fatalf("a clean --lint run: exit %d, err %v\n%s", exitCode, renderRequestedError, output)
 	}
 }
 
@@ -147,10 +147,10 @@ func TestALintRunThatSkipsWhatItWasNotAskedForIsComplete(test *testing.T) {
 func TestARequestedPhaseThatComesBackSkippedStillFails(test *testing.T) {
 	// Skipped as not requested when it was requested: a bare run reported as though it were --lint. The
 	// engine is refused rather than believed.
-	_, _, err := renderRequested(test, contractFixture(test, "LintOnly.jsonl"), engineRequestedPhases(flagsOf()), 1)
-	if err == nil ||
-		!strings.Contains(err.Error(), "the fix phase was asked for, and the engine skipped it as \"not requested\"") {
-		test.Fatalf("a bare run whose fix came back not requested was accepted: %v", err)
+	_, _, renderRequestedError := renderRequested(test, contractFixture(test, "LintOnly.jsonl"), engineRequestedPhases(flagsOf()), 1)
+	if renderRequestedError == nil ||
+		!strings.Contains(renderRequestedError.Error(), "the fix phase was asked for, and the engine skipped it as \"not requested\"") {
+		test.Fatalf("a bare run whose fix came back not requested was accepted: %v", renderRequestedError)
 	}
 
 	// Skipped for any other reason, under --lint, while calling the run complete: the contradiction the
@@ -168,15 +168,15 @@ func TestARequestedPhaseThatComesBackSkippedStillFails(test *testing.T) {
 		})
 	}
 	lint := engineRequestedPhases(flagsOf("lint"))
-	_, _, err = renderRequested(test, otherSkip(true), lint, 1)
-	if err == nil || !strings.Contains(err.Error(), "calls the run complete") {
-		test.Fatalf("a requested lint skipped for another reason, called complete, was accepted: %v", err)
+	_, _, renderRequestedError = renderRequested(test, otherSkip(true), lint, 1)
+	if renderRequestedError == nil || !strings.Contains(renderRequestedError.Error(), "calls the run complete") {
+		test.Fatalf("a requested lint skipped for another reason, called complete, was accepted: %v", renderRequestedError)
 	}
 
 	// Called incomplete instead, it is believed and fails as an incomplete run.
-	output, exitCode, err := renderRequested(test, otherSkip(false), lint, 1)
-	if err != nil || exitCode != 1 || !strings.Contains(output, "this run did not check everything") {
-		test.Fatalf("a requested lint skipped and called incomplete: exit %d, err %v\n%s", exitCode, err, output)
+	output, exitCode, renderRequestedError := renderRequested(test, otherSkip(false), lint, 1)
+	if renderRequestedError != nil || exitCode != 1 || !strings.Contains(output, "this run did not check everything") {
+		test.Fatalf("a requested lint skipped and called incomplete: exit %d, err %v\n%s", exitCode, renderRequestedError, output)
 	}
 }
 

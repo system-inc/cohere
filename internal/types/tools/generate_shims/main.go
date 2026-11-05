@@ -127,8 +127,8 @@ func main() {
 	}
 
 	packagesToShimFullNames := make([]string, len(packagesToShim))
-	for i, packagePath := range packagesToShim {
-		packagesToShimFullNames[i] = tsgoInternalPrefix + packagePath
+	for index, packagePath := range packagesToShim {
+		packagesToShimFullNames[index] = tsgoInternalPrefix + packagePath
 	}
 
 	packages, loadError := packages.Load(&packages.Config{
@@ -206,11 +206,11 @@ func main() {
 			}
 		}
 
-		var qualifierOnlyPackageName types.Qualifier = func(p *types.Package) string {
-			importPackage(p.Path(), true)
-			return p.Name()
+		var qualifierOnlyPackageName types.Qualifier = func(typesPackage *types.Package) string {
+			importPackage(typesPackage.Path(), true)
+			return typesPackage.Name()
 		}
-		var qualifierEmptyPackageName types.Qualifier = func(p *types.Package) string {
+		var qualifierEmptyPackageName types.Qualifier = func(typesPackage *types.Package) string {
 			return ""
 		}
 
@@ -307,8 +307,8 @@ func main() {
 
 			switch typedObject := object.(type) {
 			case *types.TypeName:
-				t := typedObject.Type()
-				named, isNamed := t.(*types.Named)
+				resolvedType := typedObject.Type()
+				named, isNamed := resolvedType.(*types.Named)
 				if isNamed {
 					_, nameWithTypeParameters, _ := strings.Cut(types.TypeString(named, qualifierOnlyPackageName), ".")
 					importPackage(goPackage.Types.Path(), true)
@@ -323,8 +323,8 @@ func main() {
 					if len(typeParameters) > 0 {
 						// (*typeWriter)typeList
 						shimBuilder.WriteByte('[')
-						for i, typ := range typeParameters {
-							if i > 0 {
+						for index, typ := range typeParameters {
+							if index > 0 {
 								shimBuilder.WriteByte(',')
 							}
 							shimBuilder.WriteString(typ.String())
@@ -350,18 +350,18 @@ func main() {
 						recvStart := 0
 						recvEnd := 0
 						parametersStart := 0
-						for i, s := range funcDeclString {
-							if s == '(' {
+						for index, character := range funcDeclString {
+							if character == '(' {
 								if recvStart == 0 {
-									recvStart = i + 1
+									recvStart = index + 1
 								}
 								if recvEnd != 0 {
-									parametersStart = i + 1
+									parametersStart = index + 1
 									break
 								}
 							}
-							if s == ')' && recvEnd == 0 {
-								recvEnd = i
+							if character == ')' && recvEnd == 0 {
+								recvEnd = index
 							}
 						}
 						shimBuilder.WriteString("func ")
@@ -383,8 +383,8 @@ func main() {
 					matchedExtraFields[name] = true
 					mirrorStructName := "extra_" + name
 
-					var emitExtraStruct func(name string, s *types.Struct)
-					emitExtraStruct = func(name string, s *types.Struct) {
+					var emitExtraStruct func(name string, structType *types.Struct)
+					emitExtraStruct = func(name string, structType *types.Struct) {
 						shimBuilder.WriteString("type extra_")
 						shimBuilder.WriteString(name)
 						shimBuilder.WriteString(" struct {")
@@ -393,7 +393,7 @@ func main() {
 							string
 							*types.Struct
 						}){}
-						for field := range s.Fields() {
+						for field := range structType.Fields() {
 							shimBuilder.WriteString("\n  ")
 							if !field.Embedded() {
 								shimBuilder.WriteString(field.Name())
@@ -406,13 +406,13 @@ func main() {
 								if ok && !named.Obj().Exported() {
 									strct, ok := named.Underlying().(*types.Struct)
 									if ok {
-										n := named.Obj().Name()
+										name := named.Obj().Name()
 										dependencies = append(dependencies, struct {
 											string
 											*types.Struct
-										}{n, strct})
+										}{name, strct})
 										shimBuilder.WriteString("extra_")
-										shimBuilder.WriteString(n)
+										shimBuilder.WriteString(name)
 										continue
 									}
 								}
@@ -672,8 +672,8 @@ func verifyTypeSubstitutions(
 			return base, nil
 		}
 		arguments := make([]types.Type, named.TypeParams().Len())
-		for i := range arguments {
-			arguments[i] = argument
+		for index := range arguments {
+			arguments[index] = argument
 		}
 		return types.Instantiate(nil, named, arguments, false)
 	}
@@ -701,16 +701,16 @@ func verifyTypeSubstitutions(
 		}
 
 		for _, argument := range probeArguments {
-			upstreamInstance, err := instantiate(upstreamType, argument)
-			if err != nil {
+			upstreamInstance, instantiateError := instantiate(upstreamType, argument)
+			if instantiateError != nil {
 				continue
 			}
-			standInInstance, err := instantiate(standInType, argument)
-			if err != nil {
+			standInInstance, instantiateError := instantiate(standInType, argument)
+			if instantiateError != nil {
 				problems = append(problems, fmt.Sprintf(
 					"substitution %q -> %q: the stand-in could not be instantiated at %s while the "+
 						"upstream type could, so their shapes differ: %v",
-					upstreamName, standInName, argument, err))
+					upstreamName, standInName, argument, instantiateError))
 				break
 			}
 
@@ -769,8 +769,8 @@ func typeCheckExtraDeclarations(
 	}
 
 	fileSet := token.NewFileSet()
-	parsed, err := parser.ParseFile(fileSet, "extra-declarations.go", sourceBuilder.String(), 0)
-	if err != nil {
+	parsed, parseFileError := parser.ParseFile(fileSet, "extra-declarations.go", sourceBuilder.String(), 0)
+	if parseFileError != nil {
 		return nil
 	}
 	configuration := types.Config{
@@ -785,8 +785,8 @@ func typeCheckExtraDeclarations(
 		// unused-import complaint would be noise rather than a layout problem.
 		DisableUnusedImportCheck: true,
 	}
-	checked, err := configuration.Check("extradeclarations", fileSet, []*ast.File{parsed}, nil)
-	if err != nil {
+	checked, checkError := configuration.Check("extradeclarations", fileSet, []*ast.File{parsed}, nil)
+	if checkError != nil {
 		return nil
 	}
 	return checked.Scope()

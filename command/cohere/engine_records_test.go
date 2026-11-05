@@ -834,16 +834,16 @@ func TestSwiftRunListingModes(test *testing.T) {
 			`{"kind":"rule","name":"cohere-swift/no-try-bang","severity":"error"}`,
 			`{"kind":"rule","name":"cohere-swift/force-unwrapping","severity":"warning"}`,
 		}
-		output, exitCode, err := renderRecords(test, engineModeRules, lines, 0)
-		if err != nil || exitCode != 0 {
-			test.Fatalf("exit %d, err %v", exitCode, err)
+		output, exitCode, renderRecordsError := renderRecords(test, engineModeRules, lines, 0)
+		if renderRecordsError != nil || exitCode != 0 {
+			test.Fatalf("exit %d, err %v", exitCode, renderRecordsError)
 		}
 		if output != "cohere-swift/force-unwrapping\ncohere-swift/no-try-bang\n" {
 			test.Errorf("rules printed as %q", output)
 		}
-		enabled, _, err := renderRecords(test, engineModeRulesEnabled, lines, 0)
-		if err != nil || enabled != "cohere-swift/force-unwrapping\twarning\ncohere-swift/no-try-bang\terror\n" {
-			test.Errorf("rules-enabled printed as %q (err %v)", enabled, err)
+		enabled, _, renderRecordsError := renderRecords(test, engineModeRulesEnabled, lines, 0)
+		if renderRecordsError != nil || enabled != "cohere-swift/force-unwrapping\twarning\ncohere-swift/no-try-bang\terror\n" {
+			test.Errorf("rules-enabled printed as %q (err %v)", enabled, renderRecordsError)
 		}
 	})
 

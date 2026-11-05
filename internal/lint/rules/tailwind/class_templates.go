@@ -196,6 +196,6 @@ func startsWithWhitespace(text string) bool {
 	return len(trimmed) != len(text)
 }
 
-func isSpace(r rune) bool {
-	return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\v' || r == '\f'
+func isSpace(character rune) bool {
+	return character == ' ' || character == '\t' || character == '\n' || character == '\r' || character == '\v' || character == '\f'
 }

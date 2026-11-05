@@ -161,9 +161,9 @@ func fixText(
 	for pass := 1; pass <= passBudget; pass++ {
 		result.Passes = pass
 
-		proposals, err := propose(fileName, current)
-		if err != nil {
-			return result, nil, fmt.Errorf("collecting fixes for %s on pass %d: %w", fileName, pass, err)
+		proposals, proposeError := propose(fileName, current)
+		if proposeError != nil {
+			return result, nil, fmt.Errorf("collecting fixes for %s on pass %d: %w", fileName, pass, proposeError)
 		}
 		lastProposals = proposals
 		if len(proposals) == 0 {
@@ -328,8 +328,8 @@ var ErrSkipped = errors.New("the transform skipped this file")
 // The reason is what a reader acts on. "Skipped" alone tells them a number; "skipped: markdown
 // doubles a standalone tilde" tells them which files and why, which is the difference between a
 // count and a finding.
-func skipReasonOf(err error) string {
-	message := err.Error()
+func skipReasonOf(transformError error) string {
+	message := transformError.Error()
 	prefix := ErrSkipped.Error() + ": "
 	if after, found := strings.CutPrefix(message, prefix); found {
 		return after
@@ -473,9 +473,9 @@ func fixAndTransformText(fileName string, text string, seed *ast.SourceFile, pro
 		}
 
 		// The printer changed the text, so ask the rules about what it printed.
-		proposals, err := propose(fileName, result.Text)
-		if err != nil {
-			return result, fmt.Errorf("collecting fixes for %s after formatting: %w", fileName, err)
+		proposals, proposeError := propose(fileName, result.Text)
+		if proposeError != nil {
+			return result, fmt.Errorf("collecting fixes for %s after formatting: %w", fileName, proposeError)
 		}
 		if len(proposals) == 0 {
 			return result, nil
@@ -507,9 +507,9 @@ func fixAndTransformText(fileName string, text string, seed *ast.SourceFile, pro
 			}
 			return propose(name, current)
 		}
-		next, nextTree, err := fixText(fileName, result.Text, nil, startingWith, maximumPasses)
-		if err != nil {
-			return result, err
+		next, nextTree, fixTextError := fixText(fileName, result.Text, nil, startingWith, maximumPasses)
+		if fixTextError != nil {
+			return result, fixTextError
 		}
 		result.Passes += next.Passes
 		result.Rejected = append(result.Rejected, next.Rejected...)

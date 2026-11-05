@@ -97,12 +97,12 @@ func (parser *scssParser) raw(each *node, property string, tokens []token, custo
 	if raws, isRaw := each.raws[property].(*rawValue); isRaw {
 		scss := raws.raw
 		var all strings.Builder
-		for _, i := range tokens {
-			if i.kind == "comment" && i.inline {
-				text := replaceCommentDelimiters(i.value[2:])
+		for _, token := range tokens {
+			if token.kind == "comment" && token.inline {
+				text := replaceCommentDelimiters(token.value[2:])
 				all.WriteString("/*" + text + "*/")
 			} else {
-				all.WriteString(i.value)
+				all.WriteString(token.value)
 			}
 		}
 		raws.raw = all.String()
@@ -117,18 +117,18 @@ func (parser *scssParser) rule(tokens []token) {
 	withColon := false
 	brackets := 0
 	value := ""
-	for _, i := range tokens {
+	for _, token := range tokens {
 		if withColon {
-			if i.kind != "comment" && i.kind != "{" {
-				value += i.value
+			if token.kind != "comment" && token.kind != "{" {
+				value += token.value
 			}
-		} else if i.kind == "space" && strings.Contains(i.value, "\n") {
+		} else if token.kind == "space" && strings.Contains(token.value, "\n") {
 			break
-		} else if i.kind == "(" {
+		} else if token.kind == "(" {
 			brackets += 1
-		} else if i.kind == ")" {
+		} else if token.kind == ")" {
 			brackets -= 1
-		} else if brackets == 0 && i.kind == ":" {
+		} else if brackets == 0 && token.kind == ":" {
 			withColon = true
 		}
 	}
@@ -142,9 +142,9 @@ func (parser *scssParser) rule(tokens []token) {
 
 		// The last token that is not a space; there is one, the colon.
 		var last token
-		for i := len(tokens) - 1; i >= 0; i-- {
-			if tokens[i].kind != "space" {
-				last = tokens[i]
+		for index := len(tokens) - 1; index >= 0; index-- {
+			if tokens[index].kind != "space" {
+				last = tokens[index]
 				break
 			}
 		}

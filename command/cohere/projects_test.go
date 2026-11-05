@@ -801,13 +801,13 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 		}
 	}
 
-	resolvedRoot, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		test.Fatal(err)
+	resolvedRoot, resolveSymlinksError := filepath.EvalSymlinks(root)
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
 	}
-	logged, err := os.ReadFile(log)
-	if err != nil {
-		test.Fatal(err)
+	logged, readError := os.ReadFile(log)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	yields := map[string][]string{}
 	for _, line := range strings.Split(strings.TrimSpace(string(logged)), "\n") {

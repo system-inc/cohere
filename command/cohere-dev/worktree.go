@@ -132,14 +132,14 @@ func checkWorktreeName(name string) error {
 // namedWorktreePath finds the checkout of main of the repository holding the working directory, and the
 // named worktree's path beside it. A nonzero code is the exit code of a failure it has said.
 func namedWorktreePath(name string) (string, string, int) {
-	top, err := gitOutput("", "rev-parse", "--show-toplevel")
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: worktree runs inside a checkout of cohere: %v\n", err)
+	top, gitOutputError := gitOutput("", "rev-parse", "--show-toplevel")
+	if gitOutputError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: worktree runs inside a checkout of cohere: %v\n", gitOutputError)
 		return "", "", 2
 	}
-	mainCheckout, err := checkoutOfMain(top)
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
+	mainCheckout, checkoutOfMainError := checkoutOfMain(top)
+	if checkoutOfMainError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", checkoutOfMainError)
 		return "", "", 1
 	}
 	return mainCheckout, filepath.Join(filepath.Dir(mainCheckout), worktreePrefix+name), 0
@@ -175,9 +175,9 @@ func moveNamedWorktree(mainCheckout string, path string) int {
 	if code := checkWorktreeHoldsNoWork(mainCheckout, path, "moving"); code != 0 {
 		return code
 	}
-	before, err := gitOutput(path, "rev-parse", "HEAD")
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s's head: %v\n", path, err)
+	before, gitOutputError := gitOutput(path, "rev-parse", "HEAD")
+	if gitOutputError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s's head: %v\n", path, gitOutputError)
 		return 1
 	}
 	if output, gitCombinedError := gitCombined(path, "switch", "--detach", "main"); gitCombinedError != nil {
@@ -190,14 +190,14 @@ func moveNamedWorktree(mainCheckout string, path string) int {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", linkSubmodulesError)
 		return 1
 	}
-	after, err := gitOutput(path, "rev-parse", "HEAD")
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s's head: %v\n", path, err)
+	after, gitOutputError := gitOutput(path, "rev-parse", "HEAD")
+	if gitOutputError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s's head: %v\n", path, gitOutputError)
 		return 1
 	}
-	changed, err := gitOutput(path, "diff", "--name-only", before, after)
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: listing the files the move changed: %v\n", err)
+	changed, gitOutputError := gitOutput(path, "diff", "--name-only", before, after)
+	if gitOutputError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: listing the files the move changed: %v\n", gitOutputError)
 		return 1
 	}
 	count := 0
@@ -225,9 +225,9 @@ func moveNamedWorktree(mainCheckout string, path string) int {
 // what a move or a removal would lose. doing names the act refused. A nonzero code is the exit code of a
 // refusal or a failure it has said.
 func checkWorktreeHoldsNoWork(mainCheckout string, path string, doing string) int {
-	registered, err := isWorktreeOf(mainCheckout, path)
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
+	registered, isWorktreeOfError := isWorktreeOf(mainCheckout, path)
+	if isWorktreeOfError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", isWorktreeOfError)
 		return 1
 	}
 	if !registered {
@@ -237,9 +237,9 @@ func checkWorktreeHoldsNoWork(mainCheckout string, path string, doing string) in
 	}
 	// Submodules are left out, since git status refuses a worktree whose submodule is a symlink, as the team
 	// makes them. Untracked files count: they are work, and a removal would take them.
-	changes, err := gitOutput(path, "status", "--porcelain", "--ignore-submodules=all")
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s's status: %v\n", path, err)
+	changes, gitOutputError := gitOutput(path, "status", "--porcelain", "--ignore-submodules=all")
+	if gitOutputError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s's status: %v\n", path, gitOutputError)
 		return 1
 	}
 	if changes != "" {
@@ -250,9 +250,9 @@ func checkWorktreeHoldsNoWork(mainCheckout string, path string, doing string) in
 	// A commit whose patch main holds counts as landed: a lead brings a hand's unit home by cherry-pick, which
 	// gives it a new hash on main, and main..`HEAD` would refuse that hand's worktree for good. A patch that
 	// differs at all, a conflict resolved, still counts as unlanded, which keeps the refusal on the safe side.
-	unlanded, err := gitOutput(path, "log", "--oneline", "--cherry-pick", "--right-only", "main...HEAD")
-	if err != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s's commits that main does not hold: %v\n", path, err)
+	unlanded, gitOutputError := gitOutput(path, "log", "--oneline", "--cherry-pick", "--right-only", "main...HEAD")
+	if gitOutputError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s's commits that main does not hold: %v\n", path, gitOutputError)
 		return 1
 	}
 	if unlanded != "" {
@@ -267,13 +267,13 @@ func checkWorktreeHoldsNoWork(mainCheckout string, path string, doing string) in
 // Both sides are compared with symlinks resolved, since git may record a path through /private where the
 // caller's has /tmp.
 func isWorktreeOf(mainCheckout string, path string) (bool, error) {
-	listing, err := gitOutput(mainCheckout, "worktree", "list", "--porcelain")
-	if err != nil {
-		return false, fmt.Errorf("listing the repository's worktrees: %w", err)
+	listing, gitOutputError := gitOutput(mainCheckout, "worktree", "list", "--porcelain")
+	if gitOutputError != nil {
+		return false, fmt.Errorf("listing the repository's worktrees: %w", gitOutputError)
 	}
-	resolved, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return false, err
+	resolved, resolveSymlinksError := filepath.EvalSymlinks(path)
+	if resolveSymlinksError != nil {
+		return false, resolveSymlinksError
 	}
 	if resolvedMain, resolveSymlinksError := filepath.EvalSymlinks(
 		mainCheckout,

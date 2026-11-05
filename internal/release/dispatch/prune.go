@@ -214,8 +214,8 @@ func planStaleDirectories(parent string, current string, now time.Time) ([]Prune
 func directoryBytes(directory string) int64 {
 	total := int64(0)
 	// Ignored: the callback skips every path it cannot read and never returns an error, so the walk has none.
-	filepath.WalkDir(directory, func(_ string, entry os.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
+	filepath.WalkDir(directory, func(_ string, entry os.DirEntry, pathError error) error {
+		if pathError != nil || entry.IsDir() {
 			return nil
 		}
 		if information, infoError := entry.Info(); infoError == nil {

@@ -11,19 +11,19 @@ import (
 // serves strings over the mapping, and the compiler and the rules keep substrings of those as long as the
 // process runs. See the content pack's package comment.
 func mapFile(path string) []byte {
-	file, err := os.Open(path)
-	if err != nil {
+	file, openError := os.Open(path)
+	if openError != nil {
 		return nil
 	}
 	// Ignored: the file is opened read-only, only to map it, so closing it loses no write, and the mapping
 	// outlives the descriptor.
 	defer file.Close()
-	information, err := file.Stat()
-	if err != nil || information.Size() == 0 {
+	information, statError := file.Stat()
+	if statError != nil || information.Size() == 0 {
 		return nil
 	}
-	mapped, err := syscall.Mmap(int(file.Fd()), 0, int(information.Size()), syscall.PROT_READ, syscall.MAP_SHARED)
-	if err != nil {
+	mapped, memoryMapError := syscall.Mmap(int(file.Fd()), 0, int(information.Size()), syscall.PROT_READ, syscall.MAP_SHARED)
+	if memoryMapError != nil {
 		return nil
 	}
 	return mapped

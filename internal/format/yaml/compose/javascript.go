@@ -17,14 +17,14 @@ import (
 func unitsToString(units []uint16) string {
 	var builder strings.Builder
 	builder.Grow(len(units))
-	for i := 0; i < len(units); i++ {
-		unit := units[i]
+	for index := 0; index < len(units); index++ {
+		unit := units[index]
 		switch {
 		case unit < utf8.RuneSelf:
 			builder.WriteByte(byte(unit))
-		case isHighSurrogate(unit) && i+1 < len(units) && isLowSurrogate(units[i+1]):
-			builder.WriteRune(utf16.DecodeRune(rune(unit), rune(units[i+1])))
-			i++
+		case isHighSurrogate(unit) && index+1 < len(units) && isLowSurrogate(units[index+1]):
+			builder.WriteRune(utf16.DecodeRune(rune(unit), rune(units[index+1])))
+			index++
 		case isHighSurrogate(unit) || isLowSurrogate(unit):
 			builder.WriteByte(0xE0 | byte(unit>>12))
 			builder.WriteByte(0x80 | byte(unit>>6)&0x3F)
@@ -40,20 +40,20 @@ func unitsToString(units []uint16) string {
 // become U+FFFD, as Go's own conversion would make them.
 func stringToUnits(text string) []uint16 {
 	units := make([]uint16, 0, len(text))
-	for i := 0; i < len(text); {
-		if i+2 < len(text) && text[i] == 0xED && text[i+1] >= 0xA0 && text[i+1] <= 0xBF && text[i+2]&0xC0 == 0x80 {
-			units = append(units, 0xD000|uint16(text[i+1]&0x3F)<<6|uint16(text[i+2]&0x3F))
-			i += 3
+	for index := 0; index < len(text); {
+		if index+2 < len(text) && text[index] == 0xED && text[index+1] >= 0xA0 && text[index+1] <= 0xBF && text[index+2]&0xC0 == 0x80 {
+			units = append(units, 0xD000|uint16(text[index+1]&0x3F)<<6|uint16(text[index+2]&0x3F))
+			index += 3
 			continue
 		}
-		character, size := utf8.DecodeRuneInString(text[i:])
+		character, size := utf8.DecodeRuneInString(text[index:])
 		if character >= 0x10000 {
 			high, low := utf16.EncodeRune(character)
 			units = append(units, uint16(high), uint16(low))
 		} else {
 			units = append(units, uint16(character))
 		}
-		i += size
+		index += size
 	}
 	return units
 }
@@ -196,8 +196,8 @@ func jsonStringify(units []uint16) string {
 
 func writeJSONString(builder *strings.Builder, units []uint16) {
 	builder.WriteByte('"')
-	for i := 0; i < len(units); i++ {
-		unit := units[i]
+	for index := 0; index < len(units); index++ {
+		unit := units[index]
 		switch {
 		case unit == '"':
 			builder.WriteString(`\"`)
@@ -215,9 +215,9 @@ func writeJSONString(builder *strings.Builder, units []uint16) {
 			builder.WriteString(`\t`)
 		case unit < 0x20:
 			fmt.Fprintf(builder, `\u%04x`, unit)
-		case isHighSurrogate(unit) && i+1 < len(units) && isLowSurrogate(units[i+1]):
-			builder.WriteRune(utf16.DecodeRune(rune(unit), rune(units[i+1])))
-			i++
+		case isHighSurrogate(unit) && index+1 < len(units) && isLowSurrogate(units[index+1]):
+			builder.WriteRune(utf16.DecodeRune(rune(unit), rune(units[index+1])))
+			index++
 		case isHighSurrogate(unit) || isLowSurrogate(unit):
 			fmt.Fprintf(builder, `\u%04x`, unit)
 		default:

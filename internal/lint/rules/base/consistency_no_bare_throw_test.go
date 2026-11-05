@@ -189,9 +189,9 @@ func consistencyNoBareThrowWording(constructorName string) string {
 // Not parallel: it swaps the catalog every render reads with policy.UseMessages, so a test rendering beside
 // it finds only this one entry (a parallel run failed rules/base with "has no message", #nxgt2ca).
 func TestNoBareThrowRendersAnEditedEntry(test *testing.T) {
-	original, err := fs.ReadFile(policy.MessageFiles(), "consistency-no-bare-throw.json")
-	if err != nil {
-		test.Fatal(err)
+	original, readFileError := fs.ReadFile(policy.MessageFiles(), "consistency-no-bare-throw.json")
+	if readFileError != nil {
+		test.Fatal(readFileError)
 	}
 	edited := strings.Replace(
 		string(original),
@@ -202,9 +202,9 @@ func TestNoBareThrowRendersAnEditedEntry(test *testing.T) {
 	if edited == string(original) {
 		test.Fatal("the anchor is not in the entry, so the edit would not apply")
 	}
-	catalog, err := policy.LoadMessages(fstest.MapFS{"consistency-no-bare-throw.json": {Data: []byte(edited)}})
-	if err != nil {
-		test.Fatal(err)
+	catalog, loadMessagesError := policy.LoadMessages(fstest.MapFS{"consistency-no-bare-throw.json": {Data: []byte(edited)}})
+	if loadMessagesError != nil {
+		test.Fatal(loadMessagesError)
 	}
 	restore := policy.UseMessages(catalog)
 	defer restore()

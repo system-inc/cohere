@@ -321,13 +321,13 @@ func Validate(record Record) error {
 			return fmt.Errorf("the record stopped early, but %w", agreeError)
 		}
 	}
-	want, err := json.Marshal(Summarize(measured, record.Runs))
-	if err != nil {
-		return err
+	want, encodeError := json.Marshal(Summarize(measured, record.Runs))
+	if encodeError != nil {
+		return encodeError
 	}
-	got, err := json.Marshal(record.Modes)
-	if err != nil {
-		return err
+	got, encodeError := json.Marshal(record.Modes)
+	if encodeError != nil {
+		return encodeError
 	}
 	if string(got) != string(want) {
 		return fmt.Errorf("the mode summaries are not what the runs give:\n  recorded %s\n  the runs %s", got, want)

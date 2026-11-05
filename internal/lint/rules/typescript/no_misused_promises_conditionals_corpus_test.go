@@ -51,9 +51,9 @@ func TestNoMisusedPromisesConditionalsUpstreamCorpus(test *testing.T) {
 		}
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			options, err := decode([]byte(row.options))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", row.options, err)
+			options, decodeError := decode([]byte(row.options))
+			if decodeError != nil {
+				test.Fatalf("decoding %q: %v", row.options, decodeError)
 			}
 			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoMisusedPromises, map[string]string{
 				"file.ts": row.source,
@@ -98,7 +98,7 @@ func TestNoMisusedPromisesConditionalsObjectRefusesOtherShapes(test *testing.T) 
 		`{"checksConditionals": {"flagUnion": "all"}}`,
 		`{"checksConditionals": "all"}`,
 	} {
-		if _, err := decode([]byte(raw)); err == nil {
+		if _, decodeError := decode([]byte(raw)); decodeError == nil {
 			test.Errorf("%s decoded, and upstream's schema refuses it", raw)
 		}
 	}

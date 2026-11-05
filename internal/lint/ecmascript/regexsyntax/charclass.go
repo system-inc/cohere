@@ -93,30 +93,30 @@ type RegexCharElement struct {
 // escape at EOF). When false, cb may have been invoked for classes encountered
 // before the error.
 func IterateRegexCharacterClasses(pattern string, flags RegexFlags, cb func(start, end int)) bool {
-	i := 0
-	for i < len(pattern) {
-		switch pattern[i] {
+	index := 0
+	for index < len(pattern) {
+		switch pattern[index] {
 		case '\\':
-			step, ok := SkipPatternEscape(pattern, i, flags)
+			step, ok := SkipPatternEscape(pattern, index, flags)
 			if !ok {
 				return false
 			}
-			i += step
+			index += step
 		case '[':
-			end, ok := iterateClassFromLBracket(pattern, i, flags, cb)
+			end, ok := iterateClassFromLBracket(pattern, index, flags, cb)
 			if !ok {
 				return false
 			}
-			i = end
+			index = end
 		case '(':
 			// Parens don't affect character-class scanning; consume and continue.
-			i++
+			index++
 		default:
-			_, w := utf8.DecodeRuneInString(pattern[i:])
-			if w == 0 {
-				i++
+			_, size := utf8.DecodeRuneInString(pattern[index:])
+			if size == 0 {
+				index++
 			} else {
-				i += w
+				index += size
 			}
 		}
 	}
@@ -135,33 +135,33 @@ func iterateClassFromLBracket(pattern string, start int, flags RegexFlags, cb fu
 	// Recurse into nested classes first (under v flag), then invoke cb on
 	// the outermost.
 	if flags.UnicodeSets {
-		i := start + 1
-		if i < end-1 && pattern[i] == '^' {
-			i++
+		index := start + 1
+		if index < end-1 && pattern[index] == '^' {
+			index++
 		}
-		for i < end-1 {
-			c := pattern[i]
-			if c == '\\' {
-				step, ok := SkipPatternEscape(pattern, i, flags)
+		for index < end-1 {
+			character := pattern[index]
+			if character == '\\' {
+				step, ok := SkipPatternEscape(pattern, index, flags)
 				if !ok {
 					return start, false
 				}
-				i += step
+				index += step
 				continue
 			}
-			if c == '[' {
-				nestedEnd, ok := iterateClassFromLBracket(pattern, i, flags, cb)
+			if character == '[' {
+				nestedEnd, ok := iterateClassFromLBracket(pattern, index, flags, cb)
 				if !ok {
 					return start, false
 				}
-				i = nestedEnd
+				index = nestedEnd
 				continue
 			}
-			_, w := utf8.DecodeRuneInString(pattern[i:])
-			if w == 0 {
-				i++
+			_, size := utf8.DecodeRuneInString(pattern[index:])
+			if size == 0 {
+				index++
 			} else {
-				i += w
+				index += size
 			}
 		}
 	}
@@ -176,36 +176,36 @@ func ClassEnd(pattern string, start int, flags RegexFlags) (int, bool) {
 	if start >= len(pattern) || pattern[start] != '[' {
 		return start, false
 	}
-	i := start + 1
+	index := start + 1
 	// A leading `^` is not an element by itself.
-	if i < len(pattern) && pattern[i] == '^' {
-		i++
+	if index < len(pattern) && pattern[index] == '^' {
+		index++
 	}
 	depth := 1
-	for i < len(pattern) {
-		c := pattern[i]
+	for index < len(pattern) {
+		character := pattern[index]
 		switch {
-		case c == '\\':
-			step, ok := SkipPatternEscape(pattern, i, flags)
+		case character == '\\':
+			step, ok := SkipPatternEscape(pattern, index, flags)
 			if !ok {
 				return start, false
 			}
-			i += step
-		case c == '[' && flags.UnicodeSets:
+			index += step
+		case character == '[' && flags.UnicodeSets:
 			depth++
-			i++
-		case c == ']':
+			index++
+		case character == ']':
 			depth--
-			i++
+			index++
 			if depth == 0 {
-				return i, true
+				return index, true
 			}
 		default:
-			_, w := utf8.DecodeRuneInString(pattern[i:])
-			if w == 0 {
-				i++
+			_, size := utf8.DecodeRuneInString(pattern[index:])
+			if size == 0 {
+				index++
 			} else {
-				i += w
+				index += size
 			}
 		}
 	}
@@ -213,50 +213,50 @@ func ClassEnd(pattern string, start int, flags RegexFlags) (int, bool) {
 }
 
 // SkipPatternEscape returns how many bytes a `\`-prefixed escape consumes at
-// pattern[i] (including the leading `\`) for the purposes of class-boundary
+// pattern[index] (including the leading `\`) for the purposes of class-boundary
 // scanning. Returns ok=false at EOF on `\`.
-func SkipPatternEscape(pattern string, i int, flags RegexFlags) (int, bool) {
-	if i+1 >= len(pattern) {
+func SkipPatternEscape(pattern string, index int, flags RegexFlags) (int, bool) {
+	if index+1 >= len(pattern) {
 		return 0, false
 	}
-	next := pattern[i+1]
+	next := pattern[index+1]
 	switch next {
 	case 'x':
-		if i+3 < len(pattern) && IsHexDigit(pattern[i+2]) && IsHexDigit(pattern[i+3]) {
+		if index+3 < len(pattern) && IsHexDigit(pattern[index+2]) && IsHexDigit(pattern[index+3]) {
 			return 4, true
 		}
 		return 2, true
 	case 'u':
-		if i+2 < len(pattern) && pattern[i+2] == '{' {
+		if index+2 < len(pattern) && pattern[index+2] == '{' {
 			if !flags.UV() {
 				return 2, true
 			}
-			closeRel := strings.IndexByte(pattern[i+3:], '}')
+			closeRel := strings.IndexByte(pattern[index+3:], '}')
 			if closeRel < 0 {
 				return 2, true // best-effort recover
 			}
 			return 3 + closeRel + 1, true
 		}
-		if i+5 < len(pattern) && AllHexDigits(pattern[i+2:i+6]) {
+		if index+5 < len(pattern) && AllHexDigits(pattern[index+2:index+6]) {
 			return 6, true
 		}
 		return 2, true
 	case 'c':
-		if i+2 < len(pattern) {
+		if index+2 < len(pattern) {
 			return 3, true
 		}
 		return 2, true
 	case 'p', 'P':
-		if flags.UV() && i+2 < len(pattern) && pattern[i+2] == '{' {
-			closeRel := strings.IndexByte(pattern[i+3:], '}')
+		if flags.UV() && index+2 < len(pattern) && pattern[index+2] == '{' {
+			closeRel := strings.IndexByte(pattern[index+3:], '}')
 			if closeRel >= 0 {
 				return 3 + closeRel + 1, true
 			}
 		}
 		return 2, true
 	case 'q':
-		if flags.UV() && i+2 < len(pattern) && pattern[i+2] == '{' {
-			closeRel := strings.IndexByte(pattern[i+3:], '}')
+		if flags.UV() && index+2 < len(pattern) && pattern[index+2] == '{' {
+			closeRel := strings.IndexByte(pattern[index+3:], '}')
 			if closeRel >= 0 {
 				return 3 + closeRel + 1, true
 			}
@@ -265,11 +265,11 @@ func SkipPatternEscape(pattern string, i int, flags RegexFlags) (int, bool) {
 	}
 	// Generic two-byte escape (covers identity, \d, \w, ...).
 	// If the next is a multi-byte UTF-8 rune, consume its full width.
-	_, w := utf8.DecodeRuneInString(pattern[i+1:])
-	if w == 0 {
+	_, size := utf8.DecodeRuneInString(pattern[index+1:])
+	if size == 0 {
 		return 2, true
 	}
-	return 1 + w, true
+	return 1 + size, true
 }
 
 // ---------------------------------------------------------------------------
@@ -333,9 +333,9 @@ func parseRegexCharacterClass(
 	if start >= len(pattern) || pattern[start] != '[' {
 		return nil, start, false
 	}
-	i := start + 1
-	if i < len(pattern) && pattern[i] == '^' {
-		i++
+	index := start + 1
+	if index < len(pattern) && pattern[index] == '^' {
+		index++
 	}
 
 	var out []RegexCharElement
@@ -344,14 +344,14 @@ func parseRegexCharacterClass(
 	}
 	pendingIndex := -1 // index into `out` of the last RegexCharSingle (candidate for range start)
 
-	for i < len(pattern) {
-		c := pattern[i]
+	for index < len(pattern) {
+		character := pattern[index]
 		switch {
-		case c == ']':
-			return out, i + 1, true
+		case character == ']':
+			return out, index + 1, true
 
-		case c == '\\':
-			el, step, ok := readClassEscape(pattern, i, flags)
+		case character == '\\':
+			el, step, ok := readClassEscape(pattern, index, flags)
 			if !ok {
 				return nil, start, false
 			}
@@ -368,38 +368,38 @@ func parseRegexCharacterClass(
 				// under u/v produces the combined code point (one element). Under non-u,
 				// `\u{H}` is not recognized at all (treated as identity `u`).
 			}
-			i += step
+			index += step
 
-		case c == '[' && flags.UnicodeSets:
+		case character == '[' && flags.UnicodeSets:
 			// v-flag nested class — emit as breaker; caller recurses via
 			// IterateRegexCharacterClasses to parse nested contents.
-			nestedEnd, ok := ClassEnd(pattern, i, flags)
+			nestedEnd, ok := ClassEnd(pattern, index, flags)
 			if !ok {
 				return nil, start, false
 			}
-			out = append(out, RegexCharElement{Kind: RegexCharBreaker, Start: i, End: nestedEnd})
-			i = nestedEnd
+			out = append(out, RegexCharElement{Kind: RegexCharBreaker, Start: index, End: nestedEnd})
+			index = nestedEnd
 			pendingIndex = -1
 
-		case (c == '-' || c == '&') && flags.UnicodeSets && i+1 < len(pattern) && pattern[i+1] == c:
+		case (character == '-' || character == '&') && flags.UnicodeSets && index+1 < len(pattern) && pattern[index+1] == character:
 			// v-flag set operator `--` or `&&` — breaker
-			out = append(out, RegexCharElement{Kind: RegexCharBreaker, Start: i, End: i + 2})
-			i += 2
+			out = append(out, RegexCharElement{Kind: RegexCharBreaker, Start: index, End: index + 2})
+			index += 2
 			pendingIndex = -1
 
-		case c == '-' && pendingIndex >= 0 && i+1 < len(pattern) && pattern[i+1] != ']':
+		case character == '-' && pendingIndex >= 0 && index+1 < len(pattern) && pattern[index+1] != ']':
 			// Range: combine pending with next element.
-			i++
+			index++
 			var nextEl RegexCharElement
 			var step int
 			var ok bool
-			if pattern[i] == '\\' {
-				nextEl, step, ok = readClassEscape(pattern, i, flags)
+			if pattern[index] == '\\' {
+				nextEl, step, ok = readClassEscape(pattern, index, flags)
 				if !ok {
 					return nil, start, false
 				}
 			} else {
-				nextEl, step, ok = readRawClassChar(pattern, i, flags)
+				nextEl, step, ok = readRawClassChar(pattern, index, flags)
 				if !ok {
 					return nil, start, false
 				}
@@ -425,11 +425,11 @@ func parseRegexCharacterClass(
 			// (which would logically expand to a surrogate pair), the range
 			// representation is already degenerate; callers in this project
 			// only inspect endpoints, so we don't split here.
-			i += step
+			index += step
 			pendingIndex = -1
 
 		default:
-			el, step, ok := readRawClassChar(pattern, i, flags)
+			el, step, ok := readRawClassChar(pattern, index, flags)
 			if !ok {
 				return nil, start, false
 			}
@@ -441,7 +441,7 @@ func parseRegexCharacterClass(
 				// per-flag whether to expand them, based on the rule's own
 				// semantic needs. See IsLoneSurrogate on the element.
 			}
-			i += step
+			index += step
 		}
 	}
 	return nil, start, false // unterminated
@@ -449,11 +449,11 @@ func parseRegexCharacterClass(
 
 // readClassEscape parses a `\`-prefixed token inside a character class. It
 // emits one RegexCharElement: either RegexCharSingle or RegexCharBreaker.
-func readClassEscape(pattern string, i int, flags RegexFlags) (RegexCharElement, int, bool) {
-	if i+1 >= len(pattern) {
+func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElement, int, bool) {
+	if index+1 >= len(pattern) {
 		return RegexCharElement{}, 0, false
 	}
-	next := pattern[i+1]
+	next := pattern[index+1]
 	switch next {
 	case 'd', 'D', 'w', 'W', 's', 'S', 'b', 'B':
 		// Note: inside a class, `\b` means U+0008 (backspace), not word
@@ -467,7 +467,7 @@ func readClassEscape(pattern string, i int, flags RegexFlags) (RegexCharElement,
 		// `\d`/`\D`/`\w`/`\W`/`\s`/`\S` are CharacterSet (breaker).
 		if next == 'b' {
 			return RegexCharElement{
-				Kind: RegexCharSingle, Value: 0x08, Start: i, End: i + 2,
+				Kind: RegexCharSingle, Value: 0x08, Start: index, End: index + 2,
 			}, 2, true
 		}
 		if next == 'B' {
@@ -476,128 +476,128 @@ func readClassEscape(pattern string, i int, flags RegexFlags) (RegexCharElement,
 			}
 			// Under non-u, identity escape.
 			return RegexCharElement{
-				Kind: RegexCharSingle, Value: 'B', Start: i, End: i + 2,
+				Kind: RegexCharSingle, Value: 'B', Start: index, End: index + 2,
 			}, 2, true
 		}
-		return RegexCharElement{Kind: RegexCharBreaker, Start: i, End: i + 2}, 2, true
+		return RegexCharElement{Kind: RegexCharBreaker, Start: index, End: index + 2}, 2, true
 	case 'p', 'P':
-		if flags.UV() && i+2 < len(pattern) && pattern[i+2] == '{' {
-			closeRel := strings.IndexByte(pattern[i+3:], '}')
+		if flags.UV() && index+2 < len(pattern) && pattern[index+2] == '{' {
+			closeRel := strings.IndexByte(pattern[index+3:], '}')
 			if closeRel < 0 {
 				return RegexCharElement{}, 0, false
 			}
-			end := i + 3 + closeRel + 1
-			return RegexCharElement{Kind: RegexCharBreaker, Start: i, End: end}, end - i, true
+			end := index + 3 + closeRel + 1
+			return RegexCharElement{Kind: RegexCharBreaker, Start: index, End: end}, end - index, true
 		}
 		// Non-u mode: identity escape of `p`/`P`.
 		return RegexCharElement{
-			Kind: RegexCharSingle, Value: uint32(next), Start: i, End: i + 2,
+			Kind: RegexCharSingle, Value: uint32(next), Start: index, End: index + 2,
 		}, 2, true
 	case 'q':
-		if flags.UV() && i+2 < len(pattern) && pattern[i+2] == '{' {
-			closeRel := strings.IndexByte(pattern[i+3:], '}')
+		if flags.UV() && index+2 < len(pattern) && pattern[index+2] == '{' {
+			closeRel := strings.IndexByte(pattern[index+3:], '}')
 			if closeRel < 0 {
 				return RegexCharElement{}, 0, false
 			}
-			end := i + 3 + closeRel + 1
-			return RegexCharElement{Kind: RegexCharBreaker, Start: i, End: end}, end - i, true
+			end := index + 3 + closeRel + 1
+			return RegexCharElement{Kind: RegexCharBreaker, Start: index, End: end}, end - index, true
 		}
 		return RegexCharElement{
-			Kind: RegexCharSingle, Value: 'q', Start: i, End: i + 2,
+			Kind: RegexCharSingle, Value: 'q', Start: index, End: index + 2,
 		}, 2, true
 	case 'x':
-		if i+3 < len(pattern) && IsHexDigit(pattern[i+2]) && IsHexDigit(pattern[i+3]) {
-			v := ParseHexUint(pattern[i+2 : i+4])
+		if index+3 < len(pattern) && IsHexDigit(pattern[index+2]) && IsHexDigit(pattern[index+3]) {
+			value := ParseHexUint(pattern[index+2 : index+4])
 			return RegexCharElement{
-				Kind: RegexCharSingle, Value: v, Start: i, End: i + 4,
+				Kind: RegexCharSingle, Value: value, Start: index, End: index + 4,
 			}, 4, true
 		}
 		return RegexCharElement{
-			Kind: RegexCharSingle, Value: 'x', Start: i, End: i + 2,
+			Kind: RegexCharSingle, Value: 'x', Start: index, End: index + 2,
 		}, 2, true
 	case 'u':
-		if i+2 < len(pattern) && pattern[i+2] == '{' {
+		if index+2 < len(pattern) && pattern[index+2] == '{' {
 			if !flags.UV() {
 				// Non-u mode: treat `\u` as identity `u`.
 				return RegexCharElement{
-					Kind: RegexCharSingle, Value: 'u', Start: i, End: i + 2,
+					Kind: RegexCharSingle, Value: 'u', Start: index, End: index + 2,
 				}, 2, true
 			}
-			closeRel := strings.IndexByte(pattern[i+3:], '}')
+			closeRel := strings.IndexByte(pattern[index+3:], '}')
 			if closeRel < 0 {
 				return RegexCharElement{}, 0, false
 			}
-			hex := pattern[i+3 : i+3+closeRel]
-			end := i + 3 + closeRel + 1
+			hex := pattern[index+3 : index+3+closeRel]
+			end := index + 3 + closeRel + 1
 			if hex == "" || !AllHexDigits(hex) {
 				return RegexCharElement{}, 0, false
 			}
 			return RegexCharElement{
 				Kind: RegexCharSingle, Value: ParseHexUint(hex), IsUBrace: true,
-				Start: i, End: end,
-			}, end - i, true
+				Start: index, End: end,
+			}, end - index, true
 		}
-		if i+5 < len(pattern) && AllHexDigits(pattern[i+2:i+6]) {
-			hi := ParseHexUint(pattern[i+2 : i+6])
+		if index+5 < len(pattern) && AllHexDigits(pattern[index+2:index+6]) {
+			hi := ParseHexUint(pattern[index+2 : index+6])
 			// Surrogate pair `\uHHHH\uHHHH` under u/v collapses to one element
 			// with an astral value.
-			if flags.UV() && hi >= 0xD800 && hi <= 0xDBFF && i+11 < len(pattern) &&
-				pattern[i+6] == '\\' && pattern[i+7] == 'u' && AllHexDigits(pattern[i+8:i+12]) {
-				lo := ParseHexUint(pattern[i+8 : i+12])
+			if flags.UV() && hi >= 0xD800 && hi <= 0xDBFF && index+11 < len(pattern) &&
+				pattern[index+6] == '\\' && pattern[index+7] == 'u' && AllHexDigits(pattern[index+8:index+12]) {
+				lo := ParseHexUint(pattern[index+8 : index+12])
 				if lo >= 0xDC00 && lo <= 0xDFFF {
 					cp := 0x10000 + (hi-0xD800)*0x400 + (lo - 0xDC00)
 					return RegexCharElement{
-						Kind: RegexCharSingle, Value: cp, Start: i, End: i + 12,
+						Kind: RegexCharSingle, Value: cp, Start: index, End: index + 12,
 					}, 12, true
 				}
 			}
 			return RegexCharElement{
-				Kind: RegexCharSingle, Value: hi, Start: i, End: i + 6,
+				Kind: RegexCharSingle, Value: hi, Start: index, End: index + 6,
 			}, 6, true
 		}
 		return RegexCharElement{
-			Kind: RegexCharSingle, Value: 'u', Start: i, End: i + 2,
+			Kind: RegexCharSingle, Value: 'u', Start: index, End: index + 2,
 		}, 2, true
 	case 'n':
-		return RegexCharElement{Kind: RegexCharSingle, Value: '\n', Start: i, End: i + 2}, 2, true
+		return RegexCharElement{Kind: RegexCharSingle, Value: '\n', Start: index, End: index + 2}, 2, true
 	case 't':
-		return RegexCharElement{Kind: RegexCharSingle, Value: '\t', Start: i, End: i + 2}, 2, true
+		return RegexCharElement{Kind: RegexCharSingle, Value: '\t', Start: index, End: index + 2}, 2, true
 	case 'r':
-		return RegexCharElement{Kind: RegexCharSingle, Value: '\r', Start: i, End: i + 2}, 2, true
+		return RegexCharElement{Kind: RegexCharSingle, Value: '\r', Start: index, End: index + 2}, 2, true
 	case 'v':
-		return RegexCharElement{Kind: RegexCharSingle, Value: '\v', Start: i, End: i + 2}, 2, true
+		return RegexCharElement{Kind: RegexCharSingle, Value: '\v', Start: index, End: index + 2}, 2, true
 	case 'f':
-		return RegexCharElement{Kind: RegexCharSingle, Value: '\f', Start: i, End: i + 2}, 2, true
+		return RegexCharElement{Kind: RegexCharSingle, Value: '\f', Start: index, End: index + 2}, 2, true
 	case '0':
 		// In u/v mode `\0` is always NUL (no octal extension). In non-u
 		// mode, if followed by a digit it's a legacy octal — but legacy
 		// octals aren't meaningful for this project's detectors, so treat
 		// as NUL for simplicity.
-		return RegexCharElement{Kind: RegexCharSingle, Value: 0, Start: i, End: i + 2}, 2, true
+		return RegexCharElement{Kind: RegexCharSingle, Value: 0, Start: index, End: index + 2}, 2, true
 	case 'c':
-		if i+2 < len(pattern) {
+		if index+2 < len(pattern) {
 			return RegexCharElement{
-				Kind: RegexCharSingle, Value: uint32(pattern[i+2]) & 0x1F,
-				Start: i, End: i + 3,
+				Kind: RegexCharSingle, Value: uint32(pattern[index+2]) & 0x1F,
+				Start: index, End: index + 3,
 			}, 3, true
 		}
 		return RegexCharElement{}, 0, false
 	}
 	// Identity escape — value is the (possibly multi-byte) character after `\`.
-	r, w := utf8.DecodeRuneInString(pattern[i+1:])
-	if w == 0 {
+	character, size := utf8.DecodeRuneInString(pattern[index+1:])
+	if size == 0 {
 		return RegexCharElement{}, 0, false
 	}
 	// Under u/v mode, identity escape of a letter/digit is a syntax error.
 	// We relax this: let caller see the element and skip the regex if it
 	// becomes problematic. (Most production code won't hit this.)
 	return RegexCharElement{
-		Kind: RegexCharSingle, Value: uint32(r), Start: i, End: i + 1 + w,
-	}, 1 + w, true
+		Kind: RegexCharSingle, Value: uint32(character), Start: index, End: index + 1 + size,
+	}, 1 + size, true
 }
 
 // readRawClassChar reads a non-`\`-prefixed character inside a class body
-// (i.e. a raw character at pattern[i]). Raw astral in non-u/v mode emits
+// (i.e. a raw character at pattern[index]). Raw astral in non-u/v mode emits
 // the HIGH surrogate only — callers handle the low-surrogate companion by
 // inspecting IsLoneSurrogate and stepping via a subsequent call.
 //
@@ -606,12 +606,12 @@ func readClassEscape(pattern string, i int, flags RegexFlags) (RegexCharElement,
 // misleading-character-class rule accepts this because it gets raw astrals
 // only in string-literal contexts, where the layer-3 parser already does the
 // UTF-16 surrogate split.
-func readRawClassChar(pattern string, i int, flags RegexFlags) (RegexCharElement, int, bool) {
-	r, w := utf8.DecodeRuneInString(pattern[i:])
-	if w == 0 {
+func readRawClassChar(pattern string, index int, flags RegexFlags) (RegexCharElement, int, bool) {
+	character, size := utf8.DecodeRuneInString(pattern[index:])
+	if size == 0 {
 		return RegexCharElement{}, 0, false
 	}
 	return RegexCharElement{
-		Kind: RegexCharSingle, Value: uint32(r), Start: i, End: i + w,
-	}, w, true
+		Kind: RegexCharSingle, Value: uint32(character), Start: index, End: index + size,
+	}, size, true
 }

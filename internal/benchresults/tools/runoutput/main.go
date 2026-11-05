@@ -21,16 +21,16 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: runoutput <log>")
 		os.Exit(2)
 	}
-	output, err := os.ReadFile(os.Args[1])
-	if err != nil {
+	output, readError := os.ReadFile(os.Args[1])
+	if readError != nil {
 		// Ignored: the exit code below says the run failed even when standard error cannot.
-		fmt.Fprintf(os.Stderr, "runoutput: %v\n", err)
+		fmt.Fprintf(os.Stderr, "runoutput: %v\n", readError)
 		os.Exit(1)
 	}
-	run, err := benchresults.ParseRunOutput(output)
-	if err != nil {
+	run, parseRunOutputError := benchresults.ParseRunOutput(output)
+	if parseRunOutputError != nil {
 		// Ignored: the exit code below says the run failed even when standard error cannot.
-		fmt.Fprintf(os.Stderr, "runoutput: %s: %v\n", os.Args[1], err)
+		fmt.Fprintf(os.Stderr, "runoutput: %s: %v\n", os.Args[1], parseRunOutputError)
 		os.Exit(1)
 	}
 	if _, printError := fmt.Printf("%.3f\t%d\t%s\n", run.EngineSeconds, run.Findings, run.Cache); printError != nil {

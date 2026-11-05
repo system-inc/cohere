@@ -16,16 +16,16 @@ import (
 func TestLandRefusesTheRuleCPUBudgetBeforeTests(test *testing.T) {
 	test.Parallel()
 	fixture := newLandFixture(test)
-	a := fixture.worktree("a")
-	path := filepath.Join(a, ruleCPUCheck)
+	worktreeA := fixture.worktree("a")
+	path := filepath.Join(worktreeA, ruleCPUCheck)
 	if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
 	if writeError := os.WriteFile(path, []byte("stand-in budget check\n"), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	fixture.git(a, "add", "internal")
-	fixture.git(a, "commit", "-q", "-m", "a rule CPU check")
+	fixture.git(worktreeA, "add", "internal")
+	fixture.git(worktreeA, "commit", "-q", "-m", "a rule CPU check")
 	bin := test.TempDir()
 	marker := filepath.Join(bin, "under-budget")
 	log := filepath.Join(bin, "commands")
@@ -50,15 +50,15 @@ exit 0
 	environment := append(fixture.environment, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	land := func() (string, error) {
 		command := exec.Command(fixture.wrapper, "land")
-		command.Dir, command.Env = a, environment
+		command.Dir, command.Env = worktreeA, environment
 		output, outputError := command.CombinedOutput()
 		return string(output), outputError
 	}
 	before := fixture.git(fixture.repository, "rev-parse", "main")
-	if output, err := land(); err == nil ||
+	if output, landError := land(); landError == nil ||
 		!strings.Contains(output, "planted-rule 501ms > 500ms") ||
 		strings.Contains(output, "landed ") {
-		test.Fatalf("over-budget land was not refused (%v):\n%s", err, output)
+		test.Fatalf("over-budget land was not refused (%v):\n%s", landError, output)
 	}
 	commands, readError := os.ReadFile(log)
 	if readError != nil {
@@ -80,10 +80,10 @@ exit 0
 	if writeError := os.WriteFile(marker, nil, 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	if output, err := land(); err != nil ||
+	if output, landError := land(); landError != nil ||
 		!strings.Contains(output, "rule CPU budget passed") ||
 		!strings.Contains(output, "landed ") {
-		test.Fatalf("under-budget land did not land (%v):\n%s", err, output)
+		test.Fatalf("under-budget land did not land (%v):\n%s", landError, output)
 	}
 }
 

@@ -24,15 +24,15 @@ const trimCaller = "command/cohere-dev"
 // (#d0x1fhp). So no code outside cohere-dev calls Trim. Tests are exempt: they trim caches of their own.
 func TestOnlyCohereDevTrims(test *testing.T) {
 	test.Parallel()
-	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	root, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	callers := []string{}
 	files := token.NewFileSet()
-	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		native, relativeError := filepath.Rel(root, path)
 		if relativeError != nil {
@@ -86,8 +86,8 @@ func TestOnlyCohereDevTrims(test *testing.T) {
 		})
 		return nil
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	for _, caller := range callers {
 		test.Errorf(

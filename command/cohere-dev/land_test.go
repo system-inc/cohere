@@ -133,10 +133,10 @@ func TestTwoLandingsBothLandInOrderWithoutOverlap(test *testing.T) {
 		}
 	}
 
-	a, b := filepath.Base(fixture.worktree("a")), filepath.Base(fixture.worktree("b"))
+	worktreeA, worktreeB := filepath.Base(fixture.worktree("a")), filepath.Base(fixture.worktree("b"))
 	gates := fixture.gates()
-	if len(gates) != 4 || !strings.HasPrefix(gates[0], "start "+a) || gates[1] != "end "+a ||
-		!strings.HasPrefix(gates[2], "start "+b) || gates[3] != "end "+b {
+	if len(gates) != 4 || !strings.HasPrefix(gates[0], "start "+worktreeA) || gates[1] != "end "+worktreeA ||
+		!strings.HasPrefix(gates[2], "start "+worktreeB) || gates[3] != "end "+worktreeB {
 		test.Fatalf("the gates ran %q, want a's start and end, then b's", gates)
 	}
 	if !strings.Contains(gates[2], "a.txt") {
@@ -179,17 +179,17 @@ func TestALandingAfterMainMovedOutsideLandGatesAgain(test *testing.T) {
 func TestLandRefusesUncommittedWorkAndUndoesAConflict(test *testing.T) {
 	test.Parallel()
 	fixture := newLandFixture(test)
-	a := fixture.worktree("a")
-	if writeError := os.WriteFile(filepath.Join(a, "a.txt"), []byte("changed\n"), 0o644); writeError != nil {
+	worktreeA := fixture.worktree("a")
+	if writeError := os.WriteFile(filepath.Join(worktreeA, "a.txt"), []byte("changed\n"), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
 	refused := exec.Command(fixture.wrapper, "land")
-	refused.Dir, refused.Env = a, fixture.environment
+	refused.Dir, refused.Env = worktreeA, fixture.environment
 	if output, outputError := refused.CombinedOutput(); outputError == nil ||
 		!strings.Contains(string(output), "not committed") {
 		test.Errorf("land of uncommitted work was not refused (%v):\n%s", outputError, output)
 	}
-	fixture.git(a, "commit", "-q", "-am", "change a.txt")
+	fixture.git(worktreeA, "commit", "-q", "-am", "change a.txt")
 
 	// Main changes the same file, so the merge conflicts.
 	if writeError := os.WriteFile(
@@ -201,9 +201,9 @@ func TestLandRefusesUncommittedWorkAndUndoesAConflict(test *testing.T) {
 	}
 	fixture.git(fixture.repository, "add", "a.txt")
 	fixture.git(fixture.repository, "commit", "-q", "-m", "main's a.txt")
-	before := fixture.git(a, "rev-parse", "HEAD")
+	before := fixture.git(worktreeA, "rev-parse", "HEAD")
 	conflicting := exec.Command(fixture.wrapper, "land")
-	conflicting.Dir, conflicting.Env = a, fixture.environment
+	conflicting.Dir, conflicting.Env = worktreeA, fixture.environment
 	output, outputError := conflicting.CombinedOutput()
 	if outputError == nil ||
 		!strings.Contains(string(output), "conflicts with this work in") ||
@@ -211,10 +211,10 @@ func TestLandRefusesUncommittedWorkAndUndoesAConflict(test *testing.T) {
 		test.Errorf("a conflicting land did not stop naming the file (%v):\n%s", outputError, output)
 	}
 	if after := fixture.git(
-		a,
+		worktreeA,
 		"rev-parse",
 		"HEAD",
-	); after != before || fixture.git(a, "status", "--porcelain", "--untracked-files=no") != "" {
+	); after != before || fixture.git(worktreeA, "status", "--porcelain", "--untracked-files=no") != "" {
 		test.Error("the conflicting merge was not undone")
 	}
 }
@@ -235,15 +235,15 @@ func TestLandChecksASymlinkedSubmoduleAgainstItsPin(test *testing.T) {
 
 	fixture.git(fixture.repository, "-c", "protocol.file.allow=always", "submodule", "add", "-q", library, "library")
 	fixture.git(fixture.repository, "commit", "-q", "-m", "pin library")
-	a := fixture.worktree("a")
-	fixture.git(a, "merge", "-q", "--no-edit", "main")
+	worktreeA := fixture.worktree("a")
+	fixture.git(worktreeA, "merge", "-q", "--no-edit", "main")
 	// The worktree's submodule, a symlink to the main checkout's, at the pin.
-	if removeError := os.RemoveAll(filepath.Join(a, "library")); removeError != nil {
+	if removeError := os.RemoveAll(filepath.Join(worktreeA, "library")); removeError != nil {
 		test.Fatal(removeError)
 	}
 	if symlinkError := os.Symlink(
 		filepath.Join(fixture.repository, "library"),
-		filepath.Join(a, "library"),
+		filepath.Join(worktreeA, "library"),
 	); symlinkError != nil {
 		test.Fatal(symlinkError)
 	}
@@ -251,7 +251,7 @@ func TestLandChecksASymlinkedSubmoduleAgainstItsPin(test *testing.T) {
 	// Moved off the pin, it is refused, both commits named.
 	fixture.git(filepath.Join(fixture.repository, "library"), "checkout", "-q", "--detach", moved)
 	refused := exec.Command(fixture.wrapper, "land")
-	refused.Dir, refused.Env = a, fixture.environment
+	refused.Dir, refused.Env = worktreeA, fixture.environment
 	output, outputError := refused.CombinedOutput()
 	if outputError == nil ||
 		!strings.Contains(string(output), "pins "+pinned[:8]) ||
@@ -262,7 +262,7 @@ func TestLandChecksASymlinkedSubmoduleAgainstItsPin(test *testing.T) {
 	// Back on the pin, it lands.
 	fixture.git(filepath.Join(fixture.repository, "library"), "checkout", "-q", "--detach", pinned)
 	landing := exec.Command(fixture.wrapper, "land")
-	landing.Dir, landing.Env = a, fixture.environment
+	landing.Dir, landing.Env = worktreeA, fixture.environment
 	if output, outputError := landing.CombinedOutput(); outputError != nil ||
 		!strings.Contains(string(output), "landed") {
 		test.Errorf("a worktree with a symlinked submodule at its pin did not land (%v):\n%s", outputError, output)
@@ -313,14 +313,14 @@ func TestTheGateBuildsGoInATreeWhoseSubmoduleIsASymlink(test *testing.T) {
 	fixture.git(fixture.repository, "add", "go.mod", "main.go")
 	fixture.git(fixture.repository, "-c", "protocol.file.allow=always", "submodule", "add", "-q", library, "library")
 	fixture.git(fixture.repository, "commit", "-q", "-m", "a module, and library pinned")
-	a := fixture.worktree("a")
-	fixture.git(a, "merge", "-q", "--no-edit", "main")
-	if removeError := os.RemoveAll(filepath.Join(a, "library")); removeError != nil {
+	worktreeA := fixture.worktree("a")
+	fixture.git(worktreeA, "merge", "-q", "--no-edit", "main")
+	if removeError := os.RemoveAll(filepath.Join(worktreeA, "library")); removeError != nil {
 		test.Fatal(removeError)
 	}
 	if symlinkError := os.Symlink(
 		filepath.Join(fixture.repository, "library"),
-		filepath.Join(a, "library"),
+		filepath.Join(worktreeA, "library"),
 	); symlinkError != nil {
 		test.Fatal(symlinkError)
 	}
@@ -333,7 +333,7 @@ func TestTheGateBuildsGoInATreeWhoseSubmoduleIsASymlink(test *testing.T) {
 		}
 	}
 	build := exec.Command("go", "build", "-o", filepath.Join(test.TempDir(), "stamp"), ".")
-	build.Dir, build.Env = a, gateEnvironment(caller)
+	build.Dir, build.Env = worktreeA, gateEnvironment(caller)
 	if output, outputError := build.CombinedOutput(); outputError != nil {
 		test.Errorf(
 			"the gate's go build failed in a worktree with a symlinked submodule (%v):\n%s",
@@ -386,32 +386,32 @@ func TestTheGateCoversEveryWorkspaceModuleButASubmodules(test *testing.T) {
 	fixture.git(fixture.repository, "add", "go.mod", "root.go", "go.work", "inner")
 	fixture.git(fixture.repository, "-c", "protocol.file.allow=always", "submodule", "add", "-q", library, "library")
 	fixture.git(fixture.repository, "commit", "-q", "-m", "a workspace of three modules, one in a submodule")
-	a := fixture.worktree("a")
-	fixture.git(a, "merge", "-q", "--no-edit", "main")
-	if removeError := os.RemoveAll(filepath.Join(a, "library")); removeError != nil {
+	worktreeA := fixture.worktree("a")
+	fixture.git(worktreeA, "merge", "-q", "--no-edit", "main")
+	if removeError := os.RemoveAll(filepath.Join(worktreeA, "library")); removeError != nil {
 		test.Fatal(removeError)
 	}
 	if symlinkError := os.Symlink(
 		filepath.Join(fixture.repository, "library"),
-		filepath.Join(a, "library"),
+		filepath.Join(worktreeA, "library"),
 	); symlinkError != nil {
 		test.Fatal(symlinkError)
 	}
 
 	land := func() (string, error) {
 		landing := exec.Command(fixture.wrapper, "land")
-		landing.Dir, landing.Env = a, fixture.environment
+		landing.Dir, landing.Env = worktreeA, fixture.environment
 		output, outputError := landing.CombinedOutput()
 		return string(output), outputError
 	}
 
 	// Staged by name: the worktree's submodule is a symlink, and `commit -a` would commit it as one.
-	write(a, map[string]string{"inner/inner_test.go": failing})
-	fixture.git(a, "add", "inner/inner_test.go")
-	fixture.git(a, "commit", "-q", "-m", "plant a failing test in the nested module")
-	output, err := land()
-	if err == nil || !strings.Contains(output, "planted in the nested module") {
-		test.Fatalf("a failing test in a nested module did not refuse the landing (%v):\n%s", err, output)
+	write(worktreeA, map[string]string{"inner/inner_test.go": failing})
+	fixture.git(worktreeA, "add", "inner/inner_test.go")
+	fixture.git(worktreeA, "commit", "-q", "-m", "plant a failing test in the nested module")
+	output, landError := land()
+	if landError == nil || !strings.Contains(output, "planted in the nested module") {
+		test.Fatalf("a failing test in a nested module did not refuse the landing (%v):\n%s", landError, output)
 	}
 	if !strings.Contains(output, "gating 2 modules from go.work: ., inner") ||
 		!strings.Contains(output, "not gated, inside a submodule: library/mod") {
@@ -421,11 +421,11 @@ func TestTheGateCoversEveryWorkspaceModuleButASubmodules(test *testing.T) {
 		test.Errorf("the gate ran a test inside a submodule:\n%s", output)
 	}
 
-	write(a, map[string]string{"inner/inner_test.go": passing})
-	fixture.git(a, "add", "inner/inner_test.go")
-	fixture.git(a, "commit", "-q", "-m", "the nested module's test passes")
-	if output, err := land(); err != nil || !strings.Contains(output, "landed") {
-		test.Errorf("the landing did not land once the nested test passed (%v):\n%s", err, output)
+	write(worktreeA, map[string]string{"inner/inner_test.go": passing})
+	fixture.git(worktreeA, "add", "inner/inner_test.go")
+	fixture.git(worktreeA, "commit", "-q", "-m", "the nested module's test passes")
+	if output, landError := land(); landError != nil || !strings.Contains(output, "landed") {
+		test.Errorf("the landing did not land once the nested test passed (%v):\n%s", landError, output)
 	}
 }
 
@@ -438,11 +438,11 @@ func TestTheGateRefusesStaleDocsData(test *testing.T) {
 	fixture := newLandFixture(test)
 	// The real go: the stand-in's directory comes off the front of PATH.
 	fixture.environment = append(fixture.environment, "PATH="+os.Getenv("PATH"))
-	a := fixture.worktree("a")
+	worktreeA := fixture.worktree("a")
 	write := func(files map[string]string) {
 		test.Helper()
 		for name, contents := range files {
-			path := filepath.Join(a, name)
+			path := filepath.Join(worktreeA, name)
 			if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
 				test.Fatal(createDirectoryError)
 			}
@@ -458,25 +458,25 @@ func TestTheGateRefusesStaleDocsData(test *testing.T) {
 			"\tif string(contents) != \"fresh\\n\" {\n\t\tfmt.Println(\"stale: docs/data/example.txt\")\n\t\tos.Exit(1)\n\t}\n}\n",
 		"docs/data/example.txt": "stale\n",
 	})
-	fixture.git(a, "add", "go.mod", "internal", "docs")
-	fixture.git(a, "commit", "-q", "-m", "a rule change whose example went stale")
+	fixture.git(worktreeA, "add", "go.mod", "internal", "docs")
+	fixture.git(worktreeA, "commit", "-q", "-m", "a rule change whose example went stale")
 	land := func() (string, error) {
 		landing := exec.Command(fixture.wrapper, "land")
-		landing.Dir, landing.Env = a, fixture.environment
+		landing.Dir, landing.Env = worktreeA, fixture.environment
 		output, outputError := landing.CombinedOutput()
 		return string(output), outputError
 	}
-	if output, err := land(); err == nil || !strings.Contains(output, "the docs data is stale, so nothing landed") ||
+	if output, landError := land(); landError == nil || !strings.Contains(output, "the docs data is stale, so nothing landed") ||
 		!strings.Contains(output, docsDataRecapture) || !strings.Contains(output, "stale: docs/data/example.txt") {
-		test.Fatalf("a stale example did not refuse the landing, naming the recapture (%v):\n%s", err, output)
+		test.Fatalf("a stale example did not refuse the landing, naming the recapture (%v):\n%s", landError, output)
 	}
 	write(map[string]string{"docs/data/example.txt": "fresh\n"})
-	fixture.git(a, "add", "docs/data/example.txt")
-	fixture.git(a, "commit", "-q", "-m", "the example recaptured")
-	if output, err := land(); err != nil ||
+	fixture.git(worktreeA, "add", "docs/data/example.txt")
+	fixture.git(worktreeA, "commit", "-q", "-m", "the example recaptured")
+	if output, landError := land(); landError != nil ||
 		!strings.Contains(output, "the docs data is current") ||
 		!strings.Contains(output, "landed") {
-		test.Errorf("the landing did not land once the example was fresh (%v):\n%s", err, output)
+		test.Errorf("the landing did not land once the example was fresh (%v):\n%s", landError, output)
 	}
 }
 

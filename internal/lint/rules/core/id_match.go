@@ -80,9 +80,9 @@ type idMatchRawOptions struct {
 // upstream's schema does not declare, which `additionalProperties: false` refuses there.
 func DecodeIdMatchOptions(list []byte) (any, error) {
 	settings := DefaultIdMatchSettings()
-	elements, err := rule.OptionElements(list, 2)
-	if err != nil || len(elements) == 0 {
-		return settings, err
+	elements, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(elements) == 0 {
+		return settings, optionElementsError
 	}
 
 	var patternText string
@@ -107,9 +107,9 @@ func DecodeIdMatchOptions(list []byte) (any, error) {
 
 	// Upstream's `new RegExp(pattern, "u")`, read as JavaScript reads it: RE2 refuses a lookaround or
 	// a backreference its user wrote, and reads `\s` and `\b` differently (#7mztrdd).
-	compiled, err := esregexp.Compile(patternText, "u")
-	if err != nil {
-		return settings, fmt.Errorf("id-match pattern %q does not compile: %w", patternText, err)
+	compiled, compileError := esregexp.Compile(patternText, "u")
+	if compileError != nil {
+		return settings, fmt.Errorf("id-match pattern %q does not compile: %w", patternText, compileError)
 	}
 	settings.Pattern = compiled
 	settings.PatternText = patternText

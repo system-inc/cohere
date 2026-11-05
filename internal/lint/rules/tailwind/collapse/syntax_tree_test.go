@@ -506,24 +506,24 @@ func treeCountKind(node *Node, kind NodeKind) int {
 	return count
 }
 
-func equalInts(a, b []int) bool {
-	if len(a) != len(b) {
+func equalInts(left, right []int) bool {
+	if len(left) != len(right) {
 		return false
 	}
-	for index := range a {
-		if a[index] != b[index] {
+	for index := range left {
+		if left[index] != right[index] {
 			return false
 		}
 	}
 	return true
 }
 
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
+func equalStrings(left, right []string) bool {
+	if len(left) != len(right) {
 		return false
 	}
-	for index := range a {
-		if a[index] != b[index] {
+	for index := range left {
+		if left[index] != right[index] {
 			return false
 		}
 	}

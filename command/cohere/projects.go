@@ -247,16 +247,16 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	if activeOutput.Mode == outputJSON {
 		failures = streams.Errors
 	}
-	executable, err := os.Executable()
-	if err != nil {
+	executable, executableError := os.Executable()
+	if executableError != nil {
 		fmt.Fprintf(failures, "cohere: %s\n",
-			sentence.FromError(fmt.Errorf("finding this binary to run each project: %w", err)))
+			sentence.FromError(fmt.Errorf("finding this binary to run each project: %w", executableError)))
 		return 1
 	}
-	yieldDirectory, err := os.MkdirTemp("", "cohere-yield-")
-	if err != nil {
+	yieldDirectory, temporaryDirectoryError := os.MkdirTemp("", "cohere-yield-")
+	if temporaryDirectoryError != nil {
 		fmt.Fprintf(failures, "cohere: %s\n",
-			sentence.FromError(fmt.Errorf("making a place for what each project yields: %w", err)))
+			sentence.FromError(fmt.Errorf("making a place for what each project yields: %w", temporaryDirectoryError)))
 		return 1
 	}
 	// Ignored: a temporary directory that outlives the run costs only its space, and nothing reads it again.

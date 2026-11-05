@@ -514,11 +514,11 @@ func TestOnlyThrowErrorSpans(test *testing.T) {
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantSpans))
 			}
-			for i, wantSpan := range testCase.wantSpans {
-				diagnostic := result.Diagnostics[i]
+			for index, wantSpan := range testCase.wantSpans {
+				diagnostic := result.Diagnostics[index]
 				gotSpan := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != wantSpan {
-					test.Errorf("finding %d spans %q, want %q", i, gotSpan, wantSpan)
+					test.Errorf("finding %d spans %q, want %q", index, gotSpan, wantSpan)
 				}
 			}
 		})

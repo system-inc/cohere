@@ -131,18 +131,18 @@ func OpenContentPack(directory string) (*ContentPack, error) {
 		used:      map[string]bool{},
 		added:     map[string]addedContent{},
 	}
-	index, err := os.ReadFile(filepath.Join(directory, contentPackIndexName))
-	if errors.Is(err, os.ErrNotExist) {
+	index, readError := os.ReadFile(filepath.Join(directory, contentPackIndexName))
+	if errors.Is(readError, os.ErrNotExist) {
 		return pack, nil
 	}
-	if err != nil {
-		return pack, fmt.Errorf("the content pack's index could not be read: %w", err)
+	if readError != nil {
+		return pack, fmt.Errorf("the content pack's index could not be read: %w", readError)
 	}
-	dataName, entries, err := parseContentPackIndex(index)
-	if err != nil {
+	dataName, entries, parseContentPackIndexError := parseContentPackIndex(index)
+	if parseContentPackIndexError != nil {
 		return pack, fmt.Errorf(
 			"the content pack's index is damaged (%w), so every file is read from disk and a new pack is written",
-			err,
+			parseContentPackIndexError,
 		)
 	}
 	mapped := mapFile(filepath.Join(directory, dataName))
@@ -321,15 +321,15 @@ func (pack *ContentPack) Save() error {
 //
 // Mutates: entries gains an entry for each file this run read, as the index written here names them
 func (pack *ContentPack) appendTo(dataName string, entries map[string]contentPackEntry) error {
-	file, err := os.OpenFile(filepath.Join(pack.directory, dataName), os.O_WRONLY|os.O_APPEND, 0)
-	if err != nil {
+	file, openError := os.OpenFile(filepath.Join(pack.directory, dataName), os.O_WRONLY|os.O_APPEND, 0)
+	if openError != nil {
 		return pack.rewrite()
 	}
-	information, err := file.Stat()
-	if err != nil {
+	information, statError := file.Stat()
+	if statError != nil {
 		// Ignored: nothing was written yet, and the stat's error is the one to report.
 		file.Close()
-		return err
+		return statError
 	}
 	offset := information.Size()
 	writer := newPackWriter(file, offset)

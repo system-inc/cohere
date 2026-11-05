@@ -101,7 +101,7 @@ var spellingPattern = regexp.MustCompile(`^([a-z][a-z0-9-]+):(.*)$`)
 // Spelled splits a "<corpus>:<path in it>" spelling into the corpus and the slash-separated path inside
 // it. spelled is false for anything else, such as an absolute path. A spelling whose name is no corpus
 // is an error, never a relative path, so a typo cannot read some other file.
-func Spelled(spelling string) (corpus Corpus, inside string, spelled bool, err error) {
+func Spelled(spelling string) (corpus Corpus, inside string, spelled bool, spelledError error) {
 	match := spellingPattern.FindStringSubmatch(spelling)
 	if match == nil {
 		return Corpus{}, "", false, nil
@@ -210,13 +210,13 @@ func locate(spelling string, lookup func(string) string, configurationPath func(
 	}
 	root := lookup(corpus.Variable)
 	if root == "" {
-		path, err := configurationPath()
-		if err != nil {
-			return "", err
+		path, configurationPathError := configurationPath()
+		if configurationPathError != nil {
+			return "", configurationPathError
 		}
-		configuration, err := ReadConfig(path)
-		if err != nil {
-			return "", err
+		configuration, readConfigurationError := ReadConfig(path)
+		if readConfigurationError != nil {
+			return "", readConfigurationError
 		}
 		root = configuration[corpus.Name]
 	}

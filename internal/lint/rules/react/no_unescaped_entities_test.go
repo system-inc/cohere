@@ -556,7 +556,7 @@ func applyOneSuggestion(test *testing.T, source string, suggestion rule.Suggesti
 	test.Helper()
 
 	ordered := append([]rule.Fix(nil), suggestion.Fixes...)
-	sort.Slice(ordered, func(a, b int) bool { return ordered[a].Range.Pos() > ordered[b].Range.Pos() })
+	sort.Slice(ordered, func(left, right int) bool { return ordered[left].Range.Pos() > ordered[right].Range.Pos() })
 
 	rewritten := source
 	for _, fix := range ordered {

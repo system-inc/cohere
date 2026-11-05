@@ -25,16 +25,16 @@ func TestFormatIsIdempotent(test *testing.T) {
 		if path == "" || !engine.Handles(path) {
 			continue
 		}
-		source, err := os.ReadFile(path)
-		if err != nil {
+		source, readError := os.ReadFile(path)
+		if readError != nil {
 			continue
 		}
-		once, err := engine.Format(path, string(source))
-		if err != nil {
+		once, formatError := engine.Format(path, string(source))
+		if formatError != nil {
 			continue
 		}
-		twice, err := engine.Format(path, once)
-		if err != nil {
+		twice, formatError := engine.Format(path, once)
+		if formatError != nil {
 			continue
 		}
 		checked++
