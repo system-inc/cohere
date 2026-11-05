@@ -60,6 +60,11 @@ struct XcodeTypesPhase {
     }
 
     var derivedData: URL {
+        Self.derivedData(scratchPath: scratchPath)
+    }
+
+    /* Where a build into this scratch keeps its derived data, so the typed rules can read the build this phase made. */
+    static func derivedData(scratchPath: URL) -> URL {
         scratchPath.appendingPathComponent("xcode-build", isDirectory: true)
     }
 

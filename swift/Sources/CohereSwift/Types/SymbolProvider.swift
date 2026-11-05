@@ -9,7 +9,8 @@ import Foundation
  neither can describe gets a reason instead, which the linter reports as unchecked.
 
  The package's local packages build into their own scratch paths, so each has its own store and its own
- compile commands; every one is consulted.
+ compile commands; every one is consulted. An Xcode root has one layout, its xcodebuild's derived data, read
+ the same way.
  */
 struct SymbolProvider {
     struct Result: Sendable {
@@ -20,7 +21,8 @@ struct SymbolProvider {
         var fromSourcekitd: Int
     }
 
-    let scratchPaths: [URL]
+    /* Every build whose index and compile commands may describe a file (`Pipeline.symbolLayouts`). */
+    let layouts: [BuildLayout]
     let runner: ProcessRunner
     /* Handed to every file's symbols, so a rule can tell our declarations from a dependency's. */
     var ownedModules: Set<String> = []
@@ -30,11 +32,8 @@ struct SymbolProvider {
         guard !files.isEmpty else { return result }
         var stores: [IndexStore] = []
         if let library = try? IndexStore.toolchainLibraryPath(runner: runner) {
-            stores = scratchPaths.compactMap {
-                try? IndexStore(
-                    libraryPath: library,
-                    storePath: IndexStore.storePath(layout: .swiftPackage(scratchPath: $0)),
-                )
+            stores = layouts.compactMap {
+                try? IndexStore(libraryPath: library, storePath: IndexStore.storePath(layout: $0))
             }
         }
         var needSourcekitd: [ParsedFile] = []
@@ -50,7 +49,7 @@ struct SymbolProvider {
         }
         guard !needSourcekitd.isEmpty else { return result }
 
-        let tables = scratchPaths.compactMap { try? CompileCommands.read(layout: .swiftPackage(scratchPath: $0)) }
+        let tables = layouts.compactMap { try? CompileCommands.read(layout: $0) }
         let session: Sourcekitd
         do {
             session = try Sourcekitd.shared(runner: runner)

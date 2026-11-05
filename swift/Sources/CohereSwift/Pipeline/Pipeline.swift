@@ -463,10 +463,22 @@ public struct Pipeline {
                 RuleRegistry.typedRules.contains { configuration.severity(of: $0.name) != .off && $0.applies(to: file) }
             }
             var symbolProvider = SymbolProvider(
-                scratchPaths: Self.symbolScratchPaths(package: package, scratch: runScratch(for: root)),
+                layouts: Self.symbolLayouts(package: package, scratch: runScratch(for: root)),
                 runner: runner,
             )
             symbolProvider.ownedModules = Self.ownedModules(of: package)
+            /*
+             An Xcode target's module is named for its product, not the target (CapturePhone's is `Capture`), so the
+             modules are also taken from the compiles that list our files, the names the index records declarations under.
+             */
+            if package.projectKind != .swiftPackage {
+                let ownedFiles = fileSet.owned.map(\.url)
+                for layout in symbolProvider.layouts {
+                    if let table = try? CompileCommands.read(layout: layout) {
+                        symbolProvider.ownedModules.formUnion(table.modules(compiling: ownedFiles))
+                    }
+                }
+            }
             linter.symbols = symbolProvider.symbols(for: typedCandidates)
             if let lintBuildFailure {
                 linter.symbols.unavailable = linter.symbols.unavailable.mapValues {
@@ -574,11 +586,8 @@ public struct Pipeline {
         let demangler: SwiftDemangler
         do {
             let library = try IndexStore.toolchainLibraryPath(runner: runner)
-            stores = Self.symbolScratchPaths(package: package, scratch: runScratch(for: root)).compactMap {
-                try? IndexStore(
-                    libraryPath: library,
-                    storePath: IndexStore.storePath(layout: .swiftPackage(scratchPath: $0)),
-                )
+            stores = Self.symbolLayouts(package: package, scratch: runScratch(for: root)).compactMap {
+                try? IndexStore(libraryPath: library, storePath: IndexStore.storePath(layout: $0))
             }
             demangler = try SwiftDemangler.shared(runner: runner)
         }
@@ -746,12 +755,21 @@ public struct Pipeline {
         )
     }
 
-    /* Every scratch a build of this package writes an index store into: the root's, and each local package's that the types phase builds for its tests. */
-    static func symbolScratchPaths(package: PackageModel, scratch: URL) -> [URL] {
-        [scratch]
+    /*
+     Every build of this package that writes an index store and compile commands: for a package, the root's scratch
+     and each local package's that the types phase builds for its tests; for an Xcode root, the one xcodebuild's
+     derived data, which every target and linked package builds into.
+     */
+    static func symbolLayouts(package: PackageModel, scratch: URL) -> [BuildLayout] {
+        guard package.projectKind == .swiftPackage else {
+            return [.xcode(derivedData: XcodeTypesPhase.derivedData(scratchPath: scratch))]
+        }
+        let scratchPaths =
+            [scratch]
             + package.localPackages.map {
                 scratch.appendingPathComponent("local/\($0.root.lastPathComponent)", isDirectory: true)
             }
+        return scratchPaths.map { .swiftPackage(scratchPath: $0) }
     }
 
     /* Each owned package's manifest, parsed, so package rules can point at the line that would fix them. A manifest that cannot be read is absent, and its findings point at line 1. */
