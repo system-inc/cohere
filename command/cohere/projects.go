@@ -86,8 +86,10 @@ func checkDiscoveredProjects(location projectLocation, locateError error, workin
 			len(found.NestedRepositories)+found.Submodules)
 	}
 	if found.isTheLocatedProject(location, locateError) {
-		// The project runs here, and its build lists the directories discovery just did.
+		// The project runs here, and its build lists the directories discovery just did. Its footer says the
+		// Swift no package checks, since a TypeScript program at the root beside an app's Swift is this path.
 		discoveredListings = found.Listings
+		discoveredUnclaimedSwift = found.UnclaimedSwift
 		for _, note := range found.notes() {
 			fmt.Fprintf(accountOutput(os.Stderr), "cohere: %s\n", note)
 		}
@@ -99,6 +101,11 @@ func checkDiscoveredProjects(location projectLocation, locateError error, workin
 // discoveredListings are the directory listings discovery read, when the one project it found runs in this
 // process, for its build to serve the tsconfig's include enumeration from. Nil otherwise. See #bjv0tg4.
 var discoveredListings *program.DirectoryListings
+
+// discoveredUnclaimedSwift is the Swift no package holds that discovery found, when the one project it found
+// runs in this process, for that run's footer to say. Nil otherwise: a project run as one of several says
+// nothing of it, since the overall verdict line does.
+var discoveredUnclaimedSwift []unclaimedSwiftDirectory
 
 // childArguments are the arguments every project's run gets: this run's, with a named lint config made
 // absolute. Discovery runs only when no path was named, so every argument is a flag, and a flag's value is
@@ -138,7 +145,8 @@ func (found discovery) isTheLocatedProject(location projectLocation, locateError
 // named, since skipping them is what everyone expects, and neither is a nested repository: one inside a
 // program, such as Structure or Base, is checked as part of it, its drift reported read-only, as it always
 // was. They are counted on the summary line. A Swift coverage query that failed is named too, since its
-// packages may then be checked twice.
+// packages may then be checked twice, and so is each directory of Swift files no package holds, since
+// nothing checks them.
 func (found discovery) notes() []string {
 	var lines []string
 	for _, marker := range found.Refused {
@@ -160,6 +168,9 @@ func (found discovery) notes() []string {
 	for _, failed := range found.SwiftCoverage.FailedQueries {
 		lines = append(lines, fmt.Sprintf("%s: the Swift coverage query failed, so every package it might check runs as its own project too: %s",
 			failed.Label, failed.Reason))
+	}
+	for _, unclaimed := range found.UnclaimedSwift {
+		lines = append(lines, fmt.Sprintf("%s: %s no Swift package checks", unclaimed.Directory, counted(unclaimed.Files, "Swift file", "Swift files")))
 	}
 	// Last, since only these are sorted: a map has no order of its own.
 	for label := range found.Ownership.SharedDirectory {
@@ -287,6 +298,7 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 	// label, is the record, and a program reads the worst from them.
 	facts := overallFactsOf(runs, time.Since(processStart))
 	facts.CoverageUnknown = len(found.SwiftCoverage.FailedQueries)
+	facts.UnclaimedSwift = found.UnclaimedSwift
 	if activeOutput.Mode != outputJSON {
 		fmt.Fprintln(out, overallFooter(facts, activeOutput.Style))
 	}
@@ -392,8 +404,8 @@ func sectionHeading(project discoveredProject) string {
 	return fmt.Sprintf("== %s (%s) ==", projectLabel(project), project.Engine)
 }
 
-// summaryLine closes the report: how many projects were checked, of which engines, how many failed, and
-// what the walk did not enter.
+// summaryLine closes the report: how many projects were checked, of which engines, how many failed, what
+// was found and not run or not checked, and what the walk did not enter.
 func summaryLine(found discovery, runs []projectRun) string {
 	counts := map[projectEngine]int{}
 	failed := 0
@@ -427,8 +439,18 @@ func summaryLine(found discovery, runs []projectRun) string {
 	if len(notRunParts) > 0 {
 		notRun = "; not run: " + strings.Join(notRunParts, ", ")
 	}
-	return fmt.Sprintf("projects: %d checked (%s), %s%s; not searched for projects: %d directories .gitignore ignores, "+
+	// Beside what was not run, since these files were not checked either, and nothing would have.
+	notChecked := ""
+	if len(found.UnclaimedSwift) > 0 {
+		files := 0
+		for _, unclaimed := range found.UnclaimedSwift {
+			files += unclaimed.Files
+		}
+		notChecked = fmt.Sprintf("; not checked: %s no Swift package checks, in %s", counted(files, "Swift file", "Swift files"),
+			counted(len(found.UnclaimedSwift), "directory", "directories"))
+	}
+	return fmt.Sprintf("projects: %d checked (%s), %s%s%s; not searched for projects: %d directories .gitignore ignores, "+
 		"%d dependency, build, cache or fixture directories, %d nested repositories",
-		checkedCount, strings.Join(engines, ", "), verdict, notRun, found.Ignored, found.NeverDescended,
+		checkedCount, strings.Join(engines, ", "), verdict, notRun, notChecked, found.Ignored, found.NeverDescended,
 		len(found.NestedRepositories)+found.Submodules)
 }

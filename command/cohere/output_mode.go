@@ -145,6 +145,9 @@ func writeRunEnd(report *pipelineReport, out io.Writer) {
 			!summary.Gaps.NothingToCheck && summary.Gaps.Unread == ""
 	}
 	recordRunSummary(summary)
+	// After the record, since it is what this invocation's discovery found and not part of the run: Swift
+	// added or given a package since would otherwise be said, or left out, by every replay.
+	summary.Gaps.UnclaimedSwift = discoveredUnclaimedSwift
 
 	switch activeOutput.Mode {
 	case outputVerbose:

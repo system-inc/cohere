@@ -482,6 +482,8 @@ func replayRunCache(stored *program.RunCache, anchor program.PathAnchor) {
 	var summary runSummary
 	if len(stored.Summary) > 0 && json.Unmarshal(spelledOutput(stored.Summary, anchor), &summary) == nil {
 		summary = replayedSummary(summary, time.Since(processStart))
+		// The run on record kept none, since what discovery found beside the project is this run's to say.
+		summary.Gaps.UnclaimedSwift = discoveredUnclaimedSwift
 		switch activeOutput.Mode {
 		case outputVerbose:
 			fmt.Fprintln(os.Stdout, footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}))
