@@ -2,6 +2,7 @@ package load
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,7 +13,10 @@ import (
 // fixtureFiles are the modules the tests load. clean has a package with in-package and external tests, whose
 // external tests reach it again through q (so go list builds "q [p.test]"), packages with no tests, and a file
 // behind `//go:build ignore`; it requires outside, a module beside it that a pattern names, with an ignored file
-// of its own. broken has one package for each way a load fails.
+// of its own. clean also has directories go list matches as no package: a windows-only package, a directory of
+// `//go:build ignore` scripts, and _tools, which ./... skips by its name though go would build its file. Its
+// tagged package builds only under the `-tags=special` the load's `GOFLAGS` sets. broken has one package for
+// each way a load fails.
 var fixtureFiles = map[string]string{
 	"clean/go.mod": "module example.com/clean\n\ngo 1.21\n\nrequire example.com/outside v0.0.0\n\n" +
 		"replace example.com/outside => ../outside\n",
@@ -23,7 +27,12 @@ var fixtureFiles = map[string]string{
 	"clean/p/ignored.go": "//go:build ignore\n\npackage p\n",
 	"clean/q/q.go": "package q\n\nimport \"example.com/clean/p\"\n\n" +
 		"func Quadruple(value int) int { return p.Double(p.Double(value)) }\n",
-	"clean/plain/plain.go": "package plain\n\nconst Name = \"plain\"\n",
+	"clean/plain/plain.go":              "package plain\n\nconst Name = \"plain\"\n",
+	"clean/windowsonly/only_windows.go": "package windowsonly\n",
+	"clean/scripts/first.go":            "//go:build ignore\n\npackage main\n\nfunc main() {}\n",
+	"clean/scripts/second.go":           "//go:build ignore\n\npackage main\n\nfunc main() {}\n",
+	"clean/_tools/tool.go":              "package tools\n",
+	"clean/tagged/tagged.go":            "//go:build special\n\npackage tagged\n",
 
 	"outside/go.mod":     "module example.com/outside\n\ngo 1.21\n",
 	"outside/outside.go": "package outside\n\nconst Name = \"outside\"\n",
@@ -41,12 +50,17 @@ var fixtureFiles = map[string]string{
 		"func TestWrong(count int) {}\n\nfunc BenchmarkWrong(test *testing.T) {}\n",
 }
 
+// cleanEnvironment is what clean is loaded under: linux/amd64, so a target that is not the host's shows the
+// load's environment reaches every go command it runs, and a tag only `GOFLAGS` sets.
+var cleanEnvironment = []string{"GOWORK=off", "GOOS=linux", "GOARCH=amd64", "GOFLAGS=-tags=special"}
+
 // fixtures is the modules written and loaded once per test binary: each load type-checks the standard
-// library from source, seconds of work every test only reads. clean is loaded for linux/amd64, so a
-// target that is not the host's shows the load's environment reaches every go command it runs.
+// library from source, seconds of work every test only reads. census is clean's .go files, as the project's
+// census would list them.
 var fixtures struct {
 	once    sync.Once
 	root    string
+	census  []string
 	clean   *Loaded
 	broken  *Loaded
 	failure error
@@ -80,18 +94,37 @@ func loadedFixtures(test *testing.T) string {
 				return
 			}
 		}
+		fixtures.census, fixtures.failure = goFilesUnder(filepath.Join(fixtures.root, "clean"))
+		if fixtures.failure != nil {
+			return
+		}
 		fixtures.clean, fixtures.failure = Packages(filepath.Join(fixtures.root, "clean"),
-			[]string{"./...", "example.com/outside"}, []string{"GOWORK=off", "GOOS=linux", "GOARCH=amd64"})
+			[]string{"./...", "example.com/outside"}, cleanEnvironment, fixtures.census)
 		if fixtures.failure != nil {
 			return
 		}
 		fixtures.broken, fixtures.failure = Packages(filepath.Join(fixtures.root, "broken"), []string{"./..."},
-			[]string{"GOWORK=off"})
+			[]string{"GOWORK=off"}, nil)
 	})
 	if fixtures.failure != nil {
 		test.Fatalf("loading the fixtures: %v", fixtures.failure)
 	}
 	return fixtures.root
+}
+
+// goFilesUnder is every .go file below directory, absolute.
+func goFilesUnder(directory string) ([]string, error) {
+	var files []string
+	walkError := filepath.WalkDir(directory, func(path string, entry fs.DirEntry, entryError error) error {
+		if entryError != nil {
+			return entryError
+		}
+		if !entry.IsDir() && filepath.Ext(path) == ".go" {
+			files = append(files, path)
+		}
+		return nil
+	})
+	return files, walkError
 }
 
 // identifiers is the ID of each package loaded analyzes, in order.
@@ -116,6 +149,7 @@ func TestACleanModuleAnalyzesEachVariantOnce(test *testing.T) {
 		"example.com/clean/p_test [example.com/clean/p.test]",
 		"example.com/clean/plain",
 		"example.com/clean/q",
+		"example.com/clean/tagged",
 		"example.com/outside",
 	}
 	if !slices.Equal(analyzedIdentifiers, want) {
@@ -201,18 +235,56 @@ func TestEveryWronglySignedTestFunctionIsOneTypeDiagnostic(test *testing.T) {
 	}
 }
 
-// A file behind a build constraint is named once, with the target the load read it for, though the package
-// and its test variant both list it; the outside module's own ignored file is not the workspace's to name.
+// excludedInClean is every file of clean the build constraints leave out under cleanEnvironment, as both the
+// load and ExcludedByConstraints must name it: p's ignored file, which go list reports, and the windows-only
+// package and the ignore scripts, which go list matches as no package at all.
+func excludedInClean(root string) []Excluded {
+	var excluded []Excluded
+	excludedFiles := []string{"p/ignored.go", "scripts/first.go", "scripts/second.go", "windowsonly/only_windows.go"}
+	for _, relative := range excludedFiles {
+		excluded = append(excluded, Excluded{
+			File:   filepath.Join(root, "clean", filepath.FromSlash(relative)),
+			Reason: "excluded by build constraints on linux/amd64",
+		})
+	}
+	return excluded
+}
+
+// Every file the build constraints leave out is named once, with the target the load read it for: one the
+// package and its test variant both list as ignored, and one in a directory go list never reports, found
+// from the census. The outside module's own ignored file is not the workspace's to name, and the tagged file
+// builds under the load's tags.
 func TestFilesTheBuildConstraintsLeftOutAreExcludedOnceForTheLoadsTarget(test *testing.T) {
 	test.Parallel()
 
 	root := loadedFixtures(test)
-	want := []Excluded{{
-		File:   filepath.Join(root, "clean", "p", "ignored.go"),
-		Reason: "excluded by build constraints on linux/amd64",
-	}}
-	if !slices.Equal(fixtures.clean.Excluded, want) {
-		test.Fatalf("want %+v, got %+v", want, fixtures.clean.Excluded)
+	if want := excludedInClean(root); !slices.Equal(fixtures.clean.Excluded, want) {
+		test.Fatalf("want\n%+v\ngot\n%+v", want, fixtures.clean.Excluded)
+	}
+}
+
+// ExcludedByConstraints, which runs before any load, names the same files from the census alone.
+func TestExcludedByConstraintsNamesWhatTheLoadExcludes(test *testing.T) {
+	test.Parallel()
+
+	root := loadedFixtures(test)
+	excluded, excludedError := ExcludedByConstraints(filepath.Join(root, "clean"), cleanEnvironment, fixtures.census)
+	if excludedError != nil {
+		test.Fatal(excludedError)
+	}
+	if want := excludedInClean(root); !slices.Equal(excluded, want) {
+		test.Fatalf("want\n%+v\ngot\n%+v", want, excluded)
+	}
+}
+
+// A census file go would build that no package holds, as under a directory ./... skips by its name, is unseen:
+// nothing type-checked it.
+func TestACensusFileNoPackageHoldsThatWouldBuildIsUnseen(test *testing.T) {
+	test.Parallel()
+
+	root := loadedFixtures(test)
+	if want := []string{filepath.Join(root, "clean", "_tools", "tool.go")}; !slices.Equal(fixtures.clean.Unseen, want) {
+		test.Fatalf("want %q unseen, got %q", want, fixtures.clean.Unseen)
 	}
 }
 
@@ -222,16 +294,16 @@ func TestTheCountsDescribeTheLoad(test *testing.T) {
 	test.Parallel()
 
 	loadedFixtures(test)
-	if fixtures.clean.PackagesInWorkspace != 5 {
-		test.Errorf("want 5 packages in the workspace, got %d", fixtures.clean.PackagesInWorkspace)
+	if fixtures.clean.PackagesInWorkspace != 6 {
+		test.Errorf("want 6 packages in the workspace, got %d", fixtures.clean.PackagesInWorkspace)
 	}
 	// testing alone reaches dozens of standard packages.
 	if fixtures.clean.PackagesLoaded < 20 {
 		test.Errorf("want the whole graph counted, got %d packages", fixtures.clean.PackagesLoaded)
 	}
-	// p.go, p_test.go, external_test.go, q.go and plain.go; outside.go is not the workspace's.
-	if fixtures.clean.FilesTypeChecked != 5 {
-		test.Errorf("want 5 files type-checked, got %d", fixtures.clean.FilesTypeChecked)
+	// p.go, p_test.go, external_test.go, q.go, plain.go and tagged.go; outside.go is not the workspace's.
+	if fixtures.clean.FilesTypeChecked != 6 {
+		test.Errorf("want 6 files type-checked, got %d", fixtures.clean.FilesTypeChecked)
 	}
 	if fixtures.clean.Elapsed <= 0 {
 		test.Errorf("want the elapsed time, got %s", fixtures.clean.Elapsed)

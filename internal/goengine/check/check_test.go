@@ -81,12 +81,12 @@ func loadedFixtures(test *testing.T) string {
 				return
 			}
 		}
-		fixtures.loaded, fixtures.failure = load.Packages(fixtures.root, []string{"./..."}, []string{"GOWORK=off"})
+		fixtures.loaded, fixtures.failure = load.Packages(fixtures.root, []string{"./..."}, []string{"GOWORK=off"}, nil)
 		if fixtures.failure != nil {
 			return
 		}
 		fixtures.generated, fixtures.failure = load.Packages(filepath.Join(fixtures.root, "generated"),
-			[]string{"./..."}, []string{"GOWORK=off"})
+			[]string{"./..."}, []string{"GOWORK=off"}, nil)
 		if fixtures.failure != nil {
 			return
 		}
