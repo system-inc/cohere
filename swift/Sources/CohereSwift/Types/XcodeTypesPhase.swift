@@ -16,6 +16,15 @@ import Foundation
  A check runs no project code on the developer's machine. Signing is off (`CODE_SIGNING_ALLOWED=NO`), and
  `ENABLE_USER_SCRIPT_SANDBOXING=YES` holds every run-script phase to the inputs and outputs it declares.
 
+ Packages resolve into the scratch, `--no-fix` too (#s8p20fe), since a scratch that may hold no resolution
+ yet would otherwise fail the read-only gate until someone ran a mutating check. xcodebuild keeps a project's
+ pins in the workspace it builds, so where they land follows the bundle: a generated bundle is in the scratch
+ already, and a committed one is built under `--no-fix` through a workspace in the scratch that names it
+ (`workspace`), measured 2026-11-05 to leave the bundle byte-identical while the pins went to the workspace.
+ A resolution the repository commits (`committedResolved`) is preferred to any, and under `--no-fix` the build
+ is held to it as it stands (`-disableAutomaticPackageResolution`), which on a fresh scratch still clones the
+ pinned revisions into `clonedPackages`. A resolve that fails is a finding at the project's definition.
+
  What the records say is judged by `CompilerRecords`, as for a package: a record older than its file vouches for
  nothing, and an owned file without a fresh record is named in `filesWithoutRecord`, which makes the run
  incomplete. A target this phase could not build (its `SDKROOT` names no platform it knows) is read from no
@@ -59,7 +68,7 @@ struct XcodeTypesPhase {
     }
 
     /*
-     Where xcodebuild reads and writes the project's package pins. A generated project's bundle is made afresh on
+     The pins inside the bundle, where xcodebuild keeps them when it builds the bundle as a project. A generated project's bundle is made afresh on
      every run (`XcodeGeneration`), so its pins are kept beside the build (`keptResolved`) and put back before
      building: without them a plain run resolves every package again, which may move a version a range allows,
      and the build-input snapshot below would have no pins to compare.
@@ -70,6 +79,54 @@ struct XcodeTypesPhase {
 
     var keptResolved: URL {
         scratchPath.appendingPathComponent("xcode-Package.resolved")
+    }
+
+    /*
+     A committed bundle under `--no-fix` is never handed to xcodebuild, because building it as a project writes its
+     pins, and the empty folders for them, into the bundle. This workspace in the scratch names it instead.
+     */
+    var buildsThroughWorkspace: Bool {
+        package.projectKind == .xcodeProject && !resolutionAllowed
+    }
+
+    var workspace: URL {
+        scratchPath.appendingPathComponent(
+            "xcode-workspace/\(project.bundle.deletingPathExtension().lastPathComponent).xcworkspace",
+            isDirectory: true,
+        )
+    }
+
+    /* The pins the build reads and writes: the workspace's when it builds through one, else the bundle's. */
+    var resolvedInBuild: URL {
+        buildsThroughWorkspace
+            ? workspace.appendingPathComponent("xcshareddata/swiftpm/Package.resolved") : resolvedInBundle
+    }
+
+    /*
+     The pins the repository commits for this project, or nil. A committed bundle's are its own; an xcodegen
+     project's can only be the ones a repository keeps in the bundle beside the spec, which it otherwise ignores.
+     Committed means git would list the file: an ignored one is a developer's own resolution, or the output of
+     their last generation, and neither is the repository's word. Outside any repository a committed bundle's pins
+     are part of the project as it stands, and a bundle beside a spec is the spec's output, so it is never read.
+     */
+    var committedResolved: URL? {
+        let candidate: URL
+        switch package.projectKind {
+            case .xcodeProject:
+                candidate = resolvedInBundle
+            case .xcodeGen:
+                candidate = package.root.appendingPathComponent(
+                    "\(project.bundle.lastPathComponent)/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+                )
+            case .swiftPackage:
+                return nil
+        }
+        guard FileManager.default.fileExists(atPath: candidate.path) else { return nil }
+        let resolved = candidate.resolvingSymlinksInPath()
+        guard let repository = IgnoreRules.Repository.containing(resolved.deletingLastPathComponent()) else {
+            return package.projectKind == .xcodeProject ? candidate : nil
+        }
+        return IgnoreRules(repository: repository).isVisible(resolved.path) ? candidate : nil
     }
 
     /* The targets to build, application and library targets before the test bundles that host in them, and the ones that cannot be. */
@@ -110,12 +167,12 @@ struct XcodeTypesPhase {
     }
 
     func arguments(for build: Build) -> [String] {
-        var arguments = [
-            "-project", project.bundle.path, "-scheme", build.target, "-destination",
-            "generic/platform=\(build.platform)", "-derivedDataPath", derivedData.path, "-clonedSourcePackagesDirPath",
-            clonedPackages.path, "-configuration", "Debug",
+        var arguments = buildsThroughWorkspace ? ["-workspace", workspace.path] : ["-project", project.bundle.path]
+        arguments += [
+            "-scheme", build.target, "-destination", "generic/platform=\(build.platform)", "-derivedDataPath",
+            derivedData.path, "-clonedSourcePackagesDirPath", clonedPackages.path, "-configuration", "Debug",
         ]
-        if !resolutionAllowed {
+        if !resolutionAllowed && committedResolved != nil {
             arguments.append("-disableAutomaticPackageResolution")
         }
         return arguments + ["CODE_SIGNING_ALLOWED=NO", "ENABLE_USER_SCRIPT_SANDBOXING=YES", build.action]
@@ -158,15 +215,16 @@ struct XcodeTypesPhase {
         let unbuiltFiles = Set(
             files.filter { file in plan.unbuilt.contains { $0.target == file.targetName } }.map(\.url.path)
         )
-        if package.projectKind == .xcodeGen {
-            restoreResolved()
+        if buildsThroughWorkspace {
+            try writeWorkspace()
         }
+        restoreResolved()
         let snapshot =
             toolchain.hasPrefix("unknown")
             ? nil
             : BuildInputSnapshot.take(
                 roots: inputRoots,
-                resolved: resolvedInBundle,
+                resolved: resolvedInBuild,
                 toolchain: toolchain,
                 arguments: plan.builds.flatMap(arguments(for:)),
                 contents: [project.bundle.appendingPathComponent("project.pbxproj")],
@@ -190,9 +248,7 @@ struct XcodeTypesPhase {
             }
         }
 
-        let createdInBundle = directoriesXcodebuildMayCreate.filter {
-            !FileManager.default.fileExists(atPath: $0.path)
-        }
+        let buildStart = Date()
         var failures: [(build: Build, result: ProcessRunner.Result)] = []
         for build in plan.builds {
             let result = try runner.run("xcodebuild", arguments(for: build), in: package.root)
@@ -200,11 +256,9 @@ struct XcodeTypesPhase {
                 failures.append((build, result))
             }
         }
+        removeFoldersMadeInLocalPackages(since: buildStart)
         if package.projectKind == .xcodeGen {
             keepResolved()
-        }
-        else if !resolutionAllowed {
-            removeEmpty(createdInBundle)
         }
         if let snapshot, failures.isEmpty {
             snapshot.store(scratchPath: derivedData)
@@ -262,6 +316,7 @@ struct XcodeTypesPhase {
             words += "; the build of \(failure.build.target) failed: \(failedStep(of: failure.result))"
         }
         if let failure = failures.first, !findings.contains(where: { $0.severity == .error }) {
+            let step = failedStep(of: failure.result)
             findings.append(
                 FindingRecord(
                     source: .compiler,
@@ -271,8 +326,9 @@ struct XcodeTypesPhase {
                     severity: .error,
                     rule: "",
                     messageId: "buildFailed",
-                    message:
-                        "xcodebuild of \(failure.build.target) failed outside any file this run checks, so the project does not build: \(failedStep(of: failure.result))",
+                    message: Self.isResolutionFailure(step)
+                        ? "xcodebuild could not resolve the packages this project names, so nothing was built and no file's types are known: \(step)"
+                        : "xcodebuild of \(failure.build.target) failed outside any file this run checks, so the project does not build: \(step)",
                 )
             )
         }
@@ -301,7 +357,7 @@ struct XcodeTypesPhase {
     /*
      What failed, in xcodebuild's words: the build commands it lists as failed, or, when it stopped before building
      (a scheme it could not find, packages it could not resolve), its error and the lines that explain it. Under
-     `--no-fix` a resolution that needs the network says so, since that is the one a plain run repairs.
+     `--no-fix` a committed resolution the project no longer matches is named, since the build was held to it.
      */
     func failedStep(of result: ProcessRunner.Result) -> String {
         let text = String(decoding: result.standardOutput, as: UTF8.self) + "\n" + result.standardError
@@ -316,29 +372,107 @@ struct XcodeTypesPhase {
         if let error = lines.firstIndex(where: { $0.hasPrefix("xcodebuild: error:") }) {
             let explained = [lines[error]] + lines[(error + 1)...].prefix { $0.hasPrefix(" ") }
             let said = explained.map { $0.trimmingCharacters(in: .whitespaces) }.joined(separator: " ")
-            if !resolutionAllowed && said.contains("Could not resolve package dependencies") {
+            guard Self.isResolutionFailure(said) else { return said }
+            if !resolutionAllowed, let committed = committedResolved {
                 return
-                    "\(said) (under --no-fix packages are never resolved, and this scratch holds no resolution to build from; a run without --no-fix resolves them once)"
+                    "\(said) (under --no-fix the build is held to the resolution the repository commits, \(committed.path), and a check never moves it)"
             }
-            return said
+            /* Its error may name only a cache folder (measured for a host that does not resolve), so the packages it was fetching are named too. */
+            var fetched: [String] = []
+            for line in lines where line.hasPrefix("Fetching from ") {
+                let location = String(line.dropFirst("Fetching from ".count)).trimmingCharacters(in: .whitespaces)
+                if !fetched.contains(location) {
+                    fetched.append(location)
+                }
+            }
+            return fetched.isEmpty ? said : "\(said) (while fetching \(fetched.joined(separator: ", ")))"
         }
         return TypesPhase.tail(of: result)
     }
 
-    /* A generated bundle's pins, put back from the last build's copy. A bundle that already has pins keeps them. */
+    /* xcodebuild's words when it stopped before building because the packages would not resolve. */
+    static func isResolutionFailure(_ said: String) -> Bool {
+        said.contains("Could not resolve package dependencies")
+    }
+
+    /*
+     The pins the build starts from. The repository's own replace whatever the build holds, so the build pins what
+     the repository pins. Without them a generated bundle gets the last build's copy back unless it has pins
+     already, a workspace keeps what its last build wrote, and a committed bundle built as a project holds its own.
+     */
     func restoreResolved() {
-        guard FileManager.default.fileExists(atPath: keptResolved.path),
-            !FileManager.default.fileExists(atPath: resolvedInBundle.path)
+        let source: URL
+        if let committed = committedResolved {
+            source = committed
+        }
+        else if package.projectKind == .xcodeGen && !FileManager.default.fileExists(atPath: resolvedInBuild.path) {
+            source = keptResolved
+        }
+        else {
+            return
+        }
+        guard source.standardizedFileURL != resolvedInBuild.standardizedFileURL,
+            let pins = try? Data(contentsOf: source)
         else { return }
         do {
             try FileManager.default.createDirectory(
-                at: resolvedInBundle.deletingLastPathComponent(),
+                at: resolvedInBuild.deletingLastPathComponent(),
                 withIntermediateDirectories: true,
             )
-            try FileManager.default.copyItem(at: keptResolved, to: resolvedInBundle)
+            try pins.write(to: resolvedInBuild, options: .atomic)
         }
         catch {
             /* Without them the build resolves, or under `--no-fix` says it could not; either way the run says what happened. */
+        }
+    }
+
+    /* The workspace naming the committed bundle by its absolute path, rewritten only when that changed, so a build's reuse is not disturbed. */
+    func writeWorkspace() throws {
+        let location = project.bundle.path.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "\"", with: "&quot;").replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+        let contents = Data(
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <Workspace
+               version = "1.0">
+               <FileRef
+                  location = "absolute:\(location)">
+               </FileRef>
+            </Workspace>
+
+            """.utf8
+        )
+        let file = workspace.appendingPathComponent("contents.xcworkspacedata")
+        guard (try? Data(contentsOf: file)) != contents else { return }
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+        try contents.write(to: file, options: .atomic)
+    }
+
+    /*
+     xcodebuild makes an empty `.swiftpm/xcode` inside every local package a build links, whether it resolves or not
+     (measured 2026-11-05, on a path package beside an app). A check writes nothing into the developer's tree, so
+     each of those two folders that this build made, empty and created since it started, is removed again, innermost
+     first. One holding anything, or older than the build, is not ours to judge and stays. The local packages are
+     read after the build, so the ones its package state names for the first time are cleaned as well.
+     */
+    func removeFoldersMadeInLocalPackages(since buildStart: Date) {
+        for root in project.projectFile.localPackages + Self.localPackages(stateIn: clonedPackages) {
+            let swiftpm = root.appendingPathComponent(".swiftpm", isDirectory: true)
+            for directory in [swiftpm.appendingPathComponent("xcode", isDirectory: true), swiftpm] {
+                guard let entries = try? FileManager.default.contentsOfDirectory(atPath: directory.path),
+                    entries.isEmpty,
+                    let created = try? FileManager.default.attributesOfItem(atPath: directory.path)[.creationDate]
+                        as? Date,
+                    created >= buildStart
+                else { continue }
+                do {
+                    try FileManager.default.removeItem(at: directory)
+                }
+                catch {
+                    /* An empty folder left behind holds no file; the run's answer stands. */
+                }
+            }
         }
     }
 
@@ -350,33 +484,6 @@ struct XcodeTypesPhase {
         }
         catch {
             /* Not kept, so the next run resolves again: slower, and still right. */
-        }
-    }
-
-    /*
-     The folders xcodebuild makes inside a committed bundle even when it resolves nothing, outermost first:
-     measured, a `--no-fix` build of a project with no packages left `project.xcworkspace/xcshareddata/swiftpm/configuration`,
-     empty. A check writes nothing into the developer's tree, so those it made are removed again (`removeEmpty`).
-     */
-    var directoriesXcodebuildMayCreate: [URL] {
-        [
-            "project.xcworkspace", "project.xcworkspace/xcshareddata", "project.xcworkspace/xcshareddata/swiftpm",
-            "project.xcworkspace/xcshareddata/swiftpm/configuration",
-        ]
-        .map { project.bundle.appendingPathComponent($0, isDirectory: true) }
-    }
-
-    /* Removes each of these folders that is empty now, innermost first. A folder holding anything, which then is not ours to judge, stays. */
-    func removeEmpty(_ directories: [URL]) {
-        for directory in directories.reversed() {
-            guard let entries = try? FileManager.default.contentsOfDirectory(atPath: directory.path), entries.isEmpty
-            else { continue }
-            do {
-                try FileManager.default.removeItem(at: directory)
-            }
-            catch {
-                /* An empty folder left behind holds no file; the run's answer stands. */
-            }
         }
     }
 }

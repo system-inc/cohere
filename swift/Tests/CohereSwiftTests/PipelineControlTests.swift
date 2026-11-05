@@ -296,8 +296,9 @@ struct PipelineControlTests {
     }
 
     /*
-     `--no-fix` forbids resolving dependencies, so a package whose Package.resolved is missing (ahraos-macos
-     gitignores its own) fails before the compiler runs. The run must say that, not blame the build layout.
+     `--no-fix` writes nothing into the tree, and SwiftPM keeps a package's pins nowhere but beside its manifest, so
+     a package whose Package.resolved is missing (ahraos-macos gitignores its own) fails before the compiler runs.
+     The run must say that and why, not blame the build layout (#s8p20fe).
      */
     @Test func aBuildThatFailsBeforeCompilingSaysSo() async throws {
         let manifest = Self.manifest.replacingOccurrences(
@@ -309,6 +310,9 @@ struct PipelineControlTests {
             _ = try await Self.run(source: Self.cleanSource, manifest: manifest)
         } throws: { error in
             String(describing: error).contains("failed before compiling anything")
+                && String(describing: error).hasSuffix(
+                    "so a check cannot resolve this package: commit its Package.resolved, or run without --no-fix once"
+                )
         }
     }
 }

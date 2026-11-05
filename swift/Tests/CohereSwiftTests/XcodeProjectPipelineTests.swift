@@ -370,10 +370,10 @@ struct XcodeProjectPipelineTests {
     }
 
     /*
-     A build that fails before compiling anything, here a package that `--no-fix` may not resolve, judges what the
-     last build left by freshness. Greeter.swift is as that build compiled it, so its record stands. Counter.swift was
-     edited since, out of the warning that build recorded, so the old warning is not reported and the file has no
-     record. The failure is a finding at the spec, and the words name it.
+     A build that fails before compiling anything, here a package at a host no network reaches (`.invalid` never
+     resolves), judges what the last build left by freshness. Greeter.swift is as that build compiled it, so its
+     record stands. Counter.swift was edited since, out of the warning that build recorded, so the old warning is not
+     reported and the file has no record. The failure is a finding at the spec that says resolution failed and why.
      */
     @Test func aBuildThatFailsBeforeCompilingReadsOnlyFreshRecords() async throws {
         try Self.requireXcodegen()
@@ -386,8 +386,8 @@ struct XcodeProjectPipelineTests {
             Self.specification.replacingOccurrences(
                 of: "targets:\n",
                 with:
-                    "packages:\n  Numerics:\n    url: https://github.com/apple/swift-numerics\n    exactVersion: 1.0.2\ntargets:\n",
-            ) + "    dependencies:\n      - package: Numerics\n        product: RealModule\n"
+                    "packages:\n  Missing:\n    url: https://example.invalid/Missing.git\n    exactVersion: 1.0.0\ntargets:\n",
+            ) + "    dependencies:\n      - package: Missing\n        product: Missing\n"
         try withPackage.write(
             to: fixture.root.appendingPathComponent("project.yml"),
             atomically: true,
@@ -402,8 +402,19 @@ struct XcodeProjectPipelineTests {
         let run = try await Self.run(root: fixture.root, arguments: ["--no-fix"])
 
         #expect(run.compilerFindings == ["project.yml:1:error"], "the stale warning is gone, and the failure is said")
+        let message = run.of("finding").first?["message"] as? String ?? ""
+        #expect(
+            message.hasPrefix(
+                "xcodebuild could not resolve the packages this project names, so nothing was built and no file's types are known: xcodebuild: error: Could not resolve package dependencies: "
+            ),
+            "\(message)",
+        )
+        #expect(message.contains("example.invalid"), "the words say which package and why: \(message)")
         #expect(run.filesWithoutRecord == ["Counter.swift"])
-        #expect(run.typesBuild.contains("under --no-fix packages are never resolved"), "\(run.typesBuild)")
+        #expect(
+            run.typesBuild.contains("; the build of App failed: xcodebuild: error: Could not resolve"),
+            "\(run.typesBuild)",
+        )
         #expect(run.complete == false)
     }
 
@@ -474,10 +485,184 @@ struct XcodeProjectPipelineTests {
         #expect(try Self.derivedDataFolders(named: project) == derivedDataBefore, "xcodebuild wrote DerivedData")
     }
 
+    /* A source that uses both packages, so a build that did not resolve them cannot vouch for it. */
+    static let packagesSource = """
+        import Lib
+        import RemoteKit
+
+        struct Uses {
+            func both() -> String {
+                libGreeting() + remoteGreeting()
+            }
+        }
+
+        """
+
     /*
-     A committed project is read where it stands, with no xcodegen run, and built where it stands. Under `--no-fix`
-     its bundle is left as it was: xcodebuild makes empty package folders inside it even when it resolves nothing,
-     and the phase removes the ones it made.
+     Two packages beside the app, the shapes CapturePhone links: `Lib` by path, like CaptureWire, and `Remote` by
+     URL at an exact version, like MediaPipe, a git repository of its own reached through `file://`, so no test needs
+     the network. Measured 2026-11-05: a path package alone builds under `-disableAutomaticPackageResolution` with
+     no pins, so it cannot tell a resolve from none, while a URL package fails with "a resolved file is required".
+     Returns the spec, its app target depending on both.
+     */
+    static func addPackages(to repository: URL, specification: String = specification) throws -> String {
+        let manifest = """
+            // swift-tools-version: 6.0
+            import PackageDescription
+
+            let package = Package(
+                name: "NAME",
+                platforms: [.iOS(.v18)],
+                products: [.library(name: "PRODUCT", targets: ["PRODUCT"])],
+                targets: [.target(name: "PRODUCT")]
+            )
+
+            """
+        let packages = [
+            ("Lib", "Lib", "public func libGreeting() -> String { \"lib\" }\n"),
+            ("Remote", "RemoteKit", "public func remoteGreeting() -> String { \"remote\" }\n"),
+        ]
+        for (name, product, source) in packages {
+            let directory = repository.appendingPathComponent(name, isDirectory: true)
+            let sources = directory.appendingPathComponent("Sources/\(product)", isDirectory: true)
+            try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
+            try manifest.replacingOccurrences(of: "NAME", with: name).replacingOccurrences(
+                of: "PRODUCT",
+                with: product,
+            )
+            .write(to: directory.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
+            try source.write(to: sources.appendingPathComponent("\(product).swift"), atomically: true, encoding: .utf8)
+        }
+        let remote = repository.appendingPathComponent("Remote", isDirectory: true)
+        let identity = [
+            "-c", "user.name=cohere", "-c", "user.email=cohere@example.com", "-c", "commit.gpgsign=false", "-c",
+            "tag.gpgsign=false", "-c", "init.defaultBranch=main", "-c", "core.hooksPath=/dev/null",
+        ]
+        for arguments in [["init", "-q"], ["add", "."], ["commit", "-q", "-m", "one"], ["tag", "1.0.0"]] {
+            let result = try ProcessRunner().run("git", identity + arguments, in: remote)
+            try #require(result.succeeded, "git \(arguments) failed: \(result.standardError)")
+        }
+        return specification.replacingOccurrences(
+            of: "targets:\n",
+            with:
+                "packages:\n  Lib:\n    path: ../Lib\n  Remote:\n    url: file://\(remote.path)\n    exactVersion: 1.0.0\ntargets:\n",
+        ) + "    dependencies:\n      - package: Lib\n      - package: Remote\n        product: RemoteKit\n"
+    }
+
+    /* The app with both packages, as a fresh checkout: no project, no pins, no scratch. */
+    static func fixtureWithPackages() throws -> (repository: URL, root: URL) {
+        let fixture = try Self.fixture(counter: Self.cleanCounter)
+        let specification = try Self.addPackages(to: fixture.repository)
+        try specification.write(
+            to: fixture.root.appendingPathComponent("project.yml"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Self.packagesSource.write(
+            to: fixture.root.appendingPathComponent("Sources/Uses.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        return fixture
+    }
+
+    /*
+     #s8p20fe: the read-only gate on a fresh checkout of an xcodegen project with package dependencies resolves them
+     into the engine's scratch and type-checks every file, and the tree is byte for byte what it was. Before, `--no-fix`
+     disabled resolution, the scratch held none, and the build failed until someone ran a mutating check.
+     */
+    @Test func aNoFixRunResolvesAGeneratedProjectsPackagesIntoTheScratch() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixtureWithPackages()
+        defer { Self.remove(fixture.repository) }
+        let before = try Self.snapshot(of: fixture.repository)
+
+        let run = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache"])
+
+        #expect(run.phase("types")?.outcome == "ran")
+        #expect(run.compilerFindings.isEmpty, "\(run.typesBuild) \(run.of("finding"))")
+        #expect(run.typesRecord["files"] as? Int == 4)
+        #expect(run.filesWithoutRecord.isEmpty, "\(run.typesBuild)")
+        let after = try Self.snapshot(of: fixture.repository)
+        #expect(after == before, "written into the tree: \(Set(after.keys).symmetricDifference(before.keys).sorted())")
+    }
+
+    /*
+     A committed project with no pins of its own, under `--no-fix`, is built through a workspace in the scratch, so
+     the pins the resolve writes land there and the bundle is left as it was. Built as a project, xcodebuild would
+     write them into the bundle.
+     */
+    @Test func aNoFixRunResolvesACommittedProjectsPackagesIntoTheScratch() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixtureWithPackages()
+        defer { Self.remove(fixture.repository) }
+        try Self.commitProject(at: fixture.root)
+        let before = try Self.snapshot(of: fixture.repository)
+
+        let run = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache"])
+
+        #expect(run.of("project").first?["projectKind"] as? String == "XcodeProject")
+        #expect(run.compilerFindings.isEmpty, "\(run.typesBuild) \(run.of("finding"))")
+        #expect(run.typesRecord["files"] as? Int == 4)
+        #expect(run.filesWithoutRecord.isEmpty, "\(run.typesBuild)")
+        let after = try Self.snapshot(of: fixture.repository)
+        #expect(after == before, "written into the tree: \(Set(after.keys).symmetricDifference(before.keys).sorted())")
+    }
+
+    /*
+     A resolution the repository commits holds a `--no-fix` build as it stands: on a fresh scratch the pinned
+     revision is cloned and the build succeeds, the pins unchanged. Pins the project no longer matches fail by name,
+     at the project file, with the committed file in the words, and are left as they were.
+     */
+    @Test func aCommittedResolutionHoldsANoFixBuild() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixtureWithPackages()
+        defer { Self.remove(fixture.repository) }
+        try Self.commitProject(at: fixture.root)
+        let pins = fixture.root.appendingPathComponent(
+            "Fixture.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+        )
+        _ = try await Self.run(root: fixture.root, arguments: ["--no-cache"])
+        let pinned = try String(contentsOf: pins, encoding: .utf8)
+        try #require(pinned.contains("\"version\" : \"1.0.0\""), "the plain run wrote no pins to commit: \(pinned)")
+        let before = try Self.snapshot(of: fixture.repository)
+
+        let held = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache"])
+        #expect(held.compilerFindings.isEmpty, "\(held.typesBuild) \(held.of("finding"))")
+        #expect(held.filesWithoutRecord.isEmpty, "\(held.typesBuild)")
+        #expect(try Self.snapshot(of: fixture.repository) == before)
+
+        let stale = pinned.replacingOccurrences(of: "1.0.0", with: "0.9.0")
+        try stale.write(to: pins, atomically: true, encoding: .utf8)
+        let refused = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache"])
+        #expect(refused.compilerFindings == ["project.pbxproj:1:error"], "\(refused.typesBuild)")
+        /* The run names files by their real path, which Foundation's own resolving does not spell (it drops `/private`), so the project file's finding gives it. */
+        let projectFile = refused.of("finding").first?["file"] as? String ?? ""
+        let realPins =
+            URL(fileURLWithPath: projectFile).deletingLastPathComponent().path
+            + "/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+        #expect(
+            refused.typesBuild.contains(
+                "(under --no-fix the build is held to the resolution the repository commits, \(realPins), and a check never moves it)"
+            ),
+            "\(refused.typesBuild)",
+        )
+        #expect(refused.filesWithoutRecord.count == 4)
+        #expect(try String(contentsOf: pins, encoding: .utf8) == stale)
+    }
+
+    /* The app's project generated where it stands and its spec removed, with the bundle no longer ignored, as a repository that commits its project. */
+    static func commitProject(at root: URL) throws {
+        let generated = try ProcessRunner().run("xcodegen", ["generate", "--quiet"], in: root)
+        try #require(generated.succeeded, "the fixture's project could not be made: \(generated.standardError)")
+        try FileManager.default.removeItem(at: root.appendingPathComponent("project.yml"))
+        try "Info.plist\n".write(to: root.appendingPathComponent(".gitignore"), atomically: true, encoding: .utf8)
+    }
+
+    /*
+     A committed project is read where it stands, with no xcodegen run. Under `--no-fix` its bundle is left as it
+     was: built as a project, xcodebuild made empty package folders inside it even when it resolved nothing, so it
+     is built through a workspace in the scratch.
      */
     @Test func aCommittedProjectIsReadWhereItStands() async throws {
         try Self.requireXcodegen()

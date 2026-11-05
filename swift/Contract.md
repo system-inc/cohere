@@ -310,11 +310,15 @@ At an Xcode root (#gg0x95n) the build is xcodebuild, one per native target that 
 through the scheme Xcode makes for it, for the generic device of the platform its `SDKROOT` names: `build`, or
 `build-for-testing` for a test bundle. It writes only into the scratch (`xcode-build` as derived data,
 `xcode-packages` for packages), never into `~/Library/Developer/Xcode/DerivedData`, signs nothing, and holds
-run-script phases to their declared files (`ENABLE_USER_SCRIPT_SANDBOXING=YES`). Under `--no-fix` it resolves no
-package, and leaves a committed project's bundle as it found it. Its records are judged by the same rules as a
-package's, and `build` reads `xcodebuild of <n> targets for <platforms>, derived data <path>`, or that the last
-build's records were reused because no input changed, then names each build that failed and the step it failed
-at, and each target not built and why (an `SDKROOT` naming no platform the engine knows). A failure no file of
+run-script phases to their declared files (`ENABLE_USER_SCRIPT_SANDBOXING=YES`). Packages resolve into the scratch,
+under `--no-fix` too (#s8p20fe): a generated bundle is in the scratch already, and under `--no-fix` a committed
+bundle is built through a workspace in the scratch that names it, so its pins land there and the bundle is left as
+it was found. A resolution the repository commits (a committed bundle's own, or one kept in the bundle beside a
+spec that git does not ignore) is preferred, and under `--no-fix` the build is held to it as it stands. A resolve
+that fails is a finding at the spec or the committed project file that says so in xcodebuild's words. Its records
+are judged by the same rules as a package's, and `build` reads
+`xcodebuild of <n> targets for <platforms>, derived data <path>`, or that the last build's records were reused
+because no input changed, then names each build that failed and the step it failed at, and each target not built and why (an `SDKROOT` naming no platform the engine knows). A failure no file of
 ours carries an error for is a finding at the spec or the committed project file, and a build that left no
 record leaves every file it was for in `filesWithoutRecord`, never an empty report.
 
@@ -407,7 +411,7 @@ it where a run that did not finish prints green.
 
 | Flag | Swift meaning in phase 1 |
 |---|---|
-| `--no-fix` | Writes nothing to the project: no source, no `.build`, no `Package.resolved`. Builds go to the engine's cache outside the project, and package resolution is disabled. The fix phase runs in check mode, recorded as `ran`: each file the formatter would rewrite becomes one `format` finding at its first changed line. |
+| `--no-fix` | Writes nothing to the project: no source, no `.build`, no `Package.resolved`. Builds go to the engine's cache outside the project. A package is built from its own `Package.resolved` with resolution disabled, since SwiftPM keeps pins nowhere else, so one with remote dependencies and none fails by name; an Xcode project resolves into the engine's scratch, held to a resolution the repository commits when there is one. The fix phase runs in check mode, recorded as `ran`: each file the formatter would rewrite becomes one `format` finding at its first changed line. |
 | `--fix` | Fix and format only. |
 | `--types`, `--lint` | That phase alone, as for TypeScript. |
 | `--format` | Formatting is on by default for Swift, unlike TypeScript, where it waits on parity with the existing gate. For Swift that parity is measured: swift-format 604.0.0 as a library is byte-identical to `xcrun swift-format` on 952 of our files. The flag is accepted and changes nothing. |
