@@ -10,7 +10,7 @@ import "sync/atomic"
 var OptionsReads atomic.Int64
 
 // Given is the options a rule's Run and ProgramFingerprint are handed: the value its registration's decoder
-// returned, or none for a rule configured as a bare `"error"`.
+// returned, or none when no decoder produced any.
 //
 //	settings, configured := options.Read()
 //	if !configured {
@@ -26,14 +26,18 @@ type Given[Options any] struct {
 	configured bool
 }
 
-// Configured is the options a config wrote for a rule, as its decoder returned them. The zero Given is a rule
-// configured with no options.
+// Configured is the options a rule's decoder produced, as it returned them. The zero Given is a rule no decoder
+// produced options for.
 func Configured[Options any](value Options) Given[Options] {
 	return Given[Options]{value: value, configured: true}
 }
 
-// Read returns the decoded options and whether the config gave any. Without options it returns the zero value
-// and false, so the rule's own default arm runs.
+// Read returns the decoded options and whether a decoder produced them, which is not the same as whether the
+// config wrote any. A bare severity reads false only for a rule that takes no options or whose decoder refuses
+// empty input, as DecodeOptionsInto does, since the config layer then falls back to the rule's Unconfigured. A
+// decoder that fills defaults from nothing, which every DecodeAt decoder is handed for a bare severity, returns
+// its defaults configured, and Read reads true. Without options it returns the zero value and false, so the
+// rule's own default arm runs.
 func (options Given[Options]) Read() (Options, bool) {
 	OptionsReads.Add(1)
 	return options.value, options.configured
