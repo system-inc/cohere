@@ -96,12 +96,12 @@ import (
 // `Diagnostic` carries a single `Range`, so the primary span is kept where upstream puts it and the
 // creation site moves into the message text. No information is dropped, but a reader comparing
 // against React's goldens should know the shape differs deliberately.
-var StaticComponents = rule.Rule{
+var StaticComponents = rule.Rule[CompilerRuleOptions]{
 	Name:             "react-hooks/static-components",
 	NeedsTypeChecker: true,
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			// The whole file is taken at once rather than listening on each function kind, because
 			// lowering already descends into nested functions through the function arena. Listening
@@ -114,9 +114,9 @@ var StaticComponents = rule.Rule{
 					return
 				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
-					// Shared with the other rules that lower this same function; see high_level_intermediate_representation.ForFunction.
-					// Construct runs inside the cached computation, because it mutates in place and is
-					// not idempotent.
+					// Shared with the other rules that lower this same function; see
+					// high_level_intermediate_representation.ForFunction. Construct runs inside the cached
+					// computation, because it mutates in place and is not idempotent.
 					lowered := high_level_intermediate_representation.ForFunction(ruleContext, functionNode)
 					if lowered == nil {
 						return
@@ -189,47 +189,47 @@ func reportDynamicComponents(ruleContext rule.Context, function *high_level_inte
 			}
 			target := instruction.LValue.Identifier
 
-			switch value := instruction.Value.(type) {
+			switch instructionValue := instruction.Value.(type) {
 			// Creating a function during render is the case the rule is named for. The other three
 			// are values whose identity this pass cannot prove stable: a call, a construction, or a
 			// method call could return anything, including a fresh component each time.
 			case *high_level_intermediate_representation.FunctionExpression:
 				dynamic[target] = target
 			case *high_level_intermediate_representation.CallExpression:
-				dynamic[target] = value.Callee.Identifier
+				dynamic[target] = instructionValue.Callee.Identifier
 			case *high_level_intermediate_representation.NewExpression:
-				dynamic[target] = value.Callee.Identifier
+				dynamic[target] = instructionValue.Callee.Identifier
 			case *high_level_intermediate_representation.MethodCall:
-				dynamic[target] = value.Property.Identifier
+				dynamic[target] = instructionValue.Property.Identifier
 
 			// Reading and writing carry taint along, which is what makes an alias chain of any
 			// length behave like the value at its head.
 			case *high_level_intermediate_representation.LoadLocal:
-				if creator, ok := dynamic[value.Place.Identifier]; ok {
+				if creator, ok := dynamic[instructionValue.Place.Identifier]; ok {
 					dynamic[target] = creator
 				}
 			case *high_level_intermediate_representation.StoreLocal:
-				if creator, ok := dynamic[value.Value.Identifier]; ok {
+				if creator, ok := dynamic[instructionValue.Value.Identifier]; ok {
 					dynamic[target] = creator
-					dynamic[value.LValue.Identifier] = creator
+					dynamic[instructionValue.LValue.Identifier] = creator
 				}
 
 			// A tag naming a value is the only shape that can carry taint. A host element such as
 			// `div` and a member expression such as `obj.Inner` both arrive with no Place, so both
 			// are silent regardless of what their names resolve to.
 			case *high_level_intermediate_representation.JsxExpression:
-				if value.Tag.Place == nil {
+				if instructionValue.Tag.Place == nil {
 					continue
 				}
-				creation, ok := dynamic[value.Tag.Place.Identifier]
+				creation, ok := dynamic[instructionValue.Tag.Place.Identifier]
 				if !ok {
 					continue
 				}
 				message := staticComponentsMessage(ruleContext, function, creation)
-				if tagNode := identifierNode(function, value.Tag.Place.Identifier); tagNode != nil {
+				if tagNode := identifierNode(function, instructionValue.Tag.Place.Identifier); tagNode != nil {
 					ruleContext.ReportNode(tagNode, message)
 				} else {
-					ruleContext.ReportRange(value.Tag.Place.Range, message)
+					ruleContext.ReportRange(instructionValue.Tag.Place.Range, message)
 				}
 			}
 		}
@@ -284,7 +284,7 @@ func analyzeCompiledFunction(ruleContext rule.Context, function *high_level_inte
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
+	compilationUnit := high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunction)
 
 	// The outermost component or hook is the compilation unit, and the walk stops here. A function
@@ -302,7 +302,7 @@ func analyzeCompiledFunction(ruleContext rule.Context, function *high_level_inte
 	// rather than JSX it is not a component at all, so nothing admits it, and the walk continues
 	// down to `Inner`, which is one. That is `forEachOutermostFunction` plus this gate agreeing,
 	// not an exception to either.
-	reportDynamicComponents(ruleContext, function)
+	reportDynamicComponents(ruleContext, compilationUnit)
 }
 
 // identifierNode returns the syntactic node a value came from, or nil for a pure temporary.

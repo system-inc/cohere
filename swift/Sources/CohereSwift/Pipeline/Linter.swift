@@ -42,7 +42,13 @@ struct Linter {
                 continue
             }
             rulesRun += 1
-            for member in ownedPackages {
+            /*
+             An Xcode project is judged only from the settings Xcode resolved for it (`XcodeBuildSettings`), and only on
+             the targets it answered for (`toolchainTargets`). One whose settings this run did not read offers the rule
+             nothing, so the rule is listed as silent there rather than judging a guess.
+             */
+            for member in ownedPackages
+            where member.projectKind == .swiftPackage || !(member.xcodeBuildSettings?.targets.isEmpty ?? true) {
                 listening[rule.name, default: 0] += 1
                 let found = rule.findings(in: member, manifest: manifests[member.root.path]).map {
                     Self.applying(severity, to: $0)
@@ -108,12 +114,37 @@ struct Linter {
         let unchecked = files.filter { file in
             symbols.unavailable[file.url.path] != nil && enabledTyped.contains { $0.applies(to: file) }
         }
-        let crashes = unchecked.map { file in
-            LintRecord.Crash(
+        /*
+         Each crash names the rules it cost, so a reader knows what the file was not judged for and that every other
+         rule judged it: a count with no rule leaves nobody able to say what a crashed file missed (@system_cohere,
+         2026-11-05, from a one-file package that crashed under `--lint` before any build).
+         */
+        var crashes = unchecked.map { file in
+            let missed = enabledTyped.filter { $0.applies(to: file) }.map(\.name).sorted()
+            return LintRecord.Crash(
                 file: file.url.path,
                 error:
-                    "the typed rules could not read what its names resolve to: \(symbols.unavailable[file.url.path] ?? "")",
+                    "\(symbols.unavailable[file.url.path] ?? ""), so the rules that read what its names resolve to could not judge it (\(missed.joined(separator: ", "))); every other rule ran on it",
             )
+        }
+        /*
+         An Xcode target whose settings Xcode could not give is unchecked by the toolchain rules, never judged on or
+         off, and named at the project's definition with why, so the run is incomplete rather than clean.
+         */
+        let toolchainRules = RuleRegistry.packageRules.map(\.name).filter { scopedOff[$0] == nil }.sorted()
+        if !toolchainRules.isEmpty {
+            for member in ownedPackages {
+                guard let settings = member.xcodeBuildSettings else { continue }
+                for (target, reason) in settings.unchecked.sorted(by: { $0.key < $1.key }) {
+                    crashes.append(
+                        LintRecord.Crash(
+                            file: settings.definition.path,
+                            error:
+                                "the build settings of \(target) could not be read: \(reason); so the rules that judge them did not (\(toolchainRules.joined(separator: ", ")))",
+                        )
+                    )
+                }
+            }
         }
         let silent = ranNames.filter { (listening[$0] ?? 0) == 0 }.sorted()
         let watchedAndQuiet = ranNames.filter { (listening[$0] ?? 0) > 0 && (reporting[$0] ?? 0) == 0 }.count

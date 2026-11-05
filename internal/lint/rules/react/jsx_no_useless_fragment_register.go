@@ -7,5 +7,8 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The decoder is hand-written rather than `rule.DecodeOptionsInto` because the generic one errors on
 // empty input, which is what a bare `"error"` configuration hands it.
 func init() {
-	rule.Register(rule.Registration{Rule: JsxNoUselessFragment, Decode: DecodeJsxNoUselessFragmentOptions})
+	rule.Register(rule.Registration[JsxNoUselessFragmentOptions]{
+		Rule:   JsxNoUselessFragment,
+		Decode: DecodeJsxNoUselessFragmentOptions,
+	})
 }

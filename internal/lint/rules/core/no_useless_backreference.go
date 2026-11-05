@@ -77,7 +77,7 @@ var regExpCallTraceMap = map[string]*reference.TraceMap{"RegExp": {Call: true, C
 // read as getStringIfConstant reads them, through reference.ConstantStringIn: a constant binding's
 // value counts, and flags that are not constant read as none, as ESLint's `flags || ""` does. A
 // pattern that is not constant is not checked.
-var NoUselessBackreference = rule.Rule{
+var NoUselessBackreference = rule.Rule[rule.NoOptions]{
 	Name: "no-useless-backreference",
 
 	// The tracker tells the global `RegExp` from a local that shares its spelling by asking where its
@@ -85,7 +85,7 @@ var NoUselessBackreference = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				pattern, flags := regexsyntax.PatternAndFlags(node.Text())

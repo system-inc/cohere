@@ -29,10 +29,10 @@ import (
 func lowerTypedForSSA(test *testing.T, code string) *Function {
 	test.Helper()
 	var lowered *Function
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "ssa-test-harness",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {
@@ -112,7 +112,8 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 		test.Parallel()
 		fn := build()
 		var moved *Phi
-		var from, to *BasicBlock
+		var from *BasicBlock
+		var to *BasicBlock
 		for _, block := range fn.Blocks {
 			if len(block.Phis) > 0 {
 				moved, from = block.Phis[0], block
@@ -176,7 +177,8 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 	test.Run("value defined twice", func(test *testing.T) {
 		test.Parallel()
 		fn := build()
-		var first, second *Instruction
+		var first *Instruction
+		var second *Instruction
 		for _, block := range fn.Blocks {
 			for _, id := range block.Instructions {
 				ins := fn.Instructions[id]
@@ -327,7 +329,7 @@ func TestMutatingVisitorCoversEveryValue(test *testing.T) {
 		&UnaryExpression{Value: place(1)},
 		&PrefixUpdate{LValue: place(1), Value: place(2)},
 		&PostfixUpdate{LValue: place(1), Value: place(2)},
-		&Primitive{Value: nil},
+		&Primitive{Value: PrimitiveUndefined{}},
 		&RegExpLiteral{},
 		&TemplateLiteral{Subexprs: []Place{place(1)}},
 		&TaggedTemplateExpression{Tag: place(1), Subexprs: []Place{place(2)}},
@@ -356,7 +358,11 @@ func TestMutatingVisitorCoversEveryValue(test *testing.T) {
 	}
 
 	for _, value := range values {
-		var byValue, byPointer []struct {
+		var byValue []struct {
+			id   static_single_assignment.IdentifierId
+			role PlaceRole
+		}
+		var byPointer []struct {
 			id   static_single_assignment.IdentifierId
 			role PlaceRole
 		}

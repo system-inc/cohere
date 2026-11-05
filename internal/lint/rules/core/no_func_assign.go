@@ -83,7 +83,7 @@ var messageNoFuncAssign = rule.Message{
 //
 // No fix. The repair is a new binding, which means choosing a name and deciding which later uses of
 // the old one meant the function, and the rule cannot know that.
-var NoFuncAssign = rule.Rule{
+var NoFuncAssign = rule.Rule[rule.NoOptions]{
 	Name: "no-func-assign",
 
 	// See the doc above: four of upstream's seven clean cases are textually near-identical to
@@ -92,7 +92,7 @@ var NoFuncAssign = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Each function on the shared walk, reading the writes to its name from the file's identifier
 		// index. Each function used to walk the whole file for writes to its name, which made this
 		// simple rule one of the tree's slowest (177ms on ahra); then the file was walked twice from

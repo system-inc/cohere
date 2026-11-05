@@ -35,16 +35,15 @@ type noMeaninglessVoidOperatorRawOptions struct {
 //
 // cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what
 // arrives is the bare object rather than upstream's one-element array.
-func DecodeNoMeaninglessVoidOperatorOptions(raw []byte) (any, error) {
+func DecodeNoMeaninglessVoidOperatorOptions(raw []byte) (NoMeaninglessVoidOperatorOptions, error) {
 	decoded, decodeOptionsError := rule.DecodeOptionsInto[noMeaninglessVoidOperatorRawOptions]()(raw)
 	if decodeOptionsError != nil {
 		return DefaultNoMeaninglessVoidOperatorSettings(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(noMeaninglessVoidOperatorRawOptions)
 	options := DefaultNoMeaninglessVoidOperatorSettings()
-	if wire.CheckNever != nil {
-		options.CheckNever = *wire.CheckNever
+	if decoded.CheckNever != nil {
+		options.CheckNever = *decoded.CheckNever
 	}
 	return options, nil
 }
@@ -125,15 +124,15 @@ func DecodeNoMeaninglessVoidOperatorOptions(raw []byte) (any, error) {
 // # Cost
 //
 // `KindVoidExpression` is a rare anchor and the checker is consulted only when one is found.
-var NoMeaninglessVoidOperator = rule.Rule{
+var NoMeaninglessVoidOperator = rule.Rule[NoMeaninglessVoidOperatorOptions]{
 	Name: "@typescript-eslint/no-meaningless-void-operator",
 
 	// The argument's type decides every finding, so the checker is required.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[NoMeaninglessVoidOperatorOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoMeaninglessVoidOperatorOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultNoMeaninglessVoidOperatorSettings()
 		}

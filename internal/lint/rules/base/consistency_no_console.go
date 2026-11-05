@@ -76,10 +76,10 @@ import (
 // # Cost
 //
 // Two common anchors, both exiting on a single identifier comparison. No checker, no program.
-var ConsistencyNoConsole = rule.Rule{
+var ConsistencyNoConsole = rule.Rule[rule.NoOptions]{
 	Name: "base/consistency-no-console",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node, receiver *ast.Node, methodName string) {
 			// Parentheses are stepped through before the receiver is read, and this line was
 			// missing on the first writing.

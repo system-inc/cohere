@@ -329,6 +329,8 @@ type queuedMarkerInsert struct {
 // Separated from the walk for the reason upstream separates its two phases, and it rebuilds each
 // affected block's instruction list rather than inserting in place so the cost is linear in the
 // block rather than quadratic in the number of insertions.
+//
+// Mutates: function each marker is appended to its instruction table and spliced into its block
 func insertQueuedMarkers(function *Function, queued []queuedMarkerInsert) {
 	byAnchor := make(map[InstructionId][]*Instruction, len(queued))
 	for _, insert := range queued {
@@ -421,6 +423,9 @@ type extractedMemoArguments struct {
 //
 // Returns false when there is no callback argument at all, which upstream treats as an error and
 // refuses to rewrite.
+//
+// Mutates: result a dependency list that is not an array, or not readable, is counted on it, so one result
+// tallies a whole function's refusals
 func extractManualMemoArguments(
 	instruction *Instruction,
 	kind ManualMemoKind,
@@ -500,12 +505,12 @@ func collectManualMemoTemporaries(function *Function, instruction *Instruction, 
 	target := instruction.LValue.Identifier
 	sidemap.anchors[target] = instruction.Id
 
-	switch value := instruction.Value.(type) {
+	switch instructionValue := instruction.Value.(type) {
 	case *FunctionExpression:
 		sidemap.functions[target] = true
 
 	case *LoadGlobal:
-		switch value.Name {
+		switch instructionValue.Name {
 		case "useMemo":
 			sidemap.manualMemos[target] = ManualMemoKindUseMemo
 		case "useCallback":
@@ -516,13 +521,13 @@ func collectManualMemoTemporaries(function *Function, instruction *Instruction, 
 			// A global that is not a hook is still a valid dependency root: `[SOME_CONSTANT]` is
 			// a legal dependency array entry, and dropping it would silently shorten the list.
 			sidemap.deps[target] = ManualMemoDependency{
-				Root: ManualMemoRoot{IsGlobal: true, Name: value.Name},
+				Root: ManualMemoRoot{IsGlobal: true, Name: instructionValue.Name},
 			}
 		}
 
 	case *Primitive:
 		// `React.useMemo` lowers the property name to a Primitive string; see the divergence note.
-		if name, ok := value.Value.(string); ok {
+		if name, ok := instructionValue.Value.(PrimitiveString); ok {
 			switch name {
 			case "useMemo":
 				sidemap.manualMemos[target] = ManualMemoKindUseMemo
@@ -535,8 +540,8 @@ func collectManualMemoTemporaries(function *Function, instruction *Instruction, 
 		// Only an array of plain elements is a dependency list. A spread or a hole means the
 		// contents are not statically the written dependencies, and upstream's `every` check
 		// rejects the same shapes.
-		places := make([]Place, 0, len(value.Elements))
-		for _, element := range value.Elements {
+		places := make([]Place, 0, len(instructionValue.Elements))
+		for _, element := range instructionValue.Elements {
 			if element.Spread || element.Hole {
 				return
 			}
@@ -548,23 +553,23 @@ func collectManualMemoTemporaries(function *Function, instruction *Instruction, 
 		// Extending an existing path by one step. New structural chains record optionality on their
 		// terminal, while computed accesses and older call shapes may still carry the instruction
 		// flag. Reading both preserves the source spelling across that transition.
-		object, ok := sidemap.deps[value.Object.Identifier]
+		object, ok := sidemap.deps[instructionValue.Object.Identifier]
 		if !ok {
 			return
 		}
 		path := make([]DependencyPathEntry, 0, len(object.Path)+1)
 		path = append(path, object.Path...)
 		path = append(path, DependencyPathEntry{
-			Property: value.Property,
-			Optional: value.Optional || sidemap.optionals[target],
+			Property: instructionValue.Property,
+			Optional: instructionValue.Optional || sidemap.optionals[target],
 		})
 		sidemap.deps[target] = ManualMemoDependency{Root: object.Root, Path: path}
 
 	case *LoadLocal:
-		propagateManualMemoDependency(function, sidemap, target, value.Place)
+		propagateManualMemoDependency(function, sidemap, target, instructionValue.Place)
 
 	case *LoadContext:
-		propagateManualMemoDependency(function, sidemap, target, value.Place)
+		propagateManualMemoDependency(function, sidemap, target, instructionValue.Place)
 
 	case *StoreLocal:
 		// A value block's result arrives through a store. Upstream tracks these so that optional
@@ -579,9 +584,9 @@ func collectManualMemoTemporaries(function *Function, instruction *Instruction, 
 		// written as `[propA.x, x]`. Without the guard the written `x` resolved to `propB.x.y`
 		// while the inferred side kept `x`, so the two never matched and the rule fired on a
 		// fixture upstream compiles cleanly.
-		if source, ok := sidemap.deps[value.Value.Identifier]; ok &&
-			!isNamedBinding(function, value.LValue.Identifier) {
-			sidemap.deps[value.LValue.Identifier] = source
+		if source, ok := sidemap.deps[instructionValue.Value.Identifier]; ok &&
+			!isNamedBinding(function, instructionValue.LValue.Identifier) {
+			sidemap.deps[instructionValue.LValue.Identifier] = source
 		}
 	}
 }

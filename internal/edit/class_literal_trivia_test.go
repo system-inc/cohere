@@ -41,7 +41,7 @@ func TestATailwindFixAfterTriviaNoLongerTakesTheFileBatchDown(test *testing.T) {
 	result, fixTextError := FixText(
 		"Component.tsx",
 		source,
-		proposeFromRules(tailwind.NoDuplicateClasses, nexus.ImportRequireNodeNamespace),
+		proposeFromRules(unconfigured(tailwind.NoDuplicateClasses), unconfigured(nexus.ImportRequireNodeNamespace)),
 		DefaultMaxPasses,
 	)
 	if fixTextError != nil {

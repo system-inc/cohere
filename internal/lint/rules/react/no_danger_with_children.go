@@ -92,13 +92,13 @@ const childrenPropertyName = "children"
 // Only the *first* child is tested, which is upstream's `jsx.children[0]` and not a simplification
 // of it. An element whose first child is a formatting newline and whose second is real text is
 // therefore clean, which is a narrowness this port carries deliberately rather than improves on.
-var NoDangerWithChildren = rule.Rule{
+var NoDangerWithChildren = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/no-danger-with-children` and the parity guard
 	// strips the namespace on a `/` boundary, so a rule named `react-no-danger-with-children`
 	// would match no inventory entry and lint no files while passing every fixture in this file.
 	Name:             "react/no-danger-with-children",
 	NeedsTypeChecker: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			// JsxElement rather than the opening element, because the finding spans the whole
 			// element and because the children are on this node. A self-closing element parses to
@@ -281,10 +281,11 @@ func variableHasProperty(
 		return false
 	}
 
-	if seen == nil {
-		seen = map[*ast.Node]bool{}
+	resolvedSeen := seen
+	if resolvedSeen == nil {
+		resolvedSeen = map[*ast.Node]bool{}
 	}
-	seen[declaration] = true
+	resolvedSeen[declaration] = true
 
 	for _, property := range initializer.AsObjectLiteralExpression().Properties.Nodes {
 		switch property.Kind {
@@ -293,7 +294,7 @@ func variableHasProperty(
 			if spread == nil || spread.Kind != ast.KindIdentifier {
 				continue
 			}
-			if variableHasProperty(ruleContext, spread, propertyName, seen) {
+			if variableHasProperty(ruleContext, spread, propertyName, resolvedSeen) {
 				return true
 			}
 

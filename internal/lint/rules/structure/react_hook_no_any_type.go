@@ -115,11 +115,11 @@ var reactHookNoAnyTypeMessageId = "reactHookNoAnyType"
 // at report time rather than written into a string, because a hardcoded list is wrong the week a
 // new checker-based rule ships and it is confidently wrong: it keeps naming the old set while
 // reading as current. See `reactHookNoAnyTypeBlindedRules`.
-var ReactHookNoAnyType = rule.Rule{
+var ReactHookNoAnyType = rule.Rule[rule.NoOptions]{
 	Name:             "structure/react-hook-no-any-type",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The typed-rule guard. A rule that reads a nil checker here would decline every file
 		// vacuously, which is precisely the silence this rule exists to make loud.
 		if ruleContext.TypeChecker == nil {
@@ -289,9 +289,9 @@ func reactHookNoAnyTypeCalleeName(callee *ast.Node) string {
 // populated branch renders, rather than proving the degraded branch twice.
 func reactHookNoAnyTypeBlindedRules() []string {
 	var blinded []string
-	for _, registration := range rule.Registered() {
-		if registration.Rule.ResolvesReactValueTypes {
-			blinded = append(blinded, registration.Rule.Name)
+	for _, entry := range rule.Registered() {
+		if entry.ResolvesReactValueTypes {
+			blinded = append(blinded, entry.Name)
 		}
 	}
 	return blinded

@@ -63,9 +63,9 @@ var messageTemplateCurlyInString = rule.Message{
 // plausible repairs and they mean different things: retyping the quotes as backticks assumes the
 // names in the placeholder resolve at that point, and escaping the dollar assumes the literal text
 // was intended. Choosing between them needs the author.
-var NoTemplateCurlyInString = rule.Rule{
+var NoTemplateCurlyInString = rule.Rule[rule.NoOptions]{
 	Name: "no-template-curly-in-string",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindStringLiteral: func(node *ast.Node) {
 				if !containsTemplatePlaceholder(node.Text()) {

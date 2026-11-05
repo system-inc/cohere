@@ -59,9 +59,9 @@ func messageRenameToProperties() rule.Message {
 //
 // So the break stays and the automation goes. The author is shown the rename, and is the one who
 // then updates the body, which is the work only they can do correctly anyway.
-var ReactComponentRequirePropertiesParameter = rule.Rule{
+var ReactComponentRequirePropertiesParameter = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-component-require-properties-parameter",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}

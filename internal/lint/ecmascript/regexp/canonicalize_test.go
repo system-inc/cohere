@@ -132,6 +132,27 @@ func TestCaseEquivalenceGroupsAgree(test *testing.T) {
 	}
 }
 
+// unicode17Pairs are the {lower, upper} pairs Unicode 16 and 17 added on top of the edition Go
+// shipped when this parser was written, spelled out here rather than read from a table.
+//
+// Only case pairs belong here. The delta also carried three fold-only pairs, U+0390/U+1FD3,
+// U+03B0/U+1FE3 and U+FB05/U+FB06, which have no case mapping in either direction and fold together
+// instead. Including them here fails, correctly: Canonicalize without the `u` flag leaves a
+// character with no uppercase standing for itself, so a fold pair asserted as a case pair asks for
+// a mapping that does not exist. That failure is how this list was found to be wrong.
+//
+// They used to come from an internal delta package that carried the mappings Go's tables lacked.
+// That package deleted itself on Go 1.27, which ships Unicode 17.0.0: measured across all 116 runes
+// it special-cased, it returned exactly what the standard library returns, with a corrupted control
+// confirming the comparison could see a difference. So the data moved into the test rather than
+// leaving with it, because the behaviour it pins is the parser's, not the delta's: JavaScript
+// compares each pair equal under `iu`, and a toolchain whose tables regressed would break this
+// whether or not a delta package existed to blame.
+var unicode17Pairs = [][2]rune{
+	{0x019B, 0xA7DC}, {0x0264, 0xA7CB}, {0x1C8A, 0x1C89}, {0xA7CD, 0xA7CC},
+	{0xA7CF, 0xA7CE}, {0xA7D3, 0xA7D2}, {0xA7D5, 0xA7D4}, {0xA7DB, 0xA7DA},
+}
+
 // TestCanonicalizeUnicode17 covers what the delta in [unicode17] is for:
 // JavaScript compares each of the pairs it names equal under a regexp's `iu`
 // flags, and Go's own tables would compare them unequal. The `i` flag on its
@@ -170,25 +191,4 @@ func TestCanonicalizeUnicode17(test *testing.T) {
 			test.Errorf("CaseEquivalents(%U, false) = %U, want %U", lower, got, wantEquivalents)
 		}
 	}
-}
-
-// unicode17Pairs are the {lower, upper} pairs Unicode 16 and 17 added on top of the edition Go
-// shipped when this parser was written, spelled out here rather than read from a table.
-//
-// Only case pairs belong here. The delta also carried three fold-only pairs, U+0390/U+1FD3,
-// U+03B0/U+1FE3 and U+FB05/U+FB06, which have no case mapping in either direction and fold together
-// instead. Including them here fails, correctly: Canonicalize without the `u` flag leaves a
-// character with no uppercase standing for itself, so a fold pair asserted as a case pair asks for
-// a mapping that does not exist. That failure is how this list was found to be wrong.
-//
-// They used to come from an internal delta package that carried the mappings Go's tables lacked.
-// That package deleted itself on Go 1.27, which ships Unicode 17.0.0: measured across all 116 runes
-// it special-cased, it returned exactly what the standard library returns, with a corrupted control
-// confirming the comparison could see a difference. So the data moved into the test rather than
-// leaving with it, because the behaviour it pins is the parser's, not the delta's: JavaScript
-// compares each pair equal under `iu`, and a toolchain whose tables regressed would break this
-// whether or not a delta package existed to blame.
-var unicode17Pairs = [][2]rune{
-	{0x019B, 0xA7DC}, {0x0264, 0xA7CB}, {0x1C8A, 0x1C89}, {0xA7CD, 0xA7CC},
-	{0xA7CF, 0xA7CE}, {0xA7D3, 0xA7D2}, {0xA7D5, 0xA7D4}, {0xA7DB, 0xA7DA},
 }

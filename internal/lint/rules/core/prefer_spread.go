@@ -54,9 +54,9 @@ var messagePreferSpread = rule.Message{
 // No fix. The rewrite has to move the spread into the argument list and delete the `this` argument,
 // and where the receiver expression has side effects, `a[i++].foo.apply(a[i++], args)` again, the
 // rewrite changes how many times they run.
-var PreferSpread = rule.Rule{
+var PreferSpread = rule.Rule[rule.NoOptions]{
 	Name: "prefer-spread",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

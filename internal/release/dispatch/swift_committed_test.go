@@ -20,7 +20,12 @@ const testToolchain = "swiftlang-6.4.0.34.1"
 func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *testing.T) {
 	fixture := newSwiftFixture(test)
 
-	first, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
+	first, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+		fixture.paths,
+		fixture.head(test),
+		testToolchain,
+		2,
+	)
 	if resolveCommittedSwiftEngineError != nil {
 		test.Fatalf("building from the first commit: %v", resolveCommittedSwiftEngineError)
 	}
@@ -33,7 +38,12 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *test
 
 	// An uncommitted edit in the checkout is not part of the commit, so the same engine serves.
 	writeFile(test, fixture.rule(), "one, uncommitted\n")
-	again, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
+	again, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+		fixture.paths,
+		fixture.head(test),
+		testToolchain,
+		2,
+	)
 	if resolveCommittedSwiftEngineError != nil {
 		test.Fatalf("resolving with an uncommitted edit on disk: %v", resolveCommittedSwiftEngineError)
 	}
@@ -46,7 +56,12 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *test
 	writeFile(test, fixture.rule(), "two\n")
 	fixture.commit(test, "swift")
 	writeFile(test, fixture.rule(), "two, uncommitted\n")
-	second, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
+	second, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+		fixture.paths,
+		fixture.head(test),
+		testToolchain,
+		2,
+	)
 	if resolveCommittedSwiftEngineError != nil {
 		test.Fatalf("building from the second commit: %v", resolveCommittedSwiftEngineError)
 	}
@@ -60,7 +75,12 @@ func TestTheCommittedSwiftEngineIsBuiltFromTheCommitNotTheWorkingTree(test *test
 	// A commit that changes only the engine's tests changes nothing compiled in, so it reuses the engine.
 	writeFile(test, filepath.Join(fixture.repository, "swift", "Tests", "RuleTests.swift"), "// a new test\n")
 	fixture.commit(test, "swift/Tests")
-	third, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
+	third, built, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(
+		fixture.paths,
+		fixture.head(test),
+		testToolchain,
+		2,
+	)
 	if resolveCommittedSwiftEngineError != nil {
 		test.Fatalf("resolving a tests-only commit: %v", resolveCommittedSwiftEngineError)
 	}

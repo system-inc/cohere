@@ -15,18 +15,23 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
 // markerRule is a rule that reads another file: it reports every variable declaration with the text of
 // marker.ts, which it finds through the program's file list. fingerprint is its ProgramFingerprint, nil for
 // none. runs counts the files it was run on, by base name.
-func markerRule(name string, fingerprint func(rule.Program, any) [sha256.Size]byte, runs *sync.Map) rule.Rule {
-	return rule.Rule{
+func markerRule(
+	name string,
+	fingerprint func(rule.Program, rule.Given[rule.NoOptions]) [sha256.Size]byte,
+	runs *sync.Map,
+) rule.Rule[rule.NoOptions] {
+	return rule.Rule[rule.NoOptions]{
 		Name:               name,
 		ProgramReads:       rule.ReadsOtherFiles,
 		ProgramFingerprint: fingerprint,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			if filepath.Base(ruleContext.SourceFile.FileName().AsString()) == "marker.ts" {
 				return nil
 			}
@@ -50,7 +55,7 @@ func markerText(program rule.Program) string {
 }
 
 // markerFingerprint is markerRule's complete fingerprint: marker.ts's text is all it reads beyond its file.
-func markerFingerprint(program rule.Program, _ any) [sha256.Size]byte {
+func markerFingerprint(program rule.Program, _ rule.Given[rule.NoOptions]) [sha256.Size]byte {
 	return sha256.Sum256([]byte(markerText(program)))
 }
 
@@ -88,13 +93,13 @@ func TestADerivedRuleReplaysWhileItsProgramFingerprintHolds(test *testing.T) {
 	test.Parallel()
 	for _, scenario := range []struct {
 		name        string
-		fingerprint func(rule.Program, any) [sha256.Size]byte
+		fingerprint func(rule.Program, rule.Given[rule.NoOptions]) [sha256.Size]byte
 		wantStale   bool
 	}{
 		{"complete fingerprint", markerFingerprint, false},
 		{
 			"control: a fingerprint that misses the marker",
-			func(rule.Program, any) [sha256.Size]byte { return [sha256.Size]byte{7} },
+			func(rule.Program, rule.Given[rule.NoOptions]) [sha256.Size]byte { return [sha256.Size]byte{7} },
 			true,
 		},
 	} {
@@ -111,18 +116,24 @@ func TestADerivedRuleReplaysWhileItsProgramFingerprintHolds(test *testing.T) {
 			var recorded *program.LintCache
 			walk := func(cached bool) (program.Result, *sync.Map) {
 				test.Helper()
-				graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+				graph, buildError := program.Build(
+					program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")},
+				)
 				if buildError != nil {
 					test.Fatal(buildError)
 				}
 				runs := &sync.Map{}
-				rules := []rule.Rule{markerRule("test-derived", scenario.fingerprint, runs)}
+				rules := []rule.Rule[rule.NoOptions]{markerRule("test-derived", scenario.fingerprint, runs)}
 				var reuse *program.FindingsReuse
 				if cached {
 					reuse = program.NewFindingsReuse(key, recorded, program.PathAnchor{})
 					graph.FindingsReuse = reuse
 				}
-				result, walkError := graph.Walk(backgroundContext, graph.ProjectFiles(), rules)
+				result, walkError := graph.Walk(
+					backgroundContext,
+					graph.ProjectFiles(),
+					rule_testing.EntriesOf(test, rules...),
+				)
 				if walkError != nil {
 					test.Fatal(walkError)
 				}
@@ -198,10 +209,12 @@ func TestARuleWithNoUsableProgramFingerprintIsWalkedEveryRun(test *testing.T) {
 	test.Parallel()
 	for _, scenario := range []struct {
 		name        string
-		fingerprint func(rule.Program, any) [sha256.Size]byte
+		fingerprint func(rule.Program, rule.Given[rule.NoOptions]) [sha256.Size]byte
 	}{
 		{"none declared", nil},
-		{"one that panics", func(rule.Program, any) [sha256.Size]byte { panic("a fingerprint that fails") }},
+		{"one that panics", func(rule.Program, rule.Given[rule.NoOptions]) [sha256.Size]byte {
+			panic("a fingerprint that fails")
+		}},
 	} {
 		test.Run(scenario.name, func(test *testing.T) {
 			test.Parallel()
@@ -214,7 +227,9 @@ func TestARuleWithNoUsableProgramFingerprintIsWalkedEveryRun(test *testing.T) {
 			key := program.HashRuleSet([]string{"uncacheable"})
 			var recorded *program.LintCache
 			for run := 1; run <= 2; run++ {
-				graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+				graph, buildError := program.Build(
+					program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")},
+				)
 				if buildError != nil {
 					test.Fatal(buildError)
 				}
@@ -224,7 +239,7 @@ func TestARuleWithNoUsableProgramFingerprintIsWalkedEveryRun(test *testing.T) {
 				result, walkError := graph.Walk(
 					backgroundContext,
 					graph.ProjectFiles(),
-					[]rule.Rule{markerRule("test-reads-other-files", scenario.fingerprint, runs)},
+					rule_testing.EntriesOf(test, markerRule("test-reads-other-files", scenario.fingerprint, runs)),
 				)
 				if walkError != nil {
 					test.Fatal(walkError)
@@ -244,12 +259,15 @@ func TestARuleWithNoUsableProgramFingerprintIsWalkedEveryRun(test *testing.T) {
 // optionMarkerRule is a derived rule whose option names the marker file it reads: it reports every variable
 // declaration with that file's text. fingerprint is its ProgramFingerprint. runs counts the files it was run
 // on, by base name, the markers excluded.
-func optionMarkerRule(fingerprint func(rule.Program, any) [sha256.Size]byte, runs *sync.Map) rule.Rule {
-	return rule.Rule{
+func optionMarkerRule(
+	fingerprint func(rule.Program, rule.Given[string]) [sha256.Size]byte,
+	runs *sync.Map,
+) rule.Rule[string] {
+	return rule.Rule[string]{
 		Name:               "test-derived-options",
 		ProgramReads:       rule.ReadsOtherFiles,
 		ProgramFingerprint: fingerprint,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[string]) rule.Listeners {
 			if strings.HasSuffix(filepath.Base(ruleContext.SourceFile.FileName().AsString()), "-marker.ts") {
 				return nil
 			}
@@ -273,12 +291,12 @@ func namedMarkerText(program rule.Program, name string) string {
 }
 
 // markerOption is optionMarkerRule's decoded option: the base name of the marker file it reads.
-func markerOption(options any) string {
-	name, isName := options.(string)
-	if !isName {
+func markerOption(options rule.Given[string]) string {
+	name, configured := options.Read()
+	if !configured {
 		// Invariant: every selection optionMarkerRule runs under configures it with an option, and the only registry
-		// it runs under decodes that option into a string.
-		panic("optionMarkerRule's options are not a marker name")
+		// it runs under binds it to that option.
+		panic("optionMarkerRule ran with no marker name")
 	}
 	return name
 }
@@ -292,15 +310,15 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 	test.Parallel()
 	for _, scenario := range []struct {
 		name        string
-		fingerprint func(rule.Program, any) [sha256.Size]byte
+		fingerprint func(rule.Program, rule.Given[string]) [sha256.Size]byte
 		wantStale   bool
 	}{
-		{"the options' marker", func(program rule.Program, options any) [sha256.Size]byte {
+		{"the options' marker", func(program rule.Program, options rule.Given[string]) [sha256.Size]byte {
 			return sha256.Sum256([]byte(namedMarkerText(program, markerOption(options))))
 		}, false},
 		{
 			"control: the top-level option's marker, whatever the selection",
-			func(program rule.Program, _ any) [sha256.Size]byte {
+			func(program rule.Program, _ rule.Given[string]) [sha256.Size]byte {
 				return sha256.Sum256([]byte(namedMarkerText(program, "red-marker.ts")))
 			},
 			true,
@@ -309,7 +327,8 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 		test.Run(scenario.name, func(test *testing.T) {
 			test.Parallel()
 			root := writeProject(test, map[string]string{
-				"tsconfig.json": `{"compilerOptions":{"target":"ES2022","module":"esnext","moduleResolution":"bundler","strict":true,"noEmit":true},` +
+				"tsconfig.json": `{"compilerOptions":{"target":"ES2022","module":"esnext",` +
+					`"moduleResolution":"bundler","strict":true,"noEmit":true},` +
 					`"include":["**/*.ts"]}`,
 				"red-marker.ts":  "// red\n",
 				"blue-marker.ts": "// blue\n",
@@ -328,12 +347,18 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 				Overrides: []configuration.Override{{Files: []string{"blues/**"},
 					Rules: map[string]configuration.RuleSetting{"test-derived-options": setting("blue-marker.ts")}}},
 			}
-			registry := configuration.OptionsRegistry{
-				"test-derived-options": {Decode: func(raw json.RawMessage) (any, error) {
-					var marker string
-					decodeError := json.Unmarshal(raw, &marker)
-					return marker, decodeError
-				}},
+			// The registry binds the rule a walk hands it, so the Run that counts that walk's runs is the one bound to
+			// each selection's marker.
+			registryFor := func(subject rule.Rule[string]) configuration.OptionsRegistry {
+				return configuration.OptionsRegistry{
+					"test-derived-options": {Decode: func(raw json.RawMessage) (rule.Bound, error) {
+						var marker string
+						if decodeError := json.Unmarshal(raw, &marker); decodeError != nil {
+							return rule.Bound{}, decodeError
+						}
+						return rule.Bind(subject, rule.Configured(marker)), nil
+					}},
+				}
 			}
 			backgroundContext := context.Background()
 			key := program.HashRuleSet([]string{"derived-options"})
@@ -354,8 +379,9 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 						graph.Workers(),
 					)
 				}
-				graph.LintConfig, graph.RuleOptions = lintConfiguration, registry
 				runs := &sync.Map{}
+				subject := optionMarkerRule(scenario.fingerprint, runs)
+				graph.LintConfig, graph.RuleOptions = lintConfiguration, registryFor(subject)
 				var reuse *program.FindingsReuse
 				if cached {
 					reuse = program.NewFindingsReuse(key, recorded, program.PathAnchor{})
@@ -364,7 +390,7 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 				result, walkError := graph.Walk(
 					backgroundContext,
 					graph.ProjectFiles(),
-					[]rule.Rule{optionMarkerRule(scenario.fingerprint, runs)},
+					[]rule.Entry{rule_testing.EntryOf(test, subject)},
 				)
 				if walkError != nil {
 					test.Fatal(walkError)
@@ -450,7 +476,8 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 func TestAWalkComputesEachProgramFingerprintOnce(test *testing.T) {
 	test.Parallel()
 	files := map[string]string{
-		"tsconfig.json": `{"compilerOptions":{"target":"ES2022","module":"esnext","moduleResolution":"bundler","strict":true,"noEmit":true},` +
+		"tsconfig.json": `{"compilerOptions":{"target":"ES2022","module":"esnext",` +
+			`"moduleResolution":"bundler","strict":true,"noEmit":true},` +
 			`"include":["**/*.ts"]}`,
 	}
 	for _, directory := range []string{"a", "b", "c"} {
@@ -470,18 +497,18 @@ func TestAWalkComputesEachProgramFingerprintOnce(test *testing.T) {
 	}
 
 	var computations atomic.Int32
-	var rules []rule.Rule
+	var rules []rule.Rule[rule.NoOptions]
 	settings := map[string]configuration.RuleSetting{}
 	for index := range 6 {
 		name := "test-derived-" + string(rune('a'+index))
-		rules = append(rules, rule.Rule{
+		rules = append(rules, rule.Rule[rule.NoOptions]{
 			Name:         name,
 			ProgramReads: rule.ReadsOtherFiles,
-			ProgramFingerprint: func(rule.Program, any) [sha256.Size]byte {
+			ProgramFingerprint: func(rule.Program, rule.Given[rule.NoOptions]) [sha256.Size]byte {
 				computations.Add(1)
 				return sha256.Sum256([]byte(name))
 			},
-			Run: func(ruleContext rule.Context, options any) rule.Listeners { return nil },
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners { return nil },
 		})
 		settings[name] = configuration.RuleSetting{Severity: configuration.SeverityError}
 	}
@@ -502,7 +529,11 @@ func TestAWalkComputesEachProgramFingerprintOnce(test *testing.T) {
 		nil,
 		program.PathAnchor{},
 	)
-	if _, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rules); walkError != nil {
+	if _, walkError := graph.Walk(
+		context.Background(),
+		graph.ProjectFiles(),
+		rule_testing.EntriesOf(test, rules...),
+	); walkError != nil {
 		test.Fatal(walkError)
 	}
 	if computations.Load() != 6 {

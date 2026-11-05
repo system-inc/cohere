@@ -60,9 +60,9 @@ var messageDivRegex = rule.Message{
 // Here the listener key is the regular expression kind, which asks the same question at the parser
 // instead. `no-regex-spaces` handles both spellings and this one does not, and the difference is
 // upstream's rather than an omission.
-var NoDivRegex = rule.Rule{
+var NoDivRegex = rule.Rule[rule.NoOptions]{
 	Name: "no-div-regex",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				literalRange := rule.TokenRange(ruleContext.SourceFile, node)

@@ -475,10 +475,10 @@ func bareValueHandler(kind BareValueKind, suffix string) func(*ParsedValue) (str
 	if predicate == nil {
 		return nil
 	}
-	return func(value *ParsedValue) (string, bool) {
-		if value == nil || !predicate(value.Value) {
+	return func(parsedValue *ParsedValue) (string, bool) {
+		if parsedValue == nil || !predicate(parsedValue.Value) {
 			return "", false
 		}
-		return bareValueTransform(kind, value.Value) + suffix, true
+		return bareValueTransform(kind, parsedValue.Value) + suffix, true
 	}
 }

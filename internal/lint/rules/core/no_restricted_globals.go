@@ -89,7 +89,7 @@ type noRestrictedGlobalsObjectWire struct {
 // object with a `globals` key. That form takes no second element, so one is refused rather than
 // dropped. Its keys are read strictly, which is upstream's `additionalProperties: false`: a
 // misspelled `checkGlobalObject` would otherwise leave the flag silently off.
-func DecodeNoRestrictedGlobalsOptions(list []byte) (any, error) {
+func DecodeNoRestrictedGlobalsOptions(list []byte) (NoRestrictedGlobalsSettings, error) {
 	settings := DefaultNoRestrictedGlobalsSettings()
 	if len(list) == 0 {
 		return settings, nil
@@ -221,7 +221,7 @@ var messageNoRestrictedGlobalsCustom = rule.Message{
 //
 // Upstream offers none, and none is possible: the repair is to use a different name, and nothing
 // here knows which.
-var NoRestrictedGlobals = rule.Rule{
+var NoRestrictedGlobals = rule.Rule[NoRestrictedGlobalsSettings]{
 	Name: "no-restricted-globals",
 
 	// Telling a global from a local shadow is name resolution. See the predicate section above for
@@ -229,8 +229,8 @@ var NoRestrictedGlobals = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoRestrictedGlobalsSettings](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoRestrictedGlobalsSettings]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok || len(settings.Globals) == 0 {
 			// Upstream returns an empty visitor when nothing is restricted. Registering no listener
 			// is the same decision, and it is also what a rule configured as a bare severity gets,

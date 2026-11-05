@@ -57,9 +57,9 @@ var optionElementRules = []string{
 // TestEveryMultiElementRuleReadsItsWholeOptionList pins the arity each of those rules declares.
 func TestEveryMultiElementRuleReadsItsWholeOptionList(test *testing.T) {
 	test.Parallel()
-	registrations := map[string]rule.Registration{}
+	registrations := map[string]rule.Entry{}
 	for _, registration := range rule.Registered() {
-		registrations[registration.Rule.Name] = registration
+		registrations[registration.Name] = registration
 	}
 	for _, name := range optionElementRules {
 		registration, registered := registrations[name]
@@ -67,7 +67,7 @@ func TestEveryMultiElementRuleReadsItsWholeOptionList(test *testing.T) {
 			test.Errorf("%s is listed as taking several option elements and is not registered under that name", name)
 			continue
 		}
-		if registration.DecodeOptionList == nil {
+		if registration.Arity != rule.OptionArityList {
 			test.Errorf("%s takes several option elements upstream and does not register DecodeOptionList, "+
 				"so the config layer refuses every element after its first", name)
 		}
@@ -196,9 +196,9 @@ var optionElementCases = []optionElementCase{
 func TestTheSecondOptionElementReachesTheRule(test *testing.T) {
 	test.Parallel()
 
-	rules := map[string]rule.Rule{}
+	registered := map[string]bool{}
 	for _, subject := range All() {
-		rules[subject.Name] = subject
+		registered[subject.Name] = true
 	}
 	covered := map[string]bool{}
 
@@ -206,8 +206,7 @@ func TestTheSecondOptionElementReachesTheRule(test *testing.T) {
 		covered[testCase.rule] = true
 		test.Run(testCase.rule, func(test *testing.T) {
 			test.Parallel()
-			subject, registered := rules[testCase.rule]
-			if !registered {
+			if !registered[testCase.rule] {
 				test.Fatalf("%s is not registered", testCase.rule)
 			}
 			if testCase.controlCount == testCase.treatmentCount {
@@ -226,7 +225,7 @@ func TestTheSecondOptionElementReachesTheRule(test *testing.T) {
 				{"control", testCase.control, testCase.controlCount},
 				{"treatment", testCase.treatment, testCase.treatmentCount},
 			} {
-				options, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(
+				bound, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(
 					test,
 					testCase.rule,
 					arm.config,
@@ -234,7 +233,7 @@ func TestTheSecondOptionElementReachesTheRule(test *testing.T) {
 				if optionsThroughTheConfigurationLayerError != nil {
 					test.Fatalf("%s %s was refused: %v", arm.name, arm.config, optionsThroughTheConfigurationLayerError)
 				}
-				result := rule_testing.RunTypedWithOptions(test, subject, fileName, testCase.source, options)
+				result := rule_testing.RunTypedBound(test, bound, fileName, testCase.source)
 				if len(result.Diagnostics) != arm.want {
 					test.Errorf("%s %s reported %d, want %d: %v",
 						arm.name, arm.config, len(result.Diagnostics), arm.want, result.MessageIds())
@@ -434,8 +433,9 @@ func TestANullInARulesOptionsIsRefused(test *testing.T) {
 }
 
 // optionsThroughTheConfigLayer writes one rule's config value to a CohereSettings.json, loads and
-// resolves it, and decodes the result through the registry exactly as the lint walk does.
-func optionsThroughTheConfigLayer(test *testing.T, ruleName string, value string) (any, error) {
+// resolves it, and decodes the result through the registry exactly as the lint walk does, returning the rule
+// bound to it.
+func optionsThroughTheConfigLayer(test *testing.T, ruleName string, value string) (rule.Bound, error) {
 	test.Helper()
 	if !json.Valid([]byte(value)) {
 		test.Fatalf("the row's config value is not JSON: %s", value)

@@ -145,7 +145,8 @@ func TestIsDeclaredByADependencyTellsADependencysTypeFromOurs(test *testing.T) {
 		"routes.d.ts":                   "interface PageProps { route: string }\ninterface Merged { a: string }\n",
 		"node_modules/kit/package.json": `{"name": "kit", "types": "index.ts"}`,
 		"node_modules/kit/index.ts":     "export interface KitProps { a: string }\n",
-		"subject.ts": "import type { KitProps } from 'kit';\ninterface Ours { a: string }\ndeclare global { interface Merged { b: string } }\n" +
+		"subject.ts": "import type { KitProps } from 'kit';\ninterface Ours { a: string }\n" +
+			"declare global { interface Merged { b: string } }\n" +
 			"export declare const page: PageProps;\nexport declare const kit: KitProps;\nexport declare const ours: Ours;\nexport declare const merged: Merged;\n",
 	}
 	for name, contents := range files {
@@ -179,7 +180,8 @@ func TestIsDeclaredByADependencyTellsADependencysTypeFromOurs(test *testing.T) {
 
 	// Each `declare const` names its type once, and the type reference's symbol is what a rule asks about.
 	symbolOfTypeAt := func(statement int) *ast.Symbol {
-		declaration := subject.Statements.Nodes[statement].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0]
+		variableStatement := subject.Statements.Nodes[statement].AsVariableStatement()
+		declaration := variableStatement.DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0]
 		symbol := checker.GetSymbolAtLocation(declaration.Type().AsTypeReferenceNode().TypeName)
 		if symbol == nil {
 			test.Fatalf("statement %d named no symbol", statement)
@@ -276,12 +278,14 @@ func TestIsResolvedSymbolRequiresADeclaration(test *testing.T) {
 	checker, release := graph.CheckerForFile(context.Background(), subject)
 	defer release()
 	typeSymbol := func(index int) *ast.Symbol {
-		declaration := subject.Statements.Nodes[index].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0]
+		variableStatement := subject.Statements.Nodes[index].AsVariableStatement()
+		declaration := variableStatement.DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0]
 		return checker.GetSymbolAtLocation(declaration.Type().AsTypeReferenceNode().TypeName)
 	}
 	own, absent, alias := typeSymbol(2), typeSymbol(3), typeSymbol(4)
 	typeAt := func(index int) *ast.Node {
-		return subject.Statements.Nodes[index].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].Type()
+		variableStatement := subject.Statements.Nodes[index].AsVariableStatement()
+		return variableStatement.DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].Type()
 	}
 	if !rule.IsUnresolvedType(checker.GetTypeAtLocation(typeAt(3))) {
 		test.Error("missing global lost its unresolved type")

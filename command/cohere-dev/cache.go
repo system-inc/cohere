@@ -178,8 +178,13 @@ func trimCache() int {
 		recordCacheLook(directory, readPoolShapeError.Error())
 		return 2
 	}
-	release, holdThePoolError := holdThePool(directory, shape.tokens, fmt.Sprintf("trimming the Go build cache, %s over the %s cap",
-		gigabytes(measured.Before), gigabytes(capBytes)), cacheTrimPatience)
+	release, holdThePoolError := holdThePool(
+		directory,
+		shape.tokens,
+		fmt.Sprintf("trimming the Go build cache, %s over the %s cap",
+			gigabytes(measured.Before), gigabytes(capBytes)),
+		cacheTrimPatience,
+	)
 	if errors.Is(holdThePoolError, errorPoolNeverEmpty) {
 		recordCacheLook(directory, fmt.Sprintf("%s over the %s cap, not trimmed: the pool was never empty for %s, "+
 			"and the next look tries again", gigabytes(measured.Before), gigabytes(capBytes), cacheTrimPatience))

@@ -88,7 +88,7 @@ var preferNonNullAssertionMessage = rule.Message{
 // Two rare anchors, and the checker is consulted only when one is found. Both type lookups are
 // declined early when the expression is any or unknown, which is the common shape in the code this
 // rule runs on.
-var NonNullableTypeAssertionStyle = rule.Rule{
+var NonNullableTypeAssertionStyle = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/non-nullable-type-assertion-style",
 
 	// Every finding is decided by comparing two types by identity, so there is no syntactic subset of
@@ -96,7 +96,7 @@ var NonNullableTypeAssertionStyle = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// report is shared by the two assertion spellings, which differ only in where the expression
 		// and the type node live. `x as T` and `<T>x` are the same judgment and upstream registers
 		// one visitor over both.

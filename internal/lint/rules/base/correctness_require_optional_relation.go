@@ -63,7 +63,7 @@ var relationDecorators = map[string]struct{}{
 //
 // One listener on a property declaration, and the type is asked for only after a relation decorator
 // is found, which is a rare shape.
-var CorrectnessRequireOptionalRelation = rule.Rule{
+var CorrectnessRequireOptionalRelation = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-optional-relation",
 
 	// The finding is decided by whether the property's type admits undefined, so there is no
@@ -71,7 +71,7 @@ var CorrectnessRequireOptionalRelation = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

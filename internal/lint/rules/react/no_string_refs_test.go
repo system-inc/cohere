@@ -590,12 +590,8 @@ func TestDecodeNoStringRefsOptions(test *testing.T) {
 			if decodeNoStringRefsOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.raw, decodeNoStringRefsOptionsError)
 			}
-			got, ok := decoded.(NoStringRefsOptions)
-			if !ok {
-				test.Fatalf("decoded %q to %T", testCase.raw, decoded)
-			}
-			if got != testCase.want {
-				test.Errorf("decoded %q to %+v, want %+v", testCase.raw, got, testCase.want)
+			if decoded != testCase.want {
+				test.Errorf("decoded %q to %+v, want %+v", testCase.raw, decoded, testCase.want)
 			}
 		})
 	}
@@ -740,12 +736,8 @@ func TestNoStringRefsRefusesUnknownOptionKeys(test *testing.T) {
 	if decodeNoStringRefsOptionsError != nil {
 		test.Fatalf("baseline: %v", decodeNoStringRefsOptionsError)
 	}
-	got, ok := decoded.(NoStringRefsOptions)
-	if !ok {
-		test.Fatalf("decoded to %T, want NoStringRefsOptions", decoded)
-	}
-	if got != (NoStringRefsOptions{NoTemplateLiterals: true}) {
-		test.Errorf("decoded to %+v", got)
+	if decoded != (NoStringRefsOptions{NoTemplateLiterals: true}) {
+		test.Errorf("decoded to %+v", decoded)
 	}
 	_, decodeNoStringRefsOptionsError = DecodeNoStringRefsOptions([]byte(`{"bogus":true,"noTemplateLiterals":true}`))
 	if decodeNoStringRefsOptionsError == nil || !strings.Contains(decodeNoStringRefsOptionsError.Error(), "bogus") {

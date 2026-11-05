@@ -72,15 +72,37 @@ func FixtureText(contents string) string {
 // Identified by @system_cohere_lint_rules, which stopped porting a 1,208-line rule on discovering
 // it could be written but not proven, rather than writing fixtures that would have passed
 // vacuously.
-func RunTyped(test *testing.T, subject rule.Rule, fileName string, sourceText string) Result {
+//
+// The rule runs unconfigured, as a config writing its bare severity runs it.
+func RunTyped[Options any](test *testing.T, subject rule.Rule[Options], fileName string, sourceText string) Result {
 	test.Helper()
-	return RunTypedWithOptions(test, subject, fileName, sourceText, nil)
+	return RunTypedGiven(test, subject, fileName, sourceText, rule.Given[Options]{})
 }
 
-// RunTypedWithOptions is RunTyped for a rule that reads configuration.
-func RunTypedWithOptions(test *testing.T, subject rule.Rule, fileName string, sourceText string, options any) Result {
+// RunTypedWithOptions is RunTyped for a rule that reads configuration, handed options as a config that wrote
+// them would hand them.
+func RunTypedWithOptions[Options any](
+	test *testing.T,
+	subject rule.Rule[Options],
+	fileName string,
+	sourceText string,
+	options Options,
+) Result {
 	test.Helper()
-	return RunTypedFilesWithOptions(test, subject, map[string]string{fileName: sourceText}, fileName, options)
+	return RunTypedGiven(test, subject, fileName, sourceText, rule.Configured(options))
+}
+
+// RunTypedGiven is RunTyped with the options exactly as the rule receives them, configured or not, for a table
+// whose cases hold both.
+func RunTypedGiven[Options any](
+	test *testing.T,
+	subject rule.Rule[Options],
+	fileName string,
+	sourceText string,
+	options rule.Given[Options],
+) Result {
+	test.Helper()
+	return RunTypedFilesGiven(test, subject, map[string]string{fileName: sourceText}, fileName, options)
 }
 
 // RunTypedVerbatimWithOptions is RunTypedWithOptions writing the source exactly as given, with no trim.
@@ -89,16 +111,29 @@ func RunTypedWithOptions(test *testing.T, subject rule.Rule, fileName string, so
 // in the row's own bytes, and FixtureText's trim moved a finding at the start or end of the file, in
 // both directions (#jjfa7qb). Hand-written fixtures keep the trim, which is what lets them be indented
 // backquoted literals.
-func RunTypedVerbatimWithOptions(
+func RunTypedVerbatimWithOptions[Options any](
 	test *testing.T,
-	subject rule.Rule,
+	subject rule.Rule[Options],
 	fileName string,
 	sourceText string,
-	options any,
+	options Options,
+) Result {
+	test.Helper()
+	return RunTypedVerbatimGiven(test, subject, fileName, sourceText, rule.Configured(options))
+}
+
+// RunTypedVerbatimGiven is RunTypedVerbatimWithOptions with the options exactly as the rule receives them,
+// configured or not: an upstream corpus holds rows of both.
+func RunTypedVerbatimGiven[Options any](
+	test *testing.T,
+	subject rule.Rule[Options],
+	fileName string,
+	sourceText string,
+	options rule.Given[Options],
 ) Result {
 	test.Helper()
 	files := map[string]string{fileName: sourceText}
-	return runTypedFiles(test, subject, files, fileName, fixedOptions(options), nil, true)
+	return runTypedFiles(test, givenAt(subject, fileName, 0, fixedOptions(options)), files, fileName, nil, true)
 }
 
 // RunTypedFiles runs a rule against one file of a multi-file program.
@@ -109,9 +144,14 @@ func RunTypedVerbatimWithOptions(
 // wrong would pass every fixture.
 //
 // subjectFileName selects which file the rule is run against; the rest are there to be resolved.
-func RunTypedFiles(test *testing.T, subject rule.Rule, files map[string]string, subjectFileName string) Result {
+func RunTypedFiles[Options any](
+	test *testing.T,
+	subject rule.Rule[Options],
+	files map[string]string,
+	subjectFileName string,
+) Result {
 	test.Helper()
-	return RunTypedFilesWithOptions(test, subject, files, subjectFileName, nil)
+	return RunTypedFilesGiven(test, subject, files, subjectFileName, rule.Given[Options]{})
 }
 
 // RunTypedFilesWithSetup is RunTypedFiles with a hook that runs against the fixture directory.
@@ -126,15 +166,15 @@ func RunTypedFiles(test *testing.T, subject rule.Rule, files map[string]string, 
 // fixture's CSS. Writing an absolute import into the stylesheet does not help, because the rule never
 // resolves the import itself. Linking a real package into the fixture does, and it makes the rule
 // take the same path it takes on a repository rather than one arranged for the test.
-func RunTypedFilesWithSetup(
+func RunTypedFilesWithSetup[Options any](
 	test *testing.T,
-	subject rule.Rule,
+	subject rule.Rule[Options],
 	files map[string]string,
 	subjectFileName string,
 	setup func(directory string),
 ) Result {
 	test.Helper()
-	return runTypedFiles(test, subject, files, subjectFileName, fixedOptions(nil), setup, false)
+	return RunTypedFilesWithSetupGiven(test, subject, files, subjectFileName, rule.Given[Options]{}, setup)
 }
 
 // RunTypedFilesWithSetupAndOptions is RunTypedFilesWithSetup for a rule that also reads
@@ -144,16 +184,31 @@ func RunTypedFilesWithSetup(
 // `no-unknown-classes` is the case: it needs the symlinked package RunTypedFilesWithSetup exists for
 // and its `ignore` option, and without this its ignore-list fixtures would have to run through a
 // harness that leaves the Program nil, where the rule declines and every assertion passes vacuously.
-func RunTypedFilesWithSetupAndOptions(
+func RunTypedFilesWithSetupAndOptions[Options any](
 	test *testing.T,
-	subject rule.Rule,
+	subject rule.Rule[Options],
 	files map[string]string,
 	subjectFileName string,
-	options any,
+	options Options,
 	setup func(directory string),
 ) Result {
 	test.Helper()
-	return runTypedFiles(test, subject, files, subjectFileName, fixedOptions(options), setup, false)
+	return RunTypedFilesWithSetupGiven(test, subject, files, subjectFileName, rule.Configured(options), setup)
+}
+
+// RunTypedFilesWithSetupGiven is RunTypedFilesWithSetupAndOptions with the options exactly as the rule receives
+// them, configured or not, for a table whose cases hold both.
+func RunTypedFilesWithSetupGiven[Options any](
+	test *testing.T,
+	subject rule.Rule[Options],
+	files map[string]string,
+	subjectFileName string,
+	options rule.Given[Options],
+	setup func(directory string),
+) Result {
+	test.Helper()
+	bindAt := givenAt(subject, subjectFileName, len(files)-1, fixedOptions(options))
+	return runTypedFiles(test, bindAt, files, subjectFileName, setup, false)
 }
 
 // RunTypedFilesWithOptionsFor is RunTypedFilesWithSetup for a rule whose options name the fixture's
@@ -166,45 +221,108 @@ func RunTypedFilesWithSetupAndOptions(
 //
 // The fixture is built the setup way, uncached, because a fixture of this kind brings its own
 // tsconfig and the cached build writes the default one over it.
-func RunTypedFilesWithOptionsFor(
+func RunTypedFilesWithOptionsFor[Options any](
 	test *testing.T,
-	subject rule.Rule,
+	subject rule.Rule[Options],
 	files map[string]string,
 	subjectFileName string,
-	optionsFor func(directory string) any,
+	optionsFor func(directory string) Options,
 ) Result {
 	test.Helper()
-	return runTypedFiles(test, subject, files, subjectFileName, optionsFor, func(string) {
+	return RunTypedFilesGivenFor(test, subject, files, subjectFileName, func(directory string) rule.Given[Options] {
+		return rule.Configured(optionsFor(directory))
+	})
+}
+
+// RunTypedFilesGivenFor is RunTypedFilesWithOptionsFor with the options exactly as the rule receives them,
+// configured or not, for a fixture that runs the rule both ways over one tree.
+func RunTypedFilesGivenFor[Options any](
+	test *testing.T,
+	subject rule.Rule[Options],
+	files map[string]string,
+	subjectFileName string,
+	optionsFor func(directory string) rule.Given[Options],
+) Result {
+	test.Helper()
+	bindAt := givenAt(subject, subjectFileName, len(files)-1, optionsFor)
+	return runTypedFiles(test, bindAt, files, subjectFileName, func(string) {
 		// It writes nothing: a setup at all is what builds the fixture uncached, keeping its own tsconfig.
 	}, false)
 }
 
-// fixedOptions is an options value that does not depend on where the fixture was written.
-func fixedOptions(options any) func(directory string) any {
-	return func(string) any {
+// fixedOptions is options that do not depend on where the fixture was written.
+func fixedOptions[Options any](options rule.Given[Options]) func(directory string) rule.Given[Options] {
+	return func(string) rule.Given[Options] {
 		return options
 	}
 }
 
-// RunTypedFilesWithOptions is the full form the others delegate to.
-func RunTypedFilesWithOptions(
+// RunTypedFilesWithOptions is RunTypedFiles for a rule that reads configuration, handed options as a config
+// that wrote them would hand them.
+func RunTypedFilesWithOptions[Options any](
 	test *testing.T,
-	subject rule.Rule,
+	subject rule.Rule[Options],
 	files map[string]string,
 	subjectFileName string,
-	options any,
+	options Options,
 ) Result {
 	test.Helper()
-	return runTypedFiles(test, subject, files, subjectFileName, fixedOptions(options), nil, false)
+	return RunTypedFilesGiven(test, subject, files, subjectFileName, rule.Configured(options))
 }
 
-// runTypedFiles is the body both public forms share.
-func runTypedFiles(
+// RunTypedFilesGiven is the full form the cached entry points delegate to: the options exactly as the rule
+// receives them, configured or not.
+func RunTypedFilesGiven[Options any](
 	test *testing.T,
-	subject rule.Rule,
+	subject rule.Rule[Options],
 	files map[string]string,
 	subjectFileName string,
-	optionsFor func(directory string) any,
+	options rule.Given[Options],
+) Result {
+	test.Helper()
+	bindAt := givenAt(subject, subjectFileName, len(files)-1, fixedOptions(options))
+	return runTypedFiles(test, bindAt, files, subjectFileName, nil, false)
+}
+
+// RunTypedBound is RunTyped for a rule already bound to its options, as the registry holds it (an Entry's
+// Unconfigured) or a registration's Bind returns it, for a test that runs the registered catalog. No case it
+// runs is captured for the docs, since its options are not known here to be shown.
+func RunTypedBound(test *testing.T, subject rule.Bound, fileName string, sourceText string) Result {
+	test.Helper()
+	bindAt := func(string) (rule.Bound, *capturedRun) { return subject, nil }
+	return runTypedFiles(test, bindAt, map[string]string{fileName: sourceText}, fileName, nil, false)
+}
+
+// RunTypedVerbatimBound is RunTypedBound writing the source exactly as given, with no trim, for an upstream
+// corpus's rows, whose offsets are their own (see RunTypedVerbatimWithOptions).
+func RunTypedVerbatimBound(test *testing.T, subject rule.Bound, fileName string, sourceText string) Result {
+	test.Helper()
+	bindAt := func(string) (rule.Bound, *capturedRun) { return subject, nil }
+	return runTypedFiles(test, bindAt, map[string]string{fileName: sourceText}, fileName, nil, true)
+}
+
+// givenAt binds subject to the options optionsFor gives for the fixture's directory, and starts the docs
+// capture of the case, for runTypedFiles to call once the directory is known.
+func givenAt[Options any](
+	subject rule.Rule[Options],
+	subjectFileName string,
+	otherFiles int,
+	optionsFor func(directory string) rule.Given[Options],
+) func(directory string) (rule.Bound, *capturedRun) {
+	return func(directory string) (rule.Bound, *capturedRun) {
+		options := optionsFor(directory)
+		// Bound as the framework binds a rule, so the fixture runs the rule as the walk would.
+		return rule.Bind(subject, options), newCapturedRun(subject.Name, subjectFileName, otherFiles, options)
+	}
+}
+
+// runTypedFiles is the body every public form shares. bindAt is the rule bound to its options, and the case's
+// docs capture, once the fixture's directory is known.
+func runTypedFiles(
+	test *testing.T,
+	bindAt func(directory string) (rule.Bound, *capturedRun),
+	files map[string]string,
+	subjectFileName string,
 	setup func(directory string),
 	verbatim bool,
 ) Result {
@@ -293,14 +411,16 @@ func runTypedFiles(
 		test.Fatal("the program produced no type checker, so a type-aware rule could not be proven")
 	}
 
+	bound, captured := bindAt(directory)
+
 	var diagnostics []rule.Diagnostic
 	ruleContext := rule.Context{
 		SourceFile:  sourceFile,
-		Program:     rule.ViewProgram(graph.Program, sourceFile, subject),
+		Program:     rule.ViewProgram(graph.Program, sourceFile, bound.Traits),
 		TypeChecker: fileChecker,
 		FileCache:   rule.NewFileCache(),
 		Report: func(diagnostic rule.Diagnostic) {
-			diagnostic.RuleName = subject.Name
+			diagnostic.RuleName = bound.Name
 			if diagnostic.SourceFile == nil {
 				diagnostic.SourceFile = sourceFile
 			}
@@ -308,8 +428,7 @@ func runTypedFiles(
 		},
 	}
 
-	options := optionsFor(directory)
-	listeners := subject.Run(ruleContext, options)
+	listeners := bound.Run(ruleContext)
 	if listeners != nil {
 		walk(sourceFile.AsNode(), listeners)
 	}
@@ -318,7 +437,7 @@ func runTypedFiles(
 	return Result{
 		Diagnostics: diagnostics,
 		SourceFile:  sourceFile,
-		capture:     newCapturedRun(subject, subjectFileName, len(files)-1, options),
+		capture:     captured,
 	}
 }
 

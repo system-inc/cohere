@@ -285,8 +285,9 @@ func (product Product) Find() (*Exports, error) {
 		lines := strings.SplitAfterN(state.description, "\n", 4)
 		return nil, fmt.Errorf(
 			"the %s product %s is not in %s: it is the export data of the %d packages outside the module "+
-				"that %s import, and a test that reads it never builds it, since building compiles. %s builds it: on Workshop "+
-				"before the tests run, and locally as the first test of a plain `go test` of its package.%s\nIt keyed:\n%s",
+				"that %s import, and a test that reads it never builds it, since building compiles. "+
+				"%s builds it: on Workshop before the tests run, and locally as the first test of a plain "+
+				"`go test` of its package.%s\nIt keyed:\n%s",
 			product.Name,
 			state.key[:12],
 			state.cache,

@@ -35,7 +35,7 @@ func DefaultPreferStatelessFunctionOptions() PreferStatelessFunctionOptions {
 // nil options. Answering the documented default explicitly makes the unconfigured path a decision
 // rather than a coincidence, which is the failure the port brief records costing a rule 3,407 inert
 // registrations.
-func DecodePreferStatelessFunctionOptions(raw []byte) (any, error) {
+func DecodePreferStatelessFunctionOptions(raw []byte) (PreferStatelessFunctionOptions, error) {
 	options := DefaultPreferStatelessFunctionOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -163,10 +163,10 @@ var messagePreferStatelessFunction = rule.Message{
 // The option exempts a class extending PureComponent. `react.IsEs6ComponentClass` accepts Component
 // and PureComponent alike and is therefore the wrong predicate for the option, while being the right
 // predicate for the outer gate. Both are used here, for their two different questions.
-var PreferStatelessFunction = rule.Rule{
+var PreferStatelessFunction = rule.Rule[PreferStatelessFunctionOptions]{
 	Name: "react/prefer-stateless-function",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[PreferStatelessFunctionOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[PreferStatelessFunctionOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultPreferStatelessFunctionOptions()
 		}
@@ -291,10 +291,11 @@ func preferStatelessFunctionComponentMembers(component *ast.Node) []*ast.Node {
 // argument and the thing being unwrapped here is an argument that may be absent. That helper is how
 // this project lost 167 files to a nil panic.
 func preferStatelessFunctionUnwrapParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return node
+	return unwrapped
 }
 
 // preferStatelessFunctionMemberName reads a member's name the way upstream's `getPropertyName` does.
@@ -712,21 +713,21 @@ func preferStatelessFunctionFunctionBody(member *ast.Node) *ast.Node {
 // sequence by its last expression. `isReturningNull` separately accepts the literals null and false.
 // A bare `return;` has no argument and qualifies as neither, which upstream treats as invalid.
 func preferStatelessFunctionIsValidReturn(expression *ast.Node) bool {
-	expression = preferStatelessFunctionUnwrapParentheses(expression)
-	if expression == nil {
+	unwrapped := preferStatelessFunctionUnwrapParentheses(expression)
+	if unwrapped == nil {
 		return false
 	}
-	switch expression.Kind {
+	switch unwrapped.Kind {
 	case ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxFragment:
 		return true
 	case ast.KindNullKeyword, ast.KindFalseKeyword:
 		return true
 	case ast.KindConditionalExpression:
-		conditional := expression.AsConditionalExpression()
+		conditional := unwrapped.AsConditionalExpression()
 		return preferStatelessFunctionIsValidReturn(conditional.WhenTrue) ||
 			preferStatelessFunctionIsValidReturn(conditional.WhenFalse)
 	case ast.KindBinaryExpression:
-		binary := expression.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		switch binary.OperatorToken.Kind {
 		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
 			return preferStatelessFunctionIsValidReturn(binary.Left) ||

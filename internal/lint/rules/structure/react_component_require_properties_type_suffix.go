@@ -79,10 +79,10 @@ func messageUseTypeAliasSuffix() rule.Message {
 // `PageProperties<'/x'>`, a name nothing declares, so the fix broke type checking. Ownership is decided
 // by where the type is declared rather than how it is spelled, which takes the checker. Without one the
 // rule cannot establish ownership and leaves the name alone.
-var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
+var ReactComponentRequirePropertiesTypeSuffix = rule.Rule[rule.NoOptions]{
 	Name:             "structure/react-component-require-properties-type-suffix",
 	NeedsTypeChecker: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}

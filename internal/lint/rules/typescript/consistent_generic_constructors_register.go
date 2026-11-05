@@ -10,7 +10,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The decoder is hand-rolled rather than generic, because upstream's option is a bare string rather
 // than an object and the generic helper cannot read one. See its doc comment for the wire shapes.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[ConsistentGenericConstructorsOptions]{
 		Rule:   ConsistentGenericConstructors,
 		Decode: DecodeConsistentGenericConstructorsOptions,
 	})

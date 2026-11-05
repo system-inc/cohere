@@ -85,11 +85,11 @@ var (
 // carries the value here; the suggestion is a convenience, and a wrong one rewrites a comparison
 // into a different comparison. Recorded rather than silently omitted, and the 16 cases are in the
 // corpus waiting if somebody wants it.
-var NoUnsafeEnumComparison = rule.Rule{
+var NoUnsafeEnumComparison = rule.Rule[rule.NoOptions]{
 	Name:             "@typescript-eslint/no-unsafe-enum-comparison",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Declared and guarded. `NeedsTypeChecker` governs the registration path; the harness can
 		// still build a `rule.Context` by hand, and `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes`
 		// does exactly that. Guarding in `Run` declines the file once rather than once per node.

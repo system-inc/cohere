@@ -84,15 +84,15 @@ type NoUnsafeNegationOptions struct {
 // them by guessing is a rule that should not be choosing, so both are offered and a human ranks
 // them. ESLint reaches the same conclusion, declaring `fixable: null` with these same two
 // suggestions, one labelled as changing behaviour and one as preserving it.
-var NoUnsafeNegation = rule.Rule{
+var NoUnsafeNegation = rule.Rule[NoUnsafeNegationOptions]{
 	Name: "no-unsafe-negation",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnsafeNegationOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		enforceForOrderingRelations := false
-		if parsed, ok := rule.OptionsAs[NoUnsafeNegationOptions](options); ok {
+		if parsed, ok := options.Read(); ok {
 			enforceForOrderingRelations = parsed.EnforceForOrderingRelations
 		}
 

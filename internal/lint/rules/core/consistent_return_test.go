@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -30,17 +31,18 @@ type consistentReturnCase struct {
 	findings    []consistentReturnExpectation
 }
 
-// decodeConsistentReturnOptionsForTest routes a case's options through the shipped decoder.
-func decodeConsistentReturnOptionsForTest(test *testing.T, optionsJson string) any {
+// decodeConsistentReturnOptionsForTest routes a case's options through the shipped decoder. An empty
+// optionsJson is a rule configured as a bare severity, so it comes back unconfigured.
+func decodeConsistentReturnOptionsForTest(test *testing.T, optionsJson string) rule.Given[ConsistentReturnSettings] {
 	test.Helper()
 	if optionsJson == "" {
-		return nil
+		return rule.Given[ConsistentReturnSettings]{}
 	}
 	decoded, decodeConsistentReturnOptionsError := DecodeConsistentReturnOptions(json.RawMessage(optionsJson))
 	if decodeConsistentReturnOptionsError != nil {
 		test.Fatalf("decoding options %q: %v", optionsJson, decodeConsistentReturnOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 var consistentReturnCleanCases = []consistentReturnCase{
@@ -226,7 +228,7 @@ func TestConsistentReturnFires(test *testing.T) {
 	for _, testCase := range consistentReturnFiringCases {
 		test.Run(testCase.source, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, ConsistentReturn, consistentReturnFile,
+			result := rule_testing.RunGiven(test, ConsistentReturn, consistentReturnFile,
 				testCase.source, decodeConsistentReturnOptionsForTest(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.findings))
@@ -292,7 +294,7 @@ func TestConsistentReturnStaysSilent(test *testing.T) {
 	for _, testCase := range consistentReturnCleanCases {
 		test.Run(testCase.source, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, ConsistentReturn,
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(test, ConsistentReturn,
 				consistentReturnFile, testCase.source,
 				decodeConsistentReturnOptionsForTest(test, testCase.optionsJson)))
 		})
@@ -509,7 +511,7 @@ func TestConsistentReturnAddedCases(test *testing.T) {
 	for _, testCase := range consistentReturnAddedCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, ConsistentReturn, consistentReturnFile,
+			result := rule_testing.RunGiven(test, ConsistentReturn, consistentReturnFile,
 				testCase.source, decodeConsistentReturnOptionsForTest(test, testCase.optionsJson))
 
 			if testCase.message == "" {
@@ -551,20 +553,16 @@ func TestConsistentReturnDecoderRoundTrip(test *testing.T) {
 			if decodeConsistentReturnOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.optionsJson, decodeConsistentReturnOptionsError)
 			}
-			settings, ok := decoded.(ConsistentReturnSettings)
-			if !ok {
-				test.Fatalf("the decoder returned %T, not ConsistentReturnSettings", decoded)
-			}
-			if got := settings.TreatUndefinedAsUnspecified; got != testCase.want {
+			if got := decoded.TreatUndefinedAsUnspecified; got != testCase.want {
 				test.Errorf("treatUndefinedAsUnspecified should be %v, got %v", testCase.want, got)
 			}
 		})
 	}
 
-	// A rule configured as a bare severity is handed nil options rather than a struct. Asserted by
+	// A rule configured as a bare severity is handed no options rather than a struct. Asserted by
 	// bypassing the decoder entirely, which is the path no other fixture here takes.
-	result := rule_testing.RunWithOptions(test, ConsistentReturn, consistentReturnFile,
-		"function foo() { if (true) return true; else return; }", nil)
+	result := rule_testing.Run(test, ConsistentReturn, consistentReturnFile,
+		"function foo() { if (true) return true; else return; }")
 	rule_testing.ExpectFindings(test, result, "missingReturnValue")
 }
 

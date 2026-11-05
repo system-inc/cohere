@@ -108,7 +108,7 @@ type NoMisusedSpreadOptions struct {
 // precedence branch: `{ ...(map) }` loses the redundant parentheses because the inner node is read
 // through `SkipParentheses`, and `{ ...(map, map) }` keeps them because a comma expression has weak
 // precedence and would otherwise change meaning.
-var NoMisusedSpread = rule.Rule{
+var NoMisusedSpread = rule.Rule[NoMisusedSpreadOptions]{
 	Name: "@typescript-eslint/no-misused-spread",
 
 	// Every arm asks the checker what the spread argument is. None of it is answerable from syntax.
@@ -118,15 +118,20 @@ var NoMisusedSpread = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoMisusedSpreadOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
-		settings, _ := rule.OptionsAs[NoMisusedSpreadOptions](options)
+		settings, _ := options.Read()
 
 		allowed := func(subjectType *checker.Type) bool {
-			return type_checking.TypeMatchesSomeSpecifier(subjectType, settings.Allow, settings.AllowInline, ruleContext.Program)
+			return type_checking.TypeMatchesSomeSpecifier(
+				subjectType,
+				settings.Allow,
+				settings.AllowInline,
+				ruleContext.Program,
+			)
 		}
 
 		// checkObjectSpread is the cascade. Every arm returns, so the first match wins.
@@ -690,16 +695,14 @@ type noMisusedSpreadRawOptions struct {
 // The empty allow list is both the default and the correct zero value, so unlike restrict-plus-
 // operands there is no default to restore on nil: a rule handed nil options allows nothing, which is
 // exactly upstream's `defaultOptions`.
-func DecodeNoMisusedSpreadOptions(raw []byte) (any, error) {
+func DecodeNoMisusedSpreadOptions(raw []byte) (NoMisusedSpreadOptions, error) {
 	decoded, decodeOptionsError := rule.DecodeOptionsInto[noMisusedSpreadRawOptions]()(raw)
 	if decodeOptionsError != nil {
 		return NoMisusedSpreadOptions{}, decodeOptionsError
 	}
 
-	wire, _ := decoded.(noMisusedSpreadRawOptions)
-
 	var options NoMisusedSpreadOptions
-	for _, entry := range wire.Allow {
+	for _, entry := range decoded.Allow {
 		if entry.inline != "" {
 			options.AllowInline = append(options.AllowInline, entry.inline)
 			continue

@@ -28,12 +28,17 @@ func correctnessNoGlobalListenerTargetAssertionMessage() rule.Message {
 // element type inside a handler registered with `document.addEventListener` or
 // `window.addEventListener`.
 //
-//	invalid: document.addEventListener('keydown', function(event) { const target = event.target as HTMLTextAreaElement; use(target.selectionStart); });
+//	invalid: document.addEventListener('keydown', function(event) {
+//	         const target = event.target as HTMLTextAreaElement; use(target.selectionStart); });
 //	invalid: window.addEventListener('click', (event) => { (event.target as HTMLInputElement).select(); });
-//	invalid: function handleKeyDown(event: KeyboardEvent) { (<HTMLInputElement>event.target).value; } document.addEventListener('keydown', handleKeyDown);
-//	valid:   document.addEventListener('keydown', function(event) { if(!(event.target instanceof HTMLTextAreaElement)) return; use(event.target.selectionStart); });
-//	valid:   document.addEventListener('click', function(event) { const target = event.target as HTMLElement; target.closest('[data-menu]'); });
-//	valid:   textarea.addEventListener('keydown', function(event) { (event.target as HTMLTextAreaElement).selectionStart; });
+//	invalid: function handleKeyDown(event: KeyboardEvent) { (<HTMLInputElement>event.target).value; }
+//	         document.addEventListener('keydown', handleKeyDown);
+//	valid:   document.addEventListener('keydown', function(event) {
+//	         if(!(event.target instanceof HTMLTextAreaElement)) return; use(event.target.selectionStart); });
+//	valid:   document.addEventListener('click', function(event) {
+//	         const target = event.target as HTMLElement; target.closest('[data-menu]'); });
+//	valid:   textarea.addEventListener('keydown', function(event) {
+//	         (event.target as HTMLTextAreaElement).selectionStart; });
 //	valid:   document.addEventListener('click', function(event) { (event.currentTarget as Document).title; });
 //
 // # Where it came from
@@ -85,7 +90,7 @@ func correctnessNoGlobalListenerTargetAssertionMessage() rule.Message {
 //
 // Whether to guard with `instanceof`, return early, or move the listener onto the element is the
 // author's call, and an inserted guard would change which events the handler acts on.
-var CorrectnessNoGlobalListenerTargetAssertion = rule.Rule{
+var CorrectnessNoGlobalListenerTargetAssertion = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-global-listener-target-assertion",
 
 	// `document`, `window`, `addEventListener`, `Event.target` and the element types are each told
@@ -98,7 +103,7 @@ var CorrectnessNoGlobalListenerTargetAssertion = rule.Rule{
 	// Left on the default, Contents: the dispatch scan cannot prove the handler resolution stops short of
 	// an imported body, so a shape-keyed replay is not claimed (TestRulesClaimShapesOnlyWhereTheScanAllowsIt).
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 			return nil
 		}

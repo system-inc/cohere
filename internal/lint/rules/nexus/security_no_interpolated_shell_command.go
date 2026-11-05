@@ -137,12 +137,12 @@ const (
 // Splitting a shell string into a program and an argument list changes what runs whenever the
 // string used shell syntax on purpose (a pipe, `2>/dev/null`, a glob), so the rewrite is the
 // author's.
-var SecurityNoInterpolatedShellCommand = rule.Rule{
+var SecurityNoInterpolatedShellCommand = rule.Rule[rule.NoOptions]{
 	Name:             "nexus/security-no-interpolated-shell-command",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			// Both the callee and the literal-ness of every piece are type questions. A name match
 			// alone would report every function called `exec`, so with no checker the rule declines.

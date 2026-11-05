@@ -8,5 +8,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // shared edit. The decoder is hand-written rather than `rule.DecodeOptionsInto` so a bare `"error"`
 // configuration resolves to the documented default; see DecodeDefaultCaseOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: DefaultCase, Decode: DecodeDefaultCaseOptions})
+	rule.Register(rule.Registration[DefaultCaseOptions]{Rule: DefaultCase, Decode: DecodeDefaultCaseOptions})
 }

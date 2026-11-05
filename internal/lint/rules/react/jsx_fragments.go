@@ -47,7 +47,7 @@ func DefaultJsxFragmentsOptions() JsxFragmentsOptions {
 // measured on the installed build, and refuses any other value at load, the empty string included,
 // before `context.options[0] || 'syntax'` could ever see it. The config layer now refuses a decoder's
 // error by rule name, so refusing is what tells the author (#rfbha44).
-func DecodeJsxFragmentsOptions(raw []byte) (any, error) {
+func DecodeJsxFragmentsOptions(raw []byte) (JsxFragmentsOptions, error) {
 	options := DefaultJsxFragmentsOptions()
 	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	trimmed := strings.TrimSpace(string(raw))
@@ -151,17 +151,17 @@ var messagePreferFragmentPragma = rule.Message{
 // Reporting without the repair is also the safe direction for the `element` direction, whose fix
 // has no known hazard, because a rule that fixes one direction and not the other is a rule whose
 // behaviour a reader has to look up.
-var JsxFragments = rule.Rule{
+var JsxFragments = rule.Rule[JsxFragmentsOptions]{
 	Name:             "react/jsx-fragments",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[JsxFragmentsOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := DefaultJsxFragmentsOptions()
-		if configured, isConfigured := rule.OptionsAs[JsxFragmentsOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			settings = configured
 		}
 

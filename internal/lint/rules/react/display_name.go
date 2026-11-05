@@ -32,7 +32,7 @@ func DefaultDisplayNameOptions() DisplayNameOptions {
 // Our config layer unwraps the severity tuple before dispatch, so this receives upstream's option
 // object rather than upstream's one-element array. Empty input is a rule configured as a bare
 // `"error"` and resolves to the default.
-func DecodeDisplayNameOptions(raw []byte) (any, error) {
+func DecodeDisplayNameOptions(raw []byte) (DisplayNameOptions, error) {
 	options := DefaultDisplayNameOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -85,7 +85,7 @@ var messageNoContextDisplayName = rule.Message{
 // # No fix
 //
 // The repair is to name a thing, which means choosing the name. Upstream ships no fixer either.
-var DisplayName = rule.Rule{
+var DisplayName = rule.Rule[DisplayNameOptions]{
 	Name: "react/display-name",
 
 	// The checker resolves the object of a `C.displayName` write back to its declaration, which is
@@ -94,13 +94,13 @@ var DisplayName = rule.Rule{
 	// and not the other, so a name comparison would be wrong.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[DisplayNameOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := DefaultDisplayNameOptions()
-		if configured, isConfigured := rule.OptionsAs[DisplayNameOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			settings = configured
 		}
 
@@ -283,11 +283,11 @@ func hasTranspilerName(node *ast.Node) bool {
 
 // isModuleExportsAssignmentTarget reports whether an assignment target is `module.exports`.
 func isModuleExportsAssignmentTarget(target *ast.Node) bool {
-	target = skipParenthesesOptional(target)
-	if target == nil || target.Kind != ast.KindPropertyAccessExpression {
+	unwrapped := skipParenthesesOptional(target)
+	if unwrapped == nil || unwrapped.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
-	access := target.AsPropertyAccessExpression()
+	access := unwrapped.AsPropertyAccessExpression()
 	object := skipParenthesesOptional(access.Expression)
 	if object == nil || object.Kind != ast.KindIdentifier || object.Text() != "module" {
 		return false
@@ -420,11 +420,11 @@ func isDisplayNameKey(key *ast.Node) bool {
 //
 // Never index blindly either way; the list is what the question wants.
 func resolvedDeclarationsOf(ruleContext rule.Context, expression *ast.Node) []*ast.Node {
-	expression = skipParenthesesOptional(expression)
-	if expression == nil || ruleContext.TypeChecker == nil {
+	unwrapped := skipParenthesesOptional(expression)
+	if unwrapped == nil || ruleContext.TypeChecker == nil {
 		return nil
 	}
-	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(expression)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(unwrapped)
 	if symbol == nil {
 		return nil
 	}
@@ -643,11 +643,11 @@ func collectContextObjects(contextCheckerHolder rule.Context, sourceFile *ast.No
 // isCreateContextCall reports whether an expression is a call to `createContext`, bare or through
 // any receiver.
 func isCreateContextCall(expression *ast.Node) bool {
-	expression = skipParenthesesOptional(expression)
-	if expression == nil || expression.Kind != ast.KindCallExpression {
+	unwrapped := skipParenthesesOptional(expression)
+	if unwrapped == nil || unwrapped.Kind != ast.KindCallExpression {
 		return false
 	}
-	callee := skipParenthesesOptional(expression.AsCallExpression().Expression)
+	callee := skipParenthesesOptional(unwrapped.AsCallExpression().Expression)
 	if callee == nil {
 		return false
 	}

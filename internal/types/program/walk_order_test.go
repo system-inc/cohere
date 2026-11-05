@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -55,9 +56,9 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(test *testing.T) {
 
 	// Dispatched first, sorts last: reports every declaration twice, message `b` before `a`, so the
 	// message id is the only thing separating the pair.
-	forward := rule.Rule{
+	forward := rule.Rule[rule.NoOptions]{
 		Name: "zeta-forward",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				ruleContext.ReportNode(node, rule.Message{Id: "b", Description: declarationName(node)})
 				ruleContext.ReportNode(node, rule.Message{Id: "a", Description: declarationName(node)})
@@ -65,9 +66,9 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(test *testing.T) {
 		},
 	}
 	// Dispatched second, sorts first: reports from the file node, last declaration first.
-	reverse := rule.Rule{
+	reverse := rule.Rule[rule.NoOptions]{
 		Name: "alpha-reverse",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				var declarations []*ast.Node
 				var collect func(*ast.Node)
@@ -116,7 +117,11 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(test *testing.T) {
 
 	var first []string
 	for run := range 5 {
-		result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{forward, reverse})
+		result, walkError := graph.Walk(
+			context.Background(),
+			graph.ProjectFiles(),
+			rule_testing.EntriesOf(test, forward, reverse),
+		)
 		if walkError != nil {
 			test.Fatalf("walking: %v", walkError)
 		}

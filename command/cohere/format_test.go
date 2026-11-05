@@ -199,7 +199,11 @@ func TestFormattingIsIdempotent(test *testing.T) {
 // generating garbage.
 func TestFormattedOutputStillParses(test *testing.T) {
 	test.Parallel()
-	formatted, formatTransformError := formatTransform(prettierLike())("sample.ts", "const   alpha  =  1;\nexport   { alpha };\n", nil)
+	formatted, formatTransformError := formatTransform(prettierLike())(
+		"sample.ts",
+		"const   alpha  =  1;\nexport   { alpha };\n",
+		nil,
+	)
 	if formatTransformError != nil {
 		test.Fatalf("unexpected error: %v", formatTransformError)
 	}
@@ -493,7 +497,8 @@ func TestTheFormatFixpointIsBoundedAndStopsWhenStable(test *testing.T) {
 	if formatTransformError == nil || errors.Is(formatTransformError, edit.ErrSkipped) {
 		test.Fatalf("a file still changing at the bound was not a failure: %v", formatTransformError)
 	}
-	if !strings.Contains(formatTransformError.Error(), "Drifting.ts") || !strings.Contains(formatTransformError.Error(), "not idempotent") {
+	if !strings.Contains(formatTransformError.Error(), "Drifting.ts") ||
+		!strings.Contains(formatTransformError.Error(), "not idempotent") {
 		test.Fatalf("the failure does not name the file and why: %v", formatTransformError)
 	}
 	if len(growing.askedFor) != formatPassLimit {
@@ -511,12 +516,24 @@ func TestTheFormatFixpointIsBoundedAndStopsWhenStable(test *testing.T) {
 			}
 		},
 	}
-	if formatted, formatTransformError := formatTransform(settling)("Settling.ts", "a\n", nil); formatTransformError != nil || formatted != "c\n" {
-		test.Fatalf("a file that settles on the second pass came back %q, %v; want \"c\\n\"", formatted, formatTransformError)
+	if formatted, formatTransformError := formatTransform(settling)(
+		"Settling.ts",
+		"a\n",
+		nil,
+	); formatTransformError != nil || formatted != "c\n" {
+		test.Fatalf(
+			"a file that settles on the second pass came back %q, %v; want \"c\\n\"",
+			formatted,
+			formatTransformError,
+		)
 	}
 
 	stable := prettierLike()
-	if _, formatTransformError := formatTransform(stable)("Formatted.ts", "const a = 1;\n", nil); formatTransformError != nil {
+	if _, formatTransformError := formatTransform(stable)(
+		"Formatted.ts",
+		"const a = 1;\n",
+		nil,
+	); formatTransformError != nil {
 		test.Fatal(formatTransformError)
 	}
 	if len(stable.askedFor) != 1 {

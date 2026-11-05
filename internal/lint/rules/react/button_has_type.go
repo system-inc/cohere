@@ -118,7 +118,7 @@ type buttonHasTypeWireOptions struct {
 // hands a rule. And its zero value is all-false, which for this rule means every written-out type is
 // forbidden, so a rule that fell back to the zero value would report `forbiddenValue` on correct
 // code rather than going quiet, which is the loud direction of a silent inversion but still wrong.
-func DecodeButtonHasTypeOptions(raw []byte) (any, error) {
+func DecodeButtonHasTypeOptions(raw []byte) (ButtonHasTypeOptions, error) {
 	options := DefaultButtonHasTypeOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -199,12 +199,12 @@ func DecodeButtonHasTypeOptions(raw []byte) (any, error) {
 // NumericLiteral is already `1.5`, `16`, `1000`, `10`, probed against all six forms. The one
 // difference is a BigIntLiteral, whose `.Text()` keeps the `n` suffix where upstream renders `1`, so
 // that suffix is stripped at the site.
-var ButtonHasType = rule.Rule{
+var ButtonHasType = rule.Rule[ButtonHasTypeOptions]{
 	Name:             "react/button-has-type",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[ButtonHasTypeOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ButtonHasTypeOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			// Nil options reach here when the config layer turns a decoder error into nil for a
 			// non-required rule. The zero value would forbid all three types and report on correct
@@ -245,25 +245,25 @@ var ButtonHasType = rule.Rule{
 			// reports invalidValue upstream and reported complexType here until this line existed.
 			// Skipping reproduces upstream rather than improving on it, and `SkipParentheses`
 			// dereferences its argument, which is why the nil check above it is not optional.
-			expression = ast.SkipParentheses(expression)
-			if expression == nil {
+			unwrapped := ast.SkipParentheses(expression)
+			if unwrapped == nil {
 				return
 			}
 
-			if value, static := buttonHasTypeLiteralValue(expression); static {
+			if value, static := buttonHasTypeLiteralValue(unwrapped); static {
 				checkValue(node, value)
 				return
 			}
 
-			switch expression.Kind {
+			switch unwrapped.Kind {
 			case ast.KindNoSubstitutionTemplateLiteral:
 				// A template with no interpolations is upstream's `expressions.length === 0` arm,
 				// which reads `quasis[0].value.raw`. Our parser gives this its own kind, so an
 				// interpolating template is a TemplateExpression and never reaches here.
-				checkValue(node, expression.Text())
+				checkValue(node, unwrapped.Text())
 
 			case ast.KindConditionalExpression:
-				conditional := expression.AsConditionalExpression()
+				conditional := unwrapped.AsConditionalExpression()
 				checkExpression(node, conditional.WhenTrue)
 				checkExpression(node, conditional.WhenFalse)
 
@@ -272,12 +272,12 @@ var ButtonHasType = rule.Rule{
 				// checker proves every value this expression can take is a written-out type the
 				// config permits, nothing is computed in the sense the message means, so there is
 				// nothing to report. See buttonHasTypeProvenPermitted.
-				if buttonHasTypeProvenPermitted(ruleContext, expression, settings) {
+				if buttonHasTypeProvenPermitted(ruleContext, unwrapped, settings) {
 					return
 				}
 				// The complex report anchors on the expression rather than on the element, which is
 				// upstream's `reportComplex(expression)` and is the one place these two nodes differ.
-				ruleContext.ReportNode(expression, messageButtonComplexType)
+				ruleContext.ReportNode(unwrapped, messageButtonComplexType)
 			}
 		}
 

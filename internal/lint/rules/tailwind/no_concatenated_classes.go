@@ -59,15 +59,15 @@ type NoConcatenatedClassesOptions struct {
 // No fix, deliberately. The repair is to write out the class names the code is choosing between,
 // which means knowing which ones those are. A rule cannot know that, and a fix that guessed would
 // produce a class list the author never intended.
-var NoConcatenatedClasses = rule.Rule{
+var NoConcatenatedClasses = rule.Rule[NoConcatenatedClassesOptions]{
 	Name: "better-tailwindcss/no-concatenated-classes",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoConcatenatedClassesOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
-		if configured, isConfigured := rule.OptionsAs[NoConcatenatedClassesOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			surfaces = configured.ClassLiteralSurfaces()
 		}
 

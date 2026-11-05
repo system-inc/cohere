@@ -20,7 +20,7 @@ import (
 const staticPropertyPlacementFile = "/repository/source/StaticPropertyPlacement.tsx"
 
 // staticPropertyPlacementDecode routes a fixture's raw options through the exported decoder.
-func staticPropertyPlacementDecode(test *testing.T, raw string) any {
+func staticPropertyPlacementDecode(test *testing.T, raw string) StaticPropertyPlacementOptions {
 	test.Helper()
 	decoded, decodeStaticPropertyPlacementOptionsError := DecodeStaticPropertyPlacementOptions([]byte(raw))
 	if decodeStaticPropertyPlacementOptionsError != nil {
@@ -879,17 +879,13 @@ func TestDecodeStaticPropertyPlacementOptions(test *testing.T) {
 			if decodeStaticPropertyPlacementOptionsError != nil {
 				test.Fatalf("decode returned %v", decodeStaticPropertyPlacementOptionsError)
 			}
-			options, isOptions := decoded.(StaticPropertyPlacementOptions)
-			if !isOptions {
-				test.Fatalf("decode returned %T", decoded)
-			}
-			if len(options.Positions) != len(staticPropertyPlacementProperties) {
+			if len(decoded.Positions) != len(staticPropertyPlacementProperties) {
 				test.Fatalf("decoded %d positions, wanted %d",
-					len(options.Positions), len(staticPropertyPlacementProperties))
+					len(decoded.Positions), len(staticPropertyPlacementProperties))
 			}
 			for property, want := range testCase.want {
-				if options.Positions[property] != want {
-					test.Fatalf("%s is %q, wanted %q", property, options.Positions[property], want)
+				if decoded.Positions[property] != want {
+					test.Fatalf("%s is %q, wanted %q", property, decoded.Positions[property], want)
 				}
 			}
 		})
@@ -922,8 +918,8 @@ func TestDecodeStaticPropertyPlacementOptionsRefusesWhatUpstreamRefuses(test *te
 // TestStaticPropertyPlacementNilOptionsUsesTheDefault bypasses the decoder entirely.
 //
 // Every other fixture here reaches the rule through the decoder, so nothing else can see the
-// rule's own nil fallback. A rule handed nil options would otherwise read a nil map, find no
-// position for any property, and go silent on everything.
+// rule's own unconfigured fallback. A rule handed the zero `rule.Given` would otherwise read a nil map,
+// find no position for any property, and go silent on everything.
 func TestStaticPropertyPlacementNilOptionsUsesTheDefault(test *testing.T) {
 	test.Parallel()
 

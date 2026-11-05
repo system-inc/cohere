@@ -117,9 +117,9 @@ type NoExplicitAnyOptions struct {
 // which is not its job and would misfire on every other tolerated shape. Both cases are pinned as
 // fixtures asserting a finding, with the upstream behavior noted at the line, so the next reader
 // does not discover the mismatch by grepping the snapshot and quietly "fix" it.
-var NoExplicitAny = rule.Rule{
+var NoExplicitAny = rule.Rule[NoExplicitAnyOptions]{
 	Name: "@typescript-eslint/no-explicit-any",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoExplicitAnyOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -130,7 +130,7 @@ var NoExplicitAny = rule.Rule{
 			return nil
 		}
 
-		parsed, _ := rule.OptionsAs[NoExplicitAnyOptions](options)
+		parsed, _ := options.Read()
 
 		return rule.Listeners{
 			ast.KindAnyKeyword: func(node *ast.Node) {

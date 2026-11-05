@@ -188,31 +188,6 @@ func (system *LoadedDesignSystem) Utilities() *UtilityEvaluator { return system.
 // Part of the DesignSystem interface candidate.go declares.
 func (system *LoadedDesignSystem) Prefix() string { return system.theme.Prefix }
 
-// HasUtility reports whether root is registered as a utility of the given kind.
-//
-// The repository's own `@utility` blocks are asked first, then the framework's registry. That order
-// is upstream's: `@utility` registration runs after the framework's and `Utilities.set` overwrites,
-// so a repository redefining a framework root wins. Both are consulted because neither alone is
-// right: the framework tables do not know about `slide-in-from-top`, and the repository's blocks
-// do not know about `bg`.
-//
-// A repository `@utility` block is always functional or static according to whether its name
-// carries the `-*` suffix, which is what collectStylesheets recorded when it parsed the block.
-func (system *LoadedDesignSystem) HasUtility(root string, kind UtilityKind) bool {
-	if declared, isDeclared := system.utilityRoots[root]; isDeclared {
-		return declared[kind]
-	}
-	switch kind {
-	case UtilityKindStatic:
-		_, registered := FrameworkStaticDeclarations[root]
-		return registered
-	case UtilityKindFunctional:
-		return frameworkFunctionalRoots[root]
-	default:
-		return false
-	}
-}
-
 // frameworkFunctionalRoots is every functional root the framework registers.
 //
 // Built once from the ported registration tables plus the descriptor rows that carry the roots no
@@ -226,9 +201,9 @@ func (system *LoadedDesignSystem) HasUtility(root string, kind UtilityKind) bool
 // are declared by ahra and not by www-connected-app, so a table under a "Source: Tailwind 4.3.3"
 // header was telling every other repository that two of ahra's animations were framework utilities.
 //
-// The repository's own blocks are answered above this switch, from `system.utilityRoots`, so nothing
-// is lost by dropping them here: a repository that declares `prose` still gets it, and one that does
-// not no longer inherits ahra's.
+// The repository's own blocks are answered before HasUtility's switch, from `system.utilityRoots`, so
+// nothing is lost by dropping them here: a repository that declares `prose` still gets it, and one that
+// does not no longer inherits ahra's.
 var frameworkFunctionalRoots = func() map[string]bool {
 	roots := make(
 		map[string]bool,
@@ -256,6 +231,31 @@ var frameworkFunctionalRoots = func() map[string]bool {
 	}
 	return roots
 }()
+
+// HasUtility reports whether root is registered as a utility of the given kind.
+//
+// The repository's own `@utility` blocks are asked first, then the framework's registry. That order
+// is upstream's: `@utility` registration runs after the framework's and `Utilities.set` overwrites,
+// so a repository redefining a framework root wins. Both are consulted because neither alone is
+// right: the framework tables do not know about `slide-in-from-top`, and the repository's blocks
+// do not know about `bg`.
+//
+// A repository `@utility` block is always functional or static according to whether its name
+// carries the `-*` suffix, which is what collectStylesheets recorded when it parsed the block.
+func (system *LoadedDesignSystem) HasUtility(root string, kind UtilityKind) bool {
+	if declared, isDeclared := system.utilityRoots[root]; isDeclared {
+		return declared[kind]
+	}
+	switch kind {
+	case UtilityKindStatic:
+		_, registered := FrameworkStaticDeclarations[root]
+		return registered
+	case UtilityKindFunctional:
+		return frameworkFunctionalRoots[root]
+	default:
+		return false
+	}
+}
 
 // RepositoryStaticUtilityNames is every static utility the repository itself declares.
 //

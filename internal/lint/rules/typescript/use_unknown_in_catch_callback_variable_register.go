@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // No Decode entry, because upstream declares `schema: []` and the rule reads no configuration. That
 // was read off the installed build's metadata as well as the clone, and the two agree.
 func init() {
-	rule.Register(rule.Registration{Rule: UseUnknownInCatchCallbackVariable})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: UseUnknownInCatchCallbackVariable})
 }

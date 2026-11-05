@@ -252,7 +252,12 @@ func checkWorktreeHoldsNoWork(mainCheckout string, path string, doing string) in
 	// differs at all, a conflict resolved, still counts as unlanded, which keeps the refusal on the safe side.
 	unlanded, gitOutputError := gitOutput(path, "log", "--oneline", "--cherry-pick", "--right-only", "main...HEAD")
 	if gitOutputError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s's commits that main does not hold: %v\n", path, gitOutputError)
+		fmt.Fprintf(
+			streams.Errors,
+			"cohere-dev: reading %s's commits that main does not hold: %v\n",
+			path,
+			gitOutputError,
+		)
 		return 1
 	}
 	if unlanded != "" {

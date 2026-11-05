@@ -111,9 +111,13 @@ func proposeFromTailwindFixers(test *testing.T) edit.Propose {
 		ordered := runClassOrderFixture(test, baseName, text)
 		diagnostics = append(diagnostics, ordered.Diagnostics...)
 
-		for _, subject := range []rule.Rule{NoDuplicateClasses, NoUnnecessaryWhitespace, NoDeprecatedClasses} {
-			diagnostics = append(diagnostics, rule_testing.Run(test, subject, baseName, text).Diagnostics...)
-		}
+		// One call each rather than a loop, since the three rules' options are three types.
+		duplicates := rule_testing.Run(test, NoDuplicateClasses, baseName, text)
+		whitespace := rule_testing.Run(test, NoUnnecessaryWhitespace, baseName, text)
+		deprecated := rule_testing.Run(test, NoDeprecatedClasses, baseName, text)
+		diagnostics = append(diagnostics, duplicates.Diagnostics...)
+		diagnostics = append(diagnostics, whitespace.Diagnostics...)
+		diagnostics = append(diagnostics, deprecated.Diagnostics...)
 
 		// The typed fixture writes the file trimmed, with one newline after it, so its offsets are the
 		// engine's only while the text has no leading whitespace. Asserted rather than assumed: a

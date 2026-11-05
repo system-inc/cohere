@@ -113,9 +113,9 @@ func (options NoSequencesOptions) allowInParentheses() bool {
 // No fix. Upstream ships none, and the repair is a judgment the rule cannot make: splitting a
 // sequence into statements is only correct where the expression is already a statement, and the
 // alternative repair of adding parentheses silences the finding without addressing it.
-var NoSequences = rule.Rule{
+var NoSequences = rule.Rule[NoSequencesOptions]{
 	Name: "no-sequences",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoSequencesOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -125,7 +125,7 @@ var NoSequences = rule.Rule{
 		// value of NoSequencesOptions. Its AllowInParentheses is a nil pointer, which the accessor
 		// reads as upstream's `true`.
 		var settings NoSequencesOptions
-		if parsed, ok := rule.OptionsAs[NoSequencesOptions](options); ok {
+		if parsed, ok := options.Read(); ok {
 			settings = parsed
 		}
 		allowInParentheses := settings.allowInParentheses()
@@ -291,7 +291,7 @@ func leftmostCommaOf(ruleContext rule.Context, node *ast.Node) *core.TextRange {
 // input and the config layer turns the error into nil, so a rule reached through it can never see
 // the difference between "no options were written" and "an option was written as false". For an
 // option defaulting to false that distinction is invisible; for this one it inverts the rule.
-func DecodeNoSequencesOptions(raw []byte) (any, error) {
+func DecodeNoSequencesOptions(raw []byte) (NoSequencesOptions, error) {
 	var options NoSequencesOptions
 	if len(raw) == 0 {
 		return options, nil

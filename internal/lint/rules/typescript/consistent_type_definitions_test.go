@@ -329,22 +329,18 @@ func TestConsistentTypeDefinitionsDecoderDefaultsToInterface(test *testing.T) {
 	if decodeConsistentTypeDefinitionsOptionsError != nil {
 		test.Fatalf("empty options should decode to the default: %v", decodeConsistentTypeDefinitionsOptionsError)
 	}
-	settings, ok := decoded.(ConsistentTypeDefinitionsOptions)
-	if !ok {
-		test.Fatalf("expected ConsistentTypeDefinitionsOptions, got %T", decoded)
-	}
-	if settings.Style != ConsistentTypeDefinitionsInterface {
-		test.Fatalf("expected the default to be interface, got %q", settings.Style)
+	if decoded.Style != ConsistentTypeDefinitionsInterface {
+		test.Fatalf("expected the default to be interface, got %q", decoded.Style)
 	}
 
 	// The control that the default is doing work: unconfigured, the rule reports a type alias and
 	// stays silent on an interface, which is the `interface` arm rather than no arm at all.
 	reported := rule_testing.RunWithOptions(test, ConsistentTypeDefinitions,
-		consistentTypeDefinitionsFile, "type T = { x: number };", settings)
+		consistentTypeDefinitionsFile, "type T = { x: number };", decoded)
 	rule_testing.ExpectFindings(test, reported, "interfaceOverType")
 
 	silent := rule_testing.RunWithOptions(test, ConsistentTypeDefinitions,
-		consistentTypeDefinitionsFile, "interface I { x: number }", settings)
+		consistentTypeDefinitionsFile, "interface I { x: number }", decoded)
 	rule_testing.ExpectClean(test, silent)
 
 	// And a bad value fails loudly rather than silencing the rule.

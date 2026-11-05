@@ -14,5 +14,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // rules get turned on is a decision for whoever owns that configuration, and a port that enabled
 // itself would be making it silently.
 func init() {
-	rule.Register(rule.Registration{Rule: ConsistencyNoBareThrow})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: ConsistencyNoBareThrow})
 }

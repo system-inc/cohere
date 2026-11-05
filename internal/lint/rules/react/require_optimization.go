@@ -33,7 +33,7 @@ type RequireOptimizationOptions struct {
 // Hand-written rather than `rule.DecodeOptionsInto` because the generic helper errors on empty
 // input, which is what a bare `"error"` configuration hands a rule, and upstream accepts that as
 // the defaults. The one default here is the zero value, so nothing else needs translating.
-func DecodeRequireOptimizationOptions(raw []byte) (any, error) {
+func DecodeRequireOptimizationOptions(raw []byte) (RequireOptimizationOptions, error) {
 	var options RequireOptimizationOptions
 	if len(raw) == 0 {
 		return options, nil
@@ -101,10 +101,10 @@ func DecodeRequireOptimizationOptions(raw []byte) (any, error) {
 // in a codebase, where upstream reports on almost none. The intuitive reading is that this arm
 // means "an object with no shouldComponentUpdate"; the actual one is "an object with no function
 // value at all, and no PureRenderMixin".
-var RequireOptimization = rule.Rule{
+var RequireOptimization = rule.Rule[RequireOptimizationOptions]{
 	Name: "react/require-optimization",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[RequireOptimizationOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[RequireOptimizationOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = RequireOptimizationOptions{}
 		}
@@ -489,15 +489,16 @@ func requireOptimizationClassRange(ruleContext rule.Context, node *ast.Node) cor
 // and comments before that are leading trivia of the same node.
 func requireOptimizationScanPastTrivia(sourceFile *ast.SourceFile, from int) int {
 	text := sourceFile.Text()
-	for from < len(text) {
-		switch text[from] {
+	position := from
+	for position < len(text) {
+		switch text[position] {
 		case ' ', '\t', '\n', '\r':
-			from++
+			position++
 		default:
-			return from
+			return position
 		}
 	}
-	return from
+	return position
 }
 
 // requireOptimizationIsCreateReactClassCall reports whether a call is `createReactClass(...)`.

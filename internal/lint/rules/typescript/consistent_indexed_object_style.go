@@ -37,7 +37,7 @@ func DefaultConsistentIndexedObjectStyleSettings() ConsistentIndexedObjectStyleO
 // disable the rule. It did not disable it; it ran a mode nobody wrote, and the config loaded clean.
 // Upstream's schema is a string enum and refuses those at load, and the config layer now refuses a
 // decoder's error by rule name, so refusing is what tells the author (#p9s1131).
-func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (any, error) {
+func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (ConsistentIndexedObjectStyleOptions, error) {
 	options := DefaultConsistentIndexedObjectStyleSettings()
 
 	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
@@ -110,14 +110,14 @@ func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (any, error) {
 // Four anchors, all of them type nodes, which are rare outside declaration files. The checker is
 // consulted only after a node has already been shown to be a single-member index signature or a
 // convertible mapped type.
-var ConsistentIndexedObjectStyle = rule.Rule{
+var ConsistentIndexedObjectStyle = rule.Rule[ConsistentIndexedObjectStyleOptions]{
 	Name: "@typescript-eslint/consistent-indexed-object-style",
 
 	// The circularity test resolves an identifier to its declaration.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[ConsistentIndexedObjectStyleOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistentIndexedObjectStyleOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultConsistentIndexedObjectStyleSettings()
 		}

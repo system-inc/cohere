@@ -76,7 +76,7 @@ type JsxNoUselessFragmentOptions struct {
 // Hand-written rather than `rule.DecodeOptionsInto` because the generic helper errors on empty
 // input, which is what a bare `"error"` configuration hands a rule. The one default is the zero
 // value, so nothing else needs translating.
-func DecodeJsxNoUselessFragmentOptions(raw []byte) (any, error) {
+func DecodeJsxNoUselessFragmentOptions(raw []byte) (JsxNoUselessFragmentOptions, error) {
 	var options JsxNoUselessFragmentOptions
 	if len(raw) == 0 {
 		return options, nil
@@ -138,10 +138,10 @@ func DecodeJsxNoUselessFragmentOptions(raw []byte) (any, error) {
 // is empty or holds real text or an expression, and any fragment inside a component element, because
 // that component may require its children be a React element. Its fourth, a fragment missing its
 // opening or closing token, is an old-parser artifact our parser cannot produce.
-var JsxNoUselessFragment = rule.Rule{
+var JsxNoUselessFragment = rule.Rule[JsxNoUselessFragmentOptions]{
 	Name: "react/jsx-no-useless-fragment",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[JsxNoUselessFragmentOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[JsxNoUselessFragmentOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = JsxNoUselessFragmentOptions{}
 		}

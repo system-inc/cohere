@@ -181,12 +181,12 @@ var messageJsxPropsNoSpreadMultiMemberExpression = rule.Message{
 // literal translation of oxc's node would make this rule silent on every fail fixture upstream
 // ships: all five are self-closing. Both kinds are listened on, which `jsx_no_duplicate_props.go`
 // established here first.
-var JsxPropsNoSpreadMulti = rule.Rule{
+var JsxPropsNoSpreadMulti = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/jsx-props-no-spread-multi` and the parity guard
 	// strips the namespace on a `/` boundary, so a rule named `react-jsx-props-no-spread-multi`
 	// would match no inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/jsx-props-no-spread-multi",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node) {
 			_, attributes := jsx.ElementParts(node)
 			if attributes == nil {
@@ -327,26 +327,27 @@ func isSpreadableMemberExpression(node *ast.Node) bool {
 // TypeScript's non-null and assertion wrappers are not walked through either, for the same reason as
 // the parenthesis: `a?.b!.c` terminates the chain at the `!` in oxc exactly as `(a?.b).c` does.
 func isOptionalChain(node *ast.Node) bool {
-	for node != nil {
-		switch node.Kind {
+	current := node
+	for current != nil {
+		switch current.Kind {
 		case ast.KindPropertyAccessExpression:
-			access := node.AsPropertyAccessExpression()
+			access := current.AsPropertyAccessExpression()
 			if access.QuestionDotToken != nil {
 				return true
 			}
-			node = access.Expression
+			current = access.Expression
 		case ast.KindElementAccessExpression:
-			access := node.AsElementAccessExpression()
+			access := current.AsElementAccessExpression()
 			if access.QuestionDotToken != nil {
 				return true
 			}
-			node = access.Expression
+			current = access.Expression
 		case ast.KindCallExpression:
-			call := node.AsCallExpression()
+			call := current.AsCallExpression()
 			if call.QuestionDotToken != nil {
 				return true
 			}
-			node = call.Expression
+			current = call.Expression
 		default:
 			// A parenthesis, a non-null assertion or a type assertion terminates the chain rather
 			// than being seen through. That is the third measured line above, and descending here
@@ -436,9 +437,9 @@ func isSameMemberExpression(left *ast.Node, right *ast.Node) bool {
 // arm, which is what returning false here gives them. What is reproduced is every shape a real
 // spread receiver takes.
 func isSameExpression(left *ast.Node, right *ast.Node) bool {
-	left = ast.SkipOuterExpressions(left, ast.OEKParentheses|ast.OEKAssertions)
-	right = ast.SkipOuterExpressions(right, ast.OEKParentheses|ast.OEKAssertions)
-	if left == nil || right == nil {
+	unwrappedLeft := ast.SkipOuterExpressions(left, ast.OEKParentheses|ast.OEKAssertions)
+	unwrappedRight := ast.SkipOuterExpressions(right, ast.OEKParentheses|ast.OEKAssertions)
+	if unwrappedLeft == nil || unwrappedRight == nil {
 		return false
 	}
 
@@ -451,22 +452,22 @@ func isSameExpression(left *ast.Node, right *ast.Node) bool {
 	//
 	// So `a?.b` compares equal to `a.b` once it is nested, which is why this reaches for the plain
 	// access check rather than `isSpreadableMemberExpression`.
-	if ast.IsAccessExpression(left) && ast.IsAccessExpression(right) {
-		return isSameMemberExpression(left, right)
+	if ast.IsAccessExpression(unwrappedLeft) && ast.IsAccessExpression(unwrappedRight) {
+		return isSameMemberExpression(unwrappedLeft, unwrappedRight)
 	}
 
-	if left.Kind != right.Kind {
+	if unwrappedLeft.Kind != unwrappedRight.Kind {
 		return false
 	}
 
-	switch left.Kind {
+	switch unwrappedLeft.Kind {
 	case ast.KindIdentifier, ast.KindPrivateIdentifier:
-		return left.Text() == right.Text()
+		return unwrappedLeft.Text() == unwrappedRight.Text()
 	case ast.KindThisKeyword, ast.KindSuperKeyword, ast.KindNullKeyword:
 		return true
 	case ast.KindStringLiteral, ast.KindNumericLiteral,
 		ast.KindNoSubstitutionTemplateLiteral, ast.KindRegularExpressionLiteral:
-		return left.Text() == right.Text()
+		return unwrappedLeft.Text() == unwrappedRight.Text()
 	case ast.KindTrueKeyword, ast.KindFalseKeyword:
 		return true
 	}

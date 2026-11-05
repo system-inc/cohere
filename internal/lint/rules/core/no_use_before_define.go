@@ -133,7 +133,7 @@ func (options NoUseBeforeDefineOptions) resolve() noUseBeforeDefineSettings {
 // and means exactly `{"functions": false}`, so it is normalised here rather than carried through the
 // rule as a second code path. Any other string means the same as no options at all, which is what
 // upstream's `parseOptions` does with it.
-func DecodeNoUseBeforeDefineOptions(raw []byte) (any, error) {
+func DecodeNoUseBeforeDefineOptions(raw []byte) (NoUseBeforeDefineOptions, error) {
 	var options NoUseBeforeDefineOptions
 	if len(raw) == 0 {
 		return options, nil
@@ -165,11 +165,11 @@ func DecodeNoUseBeforeDefineOptions(raw []byte) (any, error) {
 // green, because every fixture reached the rule through the decoder and nothing tested the path the
 // live config actually uses.
 //
-// The decoder returns the value, and rule.OptionsAs panics on any other type rather than defaulting
-// in silence, which is how a mismatch hid in unified-signatures (#qmvkf83). The pointer arm this
-// replaced had no caller: nothing hands this rule a pointer.
-func resolveNoUseBeforeDefineSettings(options any) noUseBeforeDefineSettings {
-	typed, configured := rule.OptionsAs[NoUseBeforeDefineOptions](options)
+// The options arrive as the type the decoder returns, fixed where the rule is registered, so a mismatch
+// like the one that hid in unified-signatures (#qmvkf83) does not compile (#ymag4q6). The pointer arm
+// this replaced had no caller: nothing hands this rule a pointer.
+func resolveNoUseBeforeDefineSettings(options rule.Given[NoUseBeforeDefineOptions]) noUseBeforeDefineSettings {
+	typed, configured := options.Read()
 	if !configured {
 		return defaultNoUseBeforeDefineSettings()
 	}
@@ -329,12 +329,12 @@ func useBeforeDefineRunsLater(identifier *ast.Node, declaration *ast.Node) bool 
 // the class definition itself, so a reference there really can precede initialization. Those two
 // live in the same class body and only the enclosing construct separates them, which is why this
 // rule walks the parent chain rather than comparing offsets and stopping.
-var NoUseBeforeDefine = rule.Rule{
+var NoUseBeforeDefine = rule.Rule[NoUseBeforeDefineOptions]{
 	Name:             "no-use-before-define",
 	NeedsTypeChecker: true,
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUseBeforeDefineOptions]) rule.Listeners {
 		// Declared once for the file rather than once per listener. `NeedsTypeChecker` governs the
 		// registration path and says nothing about a Context built by hand, which
 		// `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes` does, so the declaration is not the

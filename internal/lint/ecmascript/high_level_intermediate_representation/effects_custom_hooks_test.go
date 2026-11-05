@@ -51,10 +51,10 @@ func TestCustomHookEffectsFollowModuleBindings(test *testing.T) {
 				testCase.callee +
 				"({value: 0});}"
 			visited := 0
-			probe := rule.Rule{
+			probe := rule.Rule[rule.NoOptions]{
 				Name:             "custom-hook-effects",
 				NeedsTypeChecker: true,
-				Run: func(ruleContext rule.Context, options any) rule.Listeners {
+				Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 					return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 						forEachFunctionLike(node, func(node *ast.Node) {
 							if node.Name() == nil || node.Name().Text() != "Component" {
@@ -70,7 +70,8 @@ func TestCustomHookEffectsFollowModuleBindings(test *testing.T) {
 									continue
 								}
 								visited++
-								var frozenResult, frozenArgument bool
+								var frozenResult bool
+								var frozenArgument bool
 								for _, effect := range effects.Get(instruction.Id) {
 									if effect.Kind == mutation_aliasing.AliasingEffectCreate &&
 										effect.Into.Identifier == instruction.LValue.Identifier {
@@ -141,10 +142,10 @@ func TestCalleeProducersAreBuiltOncePerFunction(test *testing.T) {
 	test.Parallel()
 	calls := 0
 	var builds []int
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "callee-producers",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				forEachFunctionLike(node, func(node *ast.Node) {
 					if node.Name() == nil || node.Name().Text() != "Component" {

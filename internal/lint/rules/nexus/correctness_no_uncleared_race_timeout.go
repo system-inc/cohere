@@ -25,10 +25,14 @@ func correctnessNoUnclearedRaceTimeoutMessage() rule.Message {
 // CorrectnessNoUnclearedRaceTimeout reports a timeout armed inside a `Promise.race` whose timer
 // handle nothing can reach, so the timer is never cleared when the other side wins.
 //
-//	invalid: await Promise.race([work(), new Promise((_resolve, reject) => { setTimeout(() => reject(new Error('timeout')), ms); })]);
-//	invalid: await Promise.race([work(), new Promise((_resolve, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
-//	invalid: const timeout = new Promise<never>((_resolve, reject) => { const timer = setTimeout(reject, ms); }); await Promise.race([work(), timeout]);
-//	valid:   let timer; try { await Promise.race([work(), new Promise((_r, reject) => { timer = setTimeout(reject, ms); })]); } finally { clearTimeout(timer); }
+//	invalid: await Promise.race([work(), new Promise((_resolve, reject) => {
+//	         setTimeout(() => reject(new Error('timeout')), ms); })]);
+//	invalid: await Promise.race([work(), new Promise((_resolve, reject) =>
+//	         setTimeout(() => reject(new Error('timeout')), ms))]);
+//	invalid: const timeout = new Promise<never>((_resolve, reject) => { const timer = setTimeout(reject, ms); });
+//	         await Promise.race([work(), timeout]);
+//	valid:   let timer; try { await Promise.race([work(), new Promise((_r, reject) => {
+//	         timer = setTimeout(reject, ms); })]); } finally { clearTimeout(timer); }
 //	valid:   await Promise.race([work(), new Promise((_r, reject) => { setTimeout(reject, ms).unref(); })]);
 //	valid:   await Promise.race([work(), timeoutAfter(ms)]);
 //
@@ -74,7 +78,7 @@ func correctnessNoUnclearedRaceTimeoutMessage() rule.Message {
 //
 // The repair needs a binding declared outside the race and a `finally` around the statement that
 // awaits it, whose extent depends on the surrounding `try`. That is the author's edit.
-var CorrectnessNoUnclearedRaceTimeout = rule.Rule{
+var CorrectnessNoUnclearedRaceTimeout = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-uncleared-race-timeout",
 
 	// Symbol identity is what tells the default library's `Promise.race` from a local `race`, the global
@@ -84,7 +88,7 @@ var CorrectnessNoUnclearedRaceTimeout = rule.Rule{
 	// Whether `race` and `Promise` are the default library's, through type_checking.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

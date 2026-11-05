@@ -115,10 +115,14 @@ type themeOptionFixture struct {
 //
 // The public theme's copy of the fixture (#f598zk0) carries one repository case, testdata/public_theme, on
 // the same vendored framework.
-var tailwindPackageRoots = map[string]string{
-	"ahra":              vendored.TailwindPackageRoot(),
-	"www-connected-app": vendored.TailwindPackageRoot(),
-	"public":            vendored.TailwindPackageRoot(),
+func tailwindPackageRoots(test *testing.T) map[string]string {
+	test.Helper()
+	snapshot := vendored.TailwindPackageRootForTest(test)
+	return map[string]string{
+		"ahra":              snapshot,
+		"www-connected-app": snapshot,
+		"public":            snapshot,
+	}
 }
 
 func loadThemeCorpus(test *testing.T, name string) themeCorpus {
@@ -169,7 +173,7 @@ func buildThemeForCase(test *testing.T, aCase themeCase) (*Theme, []SkippedDirec
 // its name maps to.
 func loadRepositoryTheme(test *testing.T, aCase themeCase) (*Theme, []SkippedDirective) {
 	test.Helper()
-	packageRoot, ok := tailwindPackageRoots[aCase.Name]
+	packageRoot, ok := tailwindPackageRoots(test)[aCase.Name]
 	if !ok {
 		test.Fatalf("repository case %q has no tailwindcss package root registered in tailwindPackageRoots", aCase.Name)
 	}
@@ -570,7 +574,7 @@ func TestDesignSystemReportsSkippedDirectivesFromAnywhereInTheGraph(test *testin
 		test.Fatal(absolutePathError)
 	}
 	system, loadDesignSystemError := LoadDesignSystem(
-		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: vendored.TailwindPackageRoot()},
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: vendored.TailwindPackageRootForTest(test)},
 	)
 	if loadDesignSystemError != nil {
 		test.Fatalf("loading the directives theme: %v", loadDesignSystemError)

@@ -58,12 +58,12 @@ import (
 // unset. Here the search stops at every nested function boundary, which is the same rule stated as
 // a walk. Measured on upstream's own case: `async function foo() { async () => { await x; } }`
 // reports the outer function, and the inner arrow is separately clean because it does await.
-var RequireAwait = rule.Rule{
+var RequireAwait = rule.Rule[rule.NoOptions]{
 	Name: "require-await",
 	// The contract check reads the checker. Without this the checker is nil, the guard silently
 	// never fires, and the rule quietly reverts to upstream's blindness.
 	NeedsTypeChecker: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		check := func(node *ast.Node) {
 			checkRequireAwait(ruleContext, node)
 		}

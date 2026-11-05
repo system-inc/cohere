@@ -9,7 +9,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_class_literals [-packages <directory or corpus spelling>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_class_literals \
+//	    [-packages <directory or corpus spelling>] [-check]
 //
 // Run from the repository root. -packages names where eslint, the plugin and typescript-eslint's
 // parser resolve, the ahra corpus by default.

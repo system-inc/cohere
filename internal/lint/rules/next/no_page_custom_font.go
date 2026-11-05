@@ -116,11 +116,11 @@ var messageNoPageCustomFontOutsideDefaultExport = rule.Message{
 // no app-directory exemption. A Google Fonts link in a component, a library file, or an App Router
 // route all report `noPageCustomFontNotInDocument`. Pinned above on `components/_document.tsx` and
 // on paths with no `pages` segment.
-var NoPageCustomFont = rule.Rule{
+var NoPageCustomFont = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-page-custom-font` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name: "@next/next/no-page-custom-font",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// A property of the file, so it is asked once rather than at every element. Upstream asks
 		// it per node only because its listener has nowhere earlier to stand.
 		inDocument := nextjs.IsDocumentFile(ruleContext.SourceFile.FileName().AsString())

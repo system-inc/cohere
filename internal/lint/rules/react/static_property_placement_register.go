@@ -9,7 +9,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // `["error", "property assignment", {"displayName": "static getter"}]`. See
 // DecodeStaticPropertyPlacementOptions.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[StaticPropertyPlacementOptions]{
 		Rule:             StaticPropertyPlacement,
 		DecodeOptionList: DecodeStaticPropertyPlacementOptions,
 	})

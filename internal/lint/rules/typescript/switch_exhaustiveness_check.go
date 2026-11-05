@@ -187,7 +187,7 @@ var defaultCaseCommentPattern = esregexp.MustCompile(`^no default$`, "iu")
 // expression on every switch it sees. A switch with N cases costs N+1 type resolutions plus a
 // recursion over the discriminant's union. That is the honest price of the only question this rule
 // can ask.
-var SwitchExhaustivenessCheck = rule.Rule{
+var SwitchExhaustivenessCheck = rule.Rule[SwitchExhaustivenessCheckOptions]{
 	Name: "@typescript-eslint/switch-exhaustiveness-check",
 
 	// The listener consults the checker for the discriminant and for every case expression on every
@@ -195,8 +195,8 @@ var SwitchExhaustivenessCheck = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[SwitchExhaustivenessCheckOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[SwitchExhaustivenessCheckOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = SwitchExhaustivenessCheckOptions{}
 		}
@@ -223,8 +223,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		isLiteralLikeType := func(subjectType *checker.Type) bool {
 			return type_checking.IsTypeFlagSet(
 				subjectType,
-				checker.TypeFlagsLiteral|checker.TypeFlagsUndefined|
-					checker.TypeFlagsNull|checker.TypeFlagsUniqueESSymbol,
+				checker.TypeFlagsLiteral|checker.TypeFlagsUndefined|checker.TypeFlagsNull|checker.TypeFlagsUniqueESSymbol,
 			)
 		}
 

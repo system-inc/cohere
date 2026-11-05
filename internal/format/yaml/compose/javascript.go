@@ -41,7 +41,11 @@ func unitsToString(units []uint16) string {
 func stringToUnits(text string) []uint16 {
 	units := make([]uint16, 0, len(text))
 	for index := 0; index < len(text); {
-		if index+2 < len(text) && text[index] == 0xED && text[index+1] >= 0xA0 && text[index+1] <= 0xBF && text[index+2]&0xC0 == 0x80 {
+		if index+2 < len(text) &&
+			text[index] == 0xED &&
+			text[index+1] >= 0xA0 &&
+			text[index+1] <= 0xBF &&
+			text[index+2]&0xC0 == 0x80 {
 			units = append(units, 0xD000|uint16(text[index+1]&0x3F)<<6|uint16(text[index+2]&0x3F))
 			index += 3
 			continue

@@ -71,24 +71,26 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(test *testing.T) {
 		"declare const v: unknown;\ndeclare const s: string;\nexport const r = typeof v === s;\n",
 	}
 
-	rules := []rule.Rule{
-		NoCaseDeclarations,
-		NoCompareNegZero,
-		NoDebugger,
-		NoDeleteVar,
-		NoDuplicateCase,
-		NoEmpty,
-		NoEmptyPattern,
-		NoEmptyStaticBlock,
-		NoExAssign,
-		NoSparseArrays,
-		NoUnsafeFinally,
-		NoVar,
-		NoUselessCatch,
-		PreferSpread,
-		RequireYield,
-		UseIsNaN,
-		ValidTypeof,
+	// Each rule is bound unconfigured, as a bare severity runs it. They take different options, so the list holds
+	// them bound rather than as one Rule type.
+	rules := []rule.Bound{
+		rule.Bind(NoCaseDeclarations, rule.Given[rule.NoOptions]{}),
+		rule.Bind(NoCompareNegZero, rule.Given[rule.NoOptions]{}),
+		rule.Bind(NoDebugger, rule.Given[rule.NoOptions]{}),
+		rule.Bind(NoDeleteVar, rule.Given[rule.NoOptions]{}),
+		rule.Bind(NoDuplicateCase, rule.Given[rule.NoOptions]{}),
+		rule.Bind(NoEmpty, rule.Given[NoEmptyOptions]{}),
+		rule.Bind(NoEmptyPattern, rule.Given[NoEmptyPatternOptions]{}),
+		rule.Bind(NoEmptyStaticBlock, rule.Given[rule.NoOptions]{}),
+		rule.Bind(NoExAssign, rule.Given[rule.NoOptions]{}),
+		rule.Bind(NoSparseArrays, rule.Given[rule.NoOptions]{}),
+		rule.Bind(NoUnsafeFinally, rule.Given[rule.NoOptions]{}),
+		rule.Bind(NoVar, rule.Given[rule.NoOptions]{}),
+		rule.Bind(NoUselessCatch, rule.Given[rule.NoOptions]{}),
+		rule.Bind(PreferSpread, rule.Given[rule.NoOptions]{}),
+		rule.Bind(RequireYield, rule.Given[rule.NoOptions]{}),
+		rule.Bind(UseIsNaN, rule.Given[UseIsNaNOptions]{}),
+		rule.Bind(ValidTypeof, rule.Given[ValidTypeofOptions]{}),
 	}
 
 	for _, currentRule := range rules {
@@ -99,7 +101,7 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(test *testing.T) {
 				// findings are deliberately not checked: what each rule concludes about these
 				// shapes belongs in its own pair, and asserting it here would make this guard
 				// fail for reasons that are not crashes.
-				rule_testing.Run(test, currentRule, "shapes.ts", source)
+				rule_testing.RunBound(test, currentRule, "shapes.ts", source)
 			})
 		}
 	}

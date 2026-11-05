@@ -57,7 +57,7 @@ import (
 // reason is part of the contract rather than decoration. It comes off the tag's comment list, which
 // is a NodeList rather than a string because `{@link stat}` parses into its own node. Concatenating
 // the pieces' text reproduces `displayPartsToString`.
-var NoDeprecated = rule.Rule{
+var NoDeprecated = rule.Rule[NoDeprecatedOptions]{
 	Name: "@typescript-eslint/no-deprecated",
 
 	// The rule cannot answer anything without resolving symbols across files.
@@ -67,7 +67,7 @@ var NoDeprecated = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoDeprecatedOptions]) rule.Listeners {
 		// Every listener reads the checker unconditionally, so decline the file once here rather
 		// than test for nil at the top of four listeners and once per node inside them.
 		//
@@ -80,7 +80,7 @@ var NoDeprecated = rule.Rule{
 			return nil
 		}
 
-		settings, _ := rule.OptionsAs[NoDeprecatedOptions](options)
+		settings, _ := options.Read()
 
 		// report emits with the right message id for whether a reason was given.
 		//

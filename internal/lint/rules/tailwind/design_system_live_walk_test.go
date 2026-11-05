@@ -8,6 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -40,27 +41,27 @@ import (
 // work in this package at once, and a helper whose name does not say which component owns it is a
 // collision waiting to happen.
 
-// liveWalkRules is every rule in this package, as the shipped run registers them.
+// liveWalkRules is every rule in this package, as the shipped run registers them, each run unconfigured.
 //
 // Listed rather than read back out of the catalog, because the catalog is global and another
 // package's rules landing in it would change what this test walks without anyone editing this file.
 // If a tenth Tailwind rule is added and not added here, this test keeps passing while covering less,
 // which `TestLiveWalkCoversEveryRegisteredTailwindRule` below turns into a failure.
-func liveWalkRules() []rule.Rule {
-	return []rule.Rule{
-		EnforceConsistentClassOrder,
-		EnforceConsistentVariantOrder,
-		EnforceConsistentImportantPosition,
-		EnforceConsistentVariableSyntax,
-		EnforceShorthandClasses,
-		EnforceCanonicalClasses,
-		NoConcatenatedClasses,
-		NoConflictingClasses,
-		NoDeprecatedClasses,
-		NoDuplicateClasses,
-		NoUnknownClasses,
-		NoUnnecessaryWhitespace,
-		NoPhysicalDirection,
+func liveWalkRules(test testing.TB) []rule.Entry {
+	return []rule.Entry{
+		rule_testing.EntryOf(test, EnforceConsistentClassOrder),
+		rule_testing.EntryOf(test, EnforceConsistentVariantOrder),
+		rule_testing.EntryOf(test, EnforceConsistentImportantPosition),
+		rule_testing.EntryOf(test, EnforceConsistentVariableSyntax),
+		rule_testing.EntryOf(test, EnforceShorthandClasses),
+		rule_testing.EntryOf(test, EnforceCanonicalClasses),
+		rule_testing.EntryOf(test, NoConcatenatedClasses),
+		rule_testing.EntryOf(test, NoConflictingClasses),
+		rule_testing.EntryOf(test, NoDeprecatedClasses),
+		rule_testing.EntryOf(test, NoDuplicateClasses),
+		rule_testing.EntryOf(test, NoUnknownClasses),
+		rule_testing.EntryOf(test, NoUnnecessaryWhitespace),
+		rule_testing.EntryOf(test, NoPhysicalDirection),
 	}
 }
 
@@ -116,7 +117,7 @@ func TestDesignSystemIsBuiltOnceUnderTheRealWalk(test *testing.T) {
 			"two builds and the property it claims to prove would be untested", workers)
 	}
 
-	rules := liveWalkRules()
+	rules := liveWalkRules(test)
 	before := tailwindengine.BuildsSoFar()
 	if _, walkError := graph.Walk(context.Background(), files, rules); walkError != nil {
 		test.Fatalf("walking %s: %v", liveWalkRepository, walkError)
@@ -144,8 +145,8 @@ func TestDesignSystemIsBuiltOnceUnderTheRealWalk(test *testing.T) {
 func TestLiveWalkCoversEveryRegisteredTailwindRule(test *testing.T) {
 	test.Parallel()
 	covered := make(map[string]bool)
-	for _, subject := range liveWalkRules() {
-		covered[subject.Name] = true
+	for _, entry := range liveWalkRules(test) {
+		covered[entry.Name] = true
 	}
 
 	// The catalog, which in this package's test binary holds this package's registrations and
@@ -156,16 +157,16 @@ func TestLiveWalkCoversEveryRegisteredTailwindRule(test *testing.T) {
 	// would make this test start demanding coverage of rules that are not this package's business,
 	// which is a failure that would read as this test being wrong rather than as the catalog moving.
 	registered := rule.Registered()
-	if len(registered) != len(liveWalkRules()) {
+	if len(registered) != len(liveWalkRules(test)) {
 		test.Fatalf("the catalog holds %d rules and liveWalkRules lists %d; either a Tailwind rule was "+
 			"added without being added to liveWalkRules, or another package's rules are now linked "+
 			"into this test binary and this comparison is measuring the wrong set",
-			len(registered), len(liveWalkRules()))
+			len(registered), len(liveWalkRules(test)))
 	}
-	for _, registration := range registered {
-		if !covered[registration.Rule.Name] {
+	for _, entry := range registered {
+		if !covered[entry.Name] {
 			test.Errorf("rule %q is registered by this package but is not in liveWalkRules, so the "+
-				"build-once assertion never walks it", registration.Rule.Name)
+				"build-once assertion never walks it", entry.Name)
 		}
 	}
 }

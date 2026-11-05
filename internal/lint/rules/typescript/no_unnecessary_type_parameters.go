@@ -96,14 +96,14 @@ import (
 // right line: rewriting every use of the parameter to its constraint and deleting the parameter
 // changes what the signature means to every caller. A human chooses it; the engine does not apply
 // it unattended.
-var NoUnnecessaryTypeParameters = rule.Rule{
+var NoUnnecessaryTypeParameters = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unnecessary-type-parameters",
 
 	// The type phase resolves declarations and walks the resulting type graph, so the checker is
 	// required rather than merely convenient.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Declared above and guarded here. NeedsTypeChecker governs the registration path only, and
 		// the test harness builds a rule.Context by hand, which is how a typed rule panics with a
 		// nil receiver while its declaration reads as correct. Declining once in Run costs one

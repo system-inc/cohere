@@ -116,7 +116,7 @@ import (
 // The anchor is what to price, not the checker. `KindAwaitExpression` and `KindForOfStatement` are
 // uncommon nodes, and `KindVariableDeclarationList` is common but exits on the first line for
 // anything that is not `await using`. Measured on the real tree, see the test file's note.
-var AwaitThenable = rule.Rule{
+var AwaitThenable = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/await-thenable",
 
 	// All four listeners read ctx.TypeChecker unconditionally, so the checker is required.
@@ -126,7 +126,7 @@ var AwaitThenable = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

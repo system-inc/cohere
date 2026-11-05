@@ -15,9 +15,9 @@ import (
 func firstKey(test *testing.T, source string, ask func(key *ast.Node)) {
 	test.Helper()
 	found := false
-	rule_testing.Run(test, rule.Rule{
+	rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 		Name: "key-probe",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindObjectLiteralExpression: func(node *ast.Node) {
 					if found {
@@ -139,7 +139,8 @@ func TestNameTaggedSeparatesNumbersFromStrings(test *testing.T) {
 		})
 	}
 	// The number and string spellings of one text must not collide.
-	var numeric, quoted string
+	var numeric string
+	var quoted string
 	firstKey(test, "({ 1.0: 1 });", func(node *ast.Node) { numeric, _ = property.NameTagged(node, property.Static) })
 	firstKey(test, "({ '1.0': 1 });", func(node *ast.Node) { quoted, _ = property.NameTagged(node, property.Static) })
 	if numeric == quoted {
@@ -183,9 +184,9 @@ func TestAccessedName(test *testing.T) {
 		source := testCase.source
 		want, wantOk := testCase.want, testCase.wantOk
 		found := false
-		rule_testing.Run(test, rule.Rule{
+		rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 			Name: "access-probe",
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				check := func(node *ast.Node) {
 					if found {
 						return

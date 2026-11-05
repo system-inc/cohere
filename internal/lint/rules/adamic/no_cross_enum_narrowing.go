@@ -16,10 +16,10 @@ var crossEnumNarrowingText = policy.MessageOf("adamic/no-cross-enum-narrowing", 
 // NoCrossEnumNarrowing refuses comparisons which erase an enum constituent
 // despite its equal runtime tag. Each supported form has a strict-tsc-accepted,
 // Node-failing program in testdata/cross-enum (#t98h9pd).
-var NoCrossEnumNarrowing = rule.Rule{
+var NoCrossEnumNarrowing = rule.Rule[rule.NoOptions]{
 	Name:             "adamic/no-cross-enum-narrowing",
 	NeedsTypeChecker: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}
@@ -79,7 +79,8 @@ var NoCrossEnumNarrowing = rule.Rule{
 					return
 				}
 				switch expression.OperatorToken.Kind {
-				case ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken, ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken:
+				case ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken,
+					ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken:
 					compare(node, expression.Left, expression.Right)
 				}
 			},

@@ -143,7 +143,7 @@ var messageShadowingRestrictedName = rule.Message{
 // No fix. The repair is a rename, which means choosing a name and deciding which later uses of the
 // old one meant this binding rather than the global, and those are the same uses the rule exists to
 // warn about.
-var NoShadowRestrictedNames = rule.Rule{
+var NoShadowRestrictedNames = rule.Rule[NoShadowRestrictedNamesOptions]{
 	Name: "no-shadow-restricted-names",
 
 	// See the doc above: the `undefined` carve-out has to know whether a later write binds to the
@@ -152,9 +152,9 @@ var NoShadowRestrictedNames = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoShadowRestrictedNamesOptions]) rule.Listeners {
 		settings := NoShadowRestrictedNamesOptions{}
-		if configured, isConfigured := rule.OptionsAs[NoShadowRestrictedNamesOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			settings = configured
 		}
 

@@ -9,7 +9,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // returns the default on empty input instead, and the field behind it is a pointer so an absent key
 // stays distinguishable from an explicit `false`.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoSequencesOptions]{
 		Rule:   NoSequences,
 		Decode: DecodeNoSequencesOptions,
 	})

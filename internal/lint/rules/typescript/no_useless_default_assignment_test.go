@@ -20,7 +20,7 @@ func noUselessDefaultAssignmentCaseName(index int) string {
 // Building the options struct directly would leave the decoder untested, and the decoder is where
 // upstream's long option name is transcribed. A typo there yields a struct that silently keeps
 // the default, which no fixture built from a struct could see.
-func noUselessDefaultAssignmentOptionsFor(test *testing.T, optionsJson string) any {
+func noUselessDefaultAssignmentOptionsFor(test *testing.T, optionsJson string) NoUselessDefaultAssignmentOptions {
 	test.Helper()
 	if optionsJson == "" {
 		return DefaultNoUselessDefaultAssignmentSettings()

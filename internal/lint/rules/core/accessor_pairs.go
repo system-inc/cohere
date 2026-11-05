@@ -81,7 +81,7 @@ func (options AccessorPairsOptions) resolve() accessorPairsSettings {
 // config layer turns the error into nil, so a rule reached through it cannot tell "no options were
 // written" from "an option was written as false". Two of these four options default to true, so that
 // distinction inverts the rule rather than merely narrowing it.
-func DecodeAccessorPairsOptions(raw []byte) (any, error) {
+func DecodeAccessorPairsOptions(raw []byte) (AccessorPairsOptions, error) {
 	var options AccessorPairsOptions
 	if len(raw) == 0 {
 		return options, nil
@@ -165,13 +165,13 @@ var messageAccessorPairsMissingSetterInDescriptor = rule.Message{
 // bindings that happen to share the name, which upstream asks through scope analysis and this asks
 // through the checker. `resolvesToAGlobal` in this package already answers exactly that question.
 // Two of upstream's own clean cases turn on it, and both are imported.
-var AccessorPairs = rule.Rule{
+var AccessorPairs = rule.Rule[AccessorPairsOptions]{
 	TypeReach:        rule.TypeReachShapes,
 	Name:             "accessor-pairs",
 	NeedsTypeChecker: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[AccessorPairsOptions]) rule.Listeners {
 		settings := defaultAccessorPairsSettings()
-		if decoded, configured := rule.OptionsAs[AccessorPairsOptions](options); configured {
+		if decoded, configured := options.Read(); configured {
 			settings = decoded.resolve()
 		}
 

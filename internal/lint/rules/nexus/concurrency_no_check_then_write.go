@@ -124,13 +124,13 @@ func concurrencyNoCheckThenWriteMessage(write string) rule.Message {
 // write is often far from the check, past a network download (`KlingApi.ts:253`) or an encode
 // (`PhiSocialLibrary.ts`). Moving it is the author's job. `#9erqsas` proposes one library helper for
 // all eight sites rather than eight patched loops.
-var ConcurrencyNoCheckThenWrite = rule.Rule{
+var ConcurrencyNoCheckThenWrite = rule.Rule[rule.NoOptions]{
 	Name:             "nexus/concurrency-no-check-then-write",
 	NeedsTypeChecker: true,
 	// Where this file's `sharp` import resolves.
 	ProgramReads: rule.ReadsModuleResolution,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			// Every callee is identified through the checker. Without it the rule could only match
 			// names, so it declines the file.

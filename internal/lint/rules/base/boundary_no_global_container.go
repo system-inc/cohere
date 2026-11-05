@@ -59,9 +59,9 @@ func messageNoGlobalContainer() rule.Message {
 // duplicate diagnostics on one line. Our parser produces one identifier for that specifier, so this
 // port reports once. The divergence is recorded rather than reproduced: emitting a second finding at
 // a span already reported would mean inventing a duplicate to match a defect.
-var BoundaryNoGlobalContainer = rule.Rule{
+var BoundaryNoGlobalContainer = rule.Rule[rule.NoOptions]{
 	Name: "base/boundary-no-global-container",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				if node.AsIdentifier().Text != "getGlobalContainer" {

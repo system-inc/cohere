@@ -28,7 +28,7 @@ const noDangerFile = "/repository/source/Danger.tsx"
 // on every row.
 func runNoDanger(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
 	test.Helper()
-	var decoded any
+	var decoded NoDangerOptions
 	if rawOptions == "" {
 		var decodeNoDangerOptionsError error
 		decoded, decodeNoDangerOptionsError = DecodeNoDangerOptions(nil)
@@ -352,7 +352,7 @@ func TestNoDangerCustomComponentNames(test *testing.T) {
 
 // TestNoDangerDecodesOptions exercises the decoder directly, including the unconfigured path.
 //
-// A rule configured as a bare severity is handed nil rather than a struct, and the port brief
+// A rule configured as a bare severity hands its decoder empty input rather than an object, and the port brief
 // records a rule that registered on 3,407 files and was completely inert because nothing in its
 // suite reached that path. Every fixture above goes through the decoder, so this is what covers the
 // nil input and the JSON tag, neither of which has an upstream counterpart.
@@ -365,12 +365,8 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 		if decodeNoDangerOptionsError != nil {
 			test.Fatalf("decoding nil: %v", decodeNoDangerOptionsError)
 		}
-		settings, ok := decoded.(NoDangerOptions)
-		if !ok {
-			test.Fatalf("decoded to %T", decoded)
-		}
-		if len(settings.CustomComponentNames) != 0 {
-			test.Fatalf("default custom names were %v, wanted none", settings.CustomComponentNames)
+		if len(decoded.CustomComponentNames) != 0 {
+			test.Fatalf("default custom names were %v, wanted none", decoded.CustomComponentNames)
 		}
 	})
 
@@ -382,14 +378,10 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 		if decodeNoDangerOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeNoDangerOptionsError)
 		}
-		settings, ok := decoded.(NoDangerOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want NoDangerOptions", decoded)
-		}
-		if len(settings.CustomComponentNames) != 2 ||
-			settings.CustomComponentNames[0] != "A" ||
-			settings.CustomComponentNames[1] != "B*" {
-			test.Fatalf("decoded to %v", settings.CustomComponentNames)
+		if len(decoded.CustomComponentNames) != 2 ||
+			decoded.CustomComponentNames[0] != "A" ||
+			decoded.CustomComponentNames[1] != "B*" {
+			test.Fatalf("decoded to %v", decoded.CustomComponentNames)
 		}
 	})
 
@@ -401,11 +393,7 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 		if decodeNoDangerOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeNoDangerOptionsError)
 		}
-		settings, ok := decoded.(NoDangerOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want NoDangerOptions", decoded)
-		}
-		if len(settings.CustomComponentNames) != 0 {
+		if len(decoded.CustomComponentNames) != 0 {
 			test.Fatal("unknown key changed the options")
 		}
 	})
@@ -422,21 +410,19 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 		//
 		// This is the port brief's point that a survivor needs an input on which the two versions
 		// produce different output rather than merely take different internal paths.
-		component := rule_testing.RunWithOptions(
+		component := rule_testing.Run(
 			test,
 			NoDanger,
 			noDangerFile,
 			"<App dangerouslySetInnerHTML={{__html:''}} />;",
-			nil,
 		)
 		rule_testing.ExpectClean(test, component)
 
-		element := rule_testing.RunWithOptions(
+		element := rule_testing.Run(
 			test,
 			NoDanger,
 			noDangerFile,
 			"<div dangerouslySetInnerHTML={{__html:''}} />;",
-			nil,
 		)
 		rule_testing.ExpectFindings(test, element, "dangerousProp")
 	})

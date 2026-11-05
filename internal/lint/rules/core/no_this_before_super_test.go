@@ -390,8 +390,9 @@ func TestNoThisBeforeSuperPicksTheOffendingNestedConstructor(test *testing.T) {
 		test.Fatalf("outer case: expected one finding, got %d", len(result.Diagnostics))
 	}
 	reported := outerOffends[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
-	if want := "constructor() { class C extends D { constructor() { super(); this.e(); } } this.f(); super(); }"; reported != want {
-		test.Errorf("outer case points at %q, want %q", reported, want)
+	wantOuter := "constructor() { class C extends D { constructor() { super(); this.e(); } } this.f(); super(); }"
+	if reported != wantOuter {
+		test.Errorf("outer case points at %q, want %q", reported, wantOuter)
 	}
 
 	innerOffends := "class A extends B { constructor() { class C extends D { constructor() { this.e(); super(); } } super(); this.f(); } }"

@@ -18,17 +18,17 @@ const noImplicitCoercionFile = "/repository/source/NoImplicitCoercion.ts"
 // Three of the four booleans default to `true`, so a struct built by hand in a fixture would carry
 // non-nil pointers and every case would pass while the live config's bare "error" still handed the
 // rule a nil it read as three judgments switched off. An empty string here is that bare
-// configuration.
-func decodedNoImplicitCoercionOptions(test *testing.T, raw string) any {
+// configuration, so the rule runs unconfigured.
+func decodedNoImplicitCoercionOptions(test *testing.T, raw string) rule.Given[NoImplicitCoercionOptions] {
 	test.Helper()
 	if raw == "" {
-		return nil
+		return rule.Given[NoImplicitCoercionOptions]{}
 	}
 	options, decodeNoImplicitCoercionOptionsError := DecodeNoImplicitCoercionOptions(json.RawMessage(raw))
 	if decodeNoImplicitCoercionOptionsError != nil {
 		test.Fatalf("the decoder refused %s: %v", raw, decodeNoImplicitCoercionOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // The corpus is ESLint's own, at `tests/lib/rules/no-implicit-coercion.js`, and it was not
@@ -354,7 +354,7 @@ func TestNoImplicitCoercionFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name+" ["+testCase.options+"]", func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoImplicitCoercion, noImplicitCoercionFile,
+			result := rule_testing.RunTypedGiven(test, NoImplicitCoercion, noImplicitCoercionFile,
 				testCase.name, decodedNoImplicitCoercionOptions(test, testCase.options))
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
@@ -532,7 +532,7 @@ func TestNoImplicitCoercionStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name+" ["+testCase.options+"]", func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoImplicitCoercion, noImplicitCoercionFile,
+			result := rule_testing.RunTypedGiven(test, NoImplicitCoercion, noImplicitCoercionFile,
 				testCase.name, decodedNoImplicitCoercionOptions(test, testCase.options))
 			rule_testing.ExpectClean(test, result)
 		})
@@ -568,8 +568,8 @@ func TestNoImplicitCoercionWithholdsTheFixWhenBooleanIsShadowed(test *testing.T)
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoImplicitCoercion, noImplicitCoercionFile,
-				testCase.sourceText, nil)
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				testCase.sourceText)
 			rule_testing.ExpectFindings(test, result, "implicitCoercion")
 
 			fixes := len(result.Diagnostics[0].Fixes)
@@ -616,8 +616,8 @@ func TestNoImplicitCoercionParenthesesShapes(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoImplicitCoercion, noImplicitCoercionFile,
-				testCase.sourceText, nil)
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				testCase.sourceText)
 			rule_testing.ExpectFindings(test, result, "implicitCoercion")
 			want := noImplicitCoercionMessage(testCase.wantRecommends).Description
 			if got := result.Diagnostics[0].Message.Description; got != want {
@@ -657,8 +657,8 @@ func TestNoImplicitCoercionIndexOfShapes(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoImplicitCoercion, noImplicitCoercionFile,
-				testCase.sourceText, nil)
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				testCase.sourceText)
 			if !testCase.wantReport {
 				rule_testing.ExpectClean(test, result)
 				return
@@ -715,8 +715,8 @@ func TestNoImplicitCoercionMultiplyByOneOperandShapes(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoImplicitCoercion, noImplicitCoercionFile,
-				testCase.sourceText, nil)
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				testCase.sourceText)
 			if !testCase.wantReport {
 				rule_testing.ExpectClean(test, result)
 				return
@@ -763,8 +763,8 @@ func TestNoImplicitCoercionMultilineOperand(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoImplicitCoercion, noImplicitCoercionFile,
-				testCase.sourceText, nil)
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				testCase.sourceText)
 			rule_testing.ExpectFindings(test, result, "implicitCoercion")
 			want := noImplicitCoercionMessage(testCase.wantRecommends).Description
 			if got := result.Diagnostics[0].Message.Description; got != want {
@@ -805,8 +805,8 @@ func TestNoImplicitCoercionTypeScriptShapes(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoImplicitCoercion, noImplicitCoercionFile,
-				testCase.sourceText, nil)
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				testCase.sourceText)
 			rule_testing.ExpectFindings(test, result, "implicitCoercion")
 			want := noImplicitCoercionMessage(testCase.wantRecommends).Description
 			if got := result.Diagnostics[0].Message.Description; got != want {
@@ -830,11 +830,7 @@ func TestDecodeNoImplicitCoercionOptions(test *testing.T) {
 		if decodeNoImplicitCoercionOptionsError != nil {
 			test.Fatalf("the decoder refused %s: %v", raw, decodeNoImplicitCoercionOptionsError)
 		}
-		options, isOptions := decoded.(NoImplicitCoercionOptions)
-		if !isOptions {
-			test.Fatalf("expected NoImplicitCoercionOptions, got %T", decoded)
-		}
-		return options
+		return decoded
 	}
 
 	test.Run("empty input enables the three default-true judgments", func(test *testing.T) {
@@ -863,12 +859,12 @@ func TestDecodeNoImplicitCoercionOptions(test *testing.T) {
 		}
 	})
 
-	test.Run("nil options reach the rule with the defaults", func(test *testing.T) {
+	test.Run("no options reach the rule with the defaults", func(test *testing.T) {
 		test.Parallel()
-		// Past the decoder rather than through it: what a bare "error" produces after the config
-		// layer turns the decoder's error into nil. A zero-valued struct would go silent here.
-		result := rule_testing.RunTypedWithOptions(test, NoImplicitCoercion, noImplicitCoercionFile,
-			"var b = !!foo;", nil)
+		// Past the decoder rather than through it: what a bare "error" produces, the rule run
+		// unconfigured. A zero-valued struct would go silent here.
+		result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+			"var b = !!foo;")
 		rule_testing.ExpectFindings(test, result, "implicitCoercion")
 	})
 }
@@ -984,8 +980,8 @@ func TestNoImplicitCoercionIsSilentWhenNothingIsCoerced(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoImplicitCoercion, noImplicitCoercionFile,
-				declarations+testCase.sourceText, nil)
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				declarations+testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
 				rule_testing.ExpectClean(test, result)
 				return

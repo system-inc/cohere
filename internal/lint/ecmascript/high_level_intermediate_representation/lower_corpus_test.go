@@ -85,6 +85,26 @@ func skipWithoutCorpus(test *testing.T) {
 	corpusRoot(test)
 }
 
+// pinnedCorpus is each count's read of the pinned corpus, made once per test binary. About thirty corpus
+// walks ask for it, and each used to list the commit and start a `git show` per file, about 10,000 git
+// processes in one package run (#nxgt2ca). The commit is pinned, so the files cannot change between
+// walks, and every caller only reads what it is handed.
+var pinnedCorpus = struct {
+	sync.Mutex
+	byCount map[int]*pinnedCorpusRead
+}{byCount: map[int]*pinnedCorpusRead{}}
+
+type pinnedCorpusRead struct {
+	once     sync.Once
+	paths    []string
+	contents map[string]string
+
+	// failure, when set, is what every caller reports instead: a test cannot fail another test, so the
+	// read records the outcome and each caller acts on it. A corpus that is not set skips each caller
+	// before the read, through corpus.Structure.
+	failure string
+}
+
 // pinnedCorpusFiles returns the first count TypeScript paths under `source/` at pinnedCorpusCommit,
 // sorted, with each one's contents at that commit.
 //
@@ -109,26 +129,6 @@ func pinnedCorpusFiles(test *testing.T, count int) ([]string, map[string]string)
 		test.Fatal(read.failure)
 	}
 	return read.paths, read.contents
-}
-
-// pinnedCorpus is each count's read of the pinned corpus, made once per test binary. About thirty corpus
-// walks ask for it, and each used to list the commit and start a `git show` per file, about 10,000 git
-// processes in one package run (#nxgt2ca). The commit is pinned, so the files cannot change between
-// walks, and every caller only reads what it is handed.
-var pinnedCorpus = struct {
-	sync.Mutex
-	byCount map[int]*pinnedCorpusRead
-}{byCount: map[int]*pinnedCorpusRead{}}
-
-type pinnedCorpusRead struct {
-	once     sync.Once
-	paths    []string
-	contents map[string]string
-
-	// failure, when set, is what every caller reports instead: a test cannot fail another test, so the
-	// read records the outcome and each caller acts on it. A corpus that is not set skips each caller
-	// before the read, through corpus.Structure.
-	failure string
 }
 
 // readPinnedCorpus lists the first count TypeScript paths at the pinned commit and reads them through
@@ -369,9 +369,8 @@ func itoa(value int) string {
 		return "0"
 	}
 	digits := ""
-	for value > 0 {
-		digits = string(rune('0'+value%10)) + digits
-		value /= 10
+	for remaining := value; remaining > 0; remaining /= 10 {
+		digits = string(rune('0'+remaining%10)) + digits
 	}
 	return digits
 }

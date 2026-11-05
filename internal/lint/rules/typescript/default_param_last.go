@@ -130,9 +130,9 @@ var messageDefaultParamLastShouldBeLast = rule.Message{
 // corpus plus twelve added cases. The corpus writes no accessor at all, so nothing in it could see
 // the arms being deleted, and the reasoning that would have justified deleting them was the wrong
 // half of a grammar-versus-parser distinction. Four fixtures pin it now.
-var DefaultParamLast = rule.Rule{
+var DefaultParamLast = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/default-param-last",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		check := func(node *ast.Node) {
 			// A bodyless construct declares a shape rather than an implementation, and upstream
 			// gives every such construct a node type outside its three listeners. See the doc

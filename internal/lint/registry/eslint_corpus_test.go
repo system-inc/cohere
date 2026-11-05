@@ -52,7 +52,7 @@ type eslintCorpusRow struct {
 	Options     []json.RawMessage `json:"options"`
 	UsesGlobals bool              `json:"usesGlobals"`
 	Skipped     string            `json:"skipped"`
-	EsLint      [][3]any          `json:"eslint"`
+	EsLint      []eslintFinding   `json:"eslint"`
 }
 
 // key names a row by its code and options, so the gaps list survives a re-extract that reorders rows
@@ -63,42 +63,42 @@ func (row eslintCorpusRow) key() string {
 	return hex.EncodeToString(sum[:6])
 }
 
-// decodeCorpusOptions turns a row's ESLint options into the rule's decoded options, as the config layer would
-func decodeCorpusOptions(registration rule.Registration, options []json.RawMessage) (any, string) {
-	switch {
-	case registration.DecodeOptionList != nil:
+// bindCorpusOptions binds the rule to a row's ESLint options, as the config layer would
+func bindCorpusOptions(registration rule.Entry, options []json.RawMessage) (rule.Bound, string) {
+	switch registration.Arity {
+	case rule.OptionArityList:
 		var list []byte
 		if len(options) > 0 {
 			var encodeError error
 			list, encodeError = json.Marshal(options)
 			if encodeError != nil {
-				return nil, "options did not encode: " + encodeError.Error()
+				return rule.Bound{}, "options did not encode: " + encodeError.Error()
 			}
 		}
-		decoded, decodeOptionListError := registration.DecodeOptionList(list)
-		if decodeOptionListError != nil {
-			return nil, "options refused: " + decodeOptionListError.Error()
+		bound, bindError := registration.Bind(list, rule.OptionsBase{})
+		if bindError != nil {
+			return rule.Bound{}, "options refused: " + bindError.Error()
 		}
-		return decoded, ""
-	case registration.Decode != nil:
+		return bound, ""
+	case rule.OptionArityOne:
 		if len(options) > 1 {
-			return nil, "more option elements than cohere's decoder takes"
+			return rule.Bound{}, "more option elements than cohere's decoder takes"
 		}
 		if len(options) == 0 {
-			return nil, ""
+			return registration.Unconfigured, ""
 		}
-		decoded, decodeError := registration.Decode(options[0])
-		if decodeError != nil {
-			return nil, "options refused: " + decodeError.Error()
+		bound, bindError := registration.Bind(options[0], rule.OptionsBase{})
+		if bindError != nil {
+			return rule.Bound{}, "options refused: " + bindError.Error()
 		}
-		return decoded, ""
-	case registration.DecodeAt != nil:
-		return nil, "options anchored on disk, which a corpus row cannot name"
+		return bound, ""
+	case rule.OptionArityAt:
+		return rule.Bound{}, "options anchored on disk, which a corpus row cannot name"
 	default:
 		if len(options) > 0 {
-			return nil, "cohere's rule takes no options"
+			return rule.Bound{}, "cohere's rule takes no options"
 		}
-		return nil, ""
+		return registration.Unconfigured, ""
 	}
 }
 
@@ -121,8 +121,8 @@ func utf16ToByteOffsets(code string) []int {
 }
 
 // corpusVerdict replays one row through the rule and says how cohere's answer compares with ESLint's
-func corpusVerdict(test *testing.T, registration rule.Registration, row eslintCorpusRow) string {
-	decoded, problem := decodeCorpusOptions(registration, row.Options)
+func corpusVerdict(test *testing.T, registration rule.Entry, row eslintCorpusRow) string {
+	bound, problem := bindCorpusOptions(registration, row.Options)
 	if problem != "" {
 		return "options"
 	}
@@ -132,7 +132,7 @@ func corpusVerdict(test *testing.T, registration rule.Registration, row eslintCo
 	// Not parallel: the verdict reads result and ran as soon as Run returns, and a parallel subtest would
 	// not have run by then. The rules' own subtests are what run side by side.
 	test.Run(row.key(), func(test *testing.T) {
-		result = rule_testing.RunTypedVerbatimWithOptions(test, registration.Rule, "Case.ts", row.Code, decoded)
+		result = rule_testing.RunTypedVerbatimBound(test, bound, "Case.ts", row.Code)
 		ran = true
 	})
 	if !ran {
@@ -161,13 +161,7 @@ func corpusVerdict(test *testing.T, registration rule.Registration, row eslintCo
 	byteOffset := utf16ToByteOffsets(code)
 	expected := make([]string, 0, len(row.EsLint))
 	for _, finding := range row.EsLint {
-		// JSON decodes every number into an any as a float64, so anything else is a vendored file gone wrong
-		startOffset, startIsNumber := finding[1].(float64)
-		endOffset, endIsNumber := finding[2].(float64)
-		if !startIsNumber || !endIsNumber {
-			test.Fatalf("row %s: ESLint's finding %v does not hold two numeric offsets", row.key(), finding)
-		}
-		start, end := int(startOffset), int(endOffset)
+		start, end := finding.start, finding.end
 		if firstLineEnd >= 0 {
 			if start >= firstLineEnd {
 				start--
@@ -236,12 +230,12 @@ func corpusPlace(start int, end int) string {
 func TestCohereAgreesWithEsLintsCoreCorpus(test *testing.T) {
 	test.Parallel()
 
-	registrations := map[string]rule.Registration{}
+	registrations := map[string]rule.Entry{}
 	coreRules := []string{}
 	for _, registration := range rule.Registered() {
-		registrations[registration.Rule.Name] = registration
-		if !strings.Contains(registration.Rule.Name, "/") {
-			coreRules = append(coreRules, registration.Rule.Name)
+		registrations[registration.Name] = registration
+		if !strings.Contains(registration.Name, "/") {
+			coreRules = append(coreRules, registration.Name)
 		}
 	}
 
@@ -365,10 +359,10 @@ func TestUtf16OffsetsBecomeByteOffsets(test *testing.T) {
 func TestCorpusVerdictComparesPlaces(test *testing.T) {
 	test.Parallel()
 
-	probe := func(occurrence int) rule.Registration {
-		return rule.Registration{Rule: rule.Rule{
+	probe := func(occurrence int) rule.Entry {
+		return rule_testing.EntryOf(test, rule.Rule[rule.NoOptions]{
 			Name: "corpus-place-probe",
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				seen := 0
 				return rule.Listeners{
 					ast.KindIdentifier: func(node *ast.Node) {
@@ -382,14 +376,14 @@ func TestCorpusVerdictComparesPlaces(test *testing.T) {
 					},
 				}
 			},
-		}}
+		})
 	}
 
 	cases := []struct {
 		name       string
 		code       string
 		occurrence int
-		start      float64
+		start      int
 		want       string
 	}{
 		{"same text, another place", "let x; x = 0;", 1, 7, "span"},
@@ -402,7 +396,10 @@ func TestCorpusVerdictComparesPlaces(test *testing.T) {
 		{"behind a mark, a later line, another place", "\ufefflet x;\nx = 0;", 1, 8, "span"},
 	}
 	for _, testCase := range cases {
-		row := eslintCorpusRow{Code: testCase.code, EsLint: [][3]any{{"probe", testCase.start, testCase.start + 1}}}
+		row := eslintCorpusRow{
+			Code:   testCase.code,
+			EsLint: []eslintFinding{{start: testCase.start, end: testCase.start + 1}},
+		}
 		if verdict := corpusVerdict(test, probe(testCase.occurrence), row); verdict != testCase.want {
 			test.Errorf("%s: the verdict is %q, want %q", testCase.name, verdict, testCase.want)
 		}

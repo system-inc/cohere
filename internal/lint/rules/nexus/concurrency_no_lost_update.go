@@ -99,10 +99,10 @@ func concurrencyNoLostUpdateStoreMessage(read string) rule.Message {
 //     (`x = x + await y`, with the compound form's implicit read counting as first), or reached
 //     through a `const` of this function whose initializer read it (`const old = s.count; await f();
 //     s.count = old + 1`), through any chain of such consts.
-//  6. The value is modified rather than copied, and computed here. `console.log = original` writes back exactly the value
-//     it saved, which is a restore, and restoring a saved handler in `finally` is the pattern the
-//     upstream rule reported most on this tree. Any operation on the value (arithmetic, a call, a
-//     member read, a spread into a new literal) makes it a modification. Two things are not:
+//  6. The value is modified rather than copied, and computed here. `console.log = original` writes back
+//     exactly the value it saved, which is a restore, and restoring a saved handler in `finally` is the
+//     pattern the upstream rule reported most on this tree. Any operation on the value (arithmetic, a
+//     call, a member read, a spread into a new literal) makes it a modification. Two things are not:
 //     - an awaited call's result, which is the callee's answer rather than this function's
 //     computation (`token = (await refresh(token)).next` sends the old value out and writes back
 //     what came back);
@@ -135,14 +135,14 @@ func concurrencyNoLostUpdateStoreMessage(read string) rule.Message {
 //
 // No fix and no suggestion: the repair is a restructuring (re-read after the suspension, a lock, or
 // an atomic update on the store), and which one is right is the author's call.
-var ConcurrencyNoLostUpdate = rule.Rule{
+var ConcurrencyNoLostUpdate = rule.Rule[rule.NoOptions]{
 	Name: "nexus/concurrency-no-lost-update",
 
 	// Symbol identity is what makes a read and a write the same variable, and what tells an outer
 	// variable from a shadowing local of the same spelling.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}
@@ -1168,7 +1168,9 @@ func concurrencyNoLostUpdateContains(outer *ast.Node, inner *ast.Node) bool {
 
 // controlFlowGraph builds the root's graph on first need, recording suspensions, the declarations of
 // tracked consts, and every assignment as an anchor.
-func (analysis *concurrencyNoLostUpdateRoot) controlFlowGraph() *control_flow_graph.Graph[concurrencyNoLostUpdateEvent] {
+func (analysis *concurrencyNoLostUpdateRoot) controlFlowGraph() (
+	graph *control_flow_graph.Graph[concurrencyNoLostUpdateEvent],
+) {
 	if analysis.graph != nil {
 		return analysis.graph
 	}

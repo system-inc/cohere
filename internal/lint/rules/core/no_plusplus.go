@@ -73,11 +73,11 @@ func noPlusplusUnexpectedUnaryOp(operator string) rule.Message {
 // would stop at a paren that upstream never sees. `for (;; (i++)) {}` is the shape, and it is not in
 // the corpus. The walk skips parentheses as well as sequences for that reason; a fixture covers it,
 // written from reading our AST rather than from upstream's cases.
-var NoPlusplus = rule.Rule{
+var NoPlusplus = rule.Rule[NoPlusplusOptions]{
 	Name: "no-plusplus",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoPlusplusOptions]) rule.Listeners {
 		allowForLoopAfterthoughts := false
-		if resolved, isNoPlusplusOptions := rule.OptionsAs[NoPlusplusOptions](options); isNoPlusplusOptions {
+		if resolved, isNoPlusplusOptions := options.Read(); isNoPlusplusOptions {
 			allowForLoopAfterthoughts = resolved.AllowForLoopAfterthoughts
 		}
 
@@ -180,7 +180,7 @@ func DefaultNoPlusplusOptions() NoPlusplusOptions {
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto` so a bare `"error"` configuration, which arrives
 // as empty input, resolves to the documented default instead of erroring.
-func DecodeNoPlusplusOptions(raw []byte) (any, error) {
+func DecodeNoPlusplusOptions(raw []byte) (NoPlusplusOptions, error) {
 	options := DefaultNoPlusplusOptions()
 	if len(raw) == 0 {
 		return options, nil

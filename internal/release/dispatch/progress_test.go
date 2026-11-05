@@ -202,7 +202,9 @@ func TestSwiftPMSpeaksOnlyUnderVerboseOrOnFailure(test *testing.T) {
 		test.Fatalf("a --verbose build did not stream SwiftPM's lines: %q (%v)", output, buildError)
 	}
 	test.Setenv("FAKE_SWIFT_EXIT", "1")
-	if _, buildError := build(false); buildError == nil || !strings.Contains(buildError.Error(), "[Computing dependencies]") {
+	if _, buildError := build(
+		false,
+	); buildError == nil || !strings.Contains(buildError.Error(), "[Computing dependencies]") {
 		test.Fatalf("a failed build does not quote what SwiftPM said: %v", buildError)
 	}
 }

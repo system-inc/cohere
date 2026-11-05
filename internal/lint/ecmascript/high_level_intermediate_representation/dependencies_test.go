@@ -564,7 +564,7 @@ func TestDependencyDistributionIsReal(test *testing.T) {
 	skipWithoutCorpus(test)
 
 	var files []string
-	filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, pathError error) error {
+	walkError := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, pathError error) error {
 		if pathError != nil || info.IsDir() {
 			return nil
 		}
@@ -573,6 +573,9 @@ func TestDependencyDistributionIsReal(test *testing.T) {
 		}
 		return nil
 	})
+	if walkError != nil {
+		test.Fatal(walkError)
+	}
 	sort.Strings(files)
 	if len(files) > 200 {
 		files = files[:200]
@@ -588,10 +591,10 @@ func TestDependencyDistributionIsReal(test *testing.T) {
 			continue
 		}
 		fileName := "/corpus/" + filepath.Base(path)
-		probe := rule.Rule{
+		probe := rule.Rule[rule.NoOptions]{
 			Name:             "dependencies-corpus",
 			NeedsTypeChecker: true,
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						if ruleContext.TypeChecker == nil {

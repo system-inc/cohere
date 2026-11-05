@@ -103,9 +103,9 @@ var noTyposPropTypeNames = []string{
 // This is the difference from `default-props-match-prop-types`, which I stopped on in the same
 // batch: that rule needs the registry's resolved `declaredPropTypes`, and this one needs a
 // three-line predicate.
-var NoTypos = rule.Rule{
+var NoTypos = rule.Rule[rule.NoOptions]{
 	Name: "react/no-typos",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The two import bindings, tracked across the whole file. Upstream keeps them as closure
 		// state and its listeners run in source order, so an import below a usage does not name the
 		// package for that usage. Reproduced by walking the file once from the source node, in
@@ -497,13 +497,14 @@ func noTyposReturnsJsx(node *ast.Node) bool {
 // Written as a loop rather than with `ast.SkipParentheses`, which dereferences its argument, and the
 // thing being unwrapped here is a return argument that is legitimately absent for a bare `return;`.
 func noTyposIsJsxExpression(expression *ast.Node) bool {
-	for expression != nil && expression.Kind == ast.KindParenthesizedExpression {
-		expression = expression.AsParenthesizedExpression().Expression
+	unwrapped := expression
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if expression == nil {
+	if unwrapped == nil {
 		return false
 	}
-	switch expression.Kind {
+	switch unwrapped.Kind {
 	case ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxFragment:
 		return true
 	}

@@ -34,7 +34,7 @@ type NoMultiAssignOptions struct {
 // The configured shape is the bare object rather than upstream's `[{...}]`: cohere's config layer
 // strips the severity-and-options tuple before dispatch, so a fixture copying ESLint's spelling
 // fails on every row.
-func DecodeNoMultiAssignOptions(raw []byte) (any, error) {
+func DecodeNoMultiAssignOptions(raw []byte) (NoMultiAssignOptions, error) {
 	var options NoMultiAssignOptions
 	if len(raw) == 0 {
 		return options, nil
@@ -89,14 +89,14 @@ func DecodeNoMultiAssignOptions(raw []byte) (any, error) {
 // `var a = (b) = (((c)))` reports at column 9, which is the `(` of `(b)`, because that parenthesis
 // is inside the assignment rather than around it. That falls out of reporting the assignment node
 // itself and is asserted rather than assumed.
-var NoMultiAssign = rule.Rule{
+var NoMultiAssign = rule.Rule[NoMultiAssignOptions]{
 	Name: "no-multi-assign",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoMultiAssignOptions]) rule.Listeners {
 		// A rule configured as bare "error" is handed nil, so the type assertion yields the zero
 		// value. That is correct here only because the one option defaults to false; the fallback is
 		// written out rather than relied on so a later default change cannot invert the rule
 		// silently.
-		settings, _ := rule.OptionsAs[NoMultiAssignOptions](options)
+		settings, _ := options.Read()
 		ignoreNonDeclaration := settings.IgnoreNonDeclaration != nil && *settings.IgnoreNonDeclaration
 
 		return rule.Listeners{

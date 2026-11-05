@@ -101,15 +101,15 @@ type GetterReturnOptions struct {
 // returns from itself. Upstream fails `get bar() { ~function () { return true; }() }` and so does
 // this. Conversely `return` inside a nested function must not credit the outer getter, which is why
 // the walk stops at every function boundary.
-var GetterReturn = rule.Rule{
+var GetterReturn = rule.Rule[GetterReturnOptions]{
 	Name: "getter-return",
 
 	// Whether the `Object` or `Reflect` of a descriptor call is the global
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[GetterReturnOptions]) rule.Listeners {
 		allowImplicit := false
-		if parsed, isParsed := rule.OptionsAs[GetterReturnOptions](options); isParsed {
+		if parsed, isParsed := options.Read(); isParsed {
 			allowImplicit = parsed.AllowImplicit
 		}
 

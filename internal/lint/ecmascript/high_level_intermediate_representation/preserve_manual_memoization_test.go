@@ -286,10 +286,10 @@ func TestInferredDependencyComparisonIsBuiltAndGatedOnTruncation(test *testing.T
 // comparisons against a written dependency the validator would make.
 func inferredDependencyShapes(test *testing.T, source string) (withPath, withoutPath, comparisons int) {
 	test.Helper()
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "inferred-dependency-shapes",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {

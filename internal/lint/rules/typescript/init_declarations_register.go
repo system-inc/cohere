@@ -12,7 +12,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // first element is a bare mode string and whose second carries `ignoreForLoopInit`:
 // `["error", "never", {"ignoreForLoopInit": true}]`. The generic struct decoder cannot express that.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[InitDeclarationsOptions]{
 		Rule:             InitDeclarations,
 		DecodeOptionList: DecodeInitDeclarationsOptions,
 	})

@@ -49,9 +49,9 @@ var messageNoEqNull = rule.Message{
 //
 // So the skip is required for fidelity rather than being an improvement on upstream, and the span
 // stays on the whole binary expression, parentheses included, which is what those columns say.
-var NoEqNull = rule.Rule{
+var NoEqNull = rule.Rule[rule.NoOptions]{
 	Name: "no-eq-null",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()

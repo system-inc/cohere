@@ -9,5 +9,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // changing. rule.Register appends into a map keyed by name and is callable from any init, so a
 // package may hold as many of these as it has rules.
 func init() {
-	rule.Register(rule.Registration{Rule: DefaultParamLast})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: DefaultParamLast})
 }

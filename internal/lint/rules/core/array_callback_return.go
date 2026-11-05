@@ -149,7 +149,7 @@ var messageArrayCallbackPrependVoid = rule.Message{
 // walks is a token stream we answer differently. Every suggestion this rule offers is asserted by
 // applying it and comparing the whole resulting source, so a shape it gets wrong fails loudly rather
 // than silently.
-var ArrayCallbackReturn = rule.Rule{
+var ArrayCallbackReturn = rule.Rule[ArrayCallbackReturnOptions]{
 	Name: "array-callback-return",
 
 	// No type information. Every decision is syntactic: which method name the callee spells, which
@@ -157,12 +157,12 @@ var ArrayCallbackReturn = rule.Rule{
 	// asks its scope analysis nothing here either.
 	NeedsTypeChecker: false,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ArrayCallbackReturnOptions]) rule.Listeners {
 		// A rule configured as a bare severity is handed nil, which `options.(T)` turns into the
 		// zero value. All three defaults are false upstream, so the zero value is right, and the
 		// fallback is still written out rather than relied on.
 		settings := ArrayCallbackReturnOptions{}
-		if decoded, configured := rule.OptionsAs[ArrayCallbackReturnOptions](options); configured {
+		if decoded, configured := options.Read(); configured {
 			settings = decoded
 		}
 

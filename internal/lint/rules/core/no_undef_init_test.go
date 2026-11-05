@@ -36,8 +36,9 @@ func TestNoUndefInitStaysSilent(test *testing.T) {
 		{"using foo = undefined"},       // lang={"ecmaVersion":2026}
 		{"await using foo = undefined"}, // lang={"ecmaVersion":2026}
 		{"var undefined = 5; var foo = undefined;"},
-		{"class C { field = undefined; }"},                             // lang={"ecmaVersion":2022}
-		{"using a = condition ? getDisposableResource() : undefined;"}, // lang={"ecmaVersion":2026,"sourceType":"module"}
+		{"class C { field = undefined; }"}, // lang={"ecmaVersion":2022}
+		// lang={"ecmaVersion":2026,"sourceType":"module"}
+		{"using a = condition ? getDisposableResource() : undefined;"},
 	}
 
 	for _, testCase := range cases {
@@ -77,7 +78,9 @@ func TestNoUndefInitFires(test *testing.T) {
 		{"let {a} = undefined;"}, // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
 		{
 			"for(var i in [1,2,3]){let a = undefined; for(var j in [1,2,3]){}}",
-		}, // errors=["unnecessaryUndefinedInit"] output="for(var i in [1,2,3]){let a; for(var j in [1,2,3]){}}" lang={"ecmaVersion":6}
+			// errors=["unnecessaryUndefinedInit"] output="for(var i in [1,2,3]){let a; for(var j in [1,2,3]){}}"
+			// lang={"ecmaVersion":6}
+		},
 		{
 			"let /* comment */a = undefined;",
 		}, // errors=["unnecessaryUndefinedInit"] output="let /* comment */a;" lang={"ecmaVersion":6}

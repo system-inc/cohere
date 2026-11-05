@@ -120,7 +120,9 @@ func IsBuiltinTypeAliasLike(
 	subjectType *checker.Type,
 	predicate func(subType *checker.Type) bool,
 ) bool {
-	return IsBuiltinSymbolLikeRecurser(program, typeChecker, subjectType, func(subtype *checker.Type) builtinPredicateMatches {
+	return IsBuiltinSymbolLikeRecurser(program, typeChecker, subjectType, func(
+		subtype *checker.Type,
+	) builtinPredicateMatches {
 		aliasSymbol := checker.Type_alias(subtype)
 		if aliasSymbol == nil || len(aliasSymbol.TypeArguments()) == 0 {
 			return builtinPredicateMatches_False
@@ -140,7 +142,9 @@ func IsBuiltinSymbolLike(
 	subjectType *checker.Type,
 	symbolNames ...string,
 ) bool {
-	return IsBuiltinSymbolLikeRecurser(program, typeChecker, subjectType, func(subType *checker.Type) builtinPredicateMatches {
+	return IsBuiltinSymbolLikeRecurser(program, typeChecker, subjectType, func(
+		subType *checker.Type,
+	) builtinPredicateMatches {
 		symbol := checker.Type_symbol(subType)
 		if symbol == nil {
 			return builtinPredicateMatches_False
@@ -162,7 +166,9 @@ func IsAnyBuiltinSymbolLike(
 	typeChecker *checker.Checker,
 	subjectType *checker.Type,
 ) bool {
-	return IsBuiltinSymbolLikeRecurser(program, typeChecker, subjectType, func(subType *checker.Type) builtinPredicateMatches {
+	return IsBuiltinSymbolLikeRecurser(program, typeChecker, subjectType, func(
+		subType *checker.Type,
+	) builtinPredicateMatches {
 		symbol := checker.Type_symbol(subType)
 		if symbol == nil {
 			return builtinPredicateMatches_False

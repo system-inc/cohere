@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -519,15 +520,15 @@ func TestLintCacheStoreRecordsCleanFiles(test *testing.T) {
 // has one.
 func TestCacheableRulesExcludesImpureRules(test *testing.T) {
 	test.Parallel()
-	pure := rule.Rule{Name: "pure"}
-	options := rule.Rule{Name: "options", ProgramReads: rule.ReadsCompilerOptions}
-	otherFiles := rule.Rule{Name: "other-files", ProgramReads: rule.ReadsOtherFiles}
-	resolution := rule.Rule{Name: "resolution", ProgramReads: rule.ReadsModuleResolution}
-	needsChecker := rule.Rule{Name: "needs-checker", NeedsTypeChecker: true}
-	both := rule.Rule{Name: "both", ProgramReads: rule.ReadsOtherFiles, NeedsTypeChecker: true}
+	pure := rule.Rule[rule.NoOptions]{Name: "pure"}
+	options := rule.Rule[rule.NoOptions]{Name: "options", ProgramReads: rule.ReadsCompilerOptions}
+	otherFiles := rule.Rule[rule.NoOptions]{Name: "other-files", ProgramReads: rule.ReadsOtherFiles}
+	resolution := rule.Rule[rule.NoOptions]{Name: "resolution", ProgramReads: rule.ReadsModuleResolution}
+	needsChecker := rule.Rule[rule.NoOptions]{Name: "needs-checker", NeedsTypeChecker: true}
+	both := rule.Rule[rule.NoOptions]{Name: "both", ProgramReads: rule.ReadsOtherFiles, NeedsTypeChecker: true}
 
 	cacheable, uncacheable := program.CacheableRules(
-		[]rule.Rule{pure, options, otherFiles, resolution, needsChecker, both})
+		rule_testing.EntriesOf(test, pure, options, otherFiles, resolution, needsChecker, both))
 
 	names := make([]string, 0, len(cacheable))
 	for _, subject := range cacheable {
@@ -551,12 +552,12 @@ func TestCacheableRulesDefaultsToExcluding(test *testing.T) {
 	test.Parallel()
 	// A rule that declares an impurity and nothing else must still be turned away, so a future
 	// declaration added to rule.Rule cannot quietly become cacheable by omission here.
-	for _, subject := range []rule.Rule{
+	for _, subject := range []rule.Rule[rule.NoOptions]{
 		{Name: "reads-other-files", ProgramReads: rule.ReadsOtherFiles},
 		{Name: "reads-module-resolution", ProgramReads: rule.ReadsModuleResolution},
 		{Name: "needs-checker", NeedsTypeChecker: true},
 	} {
-		cacheable, _ := program.CacheableRules([]rule.Rule{subject})
+		cacheable, _ := program.CacheableRules(rule_testing.EntriesOf(test, subject))
 		if len(cacheable) != 0 {
 			test.Errorf("%s was admitted to the cache despite declaring an impurity", subject.Name)
 		}

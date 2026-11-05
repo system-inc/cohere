@@ -12,7 +12,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // rule configured as a plain "error" arrives with nil options and must fall back to that rather
 // than to the zero value, which would be an empty mode matching no arm.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[ReturnAwaitOptions]{
 		Rule:   ReturnAwait,
 		Decode: DecodeReturnAwaitOptions,
 	})

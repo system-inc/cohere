@@ -684,13 +684,17 @@ func TestSecurityNoInterpolatedSqlStringDeclinesWithoutAChecker(test *testing.T)
 	if !SecurityNoInterpolatedSqlString.NeedsTypeChecker {
 		test.Fatal("the rule must declare NeedsTypeChecker")
 	}
-	if listeners := SecurityNoInterpolatedSqlString.Run(rule.Context{}, nil); listeners != nil {
+	if listeners := SecurityNoInterpolatedSqlString.Run(
+		rule.Context{},
+		rule.Given[rule.NoOptions]{},
+	); listeners != nil {
 		test.Errorf("with no checker the rule must register no listeners, got %d", len(listeners))
 	}
 }
 
 // securityNoInterpolatedSqlValueWording is the bare-value message, written out here.
-const securityNoInterpolatedSqlValueWording = "This value is written into a SQL statement without quotes, right after a comparison, so it becomes " +
+const securityNoInterpolatedSqlValueWording = "This value is written into a SQL statement without quotes, " +
+	"right after a comparison, so it becomes " +
 	"part of the SQL rather than a value: a space, a keyword or a quote in it changes what the query does, " +
 	"and a crafted value runs as SQL. Quoting it does not help, since the value can close the quote. Pass it " +
 	"as a bound parameter (`WHERE id = ?` with the value beside the query). Where the query language has no " +

@@ -148,9 +148,9 @@ var consistencyNoBareThrowTestPaths = []string{"/test/", "/tests/", "/testing/"}
 // keyword. Measured on three constructors. That is worth stating because reporting the statement
 // would read as equally correct and would put the finding one token to the left, where a reader
 // looking for the constructor name would not find it underlined.
-var ConsistencyNoBareThrow = rule.Rule{
+var ConsistencyNoBareThrow = rule.Rule[rule.NoOptions]{
 	Name: "base/consistency-no-bare-throw",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

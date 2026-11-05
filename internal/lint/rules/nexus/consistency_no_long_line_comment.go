@@ -40,17 +40,15 @@ var consistencyNoLongLineCommentText = policy.MessageOf(
 // The fix preserves each line's text verbatim and changes only the delimiters, which is what makes
 // it safe to apply unattended. It is withheld when the run contains a star-slash sequence, since
 // that would close the block early and change what the rest of the run means.
-var ConsistencyNoLongLineComment = rule.Rule{
+var ConsistencyNoLongLineComment = rule.Rule[ConsistencyNoLongLineCommentOptions]{
 	Name: "nexus/consistency-no-long-line-comment",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistencyNoLongLineCommentOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		maximumLineCount := defaultMaximumLineCount
-		if settings, hasSettings := rule.OptionsAs[ConsistencyNoLongLineCommentOptions](
-			options,
-		); hasSettings && settings.MaximumLineCount > 0 {
+		if settings, hasSettings := options.Read(); hasSettings && settings.MaximumLineCount > 0 {
 			maximumLineCount = settings.MaximumLineCount
 		}
 

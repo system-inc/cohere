@@ -71,7 +71,11 @@ func (report *openReport) open(out *bufio.Writer, launch func([]string) error) {
 		return
 	}
 	if launchError := launch(report.Paths); launchError != nil {
-		fmt.Fprintf(out, "cohere: %s\n", sentence.Of("could not open editor: "+singleLineDescription(launchError.Error())))
+		fmt.Fprintf(
+			out,
+			"cohere: %s\n",
+			sentence.Of("could not open editor: "+singleLineDescription(launchError.Error())),
+		)
 	}
 }
 

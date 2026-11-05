@@ -3,6 +3,7 @@ package core
 import (
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -17,7 +18,7 @@ const arrowBodyStyleFile = "/repository/source/ArrowBodyStyle.ts"
 // could see.
 type arrowBodyStyleCase struct {
 	sourceText      string
-	options         any
+	options         rule.Given[ArrowBodyStyleOptions]
 	wantIds         []string
 	wantFixedSource string
 }
@@ -29,12 +30,9 @@ type arrowBodyStyleCase struct {
 // counterpart to inherit correctness from.
 func runArrowBodyStyle(test *testing.T, testCase arrowBodyStyleCase) rule_testing.Result {
 	test.Helper()
-	if testCase.options == nil {
+	options, configured := testCase.options.Read()
+	if !configured {
 		return rule_testing.Run(test, ArrowBodyStyle, arrowBodyStyleFile, testCase.sourceText)
-	}
-	options, ok := testCase.options.(ArrowBodyStyleOptions)
-	if !ok {
-		test.Fatalf("case options are not ArrowBodyStyleOptions: got %T", testCase.options)
 	}
 	decoded, decodeArrowBodyStyleOptionsError := DecodeArrowBodyStyleOptions(
 		[]byte(arrowBodyStyleUpstreamList(options)),
@@ -76,354 +74,379 @@ func arrowBodyStyleFiresCases() []arrowBodyStyleCase {
 	return []arrowBodyStyleCase{
 		{
 			"for (var foo = () => { return a in b ? bar : () => {} } ;;);",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"for (var foo = () => (a in b ? bar : () => {}) ;;);",
 		},
 		{
 			"a in b; for (var f = () => { return c };;);",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"a in b; for (var f = () => c;;);",
 		},
 		{
 			"for (a = b => { return c in d ? e : f } ;;);",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"for (a = b => (c in d ? e : f) ;;);",
 		},
 		{
 			"for (var f = () => { return a };;);",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"for (var f = () => a;;);",
 		},
 		{
 			"for (var f;f = () => { return a };);",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"for (var f;f = () => a;);",
 		},
 		{
 			"for (var f = () => { return a in c };;);",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"for (var f = () => (a in c);;);",
 		},
 		{
 			"for (var f;f = () => { return a in c };);",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"for (var f;f = () => a in c;);",
 		},
 		{
 			"for (;;){var f = () => { return a in c }}",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"for (;;){var f = () => a in c}",
 		},
 		{
 			"for (a = b => { return c = d in e } ;;);",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"for (a = b => (c = d in e) ;;);",
 		},
 		{
 			"for (var a;;a = b => { return c = d in e } );",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"for (var a;;a = b => c = d in e );",
 		},
 		{
 			"for (let a = (b, c, d) => { return vb && c in d; }; ;);",
-			nil,
+			rule.Given[ArrowBodyStyleOptions]{},
 			[]string{"unexpectedSingleBlock"},
 			"for (let a = (b, c, d) => (vb && c in d); ;);",
 		},
 		{
 			"for (let a = (b, c, d) => { return v in b && c in d; }; ;);",
-			nil,
+			rule.Given[ArrowBodyStyleOptions]{},
 			[]string{"unexpectedSingleBlock"},
 			"for (let a = (b, c, d) => (v in b && c in d); ;);",
 		},
 		{
 			"function foo(){ for (let a = (b, c, d) => { return v in b && c in d; }; ;); }",
-			nil,
+			rule.Given[ArrowBodyStyleOptions]{},
 			[]string{"unexpectedSingleBlock"},
 			"function foo(){ for (let a = (b, c, d) => (v in b && c in d); ;); }",
 		},
 		{
 			"for ( a = (b, c, d) => { return v in b && c in d; }; ;);",
-			nil,
+			rule.Given[ArrowBodyStyleOptions]{},
 			[]string{"unexpectedSingleBlock"},
 			"for ( a = (b, c, d) => (v in b && c in d); ;);",
 		},
 		{
 			"for ( a = (b) => { return (c in d) }; ;);",
-			nil,
+			rule.Given[ArrowBodyStyleOptions]{},
 			[]string{"unexpectedSingleBlock"},
 			"for ( a = (b) => (c in d); ;);",
 		},
 		{
 			"for (let a = (b, c, d) => { return vb in dd ; }; ;);",
-			nil,
+			rule.Given[ArrowBodyStyleOptions]{},
 			[]string{"unexpectedSingleBlock"},
 			"for (let a = (b, c, d) => (vb in dd ); ;);",
 		},
 		{
 			"for (let a = (b, c, d) => { return vb in c in dd ; }; ;);",
-			nil,
+			rule.Given[ArrowBodyStyleOptions]{},
 			[]string{"unexpectedSingleBlock"},
 			"for (let a = (b, c, d) => (vb in c in dd ); ;);",
 		},
 		{
 			"do{let a = () => {return f in ff}}while(true){}",
-			nil,
+			rule.Given[ArrowBodyStyleOptions]{},
 			[]string{"unexpectedSingleBlock"},
 			"do{let a = () => f in ff}while(true){}",
 		},
 		{
 			"do{for (let a = (b, c, d) => { return vb in c in dd ; }; ;);}while(true){}",
-			nil,
+			rule.Given[ArrowBodyStyleOptions]{},
 			[]string{"unexpectedSingleBlock"},
 			"do{for (let a = (b, c, d) => (vb in c in dd ); ;);}while(true){}",
 		},
 		{
 			"scores.map(score => { return x in +(score / maxScore).toFixed(2)});",
-			nil,
+			rule.Given[ArrowBodyStyleOptions]{},
 			[]string{"unexpectedSingleBlock"},
 			"scores.map(score => x in +(score / maxScore).toFixed(2));",
 		},
 		{
 			"const fn = (a, b) => { return a + x in Number(b) };",
-			nil,
+			rule.Given[ArrowBodyStyleOptions]{},
 			[]string{"unexpectedSingleBlock"},
 			"const fn = (a, b) => a + x in Number(b);",
 		},
 		{
 			"var foo = () => 0",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
 			[]string{"expectedBlock"},
 			"var foo = () => {return 0}",
 		},
 		{
 			"var foo = () => 0;",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
 			[]string{"expectedBlock"},
 			"var foo = () => {return 0};",
 		},
 		{
 			"var foo = () => ({});",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
 			[]string{"expectedBlock"},
 			"var foo = () => {return {}};",
 		},
 		{
 			"var foo = () => (  {});",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
 			[]string{"expectedBlock"},
 			"var foo = () => {return   {}};",
 		},
 		{
 			"(() => ({}))",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
 			[]string{"expectedBlock"},
 			"(() => {return {}})",
 		},
 		{
 			"(() => ( {}))",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
 			[]string{"expectedBlock"},
 			"(() => {return  {}})",
 		},
 		{
 			"var foo = () => { return 0; };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"var foo = () => 0;",
 		},
 		{
 			"var foo = () => { return 0 };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"var foo = () => 0;",
 		},
 		{
 			"var foo = () => { return bar(); };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"var foo = () => bar();",
 		},
-		{"var foo = () => {};", ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}, []string{"unexpectedEmptyBlock"}, ""},
+		{
+			"var foo = () => {};",
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}),
+			[]string{"unexpectedEmptyBlock"},
+			"",
+		},
 		{
 			"var foo = () => {\nreturn 0;\n};",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}),
 			[]string{"unexpectedSingleBlock"},
 			"var foo = () => 0;",
 		},
 		{
 			"var foo = () => { return { bar: 0 }; };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedObjectBlock"},
 			"var foo = () => ({ bar: 0 });",
 		},
 		{
 			"var foo = () => { return ({ bar: 0 }); };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"var foo = () => ({ bar: 0 });",
 		},
-		{"var foo = () => { return a, b }", nil, []string{"unexpectedSingleBlock"}, "var foo = () => (a, b)"},
+		{
+			"var foo = () => { return a, b }",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"var foo = () => (a, b)",
+		},
 		{
 			"var foo = () => { return };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true}),
 			[]string{"unexpectedSingleBlock"},
 			"",
 		},
 		{
 			"var foo = () => { return; };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true}),
 			[]string{"unexpectedSingleBlock"},
 			"",
 		},
 		{
 			"var foo = () => { return ( /* a */ {ok: true} /* b */ ) };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"var foo = () => ( /* a */ {ok: true} /* b */ );",
 		},
 		{
 			"var foo = () => { return '{' };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"var foo = () => '{';",
 		},
 		{
 			"var foo = () => { return { bar: 0 }.bar; };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedObjectBlock"},
 			"var foo = () => ({ bar: 0 }.bar);",
 		},
 		{
 			"var foo = (retv, name) => {\nretv[name] = true;\nreturn retv;\n};",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}),
 			[]string{"unexpectedOtherBlock"},
 			"",
 		},
 		{
 			"var foo = () => { bar };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}),
 			[]string{"unexpectedOtherBlock"},
 			"",
 		},
 		{
 			"var foo = () => { return 0; };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true}),
 			[]string{"unexpectedSingleBlock"},
 			"var foo = () => 0;",
 		},
 		{
 			"var foo = () => { return bar(); };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true}),
 			[]string{"unexpectedSingleBlock"},
 			"var foo = () => bar();",
 		},
 		{
 			"var foo = () => ({});",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true}),
 			[]string{"expectedBlock"},
 			"var foo = () => {return {}};",
 		},
 		{
 			"var foo = () => ({ bar: 0 });",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true}),
 			[]string{"expectedBlock"},
 			"var foo = () => {return { bar: 0 }};",
 		},
 		{
 			"var foo = () => (((((((5)))))));",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
 			[]string{"expectedBlock"},
 			"var foo = () => {return (((((((5)))))))};",
 		},
 		{
 			"var foo = () => { return bar }\n[1, 2, 3].map(foo)",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}),
 			[]string{"unexpectedSingleBlock"},
 			"",
 		},
 		{
 			"var foo = () => { return bar }\n(1).toString();",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}),
 			[]string{"unexpectedSingleBlock"},
 			"",
 		},
 		{
 			"var foo = () => { return bar };\n[1, 2, 3].map(foo)",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}),
 			[]string{"unexpectedSingleBlock"},
 			"var foo = () => bar;\n[1, 2, 3].map(foo)",
 		},
 		{
 			"var foo = /* a */ ( /* b */ ) /* c */ => /* d */ { /* e */ return /* f */ 5 /* g */ ; /* h */ } /* i */ ;",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}),
 			[]string{"unexpectedSingleBlock"},
 			"var foo = /* a */ ( /* b */ ) /* c */ => /* d */  /* e */  /* f */ 5 /* g */  /* h */  /* i */ ;",
 		},
 		{
 			"var foo = /* a */ ( /* b */ ) /* c */ => /* d */ ( /* e */ 5 /* f */ ) /* g */ ;",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
 			[]string{"expectedBlock"},
 			"var foo = /* a */ ( /* b */ ) /* c */ => /* d */ {return ( /* e */ 5 /* f */ )} /* g */ ;",
 		},
-		{"var foo = () => {\nreturn bar;\n};", nil, []string{"unexpectedSingleBlock"}, "var foo = () => bar;"},
-		{"var foo = () => {\nreturn bar;};", nil, []string{"unexpectedSingleBlock"}, "var foo = () => bar;"},
-		{"var foo = () => {return bar;\n};", nil, []string{"unexpectedSingleBlock"}, "var foo = () => bar;"},
+		{
+			"var foo = () => {\nreturn bar;\n};",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"var foo = () => bar;",
+		},
+		{
+			"var foo = () => {\nreturn bar;};",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"var foo = () => bar;",
+		},
+		{
+			"var foo = () => {return bar;\n};",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"var foo = () => bar;",
+		},
 		{
 			"\n              var foo = () => {\n                return foo\n                  .bar;\n              };\n            ",
-			nil,
+			rule.Given[ArrowBodyStyleOptions]{},
 			[]string{"unexpectedSingleBlock"},
 			"\n              var foo = () => foo\n                  .bar;\n            ",
 		},
 		{
 			"\n              var foo = () => {\n                return {\n                  bar: 1,\n                  baz: 2\n                };\n              };\n            ",
-			nil,
+			rule.Given[ArrowBodyStyleOptions]{},
 			[]string{"unexpectedObjectBlock"},
 			"\n              var foo = () => ({\n                  bar: 1,\n                  baz: 2\n                });\n            ",
 		},
 		{
 			"var foo = () => ({foo: 1}).foo();",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
 			[]string{"expectedBlock"},
 			"var foo = () => {return {foo: 1}.foo()};",
 		},
 		{
 			"var foo = () => ({foo: 1}.foo());",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
 			[]string{"expectedBlock"},
 			"var foo = () => {return {foo: 1}.foo()};",
 		},
 		{
 			"var foo = () => ( {foo: 1} ).foo();",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
 			[]string{"expectedBlock"},
 			"var foo = () => {return  {foo: 1} .foo()};",
 		},
 		{
 			"\n              var foo = () => ({\n                  bar: 1,\n                  baz: 2\n                });\n            ",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
 			[]string{"expectedBlock"},
 			"\n              var foo = () => {return {\n                  bar: 1,\n                  baz: 2\n                }};\n            ",
 		},
 		{
 			"\n              parsedYears = _map(years, (year) => (\n                  {\n                      index : year,\n                      title : splitYear(year)\n                  }\n              ));\n            ",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
 			[]string{"expectedBlock"},
 			"\n              parsedYears = _map(years, (year) => {\n                  return {\n                      index : year,\n                      title : splitYear(year)\n                  }\n              });\n            ",
 		},
 		{
 			"const createMarker = (color) => ({ latitude, longitude }, index) => {};",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
 			[]string{"expectedBlock"},
 			"const createMarker = (color) => {return ({ latitude, longitude }, index) => {}};",
 		},
@@ -432,72 +455,92 @@ func arrowBodyStyleFiresCases() []arrowBodyStyleCase {
 
 func arrowBodyStyleSilentCases() []arrowBodyStyleCase {
 	return []arrowBodyStyleCase{
-		{"var foo = () => {};", nil, []string{}, ""},
-		{"var foo = () => 0;", nil, []string{}, ""},
-		{"var addToB = (a) => { b =  b + a };", nil, []string{}, ""},
-		{"var foo = () => { /* do nothing */ };", nil, []string{}, ""},
-		{"var foo = () => {\n /* do nothing */ \n};", nil, []string{}, ""},
-		{"var foo = (retv, name) => {\nretv[name] = true;\nreturn retv;\n};", nil, []string{}, ""},
-		{"var foo = () => ({});", nil, []string{}, ""},
-		{"var foo = () => bar();", nil, []string{}, ""},
-		{"var foo = () => { bar(); };", nil, []string{}, ""},
-		{"var foo = () => { b = a };", nil, []string{}, ""},
-		{"var foo = () => { bar: 1 };", nil, []string{}, ""},
-		{"var foo = () => { return 0; };", ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}, []string{}, ""},
-		{"var foo = () => { return bar(); };", ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}, []string{}, ""},
-		{"var foo = () => 0;", ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}, []string{}, ""},
-		{"var foo = () => ({ foo: 0 });", ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}, []string{}, ""},
+		{"var foo = () => {};", rule.Given[ArrowBodyStyleOptions]{}, []string{}, ""},
+		{"var foo = () => 0;", rule.Given[ArrowBodyStyleOptions]{}, []string{}, ""},
+		{"var addToB = (a) => { b =  b + a };", rule.Given[ArrowBodyStyleOptions]{}, []string{}, ""},
+		{"var foo = () => { /* do nothing */ };", rule.Given[ArrowBodyStyleOptions]{}, []string{}, ""},
+		{"var foo = () => {\n /* do nothing */ \n};", rule.Given[ArrowBodyStyleOptions]{}, []string{}, ""},
+		{
+			"var foo = (retv, name) => {\nretv[name] = true;\nreturn retv;\n};",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{},
+			"",
+		},
+		{"var foo = () => ({});", rule.Given[ArrowBodyStyleOptions]{}, []string{}, ""},
+		{"var foo = () => bar();", rule.Given[ArrowBodyStyleOptions]{}, []string{}, ""},
+		{"var foo = () => { bar(); };", rule.Given[ArrowBodyStyleOptions]{}, []string{}, ""},
+		{"var foo = () => { b = a };", rule.Given[ArrowBodyStyleOptions]{}, []string{}, ""},
+		{"var foo = () => { bar: 1 };", rule.Given[ArrowBodyStyleOptions]{}, []string{}, ""},
+		{
+			"var foo = () => { return 0; };",
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
+			[]string{},
+			"",
+		},
+		{
+			"var foo = () => { return bar(); };",
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
+			[]string{},
+			"",
+		},
+		{"var foo = () => 0;", rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}), []string{}, ""},
+		{
+			"var foo = () => ({ foo: 0 });",
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}),
+			[]string{},
+			"",
+		},
 		{
 			"var foo = () => {};",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true}),
 			[]string{},
 			"",
 		},
 		{
 			"var foo = () => 0;",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true}),
 			[]string{},
 			"",
 		},
 		{
 			"var addToB = (a) => { b =  b + a };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true}),
 			[]string{},
 			"",
 		},
 		{
 			"var foo = () => { /* do nothing */ };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true}),
 			[]string{},
 			"",
 		},
 		{
 			"var foo = () => {\n /* do nothing */ \n};",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true}),
 			[]string{},
 			"",
 		},
 		{
 			"var foo = (retv, name) => {\nretv[name] = true;\nreturn retv;\n};",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true}),
 			[]string{},
 			"",
 		},
 		{
 			"var foo = () => bar();",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true}),
 			[]string{},
 			"",
 		},
 		{
 			"var foo = () => { bar(); };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true}),
 			[]string{},
 			"",
 		},
 		{
 			"var foo = () => { return { bar: 0 }; };",
-			ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true},
+			rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded, RequireReturnForObjectLiteral: true}),
 			[]string{},
 			"",
 		},
@@ -600,15 +643,15 @@ func TestArrowBodyStylePointsAtTheBody(test *testing.T) {
 
 	cases := []struct {
 		sourceText string
-		options    any
+		options    rule.Given[ArrowBodyStyleOptions]
 		wantSpan   string
 	}{
-		{"var foo = () => { return 0; };", nil, "{ return 0; }"},
-		{"var foo = () => {};", ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}, "{}"},
-		{"var foo = () => 0;", ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}, "0"},
-		{"var foo = () => ({ bar: 1 });", ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways},
+		{"var foo = () => { return 0; };", rule.Given[ArrowBodyStyleOptions]{}, "{ return 0; }"},
+		{"var foo = () => {};", rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}), "{}"},
+		{"var foo = () => 0;", rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}), "0"},
+		{"var foo = () => ({ bar: 1 });", rule.Configured(ArrowBodyStyleOptions{Mode: ArrowBodyStyleAlways}),
 			"({ bar: 1 })"},
-		{"var foo = () => { return { bar: 1 }; };", nil, "{ return { bar: 1 }; }"},
+		{"var foo = () => { return { bar: 1 }; };", rule.Given[ArrowBodyStyleOptions]{}, "{ return { bar: 1 }; }"},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
@@ -637,11 +680,11 @@ func TestArrowBodyStyleChoosesTheMessageByShape(test *testing.T) {
 
 	never := ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}
 	cases := []arrowBodyStyleCase{
-		{"var foo = () => {};", never, []string{"unexpectedEmptyBlock"}, ""},
-		{"var foo = () => { bar(); };", never, []string{"unexpectedOtherBlock"}, ""},
-		{"var foo = () => { return; };", never, []string{"unexpectedSingleBlock"}, ""},
-		{"var foo = () => { return 0; };", never, []string{"unexpectedSingleBlock"}, ""},
-		{"var foo = () => { return { bar: 1 }; };", never, []string{"unexpectedObjectBlock"}, ""},
+		{"var foo = () => {};", rule.Configured(never), []string{"unexpectedEmptyBlock"}, ""},
+		{"var foo = () => { bar(); };", rule.Configured(never), []string{"unexpectedOtherBlock"}, ""},
+		{"var foo = () => { return; };", rule.Configured(never), []string{"unexpectedSingleBlock"}, ""},
+		{"var foo = () => { return 0; };", rule.Configured(never), []string{"unexpectedSingleBlock"}, ""},
+		{"var foo = () => { return { bar: 1 }; };", rule.Configured(never), []string{"unexpectedObjectBlock"}, ""},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
@@ -664,12 +707,8 @@ func TestDecodeArrowBodyStyleOptions(test *testing.T) {
 		if decodeArrowBodyStyleOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeArrowBodyStyleOptionsError)
 		}
-		options, ok := decoded.(ArrowBodyStyleOptions)
-		if !ok {
-			test.Fatalf("decoded options are not ArrowBodyStyleOptions: got %T", decoded)
-		}
-		if options.Mode != ArrowBodyStyleAsNeeded {
-			test.Errorf("mode came back %q, wanted AsNeeded", options.Mode)
+		if decoded.Mode != ArrowBodyStyleAsNeeded {
+			test.Errorf("mode came back %q, wanted AsNeeded", decoded.Mode)
 		}
 	})
 
@@ -680,14 +719,10 @@ func TestDecodeArrowBodyStyleOptions(test *testing.T) {
 		if decodeArrowBodyStyleOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeArrowBodyStyleOptionsError)
 		}
-		options, ok := decoded.(ArrowBodyStyleOptions)
-		if !ok {
-			test.Fatalf("decoded options are not ArrowBodyStyleOptions: got %T", decoded)
+		if decoded.Mode != ArrowBodyStyleAsNeeded {
+			test.Errorf("mode came back %q, wanted AsNeeded", decoded.Mode)
 		}
-		if options.Mode != ArrowBodyStyleAsNeeded {
-			test.Errorf("mode came back %q, wanted AsNeeded", options.Mode)
-		}
-		if !options.RequireReturnForObjectLiteral {
+		if !decoded.RequireReturnForObjectLiteral {
 			test.Error("the second element was handed over and not read")
 		}
 	})
@@ -769,12 +804,21 @@ func TestArrowBodyStyleSkipsCommentsWhenCheckingTheNextToken(test *testing.T) {
 
 	cases := []arrowBodyStyleCase{
 		// A comment then a semicolon: repaired, and the comment survives.
-		{"var foo = () => { return bar } /* c */ ;", nil, []string{"unexpectedSingleBlock"},
-			"var foo = () => bar /* c */ ;"},
+		{
+			"var foo = () => { return bar } /* c */ ;",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"var foo = () => bar /* c */ ;",
+		},
 		// A comment then a token that would join on: declined, so the comment did not mask it.
-		{"var foo = () => { return bar } /* c */ + 1;", nil, []string{"unexpectedSingleBlock"}, ""},
+		{
+			"var foo = () => { return bar } /* c */ + 1;",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"",
+		},
 		// A line comment, whose ending is a newline rather than a delimiter.
-		{"var foo = () => { return bar } // c\n[1,2].map(foo)", nil,
+		{"var foo = () => { return bar } // c\n[1,2].map(foo)", rule.Given[ArrowBodyStyleOptions]{},
 			[]string{"unexpectedSingleBlock"}, ""},
 	}
 	for _, testCase := range cases {
@@ -811,27 +855,43 @@ func TestArrowBodyStyleParenthesizesTheInOperatorLikeUpstream(test *testing.T) {
 
 	cases := []arrowBodyStyleCase{
 		// The initializer clause: wrapped.
-		{"for (var f = () => { return a in c };;);", nil, []string{"unexpectedSingleBlock"},
-			"for (var f = () => (a in c);;);"},
+		{
+			"for (var f = () => { return a in c };;);",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"for (var f = () => (a in c);;);",
+		},
 		// The condition clause: not wrapped, though the arrow and the operator are identical.
-		{"for (var f;f = () => { return a in c };);", nil, []string{"unexpectedSingleBlock"},
-			"for (var f;f = () => a in c;);"},
+		{
+			"for (var f;f = () => { return a in c };);",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"for (var f;f = () => a in c;);",
+		},
 		// The body: not wrapped either.
-		{"for (;;){var f = () => { return a in c }}", nil, []string{"unexpectedSingleBlock"},
-			"for (;;){var f = () => a in c}"},
+		{
+			"for (;;){var f = () => { return a in c }}",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"for (;;){var f = () => a in c}",
+		},
 		// Outside any for statement: not wrapped.
-		{"var f = () => { return a in c };", nil, []string{"unexpectedSingleBlock"},
+		{"var f = () => { return a in c };", rule.Given[ArrowBodyStyleOptions]{}, []string{"unexpectedSingleBlock"},
 			"var f = () => a in c;"},
 		// An `in` the grammar could never confuse, inside brackets, still wraps -- because
 		// upstream's flag does not care where the operator sat. Reproduced, not tightened.
-		{"for (var f = () => { return a[b in c] };;);", nil, []string{"unexpectedSingleBlock"},
-			"for (var f = () => (a[b in c]);;);"},
+		{
+			"for (var f = () => { return a[b in c] };;);",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"for (var f = () => (a[b in c]);;);",
+		},
 		// An `in` inside a nested `function`, which pushes no frame upstream, reaches out too.
-		{"for (var f = () => { return g(function(){ return a in c }) };;);", nil,
+		{"for (var f = () => { return g(function(){ return a in c }) };;);", rule.Given[ArrowBodyStyleOptions]{},
 			[]string{"unexpectedSingleBlock"},
 			"for (var f = () => (g(function(){ return a in c }));;);"},
 		// The control: no `in` anywhere, so the initializer clause alone changes nothing.
-		{"for (var f = () => { return a };;);", nil, []string{"unexpectedSingleBlock"},
+		{"for (var f = () => { return a };;);", rule.Given[ArrowBodyStyleOptions]{}, []string{"unexpectedSingleBlock"},
 			"for (var f = () => a;;);"},
 	}
 	for _, testCase := range cases {
@@ -860,27 +920,51 @@ func TestArrowBodyStyleKeepsCommentsOnEitherSide(test *testing.T) {
 
 	cases := []arrowBodyStyleCase{
 		// Before the return keyword: only the first half of the check sees this.
-		{"var foo = () => { /* leading */ return 5; };", nil, []string{"unexpectedSingleBlock"},
-			"var foo = () =>  /* leading */  5 ;"},
-		{"var foo = () => { /* leading */ return 5 };", nil, []string{"unexpectedSingleBlock"},
-			"var foo = () =>  /* leading */  5 ;"},
+		{
+			"var foo = () => { /* leading */ return 5; };",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"var foo = () =>  /* leading */  5 ;",
+		},
+		{
+			"var foo = () => { /* leading */ return 5 };",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"var foo = () =>  /* leading */  5 ;",
+		},
 		// Between the keyword and the value, which is also before the value.
-		{"var foo = () => { return /* mid */ 5; };", nil, []string{"unexpectedSingleBlock"},
-			"var foo = () =>   /* mid */ 5 ;"},
+		{
+			"var foo = () => { return /* mid */ 5; };",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"var foo = () =>   /* mid */ 5 ;",
+		},
 		// Between the value and its semicolon: the trailing window starts after the semicolon, so
 		// this takes the ordinary branch and the comment survives inside the kept span. The
 		// doubled spaces in the rows below are what distinguish the two branches by eye.
-		{"var foo = () => { return 5 /* trailing */; };", nil, []string{"unexpectedSingleBlock"},
-			"var foo = () => 5 /* trailing */;"},
+		{
+			"var foo = () => { return 5 /* trailing */; };",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"var foo = () => 5 /* trailing */;",
+		},
 		// After the semicolon: this is what the trailing half of the check exists for, and the
 		// only shape that reaches it. Without these two rows the whole second half could be
 		// disabled with every fixture staying green, which is how it was found.
-		{"var foo = () => { return 5; /* after */ };", nil, []string{"unexpectedSingleBlock"},
-			"var foo = () =>   5 /* after */ ;"},
-		{"var foo = () => { return 5 /* after */ };", nil, []string{"unexpectedSingleBlock"},
-			"var foo = () =>   5 /* after */ ;"},
+		{
+			"var foo = () => { return 5; /* after */ };",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"var foo = () =>   5 /* after */ ;",
+		},
+		{
+			"var foo = () => { return 5 /* after */ };",
+			rule.Given[ArrowBodyStyleOptions]{},
+			[]string{"unexpectedSingleBlock"},
+			"var foo = () =>   5 /* after */ ;",
+		},
 		// The control: no comment at all takes the ordinary branch, which collapses the space.
-		{"var foo = () => { return 5; };", nil, []string{"unexpectedSingleBlock"},
+		{"var foo = () => { return 5; };", rule.Given[ArrowBodyStyleOptions]{}, []string{"unexpectedSingleBlock"},
 			"var foo = () => 5;"},
 	}
 	for _, testCase := range cases {

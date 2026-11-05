@@ -201,13 +201,11 @@ func funcNameMatchingMessage(direction string, isProperty bool, functionName str
 // to compare and an arrow function cannot have one. Every arm requires
 // `node.init.type === "FunctionExpression"` and then `node.init.id`, so both exclusions come from
 // the same two lines rather than from a separate guard.
-var FuncNameMatching = rule.Rule{
+var FuncNameMatching = rule.Rule[FuncNameMatchingOptions]{
 	Name: "func-name-matching",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[FuncNameMatchingOptions]) rule.Listeners {
 		resolved := DefaultFuncNameMatchingOptions()
-		if given, isFuncNameMatchingOptions := rule.OptionsAs[FuncNameMatchingOptions](
-			options,
-		); isFuncNameMatchingOptions {
+		if given, isFuncNameMatchingOptions := options.Read(); isFuncNameMatchingOptions {
 			resolved = given
 		}
 		direction := resolved.Direction
@@ -595,7 +593,7 @@ func DefaultFuncNameMatchingOptions() FuncNameMatchingOptions {
 // that is neither "always" nor "never", a key the schema does not declare, a second element after an
 // object, or a third element. Each was silently read as the default by the decoder this replaced,
 // and the defaults are exactly what the author wrote the option to change.
-func DecodeFuncNameMatchingOptions(list []byte) (any, error) {
+func DecodeFuncNameMatchingOptions(list []byte) (FuncNameMatchingOptions, error) {
 	options := DefaultFuncNameMatchingOptions()
 	elements, optionElementsError := rule.OptionElements(list, 2)
 	if optionElementsError != nil || len(elements) == 0 {

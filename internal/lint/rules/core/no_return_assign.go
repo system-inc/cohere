@@ -99,16 +99,14 @@ type NoReturnAssignOptions = NoReturnAssignMode
 // `ClassExpression` and `SwitchStatement` both stop the walk before any return is reached. It is
 // also why a function declaration's body does not leak, even though `FunctionDeclaration` itself is
 // not a sentinel: an assignment written in a body is an `ExpressionStatement`, which is.
-var NoReturnAssign = rule.Rule{
+var NoReturnAssign = rule.Rule[NoReturnAssignOptions]{
 	Name: "no-return-assign",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoReturnAssignOptions]) rule.Listeners {
 		// Unrecognized and absent both land on the permissive mode. A rule enabled with a bare
 		// severity must not silently run the strict half, and a typo must not silently escalate.
 		// Same reasoning, and the same direction, as no-cond-assign.
 		always := false
-		if mode, configured := rule.OptionsAs[NoReturnAssignOptions](
-			options,
-		); configured && mode == NoReturnAssignAlways {
+		if mode, configured := options.Read(); configured && mode == NoReturnAssignAlways {
 			always = true
 		}
 

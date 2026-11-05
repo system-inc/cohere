@@ -579,7 +579,8 @@ func (walker *Walker) hasWritableSlot(subjectType *checker.Type, depth int) bool
 		return false
 	}
 	if checker.Checker_isArrayType(walker.typeChecker, subjectType) {
-		return !isNamed(subjectType, "ReadonlyArray") || walker.hasWritableSlot(walker.typeArgument(subjectType, 0), depth+1)
+		return !isNamed(subjectType, "ReadonlyArray") ||
+			walker.hasWritableSlot(walker.typeArgument(subjectType, 0), depth+1)
 	}
 	if checker.IsTupleType(subjectType) {
 		if !subjectType.TargetTupleType().IsReadonly() {
@@ -839,8 +840,8 @@ var containers = map[string]bool{
 	"ReadonlyMap": true, "ReadonlySet": true,
 }
 
-// containerOf names `subjectType`'s container and whether it is read-only, when `subjectType` is a reference to one declared in a
-// declaration file. The file test stands in for "the library": Adamic ships its own `.d.ts` under noLib,
+// containerOf names `subjectType`'s container and whether it is read-only, when `subjectType` is a reference to one
+// declared in a declaration file. The file test stands in for "the library": Adamic ships its own `.d.ts` under noLib,
 // so asking whether the symbol came from TypeScript's default library would miss Adamic's own Map.
 func containerOf(subjectType *checker.Type) (string, bool, bool) {
 	if subjectType.ObjectFlags()&checker.ObjectFlagsReference == 0 || subjectType.Target() == nil {

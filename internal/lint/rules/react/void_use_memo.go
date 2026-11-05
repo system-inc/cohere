@@ -177,12 +177,12 @@ var messageUseMemoResultUnused = rule.Message{
 // real `useMemo` and neither authority reports it, because both test the written name rather than
 // resolving it. cohere has a whole-program checker and could resolve it. Deliberately not done: it
 // would report a class of finding neither authority produces, and a differential would show it.
-var VoidUseMemo = rule.Rule{
+var VoidUseMemo = rule.Rule[CompilerRuleOptions]{
 	// No namespace prefix. The config writes `react/void-use-memo`, and the parity guard strips the
 	// namespace on a `/` boundary, so a self-namespaced `react-void-use-memo` would match no
 	// inventory entry and lint nothing.
 	Name: "react-hooks/void-use-memo",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
@@ -229,19 +229,19 @@ var VoidUseMemo = rule.Rule{
 // is excluded and an optional *call* is not, which is upstream's asymmetry rather than an
 // approximation here. All four measured.
 func isUseMemoCallee(callee *ast.Node, enclosing *ast.Node) bool {
-	callee = ast.SkipParentheses(callee)
-	if callee == nil {
+	unwrapped := ast.SkipParentheses(callee)
+	if unwrapped == nil {
 		return false
 	}
 
-	if callee.Kind == ast.KindIdentifier {
-		return callee.Text() == "useMemo" && !isShadowedWithin("useMemo", callee, enclosing)
+	if unwrapped.Kind == ast.KindIdentifier {
+		return unwrapped.Text() == "useMemo" && !isShadowedWithin("useMemo", unwrapped, enclosing)
 	}
 
-	if callee.Kind != ast.KindPropertyAccessExpression {
+	if unwrapped.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
-	access := callee.AsPropertyAccessExpression()
+	access := unwrapped.AsPropertyAccessExpression()
 	// `React?.useMemo(...)` is clean upstream while `useMemo?.(...)` reports, so the optional token
 	// is declined here and never at the call. Measured both ways.
 	if access.QuestionDotToken != nil {

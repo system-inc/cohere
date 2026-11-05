@@ -165,9 +165,9 @@ func messageAdjacentOverloadSignatures(name string) rule.Message {
 // The flag is reproduced anyway because it is upstream's, but it is recorded as inert rather than
 // left to read as load-bearing. The verdict names the containers this rule listens on: adding a
 // listener for a container that could hold both shapes would void it.
-var AdjacentOverloadSignatures = rule.Rule{
+var AdjacentOverloadSignatures = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/adjacent-overload-signatures",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

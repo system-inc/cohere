@@ -80,6 +80,10 @@ func hasReadOnlyClosureEffectsForCaptures(
 	return graph.MutationCount() == 0
 }
 
+// hasReadOnlyClosureEffects reports whether a function, and every closure it creates or holds, is free of the
+// instructions and effects (a mutation, a freeze) that rule out a read-only closure.
+//
+// Mutates: seen the recursion marks each function it is inside so a cycle stops, and unmarks it on the way out
 func hasReadOnlyClosureEffects(function *Function, seen map[*Function]bool) bool {
 	if function == nil || seen[function] {
 		return false
@@ -140,16 +144,16 @@ func refDerivedValues(function *Function) map[static_single_assignment.Identifie
 				if instruction == nil {
 					continue
 				}
-				switch value := instruction.Value.(type) {
+				switch shape := instruction.Value.(type) {
 				case *LoadLocal:
-					mark(value.Place.Identifier, instruction.LValue.Identifier)
+					mark(shape.Place.Identifier, instruction.LValue.Identifier)
 				case *StoreLocal:
-					mark(value.Value.Identifier, value.LValue.Identifier)
-					mark(value.Value.Identifier, instruction.LValue.Identifier)
+					mark(shape.Value.Identifier, shape.LValue.Identifier)
+					mark(shape.Value.Identifier, instruction.LValue.Identifier)
 				case *PropertyLoad:
-					mark(value.Object.Identifier, instruction.LValue.Identifier)
+					mark(shape.Object.Identifier, instruction.LValue.Identifier)
 				case *ComputedLoad:
-					mark(value.Object.Identifier, instruction.LValue.Identifier)
+					mark(shape.Object.Identifier, instruction.LValue.Identifier)
 				}
 			}
 		}

@@ -110,7 +110,7 @@ type preferNullishCoalescingWire struct {
 //
 // The corpus splits 110 object-form against 25 bare-`true`, so a decoder handling only the object
 // form still passes 110 cases. That is why this was measured first rather than tested afterwards.
-func DecodePreferNullishCoalescingOptions(raw []byte) (any, error) {
+func DecodePreferNullishCoalescingOptions(raw []byte) (PreferNullishCoalescingOptions, error) {
 	options := DefaultPreferNullishCoalescingOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -306,14 +306,14 @@ func preferNullishCoalescingSuggestion(replacement string) string {
 // reports exactly like `a || c`, because the rule looks at the operator and not at the member
 // access. Predicted as a divergence, measured as a non-divergence, and stated here so the next
 // reader does not re-derive the worry.
-var PreferNullishCoalescing = rule.Rule{
+var PreferNullishCoalescing = rule.Rule[PreferNullishCoalescingOptions]{
 	Name:             "@typescript-eslint/prefer-nullish-coalescing",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[PreferNullishCoalescingOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[PreferNullishCoalescingOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultPreferNullishCoalescingOptions()
 		}

@@ -200,7 +200,7 @@ var evalLikeFunctions = []string{"execScript", "setImmediate", "setInterval", "s
 // does is read the callee's name and return when it is neither a bare identifier nor a
 // global-candidate access. That is a syntactic test with no checker involvement, so the
 // overwhelming majority of calls in a real file exit before the type graph is touched.
-var NoImpliedEval = rule.Rule{
+var NoImpliedEval = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-implied-eval",
 
 	// Both listeners reach the checker for any call whose callee name matches, so the checker is
@@ -211,7 +211,7 @@ var NoImpliedEval = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		getCalleeName := func(node *ast.Expression) string {
 			if ast.IsIdentifier(node) {
 				return node.AsIdentifier().Text
@@ -243,7 +243,12 @@ var NoImpliedEval = rule.Rule{
 				return true
 			}
 
-			if type_checking.IsBuiltinSymbolLike(ruleContext.Program, ruleContext.TypeChecker, subjectType, "Function") {
+			if type_checking.IsBuiltinSymbolLike(
+				ruleContext.Program,
+				ruleContext.TypeChecker,
+				subjectType,
+				"Function",
+			) {
 				return true
 			}
 

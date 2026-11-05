@@ -105,7 +105,7 @@ func TestFunctionalResolutionRejectsWhatTheEngineRejects(test *testing.T) {
 
 func bareValueDescription() *FunctionalUtilityDescription {
 	return &FunctionalUtilityDescription{
-		HandleBareValue: func(value *ParsedValue) (string, bool) { return value.Value, true },
+		HandleBareValue: func(parsedValue *ParsedValue) (string, bool) { return parsedValue.Value, true },
 	}
 }
 
@@ -153,7 +153,7 @@ func TestFunctionalResolutionModifierCancelsBareValue(test *testing.T) {
 	test.Parallel()
 	theme := NewTheme()
 	description := &FunctionalUtilityDescription{
-		HandleBareValue: func(value *ParsedValue) (string, bool) { return value.Value, true },
+		HandleBareValue: func(parsedValue *ParsedValue) (string, bool) { return parsedValue.Value, true },
 	}
 
 	withModifier := ParsedCandidate{
@@ -183,7 +183,7 @@ func TestFunctionalResolutionNegatesThroughMathOperatorSpacing(test *testing.T) 
 	test.Parallel()
 	theme := NewTheme()
 	description := &FunctionalUtilityDescription{
-		HandleBareValue: func(value *ParsedValue) (string, bool) { return value.Value, true },
+		HandleBareValue: func(parsedValue *ParsedValue) (string, bool) { return parsedValue.Value, true },
 	}
 	candidate := ParsedCandidate{
 		Kind:  ParsedCandidateKindFunctional,
@@ -239,7 +239,9 @@ func TestFunctionalResolutionFractionMatchesTheEngineExactly(test *testing.T) {
 func TestFunctionalResolutionValuelessModifierProducesNothing(test *testing.T) {
 	test.Parallel()
 	theme := NewTheme()
-	theme.Add("--radius", "0.25rem", 0)
+	if addError := theme.Add("--radius", "0.25rem", 0); addError != nil {
+		test.Fatalf("Add(%q): %v", "--radius", addError)
+	}
 	description := &FunctionalUtilityDescription{
 		ThemeKeys:           []string{"--radius"},
 		DefaultValue:        "1",
@@ -271,7 +273,9 @@ func TestFunctionalResolutionValuelessModifierProducesNothing(test *testing.T) {
 func TestFunctionalResolutionThemeBeforeStaticValues(test *testing.T) {
 	test.Parallel()
 	theme := NewTheme()
-	theme.Add("--width-full", "60rem", 0)
+	if addError := theme.Add("--width-full", "60rem", 0); addError != nil {
+		test.Fatalf("Add(%q): %v", "--width-full", addError)
+	}
 
 	description := &FunctionalUtilityDescription{
 		ThemeKeys:        []string{"--width"},

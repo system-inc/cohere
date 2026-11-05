@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -132,21 +133,21 @@ func runNoDeprecatedCases(test *testing.T, cases []noDeprecatedCase) {
 				files["/repository/source/deprecated.ts"] = noDeprecatedSharedFixture
 			}
 
-			var decoded any
+			var decoded rule.Given[NoDeprecatedOptions]
 			if testCase.options != "" {
 				parsed, decodeNoDeprecatedOptionsError := DecodeNoDeprecatedOptions(json.RawMessage(testCase.options))
 				if decodeNoDeprecatedOptionsError != nil {
 					test.Fatalf("the decoder refused %s: %v", testCase.options, decodeNoDeprecatedOptionsError)
 				}
-				decoded = parsed
+				decoded = rule.Configured(parsed)
 			}
 
 			var result rule_testing.Result
 			if testCase.withInstalledTypes {
-				result = rule_testing.RunTypedFilesWithSetupAndOptions(
+				result = rule_testing.RunTypedFilesWithSetupGiven(
 					test, NoDeprecated, files, subjectName, decoded, linkInstalledTypesForNoDeprecated(test))
 			} else {
-				result = rule_testing.RunTypedFilesWithOptions(test, NoDeprecated, files, subjectName, decoded)
+				result = rule_testing.RunTypedFilesGiven(test, NoDeprecated, files, subjectName, decoded)
 			}
 
 			if len(result.Diagnostics) != len(testCase.expected) {

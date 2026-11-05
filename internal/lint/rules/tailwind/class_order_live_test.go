@@ -304,7 +304,7 @@ func TestClassOrderLiveMatchesTheEngineOverTheSyntheticCases(test *testing.T) {
 		}
 		system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 			EntryPoint:          entryPoint,
-			TailwindPackageRoot: vendored.TailwindPackageRoot(),
+			TailwindPackageRoot: vendored.TailwindPackageRootForTest(test),
 		})
 		if loadDesignSystemError != nil {
 			test.Fatalf("%s: loading its stylesheet: %v", list.name, loadDesignSystemError)

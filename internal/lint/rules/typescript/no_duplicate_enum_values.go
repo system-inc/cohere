@@ -111,11 +111,11 @@ var messageNoDuplicateEnumValues = rule.Message{
 // is what this reproduces. The member name lives in the message description rather than in a format
 // verb, because `rule.Message` has no interpolation layer, so the identifying detail a reader needs
 // is the span rather than the text.
-var NoDuplicateEnumValues = rule.Rule{
+var NoDuplicateEnumValues = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `typescript/no-duplicate-enum-values` and the parity
 	// guard strips the namespace on a `/` boundary.
 	Name: "@typescript-eslint/no-duplicate-enum-values",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {
 				declaration := node.AsEnumDeclaration()

@@ -117,8 +117,10 @@ func Judge(sourceFile *ast.Node, settings Settings, hooks Hooks, reporter Report
 			})
 		},
 		ReportRange: func(textRange core.TextRange, messageId string, description string) {
+			// The finding keeps its own copy of the range, replayed after the sort.
+			heldRange := textRange
 			collected = append(collected, finding{
-				position: textRange.Pos(), textRange: &textRange,
+				position: heldRange.Pos(), textRange: &heldRange,
 				messageId: messageId, description: description,
 			})
 		},

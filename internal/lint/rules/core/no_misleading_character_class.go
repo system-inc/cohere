@@ -162,7 +162,7 @@ var messageMisleadingZeroWidthJoiner = rule.Message{
 //
 // An astral character split into its halves takes the spelling of the whole: `\u{1F44D}` in a
 // string is two escaped halves, and `\👍` is two plain ones.
-var NoMisleadingCharacterClass = rule.Rule{
+var NoMisleadingCharacterClass = rule.Rule[NoMisleadingCharacterClassOptions]{
 	Name: "no-misleading-character-class",
 
 	// The tracker tells the global RegExp from a local one by where its symbol is declared, and a
@@ -170,8 +170,8 @@ var NoMisleadingCharacterClass = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[NoMisleadingCharacterClassOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoMisleadingCharacterClassOptions]) rule.Listeners {
+		settings, _ := options.Read()
 		allowEscape := settings.AllowEscape
 		// The regex literals a RegExp call took with flags, so already checked under the call's.
 		// Filled from the file node, which the walk enters before any literal.

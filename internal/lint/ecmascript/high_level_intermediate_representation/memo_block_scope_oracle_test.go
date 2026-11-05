@@ -56,22 +56,20 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(test *testing.T) {
 		test.Fatalf("loading the vendored corpus: %v", loadError)
 	}
 
-	var (
-		fixturesScored     int
-		flowExcluded       int
-		blocksTotal        int
-		blocksAllEmpty     int
-		blocksWithCarrying int
-		scopesInside       int
-		carryingInside     int
-		emptyInside        int
-		carryingAfter      int
-		capturingInside    int
+	var fixturesScored int
+	var flowExcluded int
+	var blocksTotal int
+	var blocksAllEmpty int
+	var blocksWithCarrying int
+	var scopesInside int
+	var carryingInside int
+	var emptyInside int
+	var carryingAfter int
+	var capturingInside int
 
-		blocksAllEmptyWithCapture  int
-		blocksAllEmptyContradicted int
-		emptyWithCaptureNames      []string
-	)
+	var blocksAllEmptyWithCapture int
+	var blocksAllEmptyContradicted int
+	var emptyWithCaptureNames []string
 	for _, fixture := range fixtures {
 		if !strings.Contains(fixture.Source, "validatePreserveExistingMemoizationGuarantees") {
 			continue
@@ -259,10 +257,10 @@ func memoBlockObservations(test *testing.T, source string) ([]memoBlockObservati
 
 	var all []memoBlockObservation
 	lowered := false
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "memo-block-scope-oracle",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {

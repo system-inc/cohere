@@ -20,7 +20,7 @@ type CompilerRuleOptions struct{}
 //
 // An empty object is accepted and honoured, since it sets nothing. An object with keys is refused,
 // naming them: it is compiler configuration, and accepting it would be an option read and ignored.
-func DecodeCompilerRuleOptions(raw []byte) (any, error) {
+func DecodeCompilerRuleOptions(raw []byte) (CompilerRuleOptions, error) {
 	options := CompilerRuleOptions{}
 	if len(raw) == 0 {
 		return options, nil

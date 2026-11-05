@@ -3,6 +3,7 @@ package typescript
 import (
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -14,7 +15,7 @@ const tripleSlashFile = "/repository/source/Thing.ts"
 // The decoder holds three defaults and a per-key value filter, so a fixture that constructed
 // `TripleSlashReferenceOptions` by hand would test the rule while leaving the half of the port that
 // reads the config unexercised. Every case below names its configuration the way a user writes it.
-func decodeTripleSlashOptions(test *testing.T, configuration string) any {
+func decodeTripleSlashOptions(test *testing.T, configuration string) TripleSlashReferenceOptions {
 	test.Helper()
 
 	options, decodeTripleSlashReferenceOptionsError := DecodeTripleSlashReferenceOptions([]byte(configuration))
@@ -550,12 +551,8 @@ func TestDecodeTripleSlashReferenceOptions(test *testing.T) {
 			if decodeTripleSlashReferenceOptionsError != nil {
 				test.Fatalf("could not decode: %v", decodeTripleSlashReferenceOptionsError)
 			}
-			got, ok := decoded.(TripleSlashReferenceOptions)
-			if !ok {
-				test.Fatalf("expected TripleSlashReferenceOptions, got %T", decoded)
-			}
-			if got != testCase.want {
-				test.Fatalf("expected %+v, got %+v", testCase.want, got)
+			if decoded != testCase.want {
+				test.Fatalf("expected %+v, got %+v", testCase.want, decoded)
 			}
 		})
 	}
@@ -576,38 +573,38 @@ func TestDecodeTripleSlashReferenceOptions(test *testing.T) {
 // separated this from an unwired rule; the finding count is what said it was broken anyway.
 //
 // The nil case is the one the config actually produces. A value of the wrong type must not silently
-// disable the rule either, and since #qmvkf83 it cannot: rule.OptionsAs panics on it, which
-// TestTripleSlashReferenceRefusesOptionsOfTheWrongType holds.
+// disable the rule either, and since #ymag4q6 it cannot be written: the rule and its decoder meet in
+// rule.Registration[TripleSlashReferenceOptions], so options of another type are a compile error.
 func TestTripleSlashReferenceUsesDefaultsWhenTheConfigNamesNoOptions(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
 		name    string
-		options any
+		options rule.Given[TripleSlashReferenceOptions]
 	}{
-		{"nil, which is what a bare severity in the config produces", nil},
+		{"nil, which is what a bare severity in the config produces", rule.Given[TripleSlashReferenceOptions]{}},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			// path defaults to never, so this must report.
 			rule_testing.ExpectFindings(test,
-				rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile,
+				rule_testing.RunGiven(test, TripleSlashReference, tripleSlashFile,
 					"/// <reference path=\"foo\" />\n", testCase.options),
 				"tripleSlashReference")
 
 			// lib defaults to always, so this must not. Both halves are needed: a fallback that
 			// set every key to never would pass the first assertion alone.
 			rule_testing.ExpectClean(test,
-				rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile,
+				rule_testing.RunGiven(test, TripleSlashReference, tripleSlashFile,
 					"/// <reference lib=\"foo\" />\n", testCase.options))
 
 			// types defaults to prefer-import, which is neither of the other two settings.
 			rule_testing.ExpectClean(test,
-				rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile,
+				rule_testing.RunGiven(test, TripleSlashReference, tripleSlashFile,
 					"/// <reference types=\"foo\" />\n", testCase.options))
 			rule_testing.ExpectFindings(test,
-				rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile,
+				rule_testing.RunGiven(test, TripleSlashReference, tripleSlashFile,
 					"/// <reference types=\"foo\" />\nimport * as foo from 'foo';\n", testCase.options),
 				"tripleSlashReference")
 		})
@@ -651,32 +648,5 @@ func TestTripleSlashReferenceScansEveryDirectiveBeforeTheCutoff(test *testing.T)
 		if got != want {
 			test.Fatalf("finding %d: expected %q, got %q", index, want, got)
 		}
-	}
-}
-
-// Options of a type the decoder never returns are a disagreement between the registration and the
-// rule, and that fails loudly rather than defaulting: these used to fall back to the defaults, which
-// is the silence that let unified-signatures ignore its options (#qmvkf83).
-func TestTripleSlashReferenceRefusesOptionsOfTheWrongType(test *testing.T) {
-	test.Parallel()
-
-	cases := []struct {
-		name    string
-		options any
-	}{
-		{"a value of some other type", "error"},
-		{"a pointer rather than the value", &TripleSlashReferenceOptions{}},
-	}
-	for _, testCase := range cases {
-		test.Run(testCase.name, func(test *testing.T) {
-			test.Parallel()
-			defer func() {
-				if recover() == nil {
-					test.Fatal("expected options of the wrong type to panic rather than default")
-				}
-			}()
-			rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile,
-				"/// <reference path=\"foo\" />\n", testCase.options)
-		})
 	}
 }

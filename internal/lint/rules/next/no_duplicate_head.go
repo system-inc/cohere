@@ -114,7 +114,7 @@ var messageNoDuplicateHead = rule.Message{
 // which is a difference the differential harness would read as ours being wrong. The four upstream
 // spellings of that path test disagree with each other anyway. Recorded here rather than fixed so
 // the next reader finds the decision rather than re-deriving it.
-var NoDuplicateHead = rule.Rule{
+var NoDuplicateHead = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-duplicate-head` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name: "@next/next/no-duplicate-head",
@@ -124,7 +124,7 @@ var NoDuplicateHead = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 	NoListener:       rule.NoListenerDeclinesIrrelevantFiles,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Every declaration node that binds a local name `Head` at the module root. Keyed by node
 		// so identity is compared rather than kind: two files can each declare a `Head` and a tag
 		// resolving to the wrong one must not count.

@@ -8,75 +8,64 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/lint/optionschema"
+	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// Decoder turns a rule's raw JSON options into the typed value that rule expects.
+// Decoder turns a rule's raw JSON options into the rule bound to them, ready to run.
 //
 // A rule declares its own options struct, and only the rule's own package knows that type. The
 // config layer holds bytes. This function type is the seam: the registry pairs a rule with a
-// decoder that knows how to produce its struct, and neither side has to import the other.
+// decoder that decodes its struct and closes the rule over it, so what comes back is a rule.Bound and
+// the options' type never crosses into this package.
 //
-// It returns an error rather than a zero value, because a rule that silently receives a zero
-// options struct is the exact defect this exists to fix. `boundary-no-project-import` was enabled
+// It returns an error rather than a rule bound to a zero value, because a rule that silently receives a
+// zero options struct is the exact defect this exists to fix. `boundary-no-project-import` was enabled
 // and inert for months under the previous gate, declining every file because its LibraryDirectory
 // was empty, and a liveness harness reporting `fixtures=54 live=53 dead=1` was the only thing that
 // ever noticed.
-type Decoder func(raw json.RawMessage) (any, error)
-
-// DecodeInto builds a Decoder for any options struct.
-//
-// Used as `configuration.DecodeInto[BoundaryNoProjectImportOptions]()`, it decodes the config's JSON into
-// that type and reports what went wrong if it cannot, naming the type so the message says which
-// rule's options failed rather than only that some JSON did not parse.
-func DecodeInto[Options any]() Decoder {
-	return func(raw json.RawMessage) (any, error) {
-		var decoded Options
-		if len(raw) == 0 {
-			return decoded, fmt.Errorf("no options were configured")
-		}
-		if decodeError := json.Unmarshal(raw, &decoded); decodeError != nil {
-			return decoded, fmt.Errorf("decoding %T: %w", decoded, decodeError)
-		}
-		return decoded, nil
-	}
-}
+type Decoder func(raw json.RawMessage) (rule.Bound, error)
 
 // RuleOptions pairs a rule name with how to decode its options and whether it can run without them.
 //
-// Exactly one of Decode and DecodeList is set, and which one is the rule's arity. Decode serves a
-// rule that takes one option element and is handed that element alone. DecodeList serves a rule
-// whose upstream schema takes more than one, and is handed every element as a JSON array, which is
-// upstream's own `context.options` with the severity removed. The arity has to live here, beside
-// the decoder, because this is the only layer that sees both the elements and the rule.
+// At most one of Decode and DecodeList is set, and which one is the rule's arity; neither is a rule
+// that takes no options. Decode serves a rule that takes one option element and is handed that element
+// alone. DecodeList serves a rule whose upstream schema takes more than one, and is handed every element
+// as a JSON array, which is upstream's own `context.options` with the severity removed. The arity has
+// to live here, beside the decoder, because this is the only layer that sees both the elements and the
+// rule.
 //
 // Required is the load-bearing field, and it is the whole lesson of the inert-rule defect. A rule
 // that needs an option and does not get one must fail loudly rather than decline quietly: declining
 // looks identical to a rule with nothing to report, and that ambiguity hid a dead rule for months.
 // A rule whose options only tune it, rather than enable it, sets Required false and runs on
 // defaults.
+//
+// Unconfigured is the rule as it runs handed no options, which is what Decode returns for a bare
+// severity on a rule that takes none or whose options only tune it.
 type RuleOptions struct {
-	Decode     Decoder
-	DecodeList Decoder
-	Required   bool
+	Decode       Decoder
+	DecodeList   Decoder
+	Required     bool
+	Unconfigured rule.Bound
 }
 
 // OptionsRegistry maps rule names to their decoders.
 type OptionsRegistry map[string]RuleOptions
 
-// Decode produces the typed options for one rule from every option element the config wrote, or
+// Decode binds one rule to the options decoded from every option element the config wrote, or
 // reports why it cannot.
 //
-// The outcomes are deliberately distinct rather than collapsed into "nil options":
+// The outcomes are deliberately distinct rather than collapsed into "no options":
 //
-//	no decoder, no elements        the rule takes no options; nil is correct and expected
+//	no decoder, no elements        the rule takes no options; Unconfigured is correct and expected
 //	no decoder, any element        an error naming the rule and each element
 //	Decode, two or more elements   an error naming the rule and every element after the first
 //	DecodeList, any count          the rule's own decoder reads the whole list, upstream's shape
-//	decoder, elements present      the typed value
-//	decoder, elements absent       an error if the rule requires options, nil if they merely tune it
+//	decoder, elements present      the rule bound to the decoded value
+//	decoder, elements absent       an error if the rule requires options, Unconfigured if they merely tune it
 //
-// Collapsing the last case into nil is precisely how a required option goes missing without anyone
-// finding out.
+// Collapsing the last case into Unconfigured is precisely how a required option goes missing without
+// anyone finding out.
 //
 // # No element is dropped
 //
@@ -85,19 +74,19 @@ type OptionsRegistry map[string]RuleOptions
 // {"enforceForRenamedProperties": true}]` loaded clean, ran, and reported 0 on source the second
 // element exists to flag, while the one-object spelling reported 1. A refusal costs one edit to the
 // config; a silent drop costs an afternoon of somebody wondering why their option does nothing.
-func (registry OptionsRegistry) Decode(ruleName string, elements []json.RawMessage) (any, error) {
+func (registry OptionsRegistry) Decode(ruleName string, elements []json.RawMessage) (rule.Bound, error) {
 	declared, hasDeclared := registry[ruleName]
 	if !hasDeclared || (declared.Decode == nil && declared.DecodeList == nil) {
 		if len(elements) > 0 {
-			return nil, fmt.Errorf(
+			return rule.Bound{}, fmt.Errorf(
 				"rule %s takes no options, and the config gives it %s, which it would never read. "+
 					"Remove the options or write the bare severity", ruleName, describeElements(elements, 0))
 		}
-		return nil, nil
+		return declared.Unconfigured, nil
 	}
 
 	if refuseNullsError := refuseNulls(elements); refuseNullsError != nil {
-		return nil, fmt.Errorf("rule %s: %w", ruleName, refuseNullsError)
+		return rule.Bound{}, fmt.Errorf("rule %s: %w", ruleName, refuseNullsError)
 	}
 
 	var raw json.RawMessage
@@ -108,12 +97,12 @@ func (registry OptionsRegistry) Decode(ruleName string, elements []json.RawMessa
 		if len(elements) > 0 {
 			list, encodeError := json.Marshal(elements)
 			if encodeError != nil {
-				return nil, fmt.Errorf("rule %s: re-encoding its option elements: %w", ruleName, encodeError)
+				return rule.Bound{}, fmt.Errorf("rule %s: re-encoding its option elements: %w", ruleName, encodeError)
 			}
 			raw = list
 		}
 	case len(elements) > 1:
-		return nil, fmt.Errorf(
+		return rule.Bound{}, fmt.Errorf(
 			"rule %s takes one option element, and the config gives it %d: %s would never be read, "+
 				"so the entry is refused rather than half applied",
 			ruleName, len(elements), describeElements(elements, 1))
@@ -121,13 +110,13 @@ func (registry OptionsRegistry) Decode(ruleName string, elements []json.RawMessa
 		raw = elements[0]
 	}
 
-	decoded, decodeError := decode(raw)
+	bound, decodeError := decode(raw)
 	if decodeError != nil {
 		if len(raw) == 0 && !declared.Required {
 			// The rule tunes on options it did not get. Defaults are its own business.
-			return nil, nil
+			return declared.Unconfigured, nil
 		}
-		return nil, fmt.Errorf("rule %s: %w", ruleName, decodeError)
+		return rule.Bound{}, fmt.Errorf("rule %s: %w", ruleName, decodeError)
 	}
 
 	// A ported rule's options are also checked against upstream's own schema, so cohere accepts
@@ -142,10 +131,10 @@ func (registry OptionsRegistry) Decode(ruleName string, elements []json.RawMessa
 	// upstream schema refuses an empty list (TestEverySchemaAcceptsTheBareSeverity).
 	if len(elements) > 0 {
 		if checkError := optionschema.Check(ruleName, elements); checkError != nil {
-			return nil, fmt.Errorf("rule %s: %w", ruleName, checkError)
+			return rule.Bound{}, fmt.Errorf("rule %s: %w", ruleName, checkError)
 		}
 	}
-	return decoded, nil
+	return bound, nil
 }
 
 // refuseNulls refuses a JSON null anywhere in a rule's option elements, naming the element and the
@@ -161,8 +150,8 @@ func (registry OptionsRegistry) Decode(ruleName string, elements []json.RawMessa
 // that read their element with json.Unmarshal rather than rule.UnmarshalOptions.
 func refuseNulls(elements []json.RawMessage) error {
 	for index, element := range elements {
-		var value any
-		if decodeError := json.Unmarshal(element, &value); decodeError != nil {
+		value, parseError := optionschema.ParseJsonValue(element)
+		if parseError != nil {
 			// Malformed JSON is the decoder's to report, in its own words.
 			continue
 		}
@@ -180,17 +169,17 @@ func refuseNulls(elements []json.RawMessage) error {
 
 // nullPath finds the first null in a decoded JSON value, walking object keys in sorted order so the
 // same config always names the same path, and returns its dotted path.
-func nullPath(value any, path string) (string, bool) {
+func nullPath(value optionschema.JsonValue, path string) (string, bool) {
 	switch typed := value.(type) {
-	case nil:
+	case optionschema.JsonNull:
 		return path, true
-	case []any:
+	case optionschema.JsonArray:
 		for index, member := range typed {
 			if found, isNull := nullPath(member, joinPath(path, strconv.Itoa(index))); isNull {
 				return found, true
 			}
 		}
-	case map[string]any:
+	case optionschema.JsonObject:
 		keys := make([]string, 0, len(typed))
 		for key := range typed {
 			keys = append(keys, key)

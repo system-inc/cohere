@@ -9,13 +9,6 @@ import Testing
  2026-11-04 (#zggj9xy): with stale state able to mislead, a run that trusts nothing has to exist.
  */
 struct NoCacheTests {
-    static func leftoverScratches() throws -> Set<String> {
-        Set(
-            try FileManager.default.contentsOfDirectory(atPath: FileManager.default.temporaryDirectory.path)
-                .filter { $0.hasPrefix("cohere-swift-no-cache-") }
-        )
-    }
-
     @Test func aRunWithNoCacheBuildsInItsOwnScratchAndLeavesNothing() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(
             "cohere-swift-nocache-package-\(UUID().uuidString)",
@@ -33,15 +26,18 @@ struct NoCacheTests {
             atomically: true,
             encoding: .utf8,
         )
-        let before = try Self.leftoverScratches()
-
         let options = try CommandOptions.parse(
             ["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix", "--no-cache"],
             workingDirectory: root,
         )
         var lines = Data()
-        _ = try await Pipeline(options: options, writer: ContractWriter { lines.append($0) }, workingDirectory: root)
-            .run()
+        let pipeline = Pipeline(options: options, writer: ContractWriter { lines.append($0) }, workingDirectory: root)
+        /*
+         This run's own scratch, by its path: other tests run beside this one with `--no-cache`, so a count of the
+         temporary directory's scratches would see theirs mid-run and blame this one.
+         */
+        let scratch = try #require(pipeline.freshScratch, "a --no-cache run named no scratch of its own")
+        _ = try await pipeline.run()
         let records = try lines.split(separator: UInt8(ascii: "\n")).map { line in
             try #require(try JSONSerialization.jsonObject(with: Data(line)) as? [String: Any])
         }
@@ -53,6 +49,6 @@ struct NoCacheTests {
             !FileManager.default.fileExists(atPath: root.appendingPathComponent(".cache").path),
             "a --no-cache run wrote to the project's .cache",
         )
-        #expect(try Self.leftoverScratches() == before, "the run's own scratch outlived it")
+        #expect(!FileManager.default.fileExists(atPath: scratch.path), "the run's own scratch outlived it")
     }
 }

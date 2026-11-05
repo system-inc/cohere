@@ -65,11 +65,11 @@ const (
  *
  * The repair is a different type or a different value, and only the author can pick it.
  */
-var NominalClass = rule.Rule{
+var NominalClass = rule.Rule[rule.NoOptions]{
 	Name:             "adamic/nominal-class",
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}

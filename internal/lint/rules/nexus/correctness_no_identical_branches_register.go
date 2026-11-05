@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // (to `switch`, to empty branches, to two equal branches inside a longer chain) would reach the shapes
 // the rule's doc comment declines on purpose.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessNoIdenticalBranches})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessNoIdenticalBranches})
 }

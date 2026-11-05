@@ -31,6 +31,13 @@ type EnforceConsistentImportantPositionOptions struct {
 	Position string `json:"position"`
 }
 
+const (
+	// importantPositionRecommended is v4's trailing marker: `flex!`.
+	importantPositionRecommended = "recommended"
+	// importantPositionLegacy is v3's leading marker: `!flex`.
+	importantPositionLegacy = "legacy"
+)
+
 // EnforceConsistentImportantPosition reports an important marker on the wrong side of a utility.
 //
 //	valid:   <div className="text-red-500!" />
@@ -73,18 +80,16 @@ type EnforceConsistentImportantPositionOptions struct {
 //
 // Not fixable, for the reason its siblings are not: a class literal here wraps across lines with
 // indentation that carries intent, and a fixer would be the first thing to reflow it.
-var EnforceConsistentImportantPosition = rule.Rule{
+var EnforceConsistentImportantPosition = rule.Rule[EnforceConsistentImportantPositionOptions]{
 	Name: "better-tailwindcss/enforce-consistent-important-position",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[EnforceConsistentImportantPositionOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
 		position := importantPositionRecommended
-		if configured, isConfigured := rule.OptionsAs[EnforceConsistentImportantPositionOptions](
-			options,
-		); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			surfaces = configured.ClassLiteralSurfaces()
 			if configured.Position == importantPositionLegacy {
 				position = importantPositionLegacy
@@ -112,13 +117,6 @@ var EnforceConsistentImportantPosition = rule.Rule{
 		return listeners
 	},
 }
-
-const (
-	// importantPositionRecommended is v4's trailing marker: `flex!`.
-	importantPositionRecommended = "recommended"
-	// importantPositionLegacy is v3's leading marker: `!flex`.
-	importantPositionLegacy = "legacy"
-)
 
 // correctedImportantPosition returns the class with its marker on the configured side.
 //

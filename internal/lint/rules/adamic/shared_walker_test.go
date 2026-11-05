@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -57,7 +58,7 @@ func TestTheRulesSharingAWalkerReportWhatEachReportsAlone(test *testing.T) {
 	); writeError != nil {
 		test.Fatal(writeError)
 	}
-	walk := func(rules ...rule.Rule) []string {
+	walk := func(rules ...rule.Rule[rule.NoOptions]) []string {
 		test.Helper()
 		graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json")})
 		if buildError != nil {
@@ -66,7 +67,11 @@ func TestTheRulesSharingAWalkerReportWhatEachReportsAlone(test *testing.T) {
 		if diagnostics := graph.Program.GetSemanticDiagnostics(context.Background(), nil); len(diagnostics) > 0 {
 			test.Fatalf("the fixture has %d type errors, so it is not a program tsc accepts", len(diagnostics))
 		}
-		result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+		result, walkError := graph.Walk(
+			context.Background(),
+			graph.ProjectFiles(),
+			rule_testing.EntriesOf(test, rules...),
+		)
 		if walkError != nil {
 			test.Fatalf("walking: %v", walkError)
 		}
@@ -89,7 +94,7 @@ func TestTheRulesSharingAWalkerReportWhatEachReportsAlone(test *testing.T) {
 	}
 
 	alone := []string{}
-	for _, subject := range []rule.Rule{InvariantMutable, NominalClass, NoOptionalWidening} {
+	for _, subject := range []rule.Rule[rule.NoOptions]{InvariantMutable, NominalClass, NoOptionalWidening} {
 		found := walk(subject)
 		if len(found) == 0 {
 			test.Fatalf("%s found nothing walked alone, so sharing is untested for it", subject.Name)

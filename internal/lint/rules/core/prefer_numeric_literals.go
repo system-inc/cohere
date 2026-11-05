@@ -88,11 +88,11 @@ var preferNumericLiteralsRadix = map[int]struct {
 // The replacement can end up beside a token it would merge with, in either direction. `yield` and
 // `0b11` written adjacently become one identifier, and `0b11` beside `in` becomes `0b11in`. Both
 // are in the corpus and both get a space here.
-var PreferNumericLiterals = rule.Rule{
+var PreferNumericLiterals = rule.Rule[rule.NoOptions]{
 	Name:             "prefer-numeric-literals",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

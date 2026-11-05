@@ -107,13 +107,13 @@ var messageNoNamespace = rule.Message{
 // its own `KindJsxSelfClosingElement` with no opening element inside it, so a rule listening only on
 // `KindJsxOpeningElement` would be silent on all eight of them while every non-JSX fixture stayed
 // green. `jsx_props_no_spread_multi.go` established this here first.
-var NoNamespace = rule.Rule{
+var NoNamespace = rule.Rule[rule.NoOptions]{
 	Name: "react/no-namespace",
 	// Declared for the bare-call branch of `isPragmaCreateElementCall`, which asks the checker
 	// which binding `createElement` resolves to. The JSX arm needs nothing from it.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		reportElement := func(node *ast.Node) {
 			// `jsx.ElementParts` rather than a switch over the two kinds. A first draft wrote the
 			// switch by hand and `TestRulePackagesDoNotReachPastWrappedAccessors` refused it,

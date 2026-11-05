@@ -12,5 +12,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // rule registered without a decoder is handed nil options, so the defaulting in Run is what keeps
 // an unconfigured rule permissive rather than reporting every `any` in the tree.
 func init() {
-	rule.Register(rule.Registration{Rule: OnlyThrowError, Decode: DecodeOnlyThrowErrorOptions})
+	rule.Register(rule.Registration[OnlyThrowErrorOptions]{Rule: OnlyThrowError, Decode: DecodeOnlyThrowErrorOptions})
 }

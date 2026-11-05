@@ -28,7 +28,8 @@ func TestControlDominatorsFindsTheDecidingBranch(test *testing.T) {
 	// Every branching terminal counts, so the guarded block is controlled and the others are not.
 	controlled := ControlDominators(function, func(Place) bool { return true })
 
-	var controlledBlocks, freeBlocks []static_single_assignment.BlockId
+	var controlledBlocks []static_single_assignment.BlockId
+	var freeBlocks []static_single_assignment.BlockId
 	for _, block := range function.Blocks {
 		if controlled(block.Id) {
 			controlledBlocks = append(controlledBlocks, block.Id)

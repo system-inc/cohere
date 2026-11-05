@@ -157,7 +157,7 @@ func TestNoSelfAssignStaysSilent(test *testing.T) {
 }
 
 // decodedNoSelfAssign runs the registered decoder over raw option JSON, the way the config layer does
-func decodedNoSelfAssign(test *testing.T, raw string) any {
+func decodedNoSelfAssign(test *testing.T, raw string) NoSelfAssignOptions {
 	test.Helper()
 	var input []byte
 	if raw != "" {

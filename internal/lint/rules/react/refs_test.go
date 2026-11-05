@@ -734,7 +734,8 @@ func TestRefsDoesNotTaintSiblingFieldsOfARefProp(test *testing.T) {
 
 	declarations := "declare module 'react' {\n  export interface RefObject<T> { current: T }\n  export function useRef<T>(initial: T): RefObject<T>;\n}"
 	source := "import * as React from 'react';\n" +
-		"interface Properties {\n  currentWidth: number;\n  guideElementReference: React.RefObject<HTMLElement | null>;\n}\n" +
+		"interface Properties {\n  currentWidth: number;\n" +
+		"  guideElementReference: React.RefObject<HTMLElement | null>;\n}\n" +
 		"function Component(properties: Properties) {\n" +
 		"  const guide = properties.guideElementReference;\n" +
 		"  const width = properties.currentWidth;\n" +
@@ -758,7 +759,8 @@ func TestRefsDoesNotTaintSiblingFieldsOfARefProp(test *testing.T) {
 	// The other half: the ref field is still a ref, so reading its `current` here does report.
 	// Without this a change that stopped recognizing refs on props would pass the assertion above.
 	reading := "import * as React from 'react';\n" +
-		"interface Properties {\n  currentWidth: number;\n  guideElementReference: React.RefObject<HTMLElement | null>;\n}\n" +
+		"interface Properties {\n  currentWidth: number;\n" +
+		"  guideElementReference: React.RefObject<HTMLElement | null>;\n}\n" +
 		"function Component(properties: Properties) {\n" +
 		"  const value = properties.guideElementReference.current;\n" +
 		"  return <div>{value}</div>;\n" +
@@ -852,10 +854,10 @@ export function Component({label}: {label: string}) {
 
 	declined := map[ast.Kind]int{}
 	asked := map[string]bool{}
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "refs-cannot-have-ref-type-probe",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(root *ast.Node) {
 					var visit func(node *ast.Node) bool

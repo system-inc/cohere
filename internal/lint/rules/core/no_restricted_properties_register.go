@@ -15,7 +15,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // DecodeOptionList rather than Decode, because upstream's option surface is variadic: each
 // restriction is its own element, `["error", {"object": "a"}, {"property": "b"}]`.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoRestrictedPropertiesOptions]{
 		Rule:             NoRestrictedProperties,
 		DecodeOptionList: DecodeNoRestrictedPropertiesOptions,
 	})

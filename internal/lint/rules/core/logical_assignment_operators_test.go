@@ -2,1515 +2,12 @@ package core
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
-
-// The corpus is ESLint's own, imported verbatim from
-// /tmp/lint-sources/eslint/tests/lib/rules/logical-assignment-operators.js by driving its
-// RuleTester with a stub and serialising what it was handed. No case was retyped, and a byte
-// comparison against the extracted source is asserted in TestLogicalAssignmentOperatorsCorpusIsVerbatim
-// below rather than trusted.
-//
-// Upstream runs the whole corpus at ecmaVersion 2021 with sourceType "script". The script part
-// matters for the five `with` cases, which are a syntax error in a module. Our harness derives
-// moduleness from the source text, and none of these fixtures carries an import or an export, so
-// every one of them is script here too.
-//
-// Four cases upstream had to reach a TypeScript fixture parser for are ordinary inputs here, and
-// they are marked at the line.
-
-// logicalAssignmentAlwaysOptions is upstream's default and its explicit ["always"], which are the
-// same settings.
-func logicalAssignmentAlwaysOptions() LogicalAssignmentOperatorsOptions {
-	return DefaultLogicalAssignmentOperatorsSettings()
-}
-
-// logicalAssignmentAlwaysIfOptions is ["always", {enforceForIfStatements: true}].
-//
-// Routed through the rule's own decoder rather than built as a struct, which is what puts the
-// positional-array wire shape and the default under test. A fixture building the struct directly
-// would leave both untested, and both are the lines with no upstream counterpart.
-func logicalAssignmentAlwaysIfOptions() LogicalAssignmentOperatorsOptions {
-	decoded, decodeLogicalAssignmentOperatorsOptionsError := DecodeLogicalAssignmentOperatorsOptions(
-		json.RawMessage(`["always", {"enforceForIfStatements": true}]`))
-	if decodeLogicalAssignmentOperatorsOptionsError != nil {
-		panic(decodeLogicalAssignmentOperatorsOptionsError)
-	}
-	options, ok := decoded.(LogicalAssignmentOperatorsOptions)
-	if !ok {
-		// Invariant: every return in the decoder hands back LogicalAssignmentOperatorsOptions.
-		panic(fmt.Sprintf("decoded options are a %T, not LogicalAssignmentOperatorsOptions", decoded))
-	}
-	return options
-}
-
-// logicalAssignmentNeverOptions is ["never"], also routed through the decoder.
-func logicalAssignmentNeverOptions() LogicalAssignmentOperatorsOptions {
-	decoded, decodeLogicalAssignmentOperatorsOptionsError := DecodeLogicalAssignmentOperatorsOptions(
-		json.RawMessage(`["never"]`),
-	)
-	if decodeLogicalAssignmentOperatorsOptionsError != nil {
-		panic(decodeLogicalAssignmentOperatorsOptionsError)
-	}
-	options, ok := decoded.(LogicalAssignmentOperatorsOptions)
-	if !ok {
-		// Invariant: every return in the decoder hands back LogicalAssignmentOperatorsOptions.
-		panic(fmt.Sprintf("decoded options are a %T, not LogicalAssignmentOperatorsOptions", decoded))
-	}
-	return options
-}
-
-// logicalAssignmentCleanCase is one input upstream accepts.
-type logicalAssignmentCleanCase struct {
-	source  string
-	options any
-}
-
-// logicalAssignmentSuggestion is one repair upstream offers rather than applies.
-type logicalAssignmentSuggestion struct {
-	id     string
-	output string
-}
-
-// logicalAssignmentReportingCase is one input upstream reports.
-//
-// fixedSource is upstream's `output`, and an empty string means upstream's `output: null`: the
-// finding is reported and deliberately not fixed. suggestions is upstream's `suggestions` array,
-// where nil means the field was absent, an empty slice means it was written as empty, and entries
-// carry the text each suggestion produces when applied.
-type logicalAssignmentReportingCase struct {
-	source      string
-	options     any
-	messageId   string
-	fixedSource string
-	suggestions []logicalAssignmentSuggestion
-}
-
-// logicalAssignmentCleanCases is upstream's `valid` list.
-var logicalAssignmentCleanCases = []logicalAssignmentCleanCase{
-	{"a || b", nil},
-	{"a && b", nil},
-	{"a ?? b", nil},
-	{"a || a || b", nil},
-	{"var a = a || b", nil},
-	{"a === undefined ? a : b", nil},
-	{"while (a) a = b", nil},
-	{"a ||= b", nil},
-	{"a &&= b", nil},
-	{"a ??= b", nil},
-	{"a += a || b", nil},
-	{"a *= a || b", nil},
-	{"a ||= a || b", nil},
-	{"a &&= a || b", nil},
-	{"a = a", nil},
-	{"a = b", nil},
-	{"a = a === b", nil},
-	{"a = a + b", nil},
-	{"a = a / b", nil},
-	{"a = fn(a) || b", nil},
-	{"a = false || c", nil},
-	{"a = f() || g()", nil},
-	{"a = b || c", nil},
-	{"a = b || a", nil},
-	{"object.a = object.b || c", nil},
-	{"[a] = a || b", nil},
-	{"({ a } = a || b)", nil},
-	{"(a = b) || a", nil},
-	{"a + (a = b)", nil},
-	{"a || (b ||= c)", nil},
-	{"a || (b &&= c)", nil},
-	{"a || b === 0", nil},
-	{"a || fn()", nil},
-	{"a || (b && c)", nil},
-	{"a || (b ?? c)", nil},
-	{"a || (b = c)", nil},
-	{"a || (a ||= b)", nil},
-	{"fn() || (a = b)", nil},
-	{"a.b || (a = b)", nil},
-	{"a?.b || (a.b = b)", nil},
-	{"class Class { #prop; constructor() { this.#prop || (this.prop = value) } }", nil},
-	{"class Class { #prop; constructor() { this.prop || (this.#prop = value) } }", nil},
-	{"if (a) a = b", nil},
-	{"if (a) a = b", logicalAssignmentAlwaysOptions()},
-	{"if (a) { a = b } else {}", logicalAssignmentAlwaysIfOptions()},
-	{"if (a) { a = b } else if (a) {}", logicalAssignmentAlwaysIfOptions()},
-	{"if (unrelated) {} else if (a) a = b; else {}", logicalAssignmentAlwaysIfOptions()},
-	{"if (unrelated) {} else if (a) a = b; else if (unrelated) {}", logicalAssignmentAlwaysIfOptions()},
-	{"if (a) {}", logicalAssignmentAlwaysIfOptions()},
-	{"if (a) { before; a = b }", logicalAssignmentAlwaysIfOptions()},
-	{"if (a) { a = b; after }", logicalAssignmentAlwaysIfOptions()},
-	{"if (a) throw new Error()", logicalAssignmentAlwaysIfOptions()},
-	{"if (a) a", logicalAssignmentAlwaysIfOptions()},
-	{"if (a) a ||= b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a) b = a", logicalAssignmentAlwaysIfOptions()},
-	{"if (a) { a() }", logicalAssignmentAlwaysIfOptions()},
-	{"if (a) { a += a || b }", logicalAssignmentAlwaysIfOptions()},
-	{"if (true) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (predicate(a)) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a?.b) a.b = c", logicalAssignmentAlwaysIfOptions()},
-	{"if (!a?.b) a.b = c", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === b) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === undefined) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === null) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a != null) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === null && a === undefined) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === 0 || a === undefined) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === null || a === 1) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a == null || a == undefined) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === null || a === !0) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === null || a === +0) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === null || a === null) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === undefined || a === void 0) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === null || a === void void 0) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === null || a === void 'string') a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === null || a === void fn()) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a == a) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a == b) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (null == null) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (undefined == undefined) undefined = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (null == x) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (null == fn()) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (null === a || a === 0) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (0 === a || null === a) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (1 === a || a === undefined) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (undefined === a || 1 === a) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === null || a === b) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (b === undefined || a === null) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (null === a || b === a) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (null === null || undefined === undefined) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (null === null || a === a) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (undefined === undefined || a === a) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (null === undefined || a === a) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"{\n   const undefined = 0;\n   if (a == undefined) a = b\n}", logicalAssignmentAlwaysIfOptions()},
-	{
-		"(() => {\n   const undefined = 0;\n   if (condition) {\n       if (a == undefined) a = b\n   }\n})()",
-		logicalAssignmentAlwaysIfOptions(),
-	},
-	{"{\n   if (a == undefined) a = b\n}\nvar undefined = 0;", logicalAssignmentAlwaysIfOptions()},
-	{"{\n   const undefined = 0;\n   if (undefined == null) undefined = b\n}", logicalAssignmentAlwaysIfOptions()},
-	{"{\n   const undefined = 0;\n   if (a === undefined || a === null) a = b\n}", logicalAssignmentAlwaysIfOptions()},
-	{"{\n   const undefined = 0;\n   if (undefined === a || null === a) a = b\n}", logicalAssignmentAlwaysIfOptions()},
-	{"if (a) b = c", logicalAssignmentAlwaysIfOptions()},
-	{"if (!a) b = c", logicalAssignmentAlwaysIfOptions()},
-	{"if (!!a) b = c", logicalAssignmentAlwaysIfOptions()},
-	{"if (a == null) b = c", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === null || a === undefined) b = c", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === null || b === undefined) a = b", logicalAssignmentAlwaysIfOptions()},
-	{"if (a === null || b === undefined) b = c", logicalAssignmentAlwaysIfOptions()},
-	{"if (Boolean(a)) b = c", logicalAssignmentAlwaysIfOptions()},
-	{"function fn(Boolean) {\n   if (Boolean(a)) a = b\n}", logicalAssignmentAlwaysIfOptions()},
-	{"a = a || b", logicalAssignmentNeverOptions()},
-	{"a = a && b", logicalAssignmentNeverOptions()},
-	{"a = a ?? b", logicalAssignmentNeverOptions()},
-	{"a = b", logicalAssignmentNeverOptions()},
-	{"a += b", logicalAssignmentNeverOptions()},
-	{"a -= b", logicalAssignmentNeverOptions()},
-	{"a.b = a.b || c", logicalAssignmentNeverOptions()},
-	{"a = a && b || c", logicalAssignmentAlwaysOptions()},
-	{"a = a && b && c || d", logicalAssignmentAlwaysOptions()},
-	{"a = (a || b) || c", logicalAssignmentAlwaysOptions()},
-	{"a = (a && b) && c", logicalAssignmentAlwaysOptions()},
-	{"a = (a ?? b) ?? c", logicalAssignmentAlwaysOptions()},
-}
-
-// logicalAssignmentReportingCases is upstream's `invalid` list.
-var logicalAssignmentReportingCases = []logicalAssignmentReportingCase{
-	{
-		source:      "a = a || b",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "a ||= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a && b",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "a &&= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a ?? b",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "a ??= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "foo = foo || bar",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "foo ||= bar",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a || fn()",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "a ||= fn()",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a || b && c",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "a ||= b && c",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a || (b || c)",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "a ||= (b || c)",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a || (b ? c : d)",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "a ||= (b ? c : d)",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "/* before */ a = a || b",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "/* before */ a ||= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a || b // after",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "a ||= b // after",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a /* between */ = a || b",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = /** @type */ a || b",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a || /* between */ b",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "(a) = a || b",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "(a) ||= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = (a) || b",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "a ||= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a || (b)",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "a ||= (b)",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a || ((b))",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "a ||= ((b))",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "(a = a || b)",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "(a ||= b)",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a || (f(), b)",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "a ||= (f(), b)",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a.b = a.b ?? c",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"useLogicalOperator", "a.b ??= c"}},
-	},
-	{
-		source:      "a.b.c = a.b.c ?? d",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"useLogicalOperator", "a.b.c ??= d"}},
-	},
-	{
-		source:      "a[b] = a[b] ?? c",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"useLogicalOperator", "a[b] ??= c"}},
-	},
-	{
-		source:      "a['b'] = a['b'] ?? c",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"useLogicalOperator", "a['b'] ??= c"}},
-	},
-	{
-		source:      "a.b = a['b'] ?? c",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"useLogicalOperator", "a.b ??= c"}},
-	},
-	{
-		source:      "a['b'] = a.b ?? c",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"useLogicalOperator", "a['b'] ??= c"}},
-	},
-	{
-		source:      "this.prop = this.prop ?? {}",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"useLogicalOperator", "this.prop ??= {}"}},
-	},
-	{
-		source:      "with (object) a = a || b",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"useLogicalOperator", "with (object) a ||= b"}},
-	},
-	{
-		source:      "with (object) { a = a || b }",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"useLogicalOperator", "with (object) { a ||= b }"}},
-	},
-	{
-		source:      "with (object) { if (condition) a = a || b }",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"useLogicalOperator", "with (object) { if (condition) a ||= b }"}},
-	},
-	{
-		source:      "with (a = a || b) {}",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "with (a ||= b) {}",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "with (object) {} a = a || b",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "with (object) {} a ||= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a || b; with (object) {}",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "a ||= b; with (object) {}",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "if (condition) a = a || b",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "if (condition) a ||= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "with (object) {\n  \"use strict\";\n   a = a || b\n}",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{
-			{"useLogicalOperator", "with (object) {\n  \"use strict\";\n   a ||= b\n}"},
-		},
-	},
-	{
-		source:      "fn(a = a || b)",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "fn(a ||= b)",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "fn((a = a || b))",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "fn((a ||= b))",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "(a = a || b) ? c : d",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "(a ||= b) ? c : d",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = b = b || c",
-		options:     nil,
-		messageId:   "assignment",
-		fixedSource: "a = b ||= c",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a || (a = b)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a ||= b",
-		suggestions: nil,
-	},
-	{
-		source:      "a && (a = b)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a &&= b",
-		suggestions: nil,
-	},
-	{
-		source:      "a ?? (a = b)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a ??= b",
-		suggestions: nil,
-	},
-	{
-		source:      "foo ?? (foo = bar)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "foo ??= bar",
-		suggestions: nil,
-	},
-	{
-		source:      "a || (a = 0)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a ||= 0",
-		suggestions: nil,
-	},
-	{
-		source:      "a || (a = fn())",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a ||= fn()",
-		suggestions: nil,
-	},
-	{
-		source:      "a || (a = (b || c))",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a ||= (b || c)",
-		suggestions: nil,
-	},
-	{
-		source:      "(a) || (a = b)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a ||= b",
-		suggestions: nil,
-	},
-	{
-		source:      "a || ((a) = b)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "(a) ||= b",
-		suggestions: nil,
-	},
-	{
-		source:      "a || (a = (b))",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a ||= (b)",
-		suggestions: nil,
-	},
-	{
-		source:      "a || ((a = b))",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a ||= b",
-		suggestions: nil,
-	},
-	{
-		source:      "a || (((a = b)))",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a ||= b",
-		suggestions: nil,
-	},
-	{
-		source:      "a || ( ( a = b ) )",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a ||= b",
-		suggestions: nil,
-	},
-	{
-		source:      "/* before */ a || (a = b)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "/* before */ a ||= b",
-		suggestions: nil,
-	},
-	{
-		source:      "a || (a = b) // after",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a ||= b // after",
-		suggestions: nil,
-	},
-	{
-		source:      "a /* between */ || (a = b)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "",
-		suggestions: nil,
-	},
-	{
-		source:      "a || /* between */ (a = b)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "",
-		suggestions: nil,
-	},
-	{
-		source:      "a.b || (a.b = c)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a.b ||= c",
-		suggestions: nil,
-	},
-	{
-		source:      "class Class { #prop; constructor() { this.#prop || (this.#prop = value) } }",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "class Class { #prop; constructor() { this.#prop ||= value } }",
-		suggestions: nil,
-	},
-	{
-		source:      "a['b'] || (a['b'] = c)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a['b'] ||= c",
-		suggestions: nil,
-	},
-	{
-		source:      "a[0] || (a[0] = b)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a[0] ||= b",
-		suggestions: nil,
-	},
-	{
-		source:      "a[this] || (a[this] = b)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a[this] ||= b",
-		suggestions: nil,
-	},
-	{
-		source:      "foo.bar || (foo.bar = baz)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "foo.bar ||= baz",
-		suggestions: nil,
-	},
-	{
-		source:      "a.b.c || (a.b.c = d)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"convertLogical", "a.b.c ||= d"}},
-	},
-	{
-		source:      "a[b.c] || (a[b.c] = d)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"convertLogical", "a[b.c] ||= d"}},
-	},
-	{
-		source:      "a[b?.c] || (a[b?.c] = d)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"convertLogical", "a[b?.c] ||= d"}},
-	},
-	{
-		source:      "with (object) a.b || (a.b = c)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"convertLogical", "with (object) a.b ||= c"}},
-	},
-	{
-		source:      "a = a.b || (a.b = {})",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a = a.b ||= {}",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a || (a = 0) || b",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "(a ||= 0) || b",
-		suggestions: nil,
-	},
-	{
-		source:      "(a || (a = 0)) || b",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "(a ||= 0) || b",
-		suggestions: nil,
-	},
-	{
-		source:      "a || (b || (b = 0))",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a || (b ||= 0)",
-		suggestions: nil,
-	},
-	{
-		source:      "a = b || (b = c)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "a = b ||= c",
-		suggestions: nil,
-	},
-	{
-		source:      "a || (a = 0) ? b : c",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "(a ||= 0) ? b : c",
-		suggestions: nil,
-	},
-	{
-		source:      "fn(a || (a = 0))",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "fn(a ||= 0)",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a &&= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (Boolean(a)) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a &&= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (!!a) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a &&= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (!a) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ||= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (!Boolean(a)) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ||= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a == undefined) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ??= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a == null) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ??= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a === null || a === undefined) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ??= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a === undefined || a === null) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ??= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a === null || a === void 0) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ??= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a === void 0 || a === null) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ??= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) { a = b; }",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a &&= b;",
-		suggestions: nil,
-	},
-	{
-		source:      "{ const undefined = 0; }\nif (a == undefined) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "{ const undefined = 0; }\na ??= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a == undefined) a = b\n{ const undefined = 0; }",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ??= b\n{ const undefined = 0; }",
-		suggestions: nil,
-	},
-	{
-		source:      "if (null == a) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ??= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "if (undefined == a) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ??= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "if (undefined === a || a === null) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ??= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "if (a === undefined || null === a) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ??= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "if (undefined === a || null === a) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ??= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "if (null === a || a === undefined) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ??= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "if (a === null || undefined === a) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ??= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "if (null === a || undefined === a) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a ??= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "if ((a)) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a &&= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) (a) = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "(a) &&= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) a = (b)",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a &&= (b)",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) (a = b)",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "(a &&= b)",
-		suggestions: nil,
-	},
-	{
-		source:      ";if (a) (a) = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: ";(a) &&= b",
-		suggestions: nil,
-	},
-	{
-		source:      "{ if (a) (a) = b }",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "{ (a) &&= b }",
-		suggestions: nil,
-	},
-	{
-		source:      "fn();if (a) (a) = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "fn();(a) &&= b",
-		suggestions: nil,
-	},
-	{
-		source:      "fn()\nif (a) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "fn()\na &&= b",
-		suggestions: nil,
-	},
-	{
-		source:      "id\nif (a) (a) = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "",
-		suggestions: nil,
-	},
-	{
-		source:      "object.prop\nif (a) (a) = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "",
-		suggestions: nil,
-	},
-	{
-		source:      "object[computed]\nif (a) (a) = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "",
-		suggestions: nil,
-	},
-	{
-		source:      "fn()\nif (a) (a) = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) a = b; fn();",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a &&= b; fn();",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) { a = b }",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a &&= b;",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) { a = b; }\nfn();",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a &&= b;\nfn();",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) { a = b }\nfn();",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a &&= b;\nfn();",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) { a = b } fn();",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a &&= b; fn();",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) { a = b\n} fn();",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a &&= b; fn();",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) a  =  b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a  &&=  b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a)\n a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a &&= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) {\n a = b; \n}",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a &&= b;",
-		suggestions: nil,
-	},
-	{
-		source:      "/* before */ if (a) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "/* before */ a &&= b",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) a = b /* after */",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a &&= b /* after */",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) /* between */ a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) a = /* between */ b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a.b) a.b = c",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a.b &&= c",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "if (a[b]) a[b] = c",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a[b] &&= c",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "if (a['b']) a['b'] = c",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "a['b'] &&= c",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "if (this.prop) this.prop = value",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "this.prop &&= value",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "(class extends SuperClass { method() { if (super.prop) super.prop = value } })",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "(class extends SuperClass { method() { super.prop &&= value } })",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "with (object) if (a) a = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "with (object) a &&= b",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "if (a.b === undefined || a.b === null) a.b = c",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"convertIf", "a.b ??= c"}},
-	},
-	{
-		source:      "if (a.b.c) a.b.c = d",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"convertIf", "a.b.c &&= d"}},
-	},
-	{
-		source:      "if (a.b.c.d) a.b.c.d = e",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"convertIf", "a.b.c.d &&= e"}},
-	},
-	{
-		source:      "if (a[b].c) a[b].c = d",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"convertIf", "a[b].c &&= d"}},
-	},
-	{
-		source:      "with (object) if (a.b) a.b = c",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"convertIf", "with (object) a.b &&= c"}},
-	},
-	{
-		source:      "if (unrelated) {} else if (a) a = b;",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "if (unrelated) {} else a &&= b;",
-		suggestions: nil,
-	},
-	{
-		source:      "if (a) {} else if (b) {} else if (a) a = b;",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "if (a) {} else if (b) {} else a &&= b;",
-		suggestions: nil,
-	},
-	{
-		source:      "if (unrelated) {} else\nif (a) a = b;",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "if (unrelated) {} else\na &&= b;",
-		suggestions: nil,
-	},
-	{
-		source:      "if (unrelated) {\n}\nelse if (a) {\na = b;\n}",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "if (unrelated) {\n}\nelse a &&= b;",
-		suggestions: nil,
-	},
-	{
-		source:      "if (unrelated) statement; else if (a) a = b;",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "if (unrelated) statement; else a &&= b;",
-		suggestions: nil,
-	},
-	{
-		source:      "if (unrelated) id\nelse if (a) (a) = b",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "",
-		suggestions: nil,
-	},
-	{
-		source:      "if (unrelated) {} else if (a) a = b; else if (c) c = d",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "if (unrelated) {} else if (a) a = b; else c &&= d",
-		suggestions: nil,
-	},
-	{
-		source:      "if (unrelated) { /* body */ } else if (a) a = b;",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "if (unrelated) { /* body */ } else a &&= b;",
-		suggestions: nil,
-	},
-	{
-		source:      "if (unrelated) {} /* before else */ else if (a) a = b;",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "if (unrelated) {} /* before else */ else a &&= b;",
-		suggestions: nil,
-	},
-	{
-		source:      "if (unrelated) {} else // Line\nif (a) a = b;",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "if (unrelated) {} else // Line\na &&= b;",
-		suggestions: nil,
-	},
-	{
-		source:      "if (unrelated) {} else /* Block */ if (a) a = b;",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "if (unrelated) {} else /* Block */ a &&= b;",
-		suggestions: nil,
-	},
-	{
-		source:      "if (array) array = array.filter(predicate)",
-		options:     logicalAssignmentAlwaysIfOptions(),
-		messageId:   "if",
-		fixedSource: "array &&= array.filter(predicate)",
-		suggestions: nil,
-	},
-	{
-		source:      "a ||= b",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "a = a || b",
-		suggestions: nil,
-	},
-	{
-		source:      "a &&= b",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "a = a && b",
-		suggestions: nil,
-	},
-	{
-		source:      "a ??= b",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "a = a ?? b",
-		suggestions: nil,
-	},
-	{
-		source:      "foo ||= bar",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "foo = foo || bar",
-		suggestions: nil,
-	},
-	{
-		source:      "a.b ||= c",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"separate", "a.b = a.b || c"}},
-	},
-	{
-		source:      "a[b] ||= c",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"separate", "a[b] = a[b] || c"}},
-	},
-	{
-		source:      "a['b'] ||= c",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"separate", "a['b'] = a['b'] || c"}},
-	},
-	{
-		source:      "this.prop ||= 0",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"separate", "this.prop = this.prop || 0"}},
-	},
-	{
-		source:      "with (object) a ||= b",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"separate", "with (object) a = a || b"}},
-	},
-	{
-		source:      "(a) ||= b",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "(a) = a || b",
-		suggestions: nil,
-	},
-	{
-		source:      "a ||= (b)",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "a = a || (b)",
-		suggestions: nil,
-	},
-	{
-		source:      "(a ||= b)",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "(a = a || b)",
-		suggestions: nil,
-	},
-	{
-		source:      "/* before */ a ||= b",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "/* before */ a = a || b",
-		suggestions: nil,
-	},
-	{
-		source:      "a ||= b // after",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "a = a || b // after",
-		suggestions: nil,
-	},
-	{
-		source:      "a /* before */ ||= b",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "",
-		suggestions: nil,
-	},
-	{
-		source:      "a ||= /* after */ b",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "",
-		suggestions: nil,
-	},
-	{
-		source:      "a ||= b && c",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "a = a || b && c",
-		suggestions: nil,
-	},
-	{
-		source:      "a &&= b || c",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "a = a && (b || c)",
-		suggestions: nil,
-	},
-	{
-		source:      "a ||= b || c",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "a = a || (b || c)",
-		suggestions: nil,
-	},
-	{
-		source:      "a &&= b && c",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "a = a && (b && c)",
-		suggestions: nil,
-	},
-	{
-		source:      "a ??= b || c",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "a = a ?? (b || c)",
-		suggestions: nil,
-	},
-	{
-		source:      "a ??= b && c",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "a = a ?? (b && c)",
-		suggestions: nil,
-	},
-	{
-		source:      "a ??= b ?? c",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "a = a ?? (b ?? c)",
-		suggestions: nil,
-	},
-	{
-		source:      "a ??= (b || c)",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "a = a ?? (b || c)",
-		suggestions: nil,
-	},
-	{
-		source:      "a ??= b + c",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "a = a ?? b + c",
-		suggestions: nil,
-	},
-	{
-		source:      "a ||= b as number;",
-		options:     logicalAssignmentNeverOptions(),
-		messageId:   "unexpected",
-		fixedSource: "a = a || (b as number);",
-		suggestions: nil,
-	}, // upstream needed a fixture parser here: typescript-parsers/logical-assignment-with-assertion
-	{
-		source:      "a.b.c || (a.b.c = d as number)",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"convertLogical", "a.b.c ||= d as number"}},
-	}, // upstream needed a fixture parser here: typescript-parsers/logical-with-assignment-with-assertion-1
-	{
-		source:      "a.b.c || (a.b.c = (d as number))",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"convertLogical", "a.b.c ||= (d as number)"}},
-	}, // upstream needed a fixture parser here: typescript-parsers/logical-with-assignment-with-assertion-2
-	{
-		source:      "(a.b.c || (a.b.c = d)) as number",
-		options:     nil,
-		messageId:   "logical",
-		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"convertLogical", "(a.b.c ||= d) as number"}},
-	}, // upstream needed a fixture parser here: typescript-parsers/logical-with-assignment-with-assertion-3
-	{
-		source:      "a = a || b || c",
-		options:     logicalAssignmentAlwaysOptions(),
-		messageId:   "assignment",
-		fixedSource: "a ||= b || c",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a && b && c",
-		options:     logicalAssignmentAlwaysOptions(),
-		messageId:   "assignment",
-		fixedSource: "a &&= b && c",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a ?? b ?? c",
-		options:     logicalAssignmentAlwaysOptions(),
-		messageId:   "assignment",
-		fixedSource: "a ??= b ?? c",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a || b && c",
-		options:     logicalAssignmentAlwaysOptions(),
-		messageId:   "assignment",
-		fixedSource: "a ||= b && c",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a || b || c || d",
-		options:     logicalAssignmentAlwaysOptions(),
-		messageId:   "assignment",
-		fixedSource: "a ||= b || c || d",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a && b && c && d",
-		options:     logicalAssignmentAlwaysOptions(),
-		messageId:   "assignment",
-		fixedSource: "a &&= b && c && d",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a ?? b ?? c ?? d",
-		options:     logicalAssignmentAlwaysOptions(),
-		messageId:   "assignment",
-		fixedSource: "a ??= b ?? c ?? d",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a || b || c && d",
-		options:     logicalAssignmentAlwaysOptions(),
-		messageId:   "assignment",
-		fixedSource: "a ||= b || c && d",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a || b && c || d",
-		options:     logicalAssignmentAlwaysOptions(),
-		messageId:   "assignment",
-		fixedSource: "a ||= b && c || d",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = (a) || b || c",
-		options:     logicalAssignmentAlwaysOptions(),
-		messageId:   "assignment",
-		fixedSource: "a ||= b || c",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = a || (b || c) || d",
-		options:     logicalAssignmentAlwaysOptions(),
-		messageId:   "assignment",
-		fixedSource: "a ||= (b || c) || d",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = (a || b || c)",
-		options:     logicalAssignmentAlwaysOptions(),
-		messageId:   "assignment",
-		fixedSource: "a ||= (b || c)",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-	{
-		source:      "a = ((a) || (b || c) || d)",
-		options:     logicalAssignmentAlwaysOptions(),
-		messageId:   "assignment",
-		fixedSource: "a ||= ((b || c) || d)",
-		suggestions: []logicalAssignmentSuggestion{},
-	},
-}
 
 // runLogicalAssignment runs the rule with a case's options, defaulting to upstream's default when
 // the case names none.
@@ -1526,12 +23,12 @@ var logicalAssignmentReportingCases = []logicalAssignmentReportingCase{
 // through the intermediate representation and the shim before finding.
 func runLogicalAssignment(test *testing.T, testCase struct {
 	source  string
-	options any
+	options rule.Given[LogicalAssignmentOperatorsOptions]
 },
 ) rule_testing.Result {
 	test.Helper()
-	options := testCase.options
-	if options == nil {
+	options, configured := testCase.options.Read()
+	if !configured {
 		options = DefaultLogicalAssignmentOperatorsSettings()
 	}
 	if logicalAssignmentNeedsScriptSource(testCase.source) {
@@ -1597,7 +94,7 @@ func TestLogicalAssignmentOperatorsStaysSilent(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			rule_testing.ExpectClean(test, result)
 		})
@@ -1614,7 +111,7 @@ func TestLogicalAssignmentOperatorsFires(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			rule_testing.ExpectFindings(test, result, testCase.messageId)
 		})
@@ -1639,7 +136,7 @@ func TestLogicalAssignmentOperatorsFixes(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			rule_testing.ExpectFixedSource(test, result,
 				logicalAssignmentAsWritten(testCase.source, testCase.fixedSource))
@@ -1674,7 +171,7 @@ func TestLogicalAssignmentOperatorsSuggestions(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -1755,7 +252,7 @@ func TestLogicalAssignmentOperatorsDeclinesToRepair(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -1787,26 +284,44 @@ func TestLogicalAssignmentOperatorsSplitsFixesFromSuggestions(test *testing.T) {
 	cases := []struct {
 		name        string
 		source      string
-		options     any
+		options     rule.Given[LogicalAssignmentOperatorsOptions]
 		wantFix     bool
 		wantSuggest bool
 	}{
-		{"a bare identifier is safe to read once", "a = a || b", nil, true, false},
-		{"a member access may be a getter", "a.b = a.b || c", nil, false, true},
+		{
+			"a bare identifier is safe to read once",
+			"a = a || b",
+			rule.Given[LogicalAssignmentOperatorsOptions]{},
+			true,
+			false,
+		},
+		{
+			"a member access may be a getter",
+			"a.b = a.b || c",
+			rule.Given[LogicalAssignmentOperatorsOptions]{},
+			false,
+			true,
+		},
 		{"a single property off an identifier is fixed in the logical shape",
-			"a.b || (a.b = c)", nil, true, false},
-		{"a deeper access is only suggested", "a.b.c || (a.b.c = d)", nil, false, true},
+			"a.b || (a.b = c)", rule.Given[LogicalAssignmentOperatorsOptions]{}, true, false},
+		{
+			"a deeper access is only suggested",
+			"a.b.c || (a.b.c = d)",
+			rule.Given[LogicalAssignmentOperatorsOptions]{},
+			false,
+			true,
+		},
 		{"an identifier in a with block may be a scrutinee property",
-			"with (object) a = a || b", nil, false, true},
+			"with (object) a = a || b", rule.Given[LogicalAssignmentOperatorsOptions]{}, false, true},
 		{"a strict file turns the with allowance back off",
-			"\"use strict\";\nwith (object) a = a || b", nil, true, false},
+			"\"use strict\";\nwith (object) a = a || b", rule.Given[LogicalAssignmentOperatorsOptions]{}, true, false},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("wanted one finding, got %d: %v", len(result.Diagnostics),
@@ -1839,24 +354,38 @@ func TestLogicalAssignmentOperatorsSpans(test *testing.T) {
 	cases := []struct {
 		name     string
 		source   string
-		options  any
+		options  rule.Given[LogicalAssignmentOperatorsOptions]
 		wantSpan string
 	}{
-		{"the assignment shape points at the whole assignment", "a = a || b", nil, "a = a || b"},
-		{"the logical shape points at the whole logical expression", "a || (a = b)", nil,
-			"a || (a = b)"},
+		{
+			"the assignment shape points at the whole assignment",
+			"a = a || b",
+			rule.Given[LogicalAssignmentOperatorsOptions]{},
+			"a = a || b",
+		},
+		{
+			"the logical shape points at the whole logical expression",
+			"a || (a = b)",
+			rule.Given[LogicalAssignmentOperatorsOptions]{},
+			"a || (a = b)",
+		},
 		{"the if shape points at the whole if statement", "if (a) a = b",
-			logicalAssignmentAlwaysIfOptions(), "if (a) a = b"},
+			rule.Configured(logicalAssignmentAlwaysIfOptions()), "if (a) a = b"},
 		{"the never shape points at the whole assignment", "a ||= b",
-			logicalAssignmentNeverOptions(), "a ||= b"},
-		{"a nested assignment reports only its own span", "x = (a = a || b)", nil, "a = a || b"},
+			rule.Configured(logicalAssignmentNeverOptions()), "a ||= b"},
+		{
+			"a nested assignment reports only its own span",
+			"x = (a = a || b)",
+			rule.Given[LogicalAssignmentOperatorsOptions]{},
+			"a = a || b",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("wanted one finding, got %d: %v", len(result.Diagnostics),
@@ -1886,21 +415,21 @@ func TestLogicalAssignmentOperatorsMessages(test *testing.T) {
 
 	cases := []struct {
 		source     string
-		options    any
+		options    rule.Given[LogicalAssignmentOperatorsOptions]
 		wantId     string
 		wantPrefix string
 	}{
-		{"a = a || b", nil, "assignment",
+		{"a = a || b", rule.Given[LogicalAssignmentOperatorsOptions]{}, "assignment",
 			"Assignment (=) can be replaced with operator assignment (||=)."},
-		{"a = a ?? b", nil, "assignment",
+		{"a = a ?? b", rule.Given[LogicalAssignmentOperatorsOptions]{}, "assignment",
 			"Assignment (=) can be replaced with operator assignment (??=)."},
-		{"a || (a = b)", nil, "logical",
+		{"a || (a = b)", rule.Given[LogicalAssignmentOperatorsOptions]{}, "logical",
 			"Logical expression can be replaced with an assignment (||=)."},
-		{"if (a) a = b", logicalAssignmentAlwaysIfOptions(), "if",
+		{"if (a) a = b", rule.Configured(logicalAssignmentAlwaysIfOptions()), "if",
 			"'if' statement can be replaced with a logical operator assignment with operator &&="},
-		{"if (a == null) a = b", logicalAssignmentAlwaysIfOptions(), "if",
+		{"if (a == null) a = b", rule.Configured(logicalAssignmentAlwaysIfOptions()), "if",
 			"'if' statement can be replaced with a logical operator assignment with operator ??="},
-		{"a &&= b", logicalAssignmentNeverOptions(), "unexpected",
+		{"a &&= b", rule.Configured(logicalAssignmentNeverOptions()), "unexpected",
 			"Unexpected logical operator assignment (&&=) shorthand."},
 	}
 	for _, testCase := range cases {
@@ -1908,7 +437,7 @@ func TestLogicalAssignmentOperatorsMessages(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -1935,17 +464,17 @@ func TestLogicalAssignmentOperatorsSuggestionMessages(test *testing.T) {
 
 	cases := []struct {
 		source  string
-		options any
+		options rule.Given[LogicalAssignmentOperatorsOptions]
 		wantId  string
 		want    string
 	}{
-		{"a.b = a.b || c", nil, "useLogicalOperator",
+		{"a.b = a.b || c", rule.Given[LogicalAssignmentOperatorsOptions]{}, "useLogicalOperator",
 			"Convert this assignment to use the operator ||=."},
-		{"a.b.c || (a.b.c = d)", nil, "convertLogical",
+		{"a.b.c || (a.b.c = d)", rule.Given[LogicalAssignmentOperatorsOptions]{}, "convertLogical",
 			"Replace this logical expression with an assignment with the operator ||=."},
-		{"if (a.b.c) a.b.c = d", logicalAssignmentAlwaysIfOptions(), "convertIf",
+		{"if (a.b.c) a.b.c = d", rule.Configured(logicalAssignmentAlwaysIfOptions()), "convertIf",
 			"Replace this 'if' statement with a logical assignment with operator &&=."},
-		{"a.b ||= c", logicalAssignmentNeverOptions(), "separate",
+		{"a.b ||= c", rule.Configured(logicalAssignmentNeverOptions()), "separate",
 			"Separate the logical assignment into an assignment with a logical operator."},
 	}
 	for _, testCase := range cases {
@@ -1953,7 +482,7 @@ func TestLogicalAssignmentOperatorsSuggestionMessages(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 1 {
 				test.Fatalf("wanted one finding with one suggestion, got %d findings",
@@ -2026,16 +555,12 @@ func TestDecodeLogicalAssignmentOperatorsOptions(test *testing.T) {
 			if decodeLogicalAssignmentOperatorsOptionsError != nil {
 				test.Fatalf("unexpected error: %v", decodeLogicalAssignmentOperatorsOptionsError)
 			}
-			settings, ok := decoded.(LogicalAssignmentOperatorsOptions)
-			if !ok {
-				test.Fatalf("decoded options are not LogicalAssignmentOperatorsOptions: got %T", decoded)
+			if decoded.Require == nil || *decoded.Require != *testCase.wantMode {
+				test.Errorf("mode is %v, want %v", decoded.Require, *testCase.wantMode)
 			}
-			if settings.Require == nil || *settings.Require != *testCase.wantMode {
-				test.Errorf("mode is %v, want %v", settings.Require, *testCase.wantMode)
-			}
-			if settings.EnforceForIfStatements != testCase.wantIf {
+			if decoded.EnforceForIfStatements != testCase.wantIf {
 				test.Errorf("enforceForIfStatements is %v, want %v",
-					settings.EnforceForIfStatements, testCase.wantIf)
+					decoded.EnforceForIfStatements, testCase.wantIf)
 			}
 		})
 	}
@@ -2100,7 +625,7 @@ func TestLogicalAssignmentOperatorsTypeScriptShapes(test *testing.T) {
 	cases := []struct {
 		name      string
 		source    string
-		options   any
+		options   rule.Given[LogicalAssignmentOperatorsOptions]
 		wantIds   []string
 		wantFixed string
 	}{
@@ -2140,7 +665,7 @@ func TestLogicalAssignmentOperatorsTypeScriptShapes(test *testing.T) {
 		{
 			name:      "the never expansion copies an assertion on the target rather than rendering it",
 			source:    "a!.b ||= c",
-			options:   logicalAssignmentNeverOptions(),
+			options:   rule.Configured(logicalAssignmentNeverOptions()),
 			wantIds:   []string{"unexpected"},
 			wantFixed: "",
 		},
@@ -2150,7 +675,7 @@ func TestLogicalAssignmentOperatorsTypeScriptShapes(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if testCase.wantFixed != "" {
@@ -2354,8 +879,8 @@ func TestLogicalAssignmentOperatorsWrapsWhereUpstreamWraps(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
-			}{testCase.source, nil})
+				options rule.Given[LogicalAssignmentOperatorsOptions]
+			}{testCase.source, rule.Given[LogicalAssignmentOperatorsOptions]{}})
 			rule_testing.ExpectFindings(test, result, "logical")
 			rule_testing.ExpectFixedSource(test, result,
 				logicalAssignmentAsWritten(testCase.source, testCase.want))
@@ -2387,11 +912,7 @@ func TestLogicalAssignmentOperatorsIsSilentInsideReactCompiledFunctions(test *te
 		if decodeLogicalAssignmentOperatorsOptionsError != nil {
 			test.Fatalf("decoding %s: %v", raw, decodeLogicalAssignmentOperatorsOptionsError)
 		}
-		options, ok := decoded.(LogicalAssignmentOperatorsOptions)
-		if !ok {
-			test.Fatalf("decoding %s gave a %T, not LogicalAssignmentOperatorsOptions", raw, decoded)
-		}
-		return options
+		return decoded
 	}
 	compilerOn := decode(`["always", {"enforceForIfStatements": true}]`)
 	compilerOff := decode(`["always", {"enforceForIfStatements": true, "reactCompiler": false}]`)

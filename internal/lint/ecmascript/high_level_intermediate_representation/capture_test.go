@@ -22,10 +22,10 @@ import (
 func lowerTypedFunctions(test *testing.T, name string, code string) []*Function {
 	test.Helper()
 	var lowered []*Function
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "capture-test-harness",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {
@@ -90,10 +90,10 @@ export function Outer() {
   return nested;
 }
 `
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "symbol-identity-probe",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					var occurrences []*ast.Symbol
@@ -464,7 +464,8 @@ export function Outer(flag: boolean) {
 
 	// Break it the way a mis-placed phi breaks it: move a phi off its join.
 	var moved *Phi
-	var from, to *BasicBlock
+	var from *BasicBlock
+	var to *BasicBlock
 	for _, block := range nested.Blocks {
 		if len(block.Phis) > 0 {
 			moved, from = block.Phis[0], block

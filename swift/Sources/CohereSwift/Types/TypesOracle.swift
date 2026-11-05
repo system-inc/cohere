@@ -8,12 +8,20 @@ import Foundation
  The build is the oracle because it is the compiler's own verdict on the package as `swift build` compiles
  it. sourcekitd is the same compiler, but it is fed the arguments read back from the build's task store,
  and a flag lost on the way (a define, a search path, an upcoming feature) changes what it reports. Only
- agreement on whole real packages shows the arguments arrived intact.
+ agreement on whole real packages shows the arguments arrived intact. An Xcode root is built the way a run
+ builds it (`XcodeTypesPhase`), and its arguments are read from the derived data's task store.
 
  A comparison that could not fail proves nothing, so the oracle also asks one file again with an injected
  type error and requires that error back at its line. Coverage comes first in the report: files asked,
- files no compile command listed, and files sourcekitd could not answer for are all counted, so a run that
- compared nothing never reads as agreement.
+ files no compile command listed, files sourcekitd could not answer for, and files the build left without a
+ fresh record are all counted, so a run that compared nothing never reads as agreement.
+
+ The build's side has a gap of its own. An error at file scope fails the module's emit-module job, and the
+ build then compiles none of its files one by one, so their warnings are never recorded and the build's
+ side holds only what that job saw. Measured 2026-11-05 on a CapturePhone copy, where sourcekitd rightly
+ reported a warning the build never reached, and on a two-file package, where neither file had a record
+ and the comparison read as agreement. A file without a fresh record is one the build did not vouch for, so
+ it is named, and there is no agreement while there is one.
  */
 public struct TypesOracle {
     /* One compiler diagnostic, compared by where it is, how severe, and what it says. */
@@ -34,6 +42,8 @@ public struct TypesOracle {
         public var filesAsked: Int
         public var filesWithoutCommand: [String]
         public var filesUnanswered: [String: String]
+        /* Owned files the build left no record newer than the file for, as the types record names them. */
+        public var filesWithoutRecord: [String]
         public var build: [Diagnostic]
         public var sourcekitd: [Diagnostic]
         /* Diagnostics both sides report whose warning group differs: the build's name, then the one sourcekitd's documentation link gives. */
@@ -47,9 +57,10 @@ public struct TypesOracle {
         public var onlyBuild: [Diagnostic] { Set(build).subtracting(sourcekitd).sorted() }
         public var onlySourcekitd: [Diagnostic] { Set(sourcekitd).subtracting(build).sorted() }
 
-        /* Agreement means every owned file was asked and answered, the two sides match, and the control was caught. */
+        /* Agreement means every owned file was recorded by the build, asked and answered, the two sides match, and the control was caught. */
         public var agrees: Bool {
-            filesWithoutCommand.isEmpty && filesUnanswered.isEmpty && onlyBuild.isEmpty && onlySourcekitd.isEmpty
+            filesWithoutRecord.isEmpty && filesWithoutCommand.isEmpty && filesUnanswered.isEmpty
+                && onlyBuild.isEmpty && onlySourcekitd.isEmpty
                 && groupDifferences.isEmpty && controlFound && filesAsked == filesOwned
         }
     }
@@ -68,18 +79,44 @@ public struct TypesOracle {
     public func run() throws -> Report {
         let toolchain = EngineVersion.toolchain(runner: runner)
         let scratchPath = Pipeline.scratchPath(for: root)
-        let package = try PackageModel.load(root: root, scratchPath: scratchPath, runner: runner, toolchain: toolchain)
+        /* The project `Pipeline` checks at this root; a root holding none is read as a package, which then says why it cannot be. */
+        let xcodeSource: XcodeProject.Source?
+        if case let .xcode(source) = try XcodeProject.rootProject(at: root) {
+            xcodeSource = source
+        }
+        else {
+            xcodeSource = nil
+        }
+        let xcodeProject = try xcodeSource.map {
+            try XcodeProject.load(source: $0, root: root, scratchPath: scratchPath, runner: runner)
+        }
+        let package =
+            try xcodeProject?.model
+            ?? PackageModel.load(root: root, scratchPath: scratchPath, runner: runner, toolchain: toolchain)
         let files = try FileSet.build(package: package).owned
+        let xcodePhase = xcodeProject.map { project in
+            XcodeTypesPhase(
+                package: package,
+                project: project,
+                files: files,
+                scratchPath: scratchPath,
+                resolutionAllowed: false,
+                toolchain: toolchain,
+                runner: runner,
+            )
+        }
 
         let buildStart = Date()
-        let types = try TypesPhase(
-            package: package,
-            files: files,
-            scratchPath: scratchPath,
-            resolutionAllowed: false,
-            toolchain: toolchain,
-            runner: runner,
-        ).run()
+        let types =
+            try xcodePhase?.run()
+            ?? TypesPhase(
+                package: package,
+                files: files,
+                scratchPath: scratchPath,
+                resolutionAllowed: false,
+                toolchain: toolchain,
+                runner: runner,
+            ).run()
         let buildMilliseconds = Pipeline.milliseconds(since: buildStart)
         var buildGroups: [Diagnostic: String] = [:]
         let build = types.findings.filter { $0.messageId != "buildFailed" }.map { finding in
@@ -94,15 +131,22 @@ public struct TypesOracle {
             return diagnostic
         }
 
-        /* A local package's tests build into their own scratch, so their commands live in that scratch's task store. */
-        var commandTables = [try CompileCommands.read(scratchPath: scratchPath)]
-        for local in package.localPackages {
-            let localScratch = scratchPath.appendingPathComponent(
-                "local/\(local.root.lastPathComponent)",
-                isDirectory: true,
-            )
-            if FileManager.default.fileExists(atPath: localScratch.path) {
-                commandTables.append(try CompileCommands.read(scratchPath: localScratch))
+        var commandTables: [CompileCommands] = []
+        if let xcodePhase {
+            /* Every target of the project builds into the one derived data, so one task store holds every command. */
+            commandTables.append(try CompileCommands.read(layout: .xcode(derivedData: xcodePhase.derivedData)))
+        }
+        else {
+            commandTables.append(try CompileCommands.read(layout: .swiftPackage(scratchPath: scratchPath)))
+            /* A local package's tests build into their own scratch, so their commands live in that scratch's task store. */
+            for local in package.localPackages {
+                let localScratch = scratchPath.appendingPathComponent(
+                    "local/\(local.root.lastPathComponent)",
+                    isDirectory: true,
+                )
+                if FileManager.default.fileExists(atPath: localScratch.path) {
+                    commandTables.append(try CompileCommands.read(layout: .swiftPackage(scratchPath: localScratch)))
+                }
             }
         }
 
@@ -170,6 +214,7 @@ public struct TypesOracle {
             filesAsked: asked,
             filesWithoutCommand: withoutCommand.sorted(),
             filesUnanswered: unanswered,
+            filesWithoutRecord: types.record.filesWithoutRecord,
             build: build.sorted(),
             sourcekitd: sourcekitd.sorted(),
             groupDifferences: groupDifferences,

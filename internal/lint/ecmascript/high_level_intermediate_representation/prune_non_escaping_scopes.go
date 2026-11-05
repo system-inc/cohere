@@ -461,6 +461,8 @@ func (collector *memoizationCollector) eachMemoizationOperand(value ReactiveValu
 // early-return value: the memoized value is returned from inside it and `propagateEarlyReturns`
 // needs the scope standing. We have no early-return representation, so only the first half applies
 // and the second is why `PropagateEarlyReturns` is still open rather than declined.
+//
+// Mutates: prunedScopes the caller gathers every scope pruned here, so the marker pass after it reads the set
 func prunePassOverScopes(
 	tree *ReactiveFunction,
 	function *Function,
@@ -580,34 +582,34 @@ func prunePassOverMemoMarkers(tree *ReactiveFunction, function *Function, scopes
 				return KeepStatement()
 			}
 
-			switch value := plain.Value.(type) {
+			switch shape := plain.Value.(type) {
 			case *StoreLocal:
 				// Upstream keys this arm on `lvalue.kind === 'Reassign'`. This IR has no reassign
 				// kind on a store, so the same population is selected structurally: a store whose
 				// target carries no scope is the inlining temporary upstream is describing.
-				if scopeless(value.LValue.Identifier) {
-					target := declarationOf(function, value.LValue.Identifier)
-					reassignments[target] = append(reassignments[target], value.Value.Identifier)
+				if scopeless(shape.LValue.Identifier) {
+					target := declarationOf(function, shape.LValue.Identifier)
+					reassignments[target] = append(reassignments[target], shape.Value.Identifier)
 				}
 
 			case *LoadLocal:
 				// The simpler inlining shape: a direct assignment to the original lvalue. Upstream
 				// requires the loaded place to have a scope and the lvalue to lack one, which is
 				// what distinguishes it from an ordinary read.
-				if instruction.LValue != nil && !scopeless(value.Place.Identifier) &&
+				if instruction.LValue != nil && !scopeless(shape.Place.Identifier) &&
 					scopeless(instruction.LValue.Identifier) {
 					target := declarationOf(function, instruction.LValue.Identifier)
-					reassignments[target] = append(reassignments[target], value.Place.Identifier)
+					reassignments[target] = append(reassignments[target], shape.Place.Identifier)
 				}
 
 			case *FinishMemoize:
-				if value.Pruned {
+				if shape.Pruned {
 					return KeepStatement()
 				}
-				declarations := []static_single_assignment.IdentifierId{value.Value.Identifier}
-				if scopeless(value.Value.Identifier) {
+				declarations := []static_single_assignment.IdentifierId{shape.Value.Identifier}
+				if scopeless(shape.Value.Identifier) {
 					if inlined, found :=
-						reassignments[declarationOf(function, value.Value.Identifier)]; found {
+						reassignments[declarationOf(function, shape.Value.Identifier)]; found {
 						declarations = inlined
 					}
 				}
@@ -623,7 +625,7 @@ func prunePassOverMemoMarkers(tree *ReactiveFunction, function *Function, scopes
 					}
 				}
 				if all {
-					value.Pruned = true
+					shape.Pruned = true
 					marked++
 				}
 			}

@@ -451,11 +451,11 @@ export function Widget() {
 //
 // The name is deliberately not one of the real rules'. A stand-in wearing a real rule's name would
 // make this test pass whether or not the derivation reads the flag at all.
-var reactHookNoAnyTypeStandInBlindedRule = rule.Rule{
+var reactHookNoAnyTypeStandInBlindedRule = rule.Rule[rule.NoOptions]{
 	Name:                    "react-hook-any-type-stand-in-blinded",
 	NeedsTypeChecker:        true,
 	ResolvesReactValueTypes: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Never registered with the real catalog and never offered a file; this body exists only so
 		// the struct is a rule rather than a shape.
 		if ruleContext.TypeChecker == nil {
@@ -468,7 +468,7 @@ var reactHookNoAnyTypeStandInBlindedRule = rule.Rule{
 }
 
 func init() {
-	rule.Register(rule.Registration{Rule: reactHookNoAnyTypeStandInBlindedRule})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: reactHookNoAnyTypeStandInBlindedRule})
 }
 
 // TestReactHookAnyTypeNamesTheBlindedRulesFromTheCatalog proves the list is derived, not written.
@@ -527,11 +527,11 @@ func TestReactHookAnyTypeBlindedRuleDerivationReadsTheFlag(test *testing.T) {
 		named[name] = true
 	}
 
-	for _, registration := range rule.Registered() {
-		want := registration.Rule.ResolvesReactValueTypes
-		if got := named[registration.Rule.Name]; got != want {
+	for _, entry := range rule.Registered() {
+		want := entry.ResolvesReactValueTypes
+		if got := named[entry.Name]; got != want {
 			test.Errorf("rule %q declares ResolvesReactValueTypes=%v but the derivation %s it",
-				registration.Rule.Name, want, map[bool]string{true: "named", false: "did not name"}[got])
+				entry.Name, want, map[bool]string{true: "named", false: "did not name"}[got])
 		}
 	}
 }
@@ -674,10 +674,10 @@ func TestReactHookAnyTypeFlagReadAgreesWithTheCheckersOwnName(test *testing.T) {
 
 			// A throwaway rule rather than the real one, so this measures the shim read directly
 			// instead of measuring it through everything else the rule decides.
-			probe := rule.Rule{
+			probe := rule.Rule[rule.NoOptions]{
 				Name:             "react-hook-any-type-shim-probe",
 				NeedsTypeChecker: true,
-				Run: func(ruleContext rule.Context, options any) rule.Listeners {
+				Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 					if ruleContext.TypeChecker == nil {
 						return nil
 					}

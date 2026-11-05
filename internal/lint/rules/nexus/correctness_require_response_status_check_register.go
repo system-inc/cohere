@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // throw on an HTTP error, and an option adding to it would let a configuration name a wrapper that
 // already throws, which is the false positive the doc comment declines on purpose.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessRequireResponseStatusCheck})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessRequireResponseStatusCheck})
 }

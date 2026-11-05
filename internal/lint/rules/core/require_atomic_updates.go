@@ -159,8 +159,9 @@ type RequireAtomicUpdatesOptions struct {
 //
 // The divergence is a strict superset in favour of reporting, and it is the right direction here:
 // the reason upstream skips an unresolved name is that it cannot tell a global from a typo, not that
-// a global cannot race. A global is in fact the most racy thing in the file. `TestRequireAtomicUpdatesResolutionDivergence`
-// pins it so the next reader sees a measurement rather than inherits an argument.
+// a global cannot race. A global is in fact the most racy thing in the file.
+// `TestRequireAtomicUpdatesResolutionDivergence` pins it so the next reader sees a measurement rather than
+// inherits an argument.
 //
 // On the real tree this accounts for 7 of the 8 extras, all of them the same shape: a handler saved
 // into a local, replaced, and restored in a `finally` after an await.
@@ -241,7 +242,7 @@ type RequireAtomicUpdatesOptions struct {
 // expression sees, which is the entire point and is not something a linter may do unattended. There
 // is also no single right answer, since the author may have meant to re-read, to lock, or to hold
 // the value deliberately.
-var RequireAtomicUpdates = rule.Rule{
+var RequireAtomicUpdates = rule.Rule[RequireAtomicUpdatesOptions]{
 	Name: "require-atomic-updates",
 
 	// Symbol identity is what makes two occurrences the same binding, and it is what separates a
@@ -257,14 +258,14 @@ var RequireAtomicUpdates = rule.Rule{
 	// unexplained survivor; the guard that can see it is the dry run against the real tree.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[RequireAtomicUpdatesOptions]) rule.Listeners {
 		// A rule configured as a bare severity is handed nil options, which `options.(T)` turns into
 		// the zero value. The zero value is the right default here (upstream defaults
 		// `allowProperties` to false) but the fallback is written explicitly rather than relied on,
 		// because a rule whose default arrives by accident is one field rename away from silently
 		// inverting.
 		settings := RequireAtomicUpdatesOptions{AllowProperties: false}
-		if decoded, configured := rule.OptionsAs[RequireAtomicUpdatesOptions](options); configured {
+		if decoded, configured := options.Read(); configured {
 			settings = decoded
 		}
 

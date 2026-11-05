@@ -189,6 +189,9 @@ func Solve[V any, E any](graph *Graph[E], direction Direction, lattice LatticeOf
 		changed = false
 		solution.rounds++
 		if solution.rounds > maximumRounds {
+			// Invariant: a monotone lattice of the small height this framework is built for converges
+			// far inside maximumRounds, so reaching it means a broken Meet or Equal, a bug in the
+			// analysis rather than anything a source file can cause.
 			panic(
 				// The dash is written as its escape, the same bytes, so the message reads as it always has.
 				"controlflow: dataflow did not converge \u2014 the lattice's Meet is probably not idempotent, " +

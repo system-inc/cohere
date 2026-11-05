@@ -68,8 +68,9 @@ const unknownFixtureStylesheet = `@import "tailwindcss";
 // unknownFixturePackageRoot is the installed tailwindcss the fixture stylesheet imports: the vendored
 // snapshot, so the fixtures run on any machine (#sycrdr6). It used to be found by walking up from ahra's
 // checkout, which only one laptop has.
-func unknownFixturePackageRoot() string {
-	return vendored.TailwindPackageRoot()
+func unknownFixturePackageRoot(test *testing.T) string {
+	test.Helper()
+	return vendored.TailwindPackageRootForTest(test)
 }
 
 // runUnknownFixture runs the rule against a one-file program that has a real design system.
@@ -88,11 +89,11 @@ func runUnknownFixtureWithOptions(
 	test *testing.T,
 	fileName string,
 	source string,
-	options any,
+	options *NoUnknownClassesOptions,
 ) rule_testing.Result {
 	test.Helper()
 
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
 			"built and these fixtures would measure a decline rather than an existence check")
@@ -116,7 +117,7 @@ func runUnknownFixtureWithOptions(
 		return rule_testing.RunTypedFilesWithSetup(test, NoUnknownClasses, files, fileName, plantPackage)
 	}
 	return rule_testing.RunTypedFilesWithSetupAndOptions(
-		test, NoUnknownClasses, files, fileName, options, plantPackage)
+		test, NoUnknownClasses, files, fileName, *options, plantPackage)
 }
 
 func TestNoUnknownClassesReportsTypos(test *testing.T) {
@@ -317,7 +318,7 @@ func TestUnknownIgnoreExemptsProjectClasses(test *testing.T) {
 	options := NoUnknownClassesOptions{Ignore: []string{`^ahralia-`}}
 
 	exempted := runUnknownFixtureWithOptions(test, "Component.tsx",
-		`const element = <div className="ahralia-splash flex" />;`, options)
+		`const element = <div className="ahralia-splash flex" />;`, &options)
 	if len(exempted.Diagnostics) != 0 {
 		test.Errorf("an ignored class should not be reported, got %d findings", len(exempted.Diagnostics))
 	}
@@ -331,7 +332,7 @@ func TestUnknownIgnoreExemptsProjectClasses(test *testing.T) {
 
 	// And the exemption must not swallow real typos alongside it.
 	stillReported := runUnknownFixtureWithOptions(test, "Component.tsx",
-		`const element = <div className="ahralia-splash flx" />;`, options)
+		`const element = <div className="ahralia-splash flx" />;`, &options)
 	if len(stillReported.Diagnostics) != 1 {
 		test.Errorf("the ignore pattern should exempt only what it matches, got %d findings",
 			len(stillReported.Diagnostics))
@@ -583,12 +584,12 @@ func TestRepositoryNamesAreNoLongerVouchedForByTheFramework(test *testing.T) {
 // first; a rule that had stopped answering would fail the second.
 func TestUnknownClassFixturesActuallyRan(test *testing.T) {
 	test.Parallel()
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Fatalf(
 			"the vendored tailwindcss at %s is missing, so every fixture in this file would skip and the "+
 				"package still report ok; restore it (internal/lint/rules/tailwind/vendored)",
-			vendored.TailwindPackageRoot(),
+			vendored.TailwindPackageRootForTest(test),
 		)
 	}
 
@@ -611,7 +612,7 @@ func unknownFixtureLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSyste
 	if _, statError := os.Stat(entryPoint); statError != nil {
 		test.Fatalf("the ahra corpus has no stylesheet at %s, so there is no live design system to ask", entryPoint)
 	}
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 
 	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
@@ -640,7 +641,7 @@ func independentLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSystem {
 		test.Fatalf("reading the independent theme: %v", readError)
 	}
 
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Skip("no installed tailwindcss on this machine")
 	}

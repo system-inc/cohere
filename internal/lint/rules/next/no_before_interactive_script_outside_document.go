@@ -145,13 +145,13 @@ var messageNoBeforeInteractiveScriptOutsideDocument = rule.Message{
 //
 // No fix. Upstream ships none, and the repair is either a move to another file or a change to what
 // the page does.
-var NoBeforeInteractiveScriptOutsideDocument = rule.Rule{
+var NoBeforeInteractiveScriptOutsideDocument = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-before-interactive-script-outside-document` and
 	// matching strips the namespace on a `/` boundary, so a prefixed name matches nothing and runs
 	// on no files while its own tests stay green.
 	Name: "@next/next/no-before-interactive-script-outside-document",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		fileName := ruleContext.SourceFile.FileName()
 
 		// Hoisted, unlike upstream, which asks this at every opening element. Same answer, asked

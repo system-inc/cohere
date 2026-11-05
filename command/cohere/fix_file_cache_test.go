@@ -11,6 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/rules/typescript"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -29,22 +30,25 @@ import (
 func TestTheFixPathsReLintComputesEachDerivationOncePerText(test *testing.T) {
 	test.Parallel()
 	computed := 0
-	asking := func(name string) rule.Rule {
-		return rule.Rule{Name: name, Run: func(ruleContext rule.Context, options any) rule.Listeners {
-			return rule.Listeners{ast.KindIdentifier: func(node *ast.Node) {
-				rule.Cached(ruleContext.FileCache, "fix-file-cache-probe", func() int {
-					computed++
-					return computed
-				})
-			}}
-		}}
+	asking := func(name string) rule.Rule[rule.NoOptions] {
+		return rule.Rule[rule.NoOptions]{
+			Name: name,
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+				return rule.Listeners{ast.KindIdentifier: func(node *ast.Node) {
+					rule.Cached(ruleContext.FileCache, "fix-file-cache-probe", func() int {
+						computed++
+						return computed
+					})
+				}}
+			},
+		}
 	}
 	text := "const first = second;\nconst third = first + second;\n"
 	if _, proposalsForTextError := proposalsForText(
 		"/Probe.ts",
 		text,
 		&program.Graph{},
-		[]rule.Rule{asking("probe-a"), asking("probe-b")},
+		rule_testing.EntriesOf(test, asking("probe-a"), asking("probe-b")),
 	); proposalsForTextError != nil {
 		test.Fatalf("proposalsForText: %v", proposalsForTextError)
 	}
@@ -80,7 +84,7 @@ func bundle(count int) string {
 // Not parallel: testing.AllocsPerRun reads the process's allocation count, which a parallel test would add to,
 // and it refuses to run inside one.
 func TestTheFixPathsReLintGrowsLinearlyOnABundle(test *testing.T) {
-	rules := []rule.Rule{typescript.NoInvalidThis}
+	rules := []rule.Entry{rule_testing.EntryOf(test, typescript.NoInvalidThis)}
 	allocations := func(count int) float64 {
 		text := bundle(count)
 		return testing.AllocsPerRun(3, func() {

@@ -109,11 +109,11 @@ type EnforceCanonicalClassesOptions struct {
 // be spliced into a class list whose order is `enforce-consistent-class-order`'s concern, and a
 // rewrite that also reordered would fight it. Reporting the shorter spelling is enough for an
 // author to act on.
-var EnforceCanonicalClasses = rule.Rule{
+var EnforceCanonicalClasses = rule.Rule[EnforceCanonicalClassesOptions]{
 	Name: "better-tailwindcss/enforce-canonical-classes",
 	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[EnforceCanonicalClassesOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -121,7 +121,7 @@ var EnforceCanonicalClasses = rule.Rule{
 		// Read before the design system is resolved: reading is pure, and a run that declines for want
 		// of a Tailwind entry point must still reach it, or the registry's decoder agreement check
 		// never looks at this rule (#zwd43jn).
-		configured, isConfigured := rule.OptionsAs[EnforceCanonicalClassesOptions](options)
+		configured, isConfigured := options.Read()
 
 		// Resolved once per file and before the listeners are built, matching the other two migrated
 		// rules. A project with no Tailwind is silence with nothing wrong; a project whose CSS will

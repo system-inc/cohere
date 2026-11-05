@@ -123,14 +123,14 @@ const (
 // member overrides a concrete base member of the other kind and declines exactly there; see
 // classLiteralConversionBreaksAnOverride. This is the only use of the checker in the rule, which is
 // why it is declared needed and why, with no checker, the rule falls back to upstream's verdicts.
-var ClassLiteralPropertyStyle = rule.Rule{
+var ClassLiteralPropertyStyle = rule.Rule[ClassLiteralPropertyStyleOptions]{
 	Name: "@typescript-eslint/class-literal-property-style",
 
 	// For classLiteralConversionBreaksAnOverride alone. The base class is usually in another file
 	// (StringSchema.ts against BaseSchema.ts), so the verdict reads the program as well.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ClassLiteralPropertyStyleOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -140,7 +140,7 @@ var ClassLiteralPropertyStyle = rule.Rule{
 		// errors on empty input and the config layer turns that into nil. A bare type assertion
 		// would then yield the empty string, which matches neither arm below, and the rule would
 		// register on every file and report nothing while every decoder-routed fixture stayed green.
-		parsed, decoded := rule.OptionsAs[ClassLiteralPropertyStyleOptions](options)
+		parsed, decoded := options.Read()
 		if !decoded {
 			parsed = DefaultClassLiteralPropertyStyleOptions()
 		}
@@ -915,7 +915,7 @@ func DefaultClassLiteralPropertyStyleOptions() ClassLiteralPropertyStyleOptions 
 // that a typo should not silence the rule; it did not silence it, it ran a style nobody wrote and
 // loaded clean doing it. Upstream's schema is a string enum and refuses it at load, and the config
 // layer now refuses a decoder's error by rule name, so refusing is what tells the author (#rfbha44).
-func DecodeClassLiteralPropertyStyleOptions(raw []byte) (any, error) {
+func DecodeClassLiteralPropertyStyleOptions(raw []byte) (ClassLiteralPropertyStyleOptions, error) {
 	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	trimmed := strings.TrimSpace(string(raw))
 	if trimmed == "" || trimmed == "null" {

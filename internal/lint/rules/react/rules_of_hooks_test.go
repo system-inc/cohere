@@ -992,7 +992,11 @@ func TestRulesOfHooksFires(test *testing.T) {
             ({g() { useState(); }});
             const {j = () => { useState(); }} = {};
             ({k = () => { useState(); }} = {});
-        `, ids: []string{"rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent"}},
+        `, ids: []string{
+			"rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent",
+			"rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent",
+			"rulesOfHooksNotComponent", "rulesOfHooksNotComponent",
+		}},
 		{name: "upstream102", source: `
                 function useHook() {
                     if (a) return;
@@ -1223,7 +1227,9 @@ func TestRulesOfHooksFires(test *testing.T) {
             Hook.use42();
             Hook.useHook();
             Hook.use_hook();
-        `, ids: []string{"rulesOfHooksTopLevel", "rulesOfHooksTopLevel", "rulesOfHooksTopLevel", "rulesOfHooksTopLevel"}},
+        `, ids: []string{
+			"rulesOfHooksTopLevel", "rulesOfHooksTopLevel", "rulesOfHooksTopLevel", "rulesOfHooksTopLevel",
+		}},
 		{name: "upstream134", source: `
                 function notAComponent() {
                     use(promise);
@@ -1629,7 +1635,9 @@ const rulesOfHooksOptionFile = "/repository/source/RulesOfHooksOption.tsx"
 func TestRulesOfHooksAdditionalHooksChangesNothing(test *testing.T) {
 	test.Parallel()
 
-	decoded, decodeOptionsError := rule.DecodeOptionsInto[RulesOfHooksOptions]()([]byte(`{"additionalHooks": "useCustomEffect"}`))
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[RulesOfHooksOptions]()(
+		[]byte(`{"additionalHooks": "useCustomEffect"}`),
+	)
 	if decodeOptionsError != nil {
 		test.Fatalf("decoding additionalHooks: %v", decodeOptionsError)
 	}
@@ -1640,7 +1648,9 @@ func TestRulesOfHooksAdditionalHooksChangesNothing(test *testing.T) {
 		test.Errorf("with the option %v, without %v; want the same, non-empty", with.MessageIds(), without.MessageIds())
 	}
 
-	if _, decodeOptionsError := rule.DecodeOptionsInto[RulesOfHooksOptions]()([]byte(`{"additionalEffectHooks": "x"}`)); decodeOptionsError == nil {
+	if _, decodeOptionsError := rule.DecodeOptionsInto[RulesOfHooksOptions]()(
+		[]byte(`{"additionalEffectHooks": "x"}`),
+	); decodeOptionsError == nil {
 		test.Error("the settings key decoded as an option; upstream's schema has only additionalHooks")
 	}
 }

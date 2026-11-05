@@ -368,6 +368,11 @@ func TestOpenSwiftArguments(test *testing.T) {
 		nil,
 	)
 	if engineArgumentsError != nil || mode != openMode || !reflect.DeepEqual(arguments, baseline) {
-		test.Fatalf("--open must be handled by the Go front door: %v, %v, %v", arguments, openMode, engineArgumentsError)
+		test.Fatalf(
+			"--open must be handled by the Go front door: %v, %v, %v",
+			arguments,
+			openMode,
+			engineArgumentsError,
+		)
 	}
 }

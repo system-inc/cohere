@@ -63,11 +63,11 @@ type NoUnknownClassesOptions struct {
 // every stray class, and misses a typo'd value on a real root. Under-reporting leaves a defect for
 // someone to find later; over-reporting on correct code is how a rule gets turned off, and this rule
 // in particular gets turned off the first time it flags a working class.
-var NoUnknownClasses = rule.Rule{
+var NoUnknownClasses = rule.Rule[NoUnknownClassesOptions]{
 	Name: "better-tailwindcss/no-unknown-classes",
 	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnknownClassesOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -75,7 +75,7 @@ var NoUnknownClasses = rule.Rule{
 		// Read before the design system is resolved: reading is pure, and a run that declines for want
 		// of a Tailwind entry point must still reach it, or the registry's decoder agreement check
 		// never looks at this rule (#zwd43jn).
-		configured, isConfigured := rule.OptionsAs[NoUnknownClassesOptions](options)
+		configured, isConfigured := options.Read()
 
 		// Resolved once per file and before the listeners are built, matching
 		// `enforce-consistent-class-order`. The two failure states are told apart rather than

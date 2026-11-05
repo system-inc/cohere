@@ -27,7 +27,7 @@ public struct Pipeline {
      records, the build-input snapshot, the prune stamp), so a fresh one reads nothing a run before left and
      writes nothing to the project's `.cache`, as TypeScript's `--no-cache` promises.
      */
-    private let freshScratch: URL?
+    let freshScratch: URL?
 
     public init(
         options: CommandOptions,
@@ -70,9 +70,22 @@ public struct Pipeline {
             return 0
         }
 
+        let configurationRoot = options.root ?? workingDirectory
+        /*
+         The file the config is looked for beside, which its note names: the Package.swift that wins below, else the
+         Xcode project's definition. A root that holds neither, or two projects, is refused below before any note prints.
+         */
+        let definition: String
+        if case let .xcode(source) = try? XcodeProject.rootProject(at: configurationRoot) {
+            definition = source.fileName
+        }
+        else {
+            definition = "Package.swift"
+        }
         let configuration = try RuleConfiguration.load(
-            packageRoot: options.root ?? workingDirectory,
+            packageRoot: configurationRoot,
             explicitPath: options.lintConfiguration,
+            definition: definition,
         )
         if options.listRules || options.listRulesEnabled {
             for name in RuleRegistry.allNames {
@@ -88,18 +101,27 @@ public struct Pipeline {
         guard let root = options.root else {
             throw RunFailure(description: "no --root was given, so there is no package to check")
         }
-        guard FileManager.default.fileExists(atPath: root.appendingPathComponent("Package.swift").path) else {
-            throw RunFailure(description: "\(root.path) holds no Package.swift, so there is no package to check")
+        let xcodeSource: XcodeProject.Source?
+        do {
+            switch try XcodeProject.rootProject(at: root) {
+                case .swiftPackage:
+                    xcodeSource = nil
+                case let .xcode(source):
+                    xcodeSource = source
+                case nil:
+                    throw RunFailure(
+                        description:
+                            "\(root.path) holds no Package.swift, project.yml or .xcodeproj, so there is nothing to check"
+                    )
+            }
+        }
+        catch let ambiguous as XcodeProject.AmbiguousRoot {
+            throw RunFailure(description: ambiguous.description)
         }
 
         /* The packages a run here accounts for, from the same traversal the run uses: manifests only, no build. */
         if options.listCoveredPackages {
-            let package = try PackageModel.load(
-                root: root,
-                scratchPath: runScratch(for: root),
-                runner: runner,
-                toolchain: toolchain,
-            )
+            let package = try loadProject(root: root, xcodeSource: xcodeSource, toolchain: toolchain).package
             let inside = package.localPackages.filter { PackageModel.isInside($0.root, root) }
             let path = { (model: PackageModel) in model.root.standardizedFileURL.path }
             try writer.write(
@@ -132,15 +154,10 @@ public struct Pipeline {
                 )
             }
         }
-        let fileRules = RuleRegistry.fileRules(vocabulary: vocabulary)
+        let fileRules = RuleRegistry.fileRules(vocabulary: vocabulary, configuration: configuration)
 
         let describeStart = Date()
-        let package = try PackageModel.load(
-            root: root,
-            scratchPath: runScratch(for: root),
-            runner: runner,
-            toolchain: toolchain,
-        )
+        let (package, xcodeProject) = try loadProject(root: root, xcodeSource: xcodeSource, toolchain: toolchain)
         let fileSet = try FileSet.build(package: package)
         let scope = try FileScope.resolve(options: options, fileSet: fileSet, workingDirectory: workingDirectory)
         /*
@@ -359,12 +376,20 @@ public struct Pipeline {
             return try writer.finish(complete: false)
         }
 
-        var typeErrors = 0
-        if !options.runTypes {
-            try writer.write(PhaseRecord(name: .types, outcome: .skipped, detail: "not requested"))
-        }
-        else {
-            /* The whole package, whatever the scope: a change in one file changes what the rest of its module means. */
+        /* The whole package, whatever the scope: a change in one file changes what the rest of its module means. */
+        func build() throws -> TypesPhase.Result {
+            if let xcodeProject {
+                return try XcodeTypesPhase(
+                    package: package,
+                    project: xcodeProject,
+                    files: fileSet.owned,
+                    scratchPath: runScratch(for: root),
+                    resolutionAllowed: !options.noFix,
+                    toolchain: toolchain,
+                    runner: runner,
+                )
+                .run()
+            }
             var typesPhase = TypesPhase(
                 package: package,
                 files: fileSet.owned,
@@ -377,7 +402,37 @@ public struct Pipeline {
                 parsed.files.map { ($0.url.path, $0.tree) },
                 uniquingKeysWith: { first, _ in first },
             )
-            let types = try typesPhase.run()
+            return try typesPhase.run()
+        }
+
+        var typeErrors = 0
+        var lintBuildFailure: String?
+        if !options.runTypes {
+            /*
+             A typed rule reads what names resolve to from the build's index and compile commands, so a `--lint` run
+             whose typed rules apply to a file still builds, the way TypeScript's lint still loads the checker. What
+             the compiler said is not this run's to report, and the build is skipped when no input changed since the
+             last one. Without it, a tree no run had built marked every such file crashed (@ahra_os_presence_motion,
+             2026-11-05: 1,251 files at ahraos-presence's root under `--lint --no-fix`).
+             */
+            let typedRulesApply = parsed.files.contains { file in
+                RuleRegistry.typedRules.contains { configuration.severity(of: $0.name) != .off && $0.applies(to: file) }
+            }
+            if options.runLint && typedRulesApply {
+                do {
+                    /* A build that failed after compiling something is said by a `buildFailed` finding rather than thrown. */
+                    lintBuildFailure = try build().findings.first { $0.messageId == "buildFailed" }?.message
+                }
+                catch let failure as TypesPhase.TypesFailure {
+                    /* Lint still runs: the rules that need no build judge every file, and each file the typed rules cannot judge says this build is why. */
+                    lintBuildFailure = failure.description
+                }
+            }
+            /* Exactly `not requested`, the one detail the contract reads as nobody asking: the build is lint's input, not a types phase. */
+            try writer.write(PhaseRecord(name: .types, outcome: .skipped, detail: "not requested"))
+        }
+        else {
+            let types = try build()
             for finding in types.findings {
                 try writer.write(finding)
             }
@@ -419,13 +474,37 @@ public struct Pipeline {
                 RuleRegistry.typedRules.contains { configuration.severity(of: $0.name) != .off && $0.applies(to: file) }
             }
             var symbolProvider = SymbolProvider(
-                scratchPaths: Self.symbolScratchPaths(package: package, scratch: runScratch(for: root)),
+                layouts: Self.symbolLayouts(package: package, scratch: runScratch(for: root)),
                 runner: runner,
             )
-            symbolProvider.ownedModules = Self.ownedModules(of: package)
+            symbolProvider.ownedModules = Self.ownedModules(of: package).union(
+                Self.compiledModules(of: package, fileSet: fileSet, layouts: symbolProvider.layouts)
+            )
             linter.symbols = symbolProvider.symbols(for: typedCandidates)
+            if let lintBuildFailure {
+                linter.symbols.unavailable = linter.symbols.unavailable.mapValues {
+                    "\($0), since the build this run made for the typed rules failed: \(lintBuildFailure)"
+                }
+            }
+            /*
+             At an Xcode root, Xcode's own answer for each target's toolchain settings, which only the toolchain rules
+             read, so it is asked for here, when one of them is enabled. Its time is in the lint phase's elapsed. Asked
+             after the build, it finds the packages that build resolved, and a run whose types bailed never asks.
+             */
+            var judged = package
+            if let loaded = xcodeProject,
+                RuleRegistry.packageRules.contains(where: { configuration.severity(of: $0.name) != .off })
+            {
+                judged = toolchainSettingsRead(
+                    into: package,
+                    project: loaded,
+                    fileSet: fileSet,
+                    root: root,
+                    toolchain: toolchain,
+                )
+            }
             let lint = await linter.run(
-                package: package,
+                package: judged,
                 manifests: await manifests(of: package),
                 files: parsed.files,
                 reusable: reusableFindings,
@@ -471,6 +550,70 @@ public struct Pipeline {
 
     static let unusedNotRequested = "not requested — this is a report, ask for it with --unused"
 
+    /*
+     The run's project: SwiftPM's answer for a package, or an Xcode project read into the same model, with the
+     bundle and project file its types phase builds from.
+     */
+    private func loadProject(
+        root: URL,
+        xcodeSource: XcodeProject.Source?,
+        toolchain: String,
+    ) throws -> (package: PackageModel, xcode: XcodeProject.Loaded?) {
+        if let xcodeSource {
+            let loaded = try XcodeProject.load(
+                source: xcodeSource,
+                root: root,
+                scratchPath: runScratch(for: root),
+                runner: runner,
+            )
+            return (loaded.model, loaded)
+        }
+        let package = try PackageModel.load(
+            root: root,
+            scratchPath: runScratch(for: root),
+            runner: runner,
+            toolchain: toolchain,
+        )
+        return (package, nil)
+    }
+
+    /*
+     The model with Xcode's answer for each owned target's toolchain settings (`XcodeBuildSettings`), read through the
+     invocation the types phase builds with, so it resolves and writes exactly where that build does, and findings
+     about a target point at its line in the project's definition. At an xcodegen root the spec's text goes with it, for
+     the edit a finding suggests; a committed project file is never offered one.
+     */
+    private func toolchainSettingsRead(
+        into package: PackageModel,
+        project: XcodeProject.Loaded,
+        fileSet: FileSet,
+        root: URL,
+        toolchain: String,
+    ) -> PackageModel {
+        let phase = XcodeTypesPhase(
+            package: package,
+            project: project,
+            files: fileSet.owned,
+            scratchPath: runScratch(for: root),
+            resolutionAllowed: !options.noFix,
+            toolchain: toolchain,
+            runner: runner,
+        )
+        let definitionText = try? String(contentsOf: project.definition, encoding: .utf8)
+        let isSpecification = package.projectKind == .xcodeGen
+        let targetLines =
+            isSpecification
+            ? XcodeGenSpecification(text: definitionText ?? "").targetLines
+            : XcodeBuildSettings.targetLines(inProjectFile: definitionText ?? "", targets: project.projectFile.targets)
+        return XcodeBuildSettings.read(
+            phase: phase,
+            definition: project.definition,
+            targetLines: targetLines,
+            specification: isSpecification ? definitionText : nil,
+        )
+        .applied(to: package)
+    }
+
     /* The unused phase of a run cut off before it: not reached when it was asked for, not requested otherwise. */
     private func unusedPhase(notReached reason: String) -> PhaseRecord {
         options.unused
@@ -483,7 +626,8 @@ public struct Pipeline {
      used or not by its file alone but the index that answers is the whole build's. It reads the index the types phase just refreshed,
      or the last build's, and a file that index does not describe as it stands is counted as not checked
      rather than guessed at. Its records are a report, not findings: the writer does not count them, so they
-     never fail a run, the way the TypeScript unused report never does.
+     never fail a run, the way the TypeScript unused report never does. An Xcode root's index is its xcodebuild's,
+     in the derived data `symbolLayouts` names.
      */
     private func runUnused(package: PackageModel, root: URL, fileSet: FileSet, parsed: [ParsedFile]) async throws {
         let start = Date()
@@ -491,8 +635,8 @@ public struct Pipeline {
         let demangler: SwiftDemangler
         do {
             let library = try IndexStore.toolchainLibraryPath(runner: runner)
-            stores = Self.symbolScratchPaths(package: package, scratch: runScratch(for: root)).compactMap {
-                try? IndexStore(libraryPath: library, storePath: IndexStore.storePath(scratchPath: $0))
+            stores = Self.symbolLayouts(package: package, scratch: runScratch(for: root)).compactMap {
+                try? IndexStore(libraryPath: library, storePath: IndexStore.storePath(layout: $0))
             }
             demangler = try SwiftDemangler.shared(runner: runner)
         }
@@ -533,7 +677,15 @@ public struct Pipeline {
             since: start,
         )
         let declarationsStart = Date()
-        let declarations = UnusedDeclarations(stores: stores, package: package).run(files: files)
+        var unusedDeclarations = UnusedDeclarations(stores: stores, package: package)
+        unusedDeclarations.ownedModules.formUnion(
+            Self.compiledModules(
+                of: package,
+                fileSet: fileSet,
+                layouts: Self.symbolLayouts(package: package, scratch: runScratch(for: root)),
+            )
+        )
+        let declarations = unusedDeclarations.run(files: files)
         try writeReport(
             rule: UnusedDeclarations.ruleName,
             findings: declarations.findings,
@@ -611,6 +763,7 @@ public struct Pipeline {
                 }
             },
             excluded: fileSet.excluded,
+            projectKind: package.projectKind.rawValue,
         )
     }
 
@@ -659,16 +812,44 @@ public struct Pipeline {
         )
     }
 
-    /* Every scratch a build of this package writes an index store into: the root's, and each local package's that the types phase builds for its tests. */
-    static func symbolScratchPaths(package: PackageModel, scratch: URL) -> [URL] {
-        [scratch]
+    /*
+     At an Xcode root, the modules the build compiled our files into, which `ownedModules(of:)` cannot name: a
+     target's module is named for its product, not the target (CapturePhone's is `Capture`), and these are the
+     names the index records declarations under. Empty for a package, whose modules are its targets' names.
+     */
+    static func compiledModules(of package: PackageModel, fileSet: FileSet, layouts: [BuildLayout]) -> Set<String> {
+        guard package.projectKind != .swiftPackage else { return [] }
+        let ownedFiles = fileSet.owned.map(\.url)
+        var modules: Set<String> = []
+        for layout in layouts {
+            if let table = try? CompileCommands.read(layout: layout) {
+                modules.formUnion(table.modules(compiling: ownedFiles))
+            }
+        }
+        return modules
+    }
+
+    /*
+     Every build of this package that writes an index store and compile commands: for a package, the root's scratch
+     and each local package's that the types phase builds for its tests; for an Xcode root, the one xcodebuild's
+     derived data, which every target and linked package builds into.
+     */
+    static func symbolLayouts(package: PackageModel, scratch: URL) -> [BuildLayout] {
+        guard package.projectKind == .swiftPackage else {
+            return [.xcode(derivedData: XcodeTypesPhase.derivedData(scratchPath: scratch))]
+        }
+        let scratchPaths =
+            [scratch]
             + package.localPackages.map {
                 scratch.appendingPathComponent("local/\($0.root.lastPathComponent)", isDirectory: true)
             }
+        return scratchPaths.map { .swiftPackage(scratchPath: $0) }
     }
 
     /* Each owned package's manifest, parsed, so package rules can point at the line that would fix them. A manifest that cannot be read is absent, and its findings point at line 1. */
     private func manifests(of package: PackageModel) async -> [String: ParsedFile] {
+        /* An Xcode project has no manifest: its package rules read the settings Xcode resolved and point at its definition (`XcodeBuildSettings`). */
+        guard package.projectKind == .swiftPackage else { return [:] }
         let owned = package.allPackages.filter { $0.root == package.root || !package.isVendored($0) }
         let files = owned.map {
             FileSet.OwnedFile(

@@ -152,7 +152,7 @@ func decodeUnicodeEscape(source string, index int, size int, escaping escapeCont
 
 // decodeFixedHex reads the fixed-width hexadecimal escapes, `\xXX` and
 // `\uXXXX`. Without `u`, one that no hex digits complete is not an error but an
-// identity escape, so `/\x/` matches an `x`, and under `index` an `X` as well.
+// identity escape, so `/\x/` matches an `x` — and under `index` an `X` as well.
 func decodeFixedHex(source string, index int, size int, digits int, escaping escapeContext) (decodedEscape, error) {
 	start := index + size
 	if start+digits <= len(source) {
@@ -276,7 +276,10 @@ func decodeLegacyOctal(source string, index int) (rune, int) {
 // escape of its own. Annex B lets it stand before nearly anything; `u` narrows
 // it to the characters a pattern would otherwise read as syntax.
 func identityEscape(character rune, size int, escaping escapeContext) (decodedEscape, error) {
-	if escaping.unicode && !strings.ContainsRune(syntaxCharacters, character) && character != '/' && (!escaping.inClass || character != '-') {
+	if escaping.unicode &&
+		!strings.ContainsRune(syntaxCharacters, character) &&
+		character != '/' &&
+		(!escaping.inClass || character != '-') {
 		return decodedEscape{}, fmt.Errorf(`%w: \%c`, ErrUnsupportedSyntax, character)
 	}
 	return decodedEscape{r: character, width: size}, nil

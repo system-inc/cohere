@@ -21,6 +21,26 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
+// keywords is upstream's shared ES3 keyword list, copied verbatim and in order.
+//
+// ES3 rather than modern: it includes `abstract`, `boolean`, `byte`, `goto` and friends, which are
+// not reserved in any current JavaScript. That is deliberate upstream, and the list is what
+// `allowKeywords: false` bans, so trimming it to today's reserved words would silently narrow the
+// rule.
+var keywords = map[string]bool{
+	"abstract": true, "boolean": true, "break": true, "byte": true, "case": true, "catch": true,
+	"char": true, "class": true, "const": true, "continue": true, "debugger": true,
+	"default": true, "delete": true, "do": true, "double": true, "else": true, "enum": true,
+	"export": true, "extends": true, "false": true, "final": true, "finally": true, "float": true,
+	"for": true, "function": true, "goto": true, "if": true, "implements": true, "import": true,
+	"in": true, "instanceof": true, "int": true, "interface": true, "long": true, "native": true,
+	"new": true, "null": true, "package": true, "private": true, "protected": true, "public": true,
+	"return": true, "short": true, "static": true, "super": true, "switch": true,
+	"synchronized": true, "this": true, "throw": true, "throws": true, "transient": true,
+	"true": true, "try": true, "typeof": true, "var": true, "void": true, "volatile": true,
+	"while": true, "with": true,
+}
+
 // Settings is what the judgment reads, decoded by each rule from its own option surface.
 type Settings struct {
 	// AllowKeywords permits `a.class` and friends. Upstream's default is true.
@@ -139,26 +159,6 @@ var validIdentifier = regexp.MustCompile(`^[a-zA-Z_$][\w$]*$`)
 // following fraction, `5.000_000` already contains a dot, and `0b1010_1010` is not decimal. The
 // corpus pins the split exactly -- 25 and 26 expect no space, 27 through 31 expect one.
 var decimalInteger = regexp.MustCompile(`^(?:0|0[0-7]*[89][0-9]*|[1-9](?:_?[0-9])*)$`)
-
-// keywords is upstream's shared ES3 keyword list, copied verbatim and in order.
-//
-// ES3 rather than modern: it includes `abstract`, `boolean`, `byte`, `goto` and friends, which are
-// not reserved in any current JavaScript. That is deliberate upstream, and the list is what
-// `allowKeywords: false` bans, so trimming it to today's reserved words would silently narrow the
-// rule.
-var keywords = map[string]bool{
-	"abstract": true, "boolean": true, "break": true, "byte": true, "case": true, "catch": true,
-	"char": true, "class": true, "const": true, "continue": true, "debugger": true,
-	"default": true, "delete": true, "do": true, "double": true, "else": true, "enum": true,
-	"export": true, "extends": true, "false": true, "final": true, "finally": true, "float": true,
-	"for": true, "function": true, "goto": true, "if": true, "implements": true, "import": true,
-	"in": true, "instanceof": true, "int": true, "interface": true, "long": true, "native": true,
-	"new": true, "null": true, "package": true, "private": true, "protected": true, "public": true,
-	"return": true, "short": true, "static": true, "super": true, "switch": true,
-	"synchronized": true, "this": true, "throw": true, "throws": true, "transient": true,
-	"true": true, "try": true, "typeof": true, "var": true, "void": true, "volatile": true,
-	"while": true, "with": true,
-}
 
 // useDotMessage builds the finding for a computed access that should be a dot access.
 //

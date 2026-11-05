@@ -557,16 +557,16 @@ func TestRequireRenderReturnHasNoFileGate(test *testing.T) {
 	}
 }
 
-// The rule takes no options, and a nil options value must not change what it decides.
+// The rule takes no options, and running it unconfigured must not change what it decides.
 //
-// A rule configured as bare `"error"` is handed nil rather than a zero struct, and a rule reading
-// options without a fallback yields the zero value silently. This rule has no `Decode` at all and
-// therefore no decoder to go wrong, so this pins that the absence is deliberate: passing nil
-// explicitly reaches the rule the same way the live config does, and it still reports.
+// A rule configured as bare `"error"` is handed the zero `rule.Given`, whose `Read` returns false, and a
+// rule reading options without a fallback gets the zero value silently. This rule has no `Decode` at all
+// and therefore no decoder to go wrong, so this pins that the absence is deliberate: running it
+// unconfigured reaches the rule the same way the live config does, and it still reports.
 func TestRequireRenderReturnIgnoresOptions(test *testing.T) {
 	test.Parallel()
 
 	const sourceText = "class Hello extends React.Component {\n  render() {}\n}\n"
-	result := rule_testing.RunWithOptions(test, RequireRenderReturn, requireRenderReturnFile, sourceText, nil)
+	result := rule_testing.Run(test, RequireRenderReturn, requireRenderReturnFile, sourceText)
 	rule_testing.ExpectFindings(test, result, "noRenderReturn")
 }

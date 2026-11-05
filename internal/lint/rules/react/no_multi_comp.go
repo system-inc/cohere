@@ -38,7 +38,7 @@ func DefaultNoMultiCompOptions() NoMultiCompOptions {
 // is false, so the zero value happens to be right; the decoder is explicit anyway because a future
 // option defaulting to true would silently invert the rule through the generic helper, and this is
 // the line where that would have to be noticed.
-func DecodeNoMultiCompOptions(raw []byte) (any, error) {
+func DecodeNoMultiCompOptions(raw []byte) (NoMultiCompOptions, error) {
 	options := DefaultNoMultiCompOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -106,7 +106,7 @@ type detectedComponent struct {
 //
 // Moving a component to its own file means creating that file, naming it, moving the imports it
 // needs, and updating every reference. Upstream ships no fixer either.
-var NoMultiComp = rule.Rule{
+var NoMultiComp = rule.Rule[NoMultiCompOptions]{
 	Name: "react/no-multi-comp",
 
 	// The checker is reached through this package's `isPragmaCreateElementCall`, to answer whether a
@@ -117,13 +117,13 @@ var NoMultiComp = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoMultiCompOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := DefaultNoMultiCompOptions()
-		if configured, isConfigured := rule.OptionsAs[NoMultiCompOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			settings = configured
 		}
 
@@ -707,24 +707,25 @@ func functionBodyBlock(node *ast.Node) *ast.Node {
 // single step. `ast.SkipParentheses` is not used because it dereferences its argument and a return
 // with no expression is a real shape here.
 func isJsxValue(ruleContext rule.Context, node *ast.Node, acceptNull bool) bool {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if node == nil {
+	if unwrapped == nil {
 		return false
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxFragment:
 		return true
 
 	case ast.KindConditionalExpression:
-		conditional := node.AsConditionalExpression()
+		conditional := unwrapped.AsConditionalExpression()
 		return isJsxValue(ruleContext, conditional.WhenTrue, acceptNull) ||
 			isJsxValue(ruleContext, conditional.WhenFalse, acceptNull)
 
 	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken == nil {
 			return false
 		}
@@ -738,7 +739,7 @@ func isJsxValue(ruleContext rule.Context, node *ast.Node, acceptNull bool) bool 
 		return false
 
 	case ast.KindCallExpression:
-		return createElementCallCounts(ruleContext, node)
+		return createElementCallCounts(ruleContext, unwrapped)
 
 	case ast.KindNullKeyword:
 		return acceptNull
@@ -925,20 +926,21 @@ const reactIdentifier = "React"
 // isReactValueExpression reports whether an expression evaluates to the React module: the bare
 // `React` identifier, or a `require('react')` call.
 func isReactValueExpression(expression *ast.Node) bool {
-	for expression != nil && expression.Kind == ast.KindParenthesizedExpression {
-		expression = expression.AsParenthesizedExpression().Expression
+	unwrapped := expression
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if expression == nil {
+	if unwrapped == nil {
 		return false
 	}
 
-	if expression.Kind == ast.KindIdentifier {
-		return expression.Text() == reactIdentifier
+	if unwrapped.Kind == ast.KindIdentifier {
+		return unwrapped.Text() == reactIdentifier
 	}
-	if expression.Kind != ast.KindCallExpression {
+	if unwrapped.Kind != ast.KindCallExpression {
 		return false
 	}
-	call := expression.AsCallExpression()
+	call := unwrapped.AsCallExpression()
 	if call.Expression == nil || call.Expression.Kind != ast.KindIdentifier ||
 		call.Expression.Text() != "require" {
 		return false
@@ -974,10 +976,11 @@ func semanticParentOf(node *ast.Node) *ast.Node {
 
 // skipParenthesesOptional unwraps parentheses from an expression, tolerating nil.
 func skipParenthesesOptional(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return node
+	return unwrapped
 }
 
 // detectedComponentName is the name upstream's `getDetectedComponents` would list for a component.
@@ -1075,22 +1078,22 @@ func outermostReturnedElementName(wrapped *ast.Node) (string, bool) {
 //
 // A fragment has no name, which is what makes upstream's fragment-wrapped case report.
 func jsxElementTagName(node *ast.Node) (string, bool) {
-	node = skipParenthesesOptional(node)
-	if node == nil {
+	element := skipParenthesesOptional(node)
+	if element == nil {
 		return "", false
 	}
 
 	// `jsx.ElementParts` reads the tag name off either opening form, which matters because a
 	// self-closing `<Foo />` never produces a JsxOpeningElement and is the shape most wrapped
 	// components are written in. A JsxElement carries its opening node, so it is unwrapped first.
-	if node.Kind == ast.KindJsxElement {
-		node = node.AsJsxElement().OpeningElement
-		if node == nil {
+	if element.Kind == ast.KindJsxElement {
+		element = element.AsJsxElement().OpeningElement
+		if element == nil {
 			return "", false
 		}
 	}
 
-	tagName, _ := jsx.ElementParts(node)
+	tagName, _ := jsx.ElementParts(element)
 	// A member tag (`<Foo.Bar />`) and a namespaced one carry no plain name, and upstream reads
 	// `openingElement.name.name`, which is undefined for both. A fragment has no tag node at all,
 	// which is what makes upstream's fragment-wrapped case report.
@@ -1159,17 +1162,17 @@ func isComponentClass(node *ast.Node) bool {
 // file importing them directly writes. Parentheses are unwrapped first, which is the whole reason
 // this exists beside the shelf's version.
 func isReactComponentBase(expression *ast.Node) bool {
-	expression = skipParenthesesOptional(expression)
-	if expression == nil {
+	unwrapped := skipParenthesesOptional(expression)
+	if unwrapped == nil {
 		return false
 	}
 
-	switch expression.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return isReactComponentBaseName(expression.Text())
+		return isReactComponentBaseName(unwrapped.Text())
 
 	case ast.KindPropertyAccessExpression:
-		access := expression.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		object := skipParenthesesOptional(access.Expression)
 		if object == nil || object.Kind != ast.KindIdentifier || object.Text() != reactIdentifier {
 			return false

@@ -441,7 +441,8 @@ func TestNoChildrenPropAllowFunctions(test *testing.T) {
 				)
 				rule_testing.ExpectFindings(test, result, testCase.wantId)
 				diagnostic := result.Diagnostics[0]
-				if got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; got != testCase.wantSpan {
+				if got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; got !=
+					testCase.wantSpan {
 					test.Errorf("the finding points at %q, want %q", got, testCase.wantSpan)
 				}
 				// Without the option, a function passed this way is ordinary children.

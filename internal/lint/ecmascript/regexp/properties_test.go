@@ -44,7 +44,12 @@ process.stdout.write(JSON.stringify(out));`
 func propertyPoints(rs []inventoryRange) []rune {
 	points := []rune{0, 0x10ffff, 0xD7ff, 0xD800, 0xDfff, 0xE000, 0xB5, 0x3BC}
 	for _, inventoryRange := range rs {
-		for _, character := range []rune{inventoryRange.Lo - 1, inventoryRange.Lo, inventoryRange.Hi, inventoryRange.Hi + 1} {
+		for _, character := range []rune{
+			inventoryRange.Lo - 1,
+			inventoryRange.Lo,
+			inventoryRange.Hi,
+			inventoryRange.Hi + 1,
+		} {
 			if character >= 0 && character <= 0x10ffff {
 				points = append(points, character)
 			}
@@ -266,7 +271,13 @@ func TestUnicodePropertySyntaxNode(test *testing.T) {
 		test.Run(fmt.Sprintf("%d", fixtureIndex), func(test *testing.T) {
 			re, compileError := Compile(fixture.Source, fixture.Flags)
 			if (compileError == nil) != answers[fixtureIndex].Accepted {
-				test.Fatalf("/%s/%s compile=%v Node accepted=%t", fixture.Source, fixture.Flags, compileError, answers[fixtureIndex].Accepted)
+				test.Fatalf(
+					"/%s/%s compile=%v Node accepted=%t",
+					fixture.Source,
+					fixture.Flags,
+					compileError,
+					answers[fixtureIndex].Accepted,
+				)
 			}
 			if compileError != nil {
 				return
@@ -275,7 +286,14 @@ func TestUnicodePropertySyntaxNode(test *testing.T) {
 				got := re.Test(subject)
 				checks++
 				if got != answers[fixtureIndex].Bits[subjectIndex] {
-					test.Fatalf("/%s/%s vs %q: Go=%t Node=%t", fixture.Source, fixture.Flags, subject, got, answers[fixtureIndex].Bits[subjectIndex])
+					test.Fatalf(
+						"/%s/%s vs %q: Go=%t Node=%t",
+						fixture.Source,
+						fixture.Flags,
+						subject,
+						got,
+						answers[fixtureIndex].Bits[subjectIndex],
+					)
 				}
 			}
 		})

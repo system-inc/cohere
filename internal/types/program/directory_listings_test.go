@@ -17,9 +17,9 @@ func listEverything(test *testing.T, root string) *program.DirectoryListings {
 		if pathError != nil || !entry.IsDir() {
 			return pathError
 		}
-		entries, readDirectoryError := os.ReadDir(path)
-		if readDirectoryError != nil {
-			return readDirectoryError
+		entries, readError := os.ReadDir(path)
+		if readError != nil {
+			return readError
 		}
 		listings.Add(path, entries)
 		return nil

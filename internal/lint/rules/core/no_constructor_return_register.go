@@ -9,8 +9,8 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // callable from any file's init, so a rule is three new files and no shared edit.
 //
 // No `Decode`, because upstream's `meta.schema` is the empty array: this rule has no option surface
-// at all, and the `options any` parameter its Run takes is the signature every rule shares rather
-// than a hint that there is something to decode.
+// at all, so it is a Rule[rule.NoOptions], and the options parameter its Run takes is the signature
+// every rule shares rather than a hint that there is something to decode.
 func init() {
-	rule.Register(rule.Registration{Rule: NoConstructorReturn})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: NoConstructorReturn})
 }

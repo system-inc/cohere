@@ -101,11 +101,11 @@ var messageUnsafeDeclarationMerging = rule.Message{
 // declares NeedsTypeChecker, its fixtures use RunTyped, and both listeners guard against a nil
 // checker: a rule that dereferences a checker result without that guard panics rather than going
 // quiet.
-var NoUnsafeDeclarationMerging = rule.Rule{
+var NoUnsafeDeclarationMerging = rule.Rule[rule.NoOptions]{
 	Name:             "@typescript-eslint/no-unsafe-declaration-merging",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node, opposite ast.Kind) {
 			// The nil-checker guard, kept even though it is inert on today's shim, and the
 			// measurement is here because the standing advice says a missing one panics.

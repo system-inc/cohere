@@ -11,7 +11,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // errors on empty input, the config layer turns that into nil, and a zero-valued struct would leave
 // every one of those three false, disabling three of the four judgments.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoImplicitCoercionOptions]{
 		Rule:   NoImplicitCoercion,
 		Decode: DecodeNoImplicitCoercionOptions,
 	})

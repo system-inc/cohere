@@ -74,7 +74,7 @@ var messageNoClassAssign = rule.Message{
 //
 // No fix. The repair is a new binding, which means choosing a name and deciding which later uses of
 // the old one meant the class, and the rule cannot know that.
-var NoClassAssign = rule.Rule{
+var NoClassAssign = rule.Rule[rule.NoOptions]{
 	Name: "no-class-assign",
 
 	// See the doc above: four of upstream's clean cases are textually identical to failing ones and
@@ -83,7 +83,7 @@ var NoClassAssign = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		reportWritesTo := func(node *ast.Node) {
 			// The engine hands every rule a nil checker when the program could not be built, and
 			// this rule can answer nothing without one. Removing this survives the fixtures,

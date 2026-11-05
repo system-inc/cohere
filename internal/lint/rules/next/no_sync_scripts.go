@@ -27,12 +27,12 @@ var messageNoSyncScripts = rule.Message{
 // choice and the correct one: `async` and `defer` are boolean attributes, so the idiomatic spelling
 // is a bare `async` with no initializer. A port that read the value would find nothing there and
 // report a script that is already asynchronous.
-var NoSyncScripts = rule.Rule{
+var NoSyncScripts = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-sync-scripts` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files while
 	// its own tests pass.
 	Name: "@next/next/no-sync-scripts",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node) {
 			tagName, attributes := jsx.ElementParts(node)
 			if !jsx.IsIntrinsicElementNamed(tagName, "script") {

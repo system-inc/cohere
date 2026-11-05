@@ -36,6 +36,13 @@ type EnforceConsistentVariableSyntaxOptions struct {
 	Syntax string `json:"syntax"`
 }
 
+const (
+	// variableSyntaxShorthand is v4's parenthesised custom property: `text-(--x)`.
+	variableSyntaxShorthand = "shorthand"
+	// variableSyntaxVariable is the bracketed call form: `text-[var(--x)]`.
+	variableSyntaxVariable = "variable"
+)
+
 // EnforceConsistentVariableSyntax reports a custom property written as an arbitrary value.
 //
 //	valid:   <div className="text-(--brand)" />
@@ -68,16 +75,16 @@ type EnforceConsistentVariableSyntaxOptions struct {
 //
 // Not fixable, for the reason its siblings are not: a class literal here wraps across lines with
 // indentation that carries intent, and a fixer would be the first thing to reflow it.
-var EnforceConsistentVariableSyntax = rule.Rule{
+var EnforceConsistentVariableSyntax = rule.Rule[EnforceConsistentVariableSyntaxOptions]{
 	Name: "better-tailwindcss/enforce-consistent-variable-syntax",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[EnforceConsistentVariableSyntaxOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
 		syntax := variableSyntaxShorthand
-		if configured, isConfigured := rule.OptionsAs[EnforceConsistentVariableSyntaxOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			surfaces = configured.ClassLiteralSurfaces()
 			if configured.Syntax == variableSyntaxVariable {
 				syntax = variableSyntaxVariable
@@ -105,13 +112,6 @@ var EnforceConsistentVariableSyntax = rule.Rule{
 		return listeners
 	},
 }
-
-const (
-	// variableSyntaxShorthand is v4's parenthesised custom property: `text-(--x)`.
-	variableSyntaxShorthand = "shorthand"
-	// variableSyntaxVariable is the bracketed call form: `text-[var(--x)]`.
-	variableSyntaxVariable = "variable"
-)
 
 // correctedVariableSyntax returns the class with its custom property in the configured form.
 func correctedVariableSyntax(className string, syntax string) (string, bool) {

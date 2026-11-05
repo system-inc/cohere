@@ -62,14 +62,14 @@ func TestFixHelperRanges(test *testing.T) {
 // rule that listened and found nothing. The first costs nothing; the second walked the tree.
 func TestRuleMayDeclineAFile(test *testing.T) {
 	test.Parallel()
-	declining := Rule{
+	declining := Rule[NoOptions]{
 		Name: "declines-everything",
-		Run: func(ruleContext Context, options any) Listeners {
+		Run: func(ruleContext Context, options Given[NoOptions]) Listeners {
 			return nil
 		},
 	}
 
-	if got := declining.Run(Context{}, nil); got != nil {
+	if got := declining.Run(Context{}, Given[NoOptions]{}); got != nil {
 		test.Fatalf("expected nil listeners from a declining rule, got %d", len(got))
 	}
 }

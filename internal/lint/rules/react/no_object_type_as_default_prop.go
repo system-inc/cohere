@@ -59,11 +59,11 @@ func messageForbiddenTypeDefaultParam(propertyName string, forbiddenType string)
 //
 // The repair is to hoist the value to a module constant and name it, which means choosing that name
 // and a place to put it. Upstream ships no fixer either.
-var NoObjectTypeAsDefaultProp = rule.Rule{
+var NoObjectTypeAsDefaultProp = rule.Rule[rule.NoOptions]{
 	Name:             "react/no-object-type-as-default-prop",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -228,12 +228,12 @@ func destructuredPropertyName(binding *ast.BindingElement) (string, bool) {
 func forbiddenDefaultTypeOf(initializer *ast.Node) (string, bool) {
 	// Our parser keeps parentheses where upstream's folds them away, so `{a = ({})}` would reach
 	// upstream's switch as the object literal itself. Unwrapped in a loop because `(({}))` nests.
-	initializer = skipParenthesesOptional(initializer)
-	if initializer == nil {
+	unwrapped := skipParenthesesOptional(initializer)
+	if unwrapped == nil {
 		return "", false
 	}
 
-	switch initializer.Kind {
+	switch unwrapped.Kind {
 	case ast.KindObjectLiteralExpression:
 		return "object literal", true
 	case ast.KindArrayLiteralExpression:
@@ -269,7 +269,7 @@ func forbiddenDefaultTypeOf(initializer *ast.Node) (string, bool) {
 		// Only a call to the bare identifier `Symbol`. Upstream tests
 		// `callee.type === 'Identifier' && callee.name === 'Symbol'`, so `Symbol.for(1)` is a
 		// member callee and is silent. Measured against the installed build.
-		callee := skipParenthesesOptional(initializer.AsCallExpression().Expression)
+		callee := skipParenthesesOptional(unwrapped.AsCallExpression().Expression)
 		if callee != nil && callee.Kind == ast.KindIdentifier && callee.Text() == "Symbol" {
 			return "Symbol literal", true
 		}

@@ -201,11 +201,19 @@ func (oracle *oracle) run(test *testing.T, repository string, stdin []byte, argu
 	command.Stderr = &standardError
 	output, outputError := command.Output()
 	// check-ignore exits 1 when nothing is ignored, which is an answer, not a failure.
-	if exitError, ok := outputError.(*exec.ExitError); ok && exitError.ExitCode() == 1 && arguments[0] == "check-ignore" {
+	if exitError, ok := outputError.(*exec.ExitError); ok &&
+		exitError.ExitCode() == 1 &&
+		arguments[0] == "check-ignore" {
 		outputError = nil
 	}
 	if outputError != nil {
-		test.Fatalf("git %s in %s: %v\n%s", strings.Join(arguments, " "), repository, outputError, standardError.String())
+		test.Fatalf(
+			"git %s in %s: %v\n%s",
+			strings.Join(arguments, " "),
+			repository,
+			outputError,
+			standardError.String(),
+		)
 	}
 	return output
 }

@@ -18,20 +18,21 @@ import (
 // is the distinction `Optional.Optional` records -- "whether this specific link is the one that
 // tests" -- and getting it wrong here would lower `a?.b.c` as a chain plus a stray load.
 func isOptionalChainLink(node *ast.Node) bool {
-	for node != nil {
-		switch node.Kind {
+	link := node
+	for link != nil {
+		switch link.Kind {
 		case ast.KindPropertyAccessExpression:
-			expression := node.AsPropertyAccessExpression()
+			expression := link.AsPropertyAccessExpression()
 			if expression.QuestionDotToken != nil {
 				return true
 			}
-			node = expression.Expression
+			link = expression.Expression
 		case ast.KindElementAccessExpression:
-			expression := node.AsElementAccessExpression()
+			expression := link.AsElementAccessExpression()
 			if expression.QuestionDotToken != nil {
 				return true
 			}
-			node = expression.Expression
+			link = expression.Expression
 		default:
 			return false
 		}
@@ -93,7 +94,7 @@ func (builder *builder) lowerOptionalChain(node *ast.Node, parentAlternate *Basi
 		alternate = builder.reserve(BlockKindValue)
 		saved := builder.currentBlock
 		builder.enter(alternate)
-		undefined := builder.emit(&Primitive{Value: nil}, node)
+		undefined := builder.emit(&Primitive{Value: PrimitiveUndefined{}}, node)
 		builder.emit(&StoreLocal{LValue: result, Value: undefined, Kind: InstructionKindConst}, node)
 		builder.gotoBlock(continuation.Id, GotoVariantBreak)
 		builder.enter(saved)

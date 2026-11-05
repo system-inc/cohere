@@ -140,6 +140,9 @@ func (ssaGraph) Block(function *Function, id static_single_assignment.BlockId) (
 
 func (ssaGraph) Blocks(function *Function) []*BasicBlock { return function.Blocks }
 
+// SetBlocks writes a pass's reordered block list back.
+//
+// Mutates: function its block list is replaced, since a setter is how the module writes this IR
 func (ssaGraph) SetBlocks(function *Function, blocks []*BasicBlock) { function.Blocks = blocks }
 
 func (ssaGraph) Retain(function *Function, keep func(id static_single_assignment.BlockId) bool) {
@@ -167,12 +170,18 @@ func (ssaGraph) Predecessors(block *BasicBlock) []static_single_assignment.Block
 	return block.Predecessors
 }
 
+// SetPredecessors writes a block's recomputed predecessors back.
+//
+// Mutates: block its predecessors are replaced, since a setter is how the module writes this IR
 func (ssaGraph) SetPredecessors(block *BasicBlock, predecessors []static_single_assignment.BlockId) {
 	block.Predecessors = predecessors
 }
 
 func (ssaGraph) Phis(block *BasicBlock) []*Phi { return block.Phis }
 
+// SetPhis writes the phis construction placed at a block back.
+//
+// Mutates: block its phis are replaced, since a setter is how the module writes this IR
 func (ssaGraph) SetPhis(block *BasicBlock, phis []*Phi) { block.Phis = phis }
 
 // EachEdge reports the structural fallthrough first, then EachSuccessor's real edges in its order,

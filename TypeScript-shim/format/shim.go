@@ -38,7 +38,11 @@ const (
 )
 
 // WithFormatCodeSettings puts settings on a context, which is how the formatter reads them.
-func WithFormatCodeSettings(callerContext context.Context, settings FormatCodeSettings, newLine string) context.Context {
+func WithFormatCodeSettings(
+	callerContext context.Context,
+	settings FormatCodeSettings,
+	newLine string,
+) context.Context {
 	return format.WithFormatCodeSettings(callerContext, settings, newLine)
 }
 

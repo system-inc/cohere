@@ -57,16 +57,16 @@ type NoUnnecessaryWhitespaceOptions struct {
 // Fixable and safe to fix unattended, because the repair is defined entirely by what the string
 // already says. Whitespace-only becomes empty, matching upstream, rather than being deleted: the
 // attribute is the author's and this rule has no opinion about whether it should exist.
-var NoUnnecessaryWhitespace = rule.Rule{
+var NoUnnecessaryWhitespace = rule.Rule[NoUnnecessaryWhitespaceOptions]{
 	Name: "better-tailwindcss/no-unnecessary-whitespace",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnnecessaryWhitespaceOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
 		allowMultiline := true
-		if configured, isConfigured := rule.OptionsAs[NoUnnecessaryWhitespaceOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			if configured.AllowMultiline != nil {
 				allowMultiline = *configured.AllowMultiline
 			}

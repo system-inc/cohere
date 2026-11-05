@@ -59,8 +59,8 @@ func IsAlwaysInvalidatingType(function *Function, id static_single_assignment.Id
 	if identifier == nil || identifier.Node == nil {
 		// Not defensive: `GetTypeAtLocation` dereferences the node and segfaults on nil. Measured
 		// by deleting this guard, which crashes the corpus test rather than returning a wrong
-		// answer. When measured, 645 of 40,241 corpus identifiers had no node -- the values `high_level_intermediate_representation.go`
-		// documents as having no direct syntactic source.
+		// answer. When measured, 645 of 40,241 corpus identifiers had no node -- the values
+		// `high_level_intermediate_representation.go` documents as having no direct syntactic source.
 		return false
 	}
 	valueType := typeChecker.GetTypeAtLocation(identifier.Node)

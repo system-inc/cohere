@@ -26,10 +26,13 @@ var messageSetStateInEffect = rule.Message{
 // SetStateInEffect flags a state setter called synchronously in the body of an effect.
 //
 //	valid:   function C() { const [s, setS] = useState(0); useEffect(() => { setTimeout(setS, 10); }); return s; }
-//	valid:   function C() { const r = useRef(0); const [s, setS] = useState(0); useEffect(() => { setS(r.current + 1); }, []); return s; }
-//	valid:   function C() { const [s, setS] = useState(0); useEffect(() => { const f = () => setS(1); f(); }); return s; }
+//	valid:   function C() { const r = useRef(0); const [s, setS] = useState(0);
+//	         useEffect(() => { setS(r.current + 1); }, []); return s; }
+//	valid:   function C() { const [s, setS] = useState(0);
+//	         useEffect(() => { const f = () => setS(1); f(); }); return s; }
 //	invalid: function C() { const [s, setS] = useState(0); useEffect(() => { setS(s => s + 1); }); return s; }
-//	invalid: function C() { const [s, setS] = useState(0); const f = () => setS(1); useEffect(() => { f(); }); return s; }
+//	invalid: function C() { const [s, setS] = useState(0); const f = () => setS(1);
+//	         useEffect(() => { f(); }); return s; }
 //	invalid: function C() { const [s, setS] = useState(0); React.useEffect(() => { setS(1); }); return s; }
 //
 // Calling a setter synchronously inside an effect body schedules a second render immediately after
@@ -236,7 +239,7 @@ var messageSetStateInEffect = rule.Message{
 //
 // Recorded rather than smoothed over, and a differential run against a tool implementing upstream's
 // binding-kind switch or its control dominators will show differences here for those reasons.
-var SetStateInEffect = rule.Rule{
+var SetStateInEffect = rule.Rule[CompilerRuleOptions]{
 	Name:             "react-hooks/set-state-in-effect",
 	NeedsTypeChecker: true,
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
@@ -244,7 +247,7 @@ var SetStateInEffect = rule.Rule{
 	// Same predicate as `set-state-in-render`: the setter is the type's alias, so an `any` hook
 	// return takes every finding in the file with it. Declared so the tripwire can name it.
 	ResolvesReactValueTypes: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			// The whole file at once, matching `static-components`. Lowering already descends into
 			// nested functions through the function arena, so listening per function kind would
@@ -306,9 +309,9 @@ func analyzeSetStateInEffectSubject(
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
+	compilationUnit := high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunctionWithoutManualMemoization)
-	reportSetStateInEffects(ruleContext, function)
+	reportSetStateInEffects(ruleContext, compilationUnit)
 }
 
 // reportSetStateInEffects is upstream's `validateNoSetStateInEffects` over one compiled function.
@@ -329,13 +332,13 @@ func reportSetStateInEffects(ruleContext rule.Context, function *high_level_inte
 			}
 			target := instruction.LValue.Identifier
 
-			switch value := instruction.Value.(type) {
+			switch instructionValue := instruction.Value.(type) {
 			// Reads and writes carry setter-ness along, which is what makes an alias chain of any
 			// length behave like the setter at its head. Transcribed from upstream even though the
 			// checker already follows a direct alias, because this is also what carries a setter
 			// into the map that the nested-function scan below consults.
 			case *high_level_intermediate_representation.LoadLocal:
-				if origin, ok := setStateFunctions[value.Place.Identifier]; ok {
+				if origin, ok := setStateFunctions[instructionValue.Place.Identifier]; ok {
 					setStateFunctions[target] = origin
 				}
 			// Same capture path as in `findSetStateCall`, for an effect written inside a nested
@@ -349,12 +352,12 @@ func reportSetStateInEffects(ruleContext rule.Context, function *high_level_inte
 			// is never called cannot produce a finding by any route, so no input can distinguish
 			// the two versions.
 			case *high_level_intermediate_representation.LoadContext:
-				if origin, ok := setStateFunctions[value.Place.Identifier]; ok {
+				if origin, ok := setStateFunctions[instructionValue.Place.Identifier]; ok {
 					setStateFunctions[target] = origin
 				}
 			case *high_level_intermediate_representation.StoreLocal:
-				if origin, ok := setStateFunctions[value.Value.Identifier]; ok {
-					setStateFunctions[value.LValue.Identifier] = origin
+				if origin, ok := setStateFunctions[instructionValue.Value.Identifier]; ok {
+					setStateFunctions[instructionValue.LValue.Identifier] = origin
 					setStateFunctions[target] = origin
 				}
 
@@ -377,10 +380,10 @@ func reportSetStateInEffects(ruleContext rule.Context, function *high_level_inte
 			// fidelity, and the fixture that would "cover" it is in the silent test asserting the
 			// observable behaviour both versions share.
 			case *high_level_intermediate_representation.FunctionExpression:
-				if !anyOperandIsSetter(ruleContext, function, value, setStateFunctions) {
+				if !anyOperandIsSetter(ruleContext, function, instructionValue, setStateFunctions) {
 					continue
 				}
-				nested := setStateInEffectNestedFunction(function, value)
+				nested := setStateInEffectNestedFunction(function, instructionValue)
 				if nested == nil {
 					continue
 				}
@@ -392,17 +395,31 @@ func reportSetStateInEffects(ruleContext rule.Context, function *high_level_inte
 				if callee, found := findSetStateCall(
 					ruleContext,
 					nested,
-					translateAcrossCaptures(value, nested, setStateFunctions),
+					translateAcrossCaptures(instructionValue, nested, setStateFunctions),
 				); found {
 					setStateFunctions[target] = callee
 				}
 
 			case *high_level_intermediate_representation.CallExpression:
-				handleEffectCall(ruleContext, function, target, value.Callee, value.Args, setStateFunctions)
+				handleEffectCall(
+					ruleContext,
+					function,
+					target,
+					instructionValue.Callee,
+					instructionValue.Args,
+					setStateFunctions,
+				)
 			case *high_level_intermediate_representation.MethodCall:
 				// `React.useEffect(...)`. The property Place is the callee, exactly as upstream
 				// selects `instr.value.property` for a MethodCall.
-				handleEffectCall(ruleContext, function, target, value.Property, value.Args, setStateFunctions)
+				handleEffectCall(
+					ruleContext,
+					function,
+					target,
+					instructionValue.Property,
+					instructionValue.Args,
+					setStateFunctions,
+				)
 			}
 		}
 	}
@@ -567,14 +584,15 @@ func findSetStateCall(
 				//
 				// Removed rather than kept with a fixture, because a test written for a branch that
 				// no input can reach asserts nothing.
-				if destructure, isDestructure := instruction.Value.(*high_level_intermediate_representation.Destructure); isDestructure {
+				destructure, isDestructure := instruction.Value.(*high_level_intermediate_representation.Destructure)
+				if isDestructure {
 					markPatternRefDerived(destructure.LValue, referenceDerived)
 				}
 			}
 
-			switch value := instruction.Value.(type) {
+			switch instructionValue := instruction.Value.(type) {
 			case *high_level_intermediate_representation.LoadLocal:
-				if origin, ok := local[value.Place.Identifier]; ok {
+				if origin, ok := local[instructionValue.Place.Identifier]; ok {
 					local[target] = origin
 				}
 
@@ -607,22 +625,22 @@ func findSetStateCall(
 				// eight lines: the entry it writes is keyed by the temporary but valued by the
 				// captured place, which is what puts the finding on the name as written here rather
 				// than on the `useState` line.
-				if _, ok := local[value.Place.Identifier]; ok {
-					local[target] = value.Place
+				if _, ok := local[instructionValue.Place.Identifier]; ok {
+					local[target] = instructionValue.Place
 				}
 
 			case *high_level_intermediate_representation.StoreLocal:
-				if origin, ok := local[value.Value.Identifier]; ok {
-					local[value.LValue.Identifier] = origin
+				if origin, ok := local[instructionValue.Value.Identifier]; ok {
+					local[instructionValue.LValue.Identifier] = origin
 					local[target] = origin
 				}
 			case *high_level_intermediate_representation.CallExpression:
-				if !isSetterPlace(ruleContext, function, value.Callee, local) {
+				if !isSetterPlace(ruleContext, function, instructionValue.Callee, local) {
 					continue
 				}
 				// The value-taint half of the ref exemption: a setter fed a ref-derived value is
 				// synchronizing React with something outside it, which is what effects are for.
-				if argument, ok := firstIdentifierArgument(value.Args); ok && referenceDerived[argument] {
+				if argument, ok := firstIdentifierArgument(instructionValue.Args); ok && referenceDerived[argument] {
 					return high_level_intermediate_representation.Place{}, false
 				}
 				// The control-dominance half: a setter that only runs when a branch on a ref says
@@ -632,7 +650,7 @@ func findSetStateCall(
 				if isRefControlledBlock(block.Id) {
 					return high_level_intermediate_representation.Place{}, false
 				}
-				return value.Callee, true
+				return instructionValue.Callee, true
 			}
 		}
 	}
@@ -651,35 +669,35 @@ func instructionReadsRefDerived(
 	instruction *high_level_intermediate_representation.Instruction,
 	isDerived func(high_level_intermediate_representation.Place) bool,
 ) bool {
-	switch value := instruction.Value.(type) {
+	switch instructionValue := instruction.Value.(type) {
 	case *high_level_intermediate_representation.LoadLocal:
-		return isDerived(value.Place)
+		return isDerived(instructionValue.Place)
 	case *high_level_intermediate_representation.StoreLocal:
-		return isDerived(value.Value)
+		return isDerived(instructionValue.Value)
 	case *high_level_intermediate_representation.PropertyLoad:
-		return isDerived(value.Object)
+		return isDerived(instructionValue.Object)
 	case *high_level_intermediate_representation.Destructure:
-		return isDerived(value.Value)
+		return isDerived(instructionValue.Value)
 	case *high_level_intermediate_representation.ComputedLoad:
-		return isDerived(value.Object) || isDerived(value.Property)
+		return isDerived(instructionValue.Object) || isDerived(instructionValue.Property)
 	case *high_level_intermediate_representation.BinaryExpression:
-		return isDerived(value.Left) || isDerived(value.Right)
+		return isDerived(instructionValue.Left) || isDerived(instructionValue.Right)
 	case *high_level_intermediate_representation.UnaryExpression:
-		return isDerived(value.Value)
+		return isDerived(instructionValue.Value)
 	case *high_level_intermediate_representation.CallExpression:
-		if isDerived(value.Callee) {
+		if isDerived(instructionValue.Callee) {
 			return true
 		}
-		for _, argument := range value.Args {
+		for _, argument := range instructionValue.Args {
 			if isDerived(argument.Place) {
 				return true
 			}
 		}
 	case *high_level_intermediate_representation.MethodCall:
-		if isDerived(value.Receiver) || isDerived(value.Property) {
+		if isDerived(instructionValue.Receiver) || isDerived(instructionValue.Property) {
 			return true
 		}
-		for _, argument := range value.Args {
+		for _, argument := range instructionValue.Args {
 			if isDerived(argument.Place) {
 				return true
 			}

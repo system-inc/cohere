@@ -88,9 +88,9 @@ var messageExtraLabel = rule.Message{
 // The verdict at any jump depends on every enclosing statement, which the pre-order walk has not
 // visited yet when the jump's own listener would fire. So the scope stack is built and read inside
 // one source-file listener, which fires before its children and lets this rule own its own descent.
-var NoExtraLabel = rule.Rule{
+var NoExtraLabel = rule.Rule[rule.NoOptions]{
 	Name: "no-extra-label",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// The enclosing scope stack, innermost last. Built during the descent and read at

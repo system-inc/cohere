@@ -388,11 +388,11 @@ func isNumber(value string) bool {
 	return hasMathFunction(value)
 }
 
+var percentSuffix = []string{"%"}
+
 func isPercentage(value string) bool {
 	return numberWithSuffix(value, percentSuffix) || hasMathFunction(value)
 }
-
-var percentSuffix = []string{"%"}
 
 // isFraction ports `^<number>\s*/\s*<number>$`.
 //

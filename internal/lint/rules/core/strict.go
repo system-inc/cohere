@@ -47,7 +47,7 @@ const (
 // Hand-rolled so an unrecognized mode fails loudly. Every arm here is selected by string equality,
 // so an unknown string left in the mode would pick a silent fifth behaviour of reporting nothing at
 // all. No element at all is upstream's default, Safe.
-func DecodeStrictOptions(raw []byte) (any, error) {
+func DecodeStrictOptions(raw []byte) (StrictMode, error) {
 	if len(raw) == 0 {
 		return StrictSafe, nil
 	}
@@ -201,14 +201,14 @@ func messageStrictWrapFor(description string) rule.Message {
 // Five of the ten findings carry that repair and five do not, and the split is upstream's
 // `shouldFix`: a directive that is merely redundant is removed, while one whose presence is a
 // symptom of something else is reported and left alone.
-var Strict = rule.Rule{
+var Strict = rule.Rule[StrictMode]{
 	Name: "strict",
 	// `alwaysStrict` decides whether a TypeScript script is strict, so the cached verdict has to
 	// follow the tsconfig.
 	ProgramReads: rule.ReadsCompilerOptions,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[StrictMode]) rule.Listeners {
 		mode := StrictSafe
-		if decoded, configured := rule.OptionsAs[StrictMode](options); configured {
+		if decoded, configured := options.Read(); configured {
 			mode = decoded
 		}
 		return rule.Listeners{

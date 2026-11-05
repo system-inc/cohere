@@ -566,12 +566,8 @@ func TestJsxNoUselessFragmentDecodesItsOptions(test *testing.T) {
 			if decodeJsxNoUselessFragmentOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.raw, decodeJsxNoUselessFragmentOptionsError)
 			}
-			settings, ok := decoded.(JsxNoUselessFragmentOptions)
-			if !ok {
-				test.Fatalf("decoded to %T", decoded)
-			}
-			if settings.AllowExpressions != testCase.want {
-				test.Errorf("AllowExpressions is %v, want %v", settings.AllowExpressions, testCase.want)
+			if decoded.AllowExpressions != testCase.want {
+				test.Errorf("AllowExpressions is %v, want %v", decoded.AllowExpressions, testCase.want)
 			}
 		})
 	}
@@ -614,13 +610,13 @@ func TestJsxNoUselessFragmentAllowExpressionsSilencesOneArmOnly(test *testing.T)
 
 // TestJsxNoUselessFragmentHandlesNilOptions covers the path the fixtures cannot reach.
 //
-// The config layer turns a decoder error into nil for a non-required rule, and `options.(T)` on nil
-// yields the zero value, which here is the default. Asserted rather than assumed.
+// The config layer binds a non-required rule whose decoder errors to the zero `rule.Given`, whose `Read`
+// returns false, so it reads the zero value, which here is the default. Asserted rather than assumed.
 func TestJsxNoUselessFragmentHandlesNilOptions(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunWithOptions(test, JsxNoUselessFragment, jsxNoUselessFragmentFile,
-		"declare const x: any;\nconst a = <>{x}</>;\n", nil)
+	result := rule_testing.Run(test, JsxNoUselessFragment, jsxNoUselessFragmentFile,
+		"declare const x: any;\nconst a = <>{x}</>;\n")
 	rule_testing.ExpectFindings(test, result, "NeedsMoreChildren")
 }
 

@@ -44,10 +44,10 @@ function useEverything(properties: { items: number[]; flag: boolean }) {
   return [value, x, doubled, properties.flag ? total : 0];
 }`
 	visited := 0
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "clone",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				forEachFunctionLike(node, func(node *ast.Node) {
 					original := Lower(node, ruleContext.TypeChecker)
@@ -112,6 +112,8 @@ export function useSyncExternalStore<T>(subscribe: (onStoreChange: () => void) =
 // The chunk is where identifiers are allocated, not part of the graph: a copy starts without one, and
 // comparing it would report a difference no pass can see. The identifiers themselves stay where they
 // are, so the graph compares exactly as before.
+//
+// Mutates: function the chunk is dropped in place, so the graph the caller compares no longer holds one
 func forgetIdentifierSlabs(function *Function) {
 	function.identifierSlab = nil
 	for _, nested := range function.Functions {

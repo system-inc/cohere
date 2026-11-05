@@ -74,7 +74,7 @@ import (
 // So the walk starts at each outermost enum or namespace, with that declaration as the stack's
 // first entry, which is the stack the whole-file walk had at that point. A nested one is reached
 // by its outermost one's walk, and skipped by the listener so no subtree is walked twice.
-var NoUnnecessaryQualifier = rule.Rule{
+var NoUnnecessaryQualifier = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unnecessary-qualifier",
 
 	// Every question the rule asks is a resolution question: what does this qualifier name, what is
@@ -82,7 +82,7 @@ var NoUnnecessaryQualifier = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		walkOutermost := func(node *ast.Node) {
 			if ruleContext.TypeChecker == nil {
 				return

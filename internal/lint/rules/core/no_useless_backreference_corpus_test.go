@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -280,7 +281,13 @@ func TestNoUselessBackreferenceAgreesWithEsLint(test *testing.T) {
 	}
 
 	for index, testCase := range cases {
-		result := rule_testing.RunTypedVerbatimWithOptions(test, NoUselessBackreference, "input.ts", testCase.code, nil)
+		result := rule_testing.RunTypedVerbatimGiven(
+			test,
+			NoUselessBackreference,
+			"input.ts",
+			testCase.code,
+			rule.Given[rule.NoOptions]{},
+		)
 		source := result.SourceFile.Text()
 		got := []string{}
 		for _, diagnostic := range result.Diagnostics {

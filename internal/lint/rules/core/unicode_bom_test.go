@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -22,16 +23,16 @@ const unicodeBomFile = "/repository/source/UnicodeBom.ts"
 // struct built by hand in a fixture would carry a non-nil Require and every case would pass while
 // the live config's bare `"error"` still handed the rule a nil the rule read as silence. An empty
 // string here means exactly that bare configuration.
-func decodedUnicodeBomOptions(test *testing.T, raw string) any {
+func decodedUnicodeBomOptions(test *testing.T, raw string) rule.Given[UnicodeBomOptions] {
 	test.Helper()
 	if raw == "" {
-		return nil
+		return rule.Given[UnicodeBomOptions]{}
 	}
 	options, decodeUnicodeBomOptionsError := DecodeUnicodeBomOptions(json.RawMessage(raw))
 	if decodeUnicodeBomOptionsError != nil {
 		test.Fatalf("the decoder refused %s: %v", raw, decodeUnicodeBomOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // The corpus is ESLint's own, at `tests/lib/rules/unicode-bom.js`, copied rather than rewritten:
@@ -72,7 +73,7 @@ func TestUnicodeBomFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, UnicodeBom, unicodeBomFile, testCase.sourceText,
+			result := rule_testing.RunGiven(test, UnicodeBom, unicodeBomFile, testCase.sourceText,
 				decodedUnicodeBomOptions(test, testCase.options))
 			rule_testing.ExpectFindings(test, result, testCase.wantId)
 			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
@@ -98,7 +99,7 @@ func TestUnicodeBomStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, UnicodeBom, unicodeBomFile, testCase.sourceText,
+			result := rule_testing.RunGiven(test, UnicodeBom, unicodeBomFile, testCase.sourceText,
 				decodedUnicodeBomOptions(test, testCase.options))
 			rule_testing.ExpectClean(test, result)
 		})
@@ -125,7 +126,7 @@ func TestUnicodeBomReportsAtPositionZero(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, UnicodeBom, unicodeBomFile, testCase.sourceText,
+			result := rule_testing.RunGiven(test, UnicodeBom, unicodeBomFile, testCase.sourceText,
 				decodedUnicodeBomOptions(test, testCase.options))
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
@@ -186,12 +187,8 @@ func TestDecodeUnicodeBomOptions(test *testing.T) {
 		if decodeUnicodeBomOptionsError != nil {
 			test.Fatalf("empty input should decode, got %v", decodeUnicodeBomOptionsError)
 		}
-		options, isOptions := decoded.(UnicodeBomOptions)
-		if !isOptions {
-			test.Fatalf("expected UnicodeBomOptions, got %T", decoded)
-		}
-		if options.Require == nil || *options.Require != UnicodeBomNever {
-			test.Fatalf("expected never, got %v", options.Require)
+		if decoded.Require == nil || *decoded.Require != UnicodeBomNever {
+			test.Fatalf("expected never, got %v", decoded.Require)
 		}
 	})
 
@@ -201,12 +198,8 @@ func TestDecodeUnicodeBomOptions(test *testing.T) {
 		if decodeUnicodeBomOptionsError != nil {
 			test.Fatalf("expected always to decode, got %v", decodeUnicodeBomOptionsError)
 		}
-		options, ok := decoded.(UnicodeBomOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not UnicodeBomOptions", decoded)
-		}
-		if options.Require == nil || *options.Require != UnicodeBomAlways {
-			test.Fatalf("expected always, got %v", options.Require)
+		if decoded.Require == nil || *decoded.Require != UnicodeBomAlways {
+			test.Fatalf("expected always, got %v", decoded.Require)
 		}
 	})
 
@@ -237,7 +230,7 @@ func TestDecodeUnicodeBomOptions(test *testing.T) {
 		test.Parallel()
 		// Past the decoder rather than through it: this is what a bare `"error"` produces after the
 		// config layer has turned the decoder's error into nil.
-		result := rule_testing.RunWithOptions(test, UnicodeBom, unicodeBomFile, "\ufeff var a = 123;", nil)
+		result := rule_testing.Run(test, UnicodeBom, unicodeBomFile, "\ufeff var a = 123;")
 		rule_testing.ExpectFindings(test, result, "unexpected")
 	})
 }
@@ -252,7 +245,7 @@ func TestDecodeUnicodeBomOptions(test *testing.T) {
 func TestUnicodeBomRemovesOneMarkPerPass(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunWithOptions(test, UnicodeBom, unicodeBomFile, "\ufeff\ufeffvar a = 1;",
+	result := rule_testing.RunGiven(test, UnicodeBom, unicodeBomFile, "\ufeff\ufeffvar a = 1;",
 		decodedUnicodeBomOptions(test, "\"never\""))
 	rule_testing.ExpectFindings(test, result, "unexpected")
 	rule_testing.ExpectFixedSource(test, result, "\ufeffvar a = 1;")
@@ -269,7 +262,7 @@ func TestUnicodeBomOnAnEmptyFile(test *testing.T) {
 
 	test.Run("always", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunWithOptions(test, UnicodeBom, unicodeBomFile, "",
+		result := rule_testing.RunGiven(test, UnicodeBom, unicodeBomFile, "",
 			decodedUnicodeBomOptions(test, "\"always\""))
 		rule_testing.ExpectFindings(test, result, "expected")
 		rule_testing.ExpectFixedSource(test, result, "\ufeff")
@@ -277,7 +270,7 @@ func TestUnicodeBomOnAnEmptyFile(test *testing.T) {
 
 	test.Run("never", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunWithOptions(test, UnicodeBom, unicodeBomFile, "",
+		result := rule_testing.RunGiven(test, UnicodeBom, unicodeBomFile, "",
 			decodedUnicodeBomOptions(test, "\"never\""))
 		rule_testing.ExpectClean(test, result)
 	})

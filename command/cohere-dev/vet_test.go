@@ -54,8 +54,13 @@ func TestTheGateRefusesWhatPlainGoVetReports(test *testing.T) {
 		output, outputError := landing.CombinedOutput()
 		return string(output), outputError
 	}
-	if output, landError := land(); landError == nil || !strings.Contains(output, "struct literal uses unkeyed fields") {
-		test.Fatalf("an unkeyed literal of another package's struct did not refuse the landing (%v):\n%s", landError, output)
+	if output, landError := land(); landError == nil ||
+		!strings.Contains(output, "struct literal uses unkeyed fields") {
+		test.Fatalf(
+			"an unkeyed literal of another package's struct did not refuse the landing (%v):\n%s",
+			landError,
+			output,
+		)
 	}
 	writeFiles(test, worktreeA, map[string]string{"user/user.go": keyed})
 	fixture.git(worktreeA, "add", "user/user.go")
@@ -84,7 +89,9 @@ func TestCohereDevTestVetsWithEveryCheck(t *testing.T) {
 		output, outputError := command.CombinedOutput()
 		return string(output), outputError
 	}
-	if output, testError := test("./user"); testError == nil || !strings.Contains(output, "struct literal uses unkeyed fields") {
+	if output, testError := test(
+		"./user",
+	); testError == nil || !strings.Contains(output, "struct literal uses unkeyed fields") {
 		t.Errorf("cohere-dev test passed an unkeyed literal that go vet reports (%v):\n%s", testError, output)
 	}
 	if output, testError := test("-vet=off", "./user"); testError != nil {

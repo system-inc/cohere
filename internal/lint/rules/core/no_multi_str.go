@@ -88,9 +88,9 @@ var messageMultiStr = rule.Message{
 // `frozen`. Any repair would have to choose between concatenation and a template and would have to
 // decide what happens to the leading whitespace on the continued line, which is exactly the value
 // the author may or may not have meant to include.
-var NoMultiStr = rule.Rule{
+var NoMultiStr = rule.Rule[rule.NoOptions]{
 	Name: "no-multi-str",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindStringLiteral: func(node *ast.Node) {
 				if isPartOfJsxSyntax(node.Parent) {

@@ -10,7 +10,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The decoder is hand-rolled because a decoration entry must be exactly one non-whitespace
 // character, which upstream states as a schema `pattern` and we have no schema layer to enforce.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoWarningCommentsOptions]{
 		Rule:   NoWarningComments,
 		Decode: DecodeNoWarningCommentsOptions,
 	})

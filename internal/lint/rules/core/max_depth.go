@@ -69,7 +69,7 @@ func DefaultMaxDepthSettings() MaxDepthSettings {
 //
 // Empty input decodes to the default rather than failing, which is what a rule configured as a bare
 // "error" is handed and what upstream's `defaultOptions` says it means.
-func DecodeMaxDepthOptions(raw []byte) (any, error) {
+func DecodeMaxDepthOptions(raw []byte) (MaxDepthSettings, error) {
 	settings := DefaultMaxDepthSettings()
 	if len(raw) == 0 {
 		return settings, nil
@@ -114,8 +114,8 @@ func DecodeMaxDepthOptions(raw []byte) (any, error) {
 }
 
 // maxDepthSettingsFrom recovers the settings from whatever the config layer handed over.
-func maxDepthSettingsFrom(options any) MaxDepthSettings {
-	if settings, ok := rule.OptionsAs[MaxDepthSettings](options); ok {
+func maxDepthSettingsFrom(options rule.Given[MaxDepthSettings]) MaxDepthSettings {
+	if settings, ok := options.Read(); ok {
 		return settings
 	}
 	return DefaultMaxDepthSettings()
@@ -172,10 +172,10 @@ var messageMaxDepthTooDeeply = rule.Message{
 //
 // Upstream offers none and none is possible: flattening a nest means extracting a function or
 // inverting a condition, and only the author knows which.
-var MaxDepth = rule.Rule{
+var MaxDepth = rule.Rule[MaxDepthSettings]{
 	Name: "max-depth",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[MaxDepthSettings]) rule.Listeners {
 		settings := maxDepthSettingsFrom(options)
 		if settings.Disabled {
 			// `{"maximum": 0}` leaves upstream comparing against `undefined`, so it reports

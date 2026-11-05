@@ -178,6 +178,10 @@ func run(verb string, arguments []string) int {
 	// A whole-module run from the root covers what the landing gate covers: every module go.work names
 	// outside a submodule (workspace.go).
 	if wholeModule(testArguments) {
+		if checkGitlinksError := checkRootGitlinks(); checkGitlinksError != nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", checkGitlinksError)
+			return 2
+		}
 		expanded, withWorkspaceModulesError := withWorkspaceModules(testArguments)
 		if withWorkspaceModulesError != nil {
 			fmt.Fprintf(streams.Errors, "cohere-dev: reading the modules to test: %v\n", withWorkspaceModulesError)
@@ -288,6 +292,24 @@ func withWorkspaceModules(arguments []string) ([]string, error) {
 		expanded = append(expanded, argument)
 	}
 	return expanded, nil
+}
+
+// checkRootGitlinks runs the land gate's gitlink check (checkGitlinks) on the head of a whole-module run from a
+// repository's root, which is the gate the Square runs on every merge: a merge that records TypeScript as a
+// symlink passes its tests on a disk where the symlink resolves. A ./... anywhere else is that directory's tree,
+// and a root with no .git has no commit to read, so both run as they did.
+func checkRootGitlinks() error {
+	root, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		return workingDirectoryError
+	}
+	if _, statError := os.Lstat(filepath.Join(root, ".git")); statError != nil {
+		if os.IsNotExist(statError) {
+			return nil
+		}
+		return fmt.Errorf("reading whether %s is a repository's root: %w", root, statError)
+	}
+	return checkGitlinks(root, "HEAD")
 }
 
 // refuseCountOnce says why a run of nearly every package, through the slot or the fast tier, never passes

@@ -154,7 +154,8 @@ func TestNoBareThrowFires(test *testing.T) {
 			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			for index, wantSpan := range testCase.wantSpans {
-				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
+				diagnostic := result.Diagnostics[index]
+				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != wantSpan {
 					test.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}
@@ -201,7 +202,9 @@ func TestNoBareThrowRendersAnEditedEntry(test *testing.T) {
 	if edited == string(original) {
 		test.Fatal("the anchor is not in the entry, so the edit would not apply")
 	}
-	catalog, loadMessagesError := policy.LoadMessages(fstest.MapFS{"consistency-no-bare-throw.json": {Data: []byte(edited)}})
+	catalog, loadMessagesError := policy.LoadMessages(
+		fstest.MapFS{"consistency-no-bare-throw.json": {Data: []byte(edited)}},
+	)
 	if loadMessagesError != nil {
 		test.Fatal(loadMessagesError)
 	}

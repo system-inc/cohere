@@ -10,9 +10,9 @@ import (
 // awaitedTypeIsThenable is a minimal type-aware rule, written to exercise the harness rather than
 // to ship. It reports an await whose operand is not a Promise, which cannot be decided by looking
 // at the syntax: `await value` is identical either way, and only the checker knows which it is.
-var awaitedTypeIsThenable = rule.Rule{
+var awaitedTypeIsThenable = rule.Rule[rule.NoOptions]{
 	Name: "probe-await-thenable",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			// A type-aware rule handed no checker must decline rather than guess. This is exactly
 			// the path that made a fixture pass vacuously under the syntax-only harness.
@@ -140,9 +140,9 @@ func TestTypedHarnessResolvesAcrossFiles(test *testing.T) {
 func TestNarrowedLiteralTypesReachTheRule(test *testing.T) {
 	test.Parallel()
 	reported := []string{}
-	recorder := rule.Rule{
+	recorder := rule.Rule[rule.NoOptions]{
 		Name: "probe-type-names",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			if ruleContext.TypeChecker == nil {
 				return nil
 			}

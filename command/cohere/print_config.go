@@ -56,7 +56,7 @@ func writeResolvedConfig(
 	}
 	absolutePath := path
 	if !tspath.IsRootedDiskPath(path) {
-		absolutePath = absoluteFrom(lintConfiguration.Root, path)
+		path = absoluteFrom(lintConfiguration.Root, path)
 	}
 	source := graph.Program.GetSourceFile(tspath.RootedFilePath(absolutePath))
 	if source == nil {

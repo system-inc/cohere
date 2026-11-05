@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -19,16 +20,16 @@ const maxClassesPerFileFile = "/repository/source/MaxClassesPerFile.ts"
 // an absent option read as a plain int would be a maximum of zero and report every file holding one
 // class. A fixture handing the rule a struct would exercise neither. An empty string here is the
 // bare "error" the live config writes.
-func decodedMaxClassesPerFileOptions(test *testing.T, raw string) any {
+func decodedMaxClassesPerFileOptions(test *testing.T, raw string) rule.Given[MaxClassesPerFileOptions] {
 	test.Helper()
 	if raw == "" {
-		return nil
+		return rule.Given[MaxClassesPerFileOptions]{}
 	}
 	options, decodeMaximumClassesPerFileOptionsError := DecodeMaxClassesPerFileOptions(json.RawMessage(raw))
 	if decodeMaximumClassesPerFileOptionsError != nil {
 		test.Fatalf("the decoder refused %s: %v", raw, decodeMaximumClassesPerFileOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // The corpus is ESLint's own, at `tests/lib/rules/max-classes-per-file.js`, copied rather than
@@ -79,7 +80,7 @@ func TestMaxClassesPerFileFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, MaxClassesPerFile, maxClassesPerFileFile,
+			result := rule_testing.RunGiven(test, MaxClassesPerFile, maxClassesPerFileFile,
 				testCase.sourceText, decodedMaxClassesPerFileOptions(test, testCase.options))
 			rule_testing.ExpectFindings(test, result, "maximumExceeded")
 
@@ -126,7 +127,7 @@ func TestMaxClassesPerFileStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, MaxClassesPerFile, maxClassesPerFileFile,
+			result := rule_testing.RunGiven(test, MaxClassesPerFile, maxClassesPerFileFile,
 				testCase.sourceText, decodedMaxClassesPerFileOptions(test, testCase.options))
 			rule_testing.ExpectClean(test, result)
 		})
@@ -169,7 +170,7 @@ func TestMaxClassesPerFileSpansTheProgramBody(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, MaxClassesPerFile, maxClassesPerFileFile,
+			result := rule_testing.RunGiven(test, MaxClassesPerFile, maxClassesPerFileFile,
 				testCase.sourceText, decodedMaxClassesPerFileOptions(test, testCase.options))
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
@@ -203,7 +204,7 @@ func TestMaxClassesPerFileCountsEveryClassInTheFile(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, MaxClassesPerFile, maxClassesPerFileFile,
+			result := rule_testing.RunGiven(test, MaxClassesPerFile, maxClassesPerFileFile,
 				testCase.sourceText, decodedMaxClassesPerFileOptions(test, ""))
 			rule_testing.ExpectFindings(test, result, "maximumExceeded")
 		})
@@ -223,11 +224,7 @@ func TestDecodeMaxClassesPerFileOptions(test *testing.T) {
 		if decodeMaximumClassesPerFileOptionsError != nil {
 			test.Fatalf("the decoder refused %s: %v", raw, decodeMaximumClassesPerFileOptionsError)
 		}
-		options, isOptions := decoded.(MaxClassesPerFileOptions)
-		if !isOptions {
-			test.Fatalf("expected MaxClassesPerFileOptions, got %T", decoded)
-		}
-		return options
+		return decoded
 	}
 
 	test.Run("empty input defaults to a maximum of one", func(test *testing.T) {
@@ -279,14 +276,14 @@ func TestDecodeMaxClassesPerFileOptions(test *testing.T) {
 	test.Run("nil options reach the rule as a maximum of one", func(test *testing.T) {
 		test.Parallel()
 		// Past the decoder rather than through it: what a bare "error" produces after the config
-		// layer has turned the decoder's error into nil. A zero read here reports the single-class
+		// layer has turned the decoder's error into no options. A zero read here reports the single-class
 		// file below, so this case distinguishes the fallback from its absence.
-		reporting := rule_testing.RunWithOptions(test, MaxClassesPerFile, maxClassesPerFileFile,
-			"class Foo {}\nclass Bar {}", nil)
+		reporting := rule_testing.Run(test, MaxClassesPerFile, maxClassesPerFileFile,
+			"class Foo {}\nclass Bar {}")
 		rule_testing.ExpectFindings(test, reporting, "maximumExceeded")
 
-		clean := rule_testing.RunWithOptions(test, MaxClassesPerFile, maxClassesPerFileFile,
-			"class Foo {}", nil)
+		clean := rule_testing.Run(test, MaxClassesPerFile, maxClassesPerFileFile,
+			"class Foo {}")
 		rule_testing.ExpectClean(test, clean)
 	})
 }
@@ -336,7 +333,7 @@ func TestMaxClassesPerFileDoesNotCountAClassDeclaredInsideAFunction(test *testin
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, MaxClassesPerFile, maxClassesPerFileFile,
+			result := rule_testing.RunGiven(test, MaxClassesPerFile, maxClassesPerFileFile,
 				testCase.sourceText, decodedMaxClassesPerFileOptions(test, ""))
 			if testCase.reports {
 				rule_testing.ExpectFindings(test, result, "maximumExceeded")

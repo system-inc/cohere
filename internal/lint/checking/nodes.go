@@ -77,7 +77,7 @@ func TypeRecurser(subjectType *checker.Type, predicate func(subjectType *checker
 	}
 }
 
-// Super dirty hack for optional fields :(
+// SUPER DIRTY HACK FOR OPTIONAL FIELDS :(
 func Ref[T any](value T) *T {
 	return &value
 }

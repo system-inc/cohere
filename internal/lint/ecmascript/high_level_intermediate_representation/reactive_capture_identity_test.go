@@ -29,7 +29,8 @@ return () => (argument: number) => [reactiveValue, stableValue, argument];
 			function := lowerTypedFunctions(test, "captures.tsx", testCase.source)[0]
 			Construct(function)
 			InferReactive(function, nil)
-			var reactiveCaptures, stableCaptures int
+			var reactiveCaptures int
+			var stableCaptures int
 			var check func(*Function)
 			check = func(parent *Function) {
 				for _, instruction := range parent.Instructions {

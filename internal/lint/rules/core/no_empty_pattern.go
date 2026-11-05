@@ -70,15 +70,15 @@ var messageEmptyArrayPattern = rule.Message{
 //
 // No fix. Whether the author meant `{ a = {} }` or meant to name properties they never wrote is not
 // recoverable from the code, and both repairs change what the function receives.
-var NoEmptyPattern = rule.Rule{
+var NoEmptyPattern = rule.Rule[NoEmptyPatternOptions]{
 	Name: "no-empty-pattern",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoEmptyPatternOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := NoEmptyPatternOptions{}
-		if configured, isConfigured := rule.OptionsAs[NoEmptyPatternOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			settings = configured
 		}
 

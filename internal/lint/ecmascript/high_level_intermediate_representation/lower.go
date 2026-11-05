@@ -129,6 +129,9 @@ func Lower(node *ast.Node, typeChecker *checker.Checker) *Function {
 // The parameter is threaded rather than made a package-level stack because lowering is re-entrant -
 // a rule may lower one function while another lowering is in progress - and a stack would make two
 // unrelated lowerings each other's enclosing scope.
+//
+// Mutates: enclosing its lastNested is set to this lowering's builder, which is how the enclosing one finds
+// the nested function's captures once the call returns
 func lowerNested(node *ast.Node, typeChecker *checker.Checker, enclosing *builder) *Function {
 	body := functionBody(node)
 	if body == nil {
@@ -632,7 +635,7 @@ func (builder *builder) lowerReturnStatement(node *ast.Node) {
 		builder.emitTo(builder.function.Returns, &LoadLocal{Place: result}, node)
 		value = builder.function.Returns
 	} else {
-		builder.emitTo(builder.function.Returns, &Primitive{Value: nil}, node)
+		builder.emitTo(builder.function.Returns, &Primitive{Value: PrimitiveUndefined{}}, node)
 	}
 	builder.terminateWith(&Return{Value: value})
 }
@@ -1083,13 +1086,11 @@ func (builder *builder) lowerTryStatement(node *ast.Node) {
 		}
 		builder.lowerStatement(catchClause.Block, "")
 		builder.gotoBlock(normalExit.Id, GotoVariantTry)
-	} else {
+	} else if hasFinally {
 		// try/finally with no catch: run the finally, then let the exception continue outward.
-		if hasFinally {
-			builder.gotoBlock(finallyBlock.Id, GotoVariantTry)
-		} else {
-			builder.terminateWith(&Unreachable{})
-		}
+		builder.gotoBlock(finallyBlock.Id, GotoVariantTry)
+	} else {
+		builder.terminateWith(&Unreachable{})
 	}
 
 	if hasFinally {

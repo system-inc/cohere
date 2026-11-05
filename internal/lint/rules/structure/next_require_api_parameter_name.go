@@ -65,9 +65,9 @@ var nextApiFunctionNames = map[string]bool{
 // what has to match. Renaming a binding would be a different rule.
 //
 // Fixable, since the repair is exactly one identifier and there is only one right answer.
-var NextRequireApiParameterName = rule.Rule{
+var NextRequireApiParameterName = rule.Rule[rule.NoOptions]{
 	Name: "structure/next-require-api-parameter-name",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		fileContext := FileContextFor(ruleContext.SourceFile.FileName().AsString())
 		if !fileContext.IsPageFile && !fileContext.IsLayoutFile {
 			// Only the files Next calls these functions in. A helper module exporting a function

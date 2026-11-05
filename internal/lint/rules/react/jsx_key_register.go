@@ -8,5 +8,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // do is accept empty input, which it turns into an error. A rule configured as a bare `"error"` is
 // handed exactly that, and upstream accepts it, so the nil path has to answer the defaults.
 func init() {
-	rule.Register(rule.Registration{Rule: JsxKey, Decode: DecodeJsxKeyOptions})
+	rule.Register(rule.Registration[JsxKeyOptions]{Rule: JsxKey, Decode: DecodeJsxKeyOptions})
 }

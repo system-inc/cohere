@@ -116,7 +116,9 @@ func writeSettingsFiles(test *testing.T, files map[string]string) string {
 func TestOnlyTheProjectsOwnFilePinsCohere(test *testing.T) {
 	test.Parallel()
 	// The baseline: the project's own pin is read.
-	loaded, loadError := Load(writeSettingsFiles(test, map[string]string{"CohereSettings.json": `{"cohere": "^1.0.0"}`}))
+	loaded, loadError := Load(
+		writeSettingsFiles(test, map[string]string{"CohereSettings.json": `{"cohere": "^1.0.0"}`}),
+	)
 	if loadError != nil {
 		test.Fatal(loadError)
 	}

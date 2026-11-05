@@ -97,7 +97,7 @@ import (
 // The anchor is a call expression, which is common, so the body exits on the argument count and the
 // member name before touching the checker. The two type queries run only for a call to something
 // named `reduce` whose second argument is a type assertion.
-var PreferReduceTypeParameter = rule.Rule{
+var PreferReduceTypeParameter = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/prefer-reduce-type-parameter",
 
 	// Both halves of the judgment are type questions: whether the receiver is an array, and whether
@@ -105,7 +105,7 @@ var PreferReduceTypeParameter = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// isArrayOrTupleThroughout answers upstream's `isArrayType`: every union constituent, and
 		// within each, every intersection constituent, must be an array or a tuple.
 		//

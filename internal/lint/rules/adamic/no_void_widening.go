@@ -19,11 +19,11 @@ var voidWideningText = policy.MessageOf("adamic/no-void-widening", "voidWidening
 //
 // unknown exposes no unchecked value and is deliberately left to Adamic's compiler.
 // Direct void-to-{} is already rejected by tsc. Value-to-void remains legal.
-var NoVoidWidening = rule.Rule{
+var NoVoidWidening = rule.Rule[rule.NoOptions]{
 	Name:             "adamic/no-void-widening",
 	NeedsTypeChecker: true,
 	ProgramReads:     rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -87,7 +87,8 @@ func readsVoidValue(tc *checker.Checker, target *checker.Type) bool {
 		return false
 	}
 	for _, member := range target.Types() {
-		if member.Flags()&(checker.TypeFlagsStringLike|checker.TypeFlagsNumberLike|checker.TypeFlagsBooleanLike|checker.TypeFlagsBigIntLike|checker.TypeFlagsESSymbolLike|checker.TypeFlagsNonPrimitive) != 0 {
+		if member.Flags()&(checker.TypeFlagsStringLike|checker.TypeFlagsNumberLike|checker.TypeFlagsBooleanLike|
+			checker.TypeFlagsBigIntLike|checker.TypeFlagsESSymbolLike|checker.TypeFlagsNonPrimitive) != 0 {
 			return true
 		}
 		if member.Flags()&checker.TypeFlagsObject != 0 &&

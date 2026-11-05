@@ -4,7 +4,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_variant -package-root <tailwindcss package> [-corpus <corpus.json>] [-output <file.json>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_variant \
+//	    -package-root <tailwindcss package> [-corpus <corpus.json>] [-output <file.json>] [-check]
 //
 // The distinction this tool enforces is the one generate_theme enforces, and for this component
 // it lands on `getVariantOrder`. Reading `variants.ts` suggests every variant holds a fixed

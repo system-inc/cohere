@@ -12,5 +12,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 //
 // No Decode entry: the original's `schema: []` means the rule has no option surface at all.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessRequireMatchingInjectType})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessRequireMatchingInjectType})
 }

@@ -7,5 +7,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The decoder is hand-written rather than `rule.DecodeOptionsInto` because the option is a bare
 // enum string rather than an object; see DecodeJsxFragmentsOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: JsxFragments, Decode: DecodeJsxFragmentsOptions})
+	rule.Register(rule.Registration[JsxFragmentsOptions]{Rule: JsxFragments, Decode: DecodeJsxFragmentsOptions})
 }

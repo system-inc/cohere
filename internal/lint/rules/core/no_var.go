@@ -43,9 +43,9 @@ var messageUnexpectedVar = rule.Message{
 // declaration and never relied on outside its block, and both are questions about the whole enclosing
 // function rather than about this line. Changing scope silently is how a lint fix turns a working
 // program into a broken one.
-var NoVar = rule.Rule{
+var NoVar = rule.Rule[rule.NoOptions]{
 	Name: "no-var",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// reportIfVar reports when a declaration list declares with `var`.
 		//
 		// let and const both carry a flag, and `var` is the absence of both. Reading it as an

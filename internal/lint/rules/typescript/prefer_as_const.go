@@ -67,9 +67,9 @@ var messagePreferAsConst = rule.Message{
 // rendering of the double it parsed to, so string equality on Text is the float comparison, and a
 // StringLiteral's Text is the cooked value rather than the source spelling. Both were probed on the
 // inputs above before this comparison was written.
-var PreferAsConst = rule.Rule{
+var PreferAsConst = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/prefer-as-const",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

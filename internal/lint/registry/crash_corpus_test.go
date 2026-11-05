@@ -128,7 +128,7 @@ func TestNoRegisteredRuleCrashesOnAbsentOptionalNodes(test *testing.T) {
 				// rule concludes about these shapes belongs in its own fixture pair, and asserting
 				// it here would make this guard fail for reasons that are not crashes.
 				for _, fileName := range fileNames {
-					rule_testing.Run(test, subject, fileName, source)
+					rule_testing.RunBound(test, subject.Unconfigured, fileName, source)
 				}
 			})
 		}

@@ -77,9 +77,9 @@ var messageUseSetStateCallback = rule.Message{
 // recorded method name is compared against the callee's own name with no receiver check, so
 // `this.nextState()` and a free `nextState()` are the same input to this rule. Reproduced, because
 // narrowing it would go silent on upstream's own case.
-var NoAccessStateInSetstate = rule.Rule{
+var NoAccessStateInSetstate = rule.Rule[rule.NoOptions]{
 	Name: "react/no-access-state-in-setstate",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

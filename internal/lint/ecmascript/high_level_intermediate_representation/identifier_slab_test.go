@@ -28,10 +28,10 @@ func TestIdentifiersShareNoStorageAcrossFunctions(test *testing.T) {
 		"function second(input: number) {\n" + body.String() + "  return input;\n}\n"
 
 	var functions []*Function
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "identifier-slab",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				forEachFunctionLike(node, func(node *ast.Node) {
 					if function := Lower(node, ruleContext.TypeChecker); function != nil {

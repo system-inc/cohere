@@ -37,15 +37,14 @@ type NoInvalidRegexpOptions struct {
 // `uniqueItems`, which the generic decoder has no way to know about. A repeated string allows
 // nothing a single one does not, but upstream refuses the config outright, and a config cohere loads
 // where ESLint would not is a config that only works in one of them.
-func DecodeNoInvalidRegexpOptions(raw []byte) (any, error) {
+func DecodeNoInvalidRegexpOptions(raw []byte) (NoInvalidRegexpOptions, error) {
 	decoded, decodeOptionsError := rule.DecodeOptionsInto[NoInvalidRegexpOptions]()(raw)
 	if decodeOptionsError != nil {
 		return NoInvalidRegexpOptions{}, decodeOptionsError
 	}
-	options, _ := decoded.(NoInvalidRegexpOptions)
 
-	seen := make(map[string]bool, len(options.AllowConstructorFlags))
-	for _, flags := range options.AllowConstructorFlags {
+	seen := make(map[string]bool, len(decoded.AllowConstructorFlags))
+	for _, flags := range decoded.AllowConstructorFlags {
 		if seen[flags] {
 			return NoInvalidRegexpOptions{}, fmt.Errorf(
 				"allowConstructorFlags lists %q more than once, and its items must be unique",
@@ -54,15 +53,15 @@ func DecodeNoInvalidRegexpOptions(raw []byte) (any, error) {
 		}
 		seen[flags] = true
 	}
-	return options, nil
+	return decoded, nil
 }
 
 // allowedConstructorFlags is the set of extra flags the options license, as upstream builds it: every
 // character of every string, less the flags the language already defines. Dropping those is what
 // keeps an allowed `u` from being struck twice, which would let `uu` through.
-func allowedConstructorFlags(options any) map[rune]bool {
+func allowedConstructorFlags(options rule.Given[NoInvalidRegexpOptions]) map[rune]bool {
 	allowed := map[rune]bool{}
-	parsed, isParsed := rule.OptionsAs[NoInvalidRegexpOptions](options)
+	parsed, isParsed := options.Read()
 	if !isParsed {
 		return allowed
 	}
@@ -126,13 +125,13 @@ func allowedConstructorFlags(options any) map[rune]bool {
 // that `u` and `v` cannot meet. With nothing configured the list is empty and every flag outside
 // `validRegExpFlags` reports. The schema's `uniqueItems` is held at decode, so `["a", "a"]` is refused
 // as upstream refuses it.
-var NoInvalidRegexp = rule.Rule{
+var NoInvalidRegexp = rule.Rule[NoInvalidRegexpOptions]{
 	Name: "no-invalid-regexp",
 
 	// Whether `RegExp` is the global
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoInvalidRegexpOptions]) rule.Listeners {
 		allowedFlags := allowedConstructorFlags(options)
 
 		check := func(node *ast.Node, callee *ast.Node, arguments *ast.NodeList) {

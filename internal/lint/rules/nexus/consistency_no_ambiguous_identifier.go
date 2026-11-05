@@ -96,9 +96,9 @@ func messageNoUnderscore() rule.Message {
 // into a broken file. It is the same trap import-require-node-namespace declines for the same
 // reason. The suggested name travels in the message instead, where a reader applies it with the
 // scope in front of them.
-var ConsistencyNoAmbiguousIdentifier = rule.Rule{
+var ConsistencyNoAmbiguousIdentifier = rule.Rule[rule.NoOptions]{
 	Name: "nexus/consistency-no-ambiguous-identifier",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				name := node.Text()

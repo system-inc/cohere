@@ -80,9 +80,9 @@ var messageUnexpectedThis = rule.Message{
 // zero-value struct inverts it and silently reports every `function Foo() { this.x = 1; }` in the
 // tree. The corpus tests the option on eight cases and the decoder below is hand written for exactly
 // this reason.
-var NoInvalidThis = rule.Rule{
+var NoInvalidThis = rule.Rule[noInvalidThisSettings]{
 	Name: "@typescript-eslint/no-invalid-this",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[noInvalidThisSettings]) rule.Listeners {
 		settings := noInvalidThisSettingsFrom(options)
 
 		return rule.Listeners{
@@ -124,25 +124,24 @@ type noInvalidThisRawOptions struct {
 // the resulting zero-value struct would say capIsConstructor is false. That is not a weaker
 // configuration, it is a different rule, and it reports every capitalized constructor function in
 // the tree.
-func DecodeNoInvalidThisOptions(raw []byte) (any, error) {
+func DecodeNoInvalidThisOptions(raw []byte) (noInvalidThisSettings, error) {
 	settings := DefaultNoInvalidThisSettings()
 
 	decoded, decodeOptionsError := rule.DecodeOptionsInto[noInvalidThisRawOptions]()(raw)
 	if decodeOptionsError != nil {
 		return settings, decodeOptionsError
 	}
-	wire, _ := decoded.(noInvalidThisRawOptions)
 
-	if wire.CapIsConstructor != nil {
-		settings.CapIsConstructor = *wire.CapIsConstructor
+	if decoded.CapIsConstructor != nil {
+		settings.CapIsConstructor = *decoded.CapIsConstructor
 	}
 	return settings, nil
 }
 
 // noInvalidThisSettingsFrom recovers the settings from whatever the config layer handed over,
 // falling back to the documented defaults for nil.
-func noInvalidThisSettingsFrom(options any) noInvalidThisSettings {
-	if settings, ok := rule.OptionsAs[noInvalidThisSettings](options); ok {
+func noInvalidThisSettingsFrom(options rule.Given[noInvalidThisSettings]) noInvalidThisSettings {
+	if settings, ok := options.Read(); ok {
 		return settings
 	}
 	return DefaultNoInvalidThisSettings()

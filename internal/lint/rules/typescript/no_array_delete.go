@@ -151,14 +151,14 @@ import (
 //
 // `KindDeleteExpression` is a rare anchor and the listener exits on the second line for anything
 // that is not an element access, so the checker is consulted only for a genuine `delete x[y]`.
-var NoArrayDelete = rule.Rule{
+var NoArrayDelete = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-array-delete",
 
 	// The listener resolves the receiver's type on every `delete x[y]`, so the checker is required.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		isUnderlyingTypeArray := func(subjectType *checker.Type) bool {
 			if type_checking.IsTypeFlagSet(subjectType, checker.TypeFlagsUnion) {
 				for _, memberType := range subjectType.Types() {

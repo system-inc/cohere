@@ -52,7 +52,7 @@ func DefaultIdDenylistSettings() IdDenylistSettings {
 // handed nil options, and for this rule the correct answer is "deny nothing", which is the same
 // answer upstream gives: its `denyList` is built from `context.options`, and an unconfigured rule
 // has none.
-func DecodeIdDenylistOptions(list []byte) (any, error) {
+func DecodeIdDenylistOptions(list []byte) (IdDenylistSettings, error) {
 	settings := DefaultIdDenylistSettings()
 	if len(list) == 0 {
 		return settings, nil
@@ -76,8 +76,8 @@ func DecodeIdDenylistOptions(list []byte) (any, error) {
 }
 
 // idDenylistSettingsFrom recovers the settings from whatever the config layer handed over.
-func idDenylistSettingsFrom(options any) IdDenylistSettings {
-	if settings, ok := rule.OptionsAs[IdDenylistSettings](options); ok {
+func idDenylistSettingsFrom(options rule.Given[IdDenylistSettings]) IdDenylistSettings {
+	if settings, ok := options.Read(); ok {
 		return settings
 	}
 	return DefaultIdDenylistSettings()
@@ -220,7 +220,7 @@ var messageIdDenylistRestrictedPrivate = rule.Message{
 //
 // Upstream offers none, and none is possible: the repair is to choose a different name, and nothing
 // here knows which one the author meant.
-var IdDenylist = rule.Rule{
+var IdDenylist = rule.Rule[IdDenylistSettings]{
 	Name: "id-denylist",
 
 	// Telling a global reference from a name the source declared is name resolution. See the
@@ -228,7 +228,7 @@ var IdDenylist = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[IdDenylistSettings]) rule.Listeners {
 		settings := idDenylistSettingsFrom(options)
 		if len(settings.Denied) == 0 {
 			// Upstream builds an empty Set and every identifier fails `isRestricted`, so the rule

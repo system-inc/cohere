@@ -293,6 +293,9 @@ func (builder *Builder[E]) newBlock() *Block[E] {
 	return blk
 }
 
+// markFinal records blk as one of the blocks a path through the function ends in.
+//
+// Mutates: blk the block is flagged final so it is recorded once however many paths end in it
 func (builder *Builder[E]) markFinal(blk *Block[E]) {
 	if blk == nil || !blk.Reachable || blk.final {
 		return
@@ -301,6 +304,9 @@ func (builder *Builder[E]) markFinal(blk *Block[E]) {
 	builder.finals = append(builder.finals, blk)
 }
 
+// markThrown records blk as one of the blocks a path through the function throws from.
+//
+// Mutates: blk the block is flagged thrown so it is recorded once however many paths throw from it
 func (builder *Builder[E]) markThrown(blk *Block[E]) {
 	if blk == nil || !blk.Reachable || blk.thrown {
 		return
@@ -313,6 +319,11 @@ func (builder *Builder[E]) link(from, to *Block[E]) {
 	builder.linkWithCycleBarrier(from, to, false)
 }
 
+// linkWithCycleBarrier adds the edge from one block to another and returns its index among from's
+// successors, or -1 when either end is missing.
+//
+// Mutates: from the edge is appended to its successors, with its cycle barrier beside it
+// Mutates: to a reachable source marks the target as having an edge in, which enter later reads
 func (builder *Builder[E]) linkWithCycleBarrier(from, to *Block[E], barrier bool) int {
 	if from == nil || to == nil {
 		return -1
@@ -326,6 +337,9 @@ func (builder *Builder[E]) linkWithCycleBarrier(from, to *Block[E], barrier bool
 	return index
 }
 
+// appendSuccessor adds to as from's next successor, reusing the block's own backing array first.
+//
+// Mutates: from the successor list is the block's own, so the edge is written into it
 func (builder *Builder[E]) appendSuccessor(from, to *Block[E]) {
 	index := len(from.Successors)
 	if index < len(from.successors) {
@@ -336,6 +350,10 @@ func (builder *Builder[E]) appendSuccessor(from, to *Block[E]) {
 	from.Successors = append(from.Successors, to)
 }
 
+// setCycleBarrier records whether the edge at index leaves from as a cycle barrier, allocating the
+// block's barrier list only once some edge is one.
+//
+// Mutates: from the barrier list is the block's own, kept as long as its successors
 func (builder *Builder[E]) setCycleBarrier(from *Block[E], index int, barrier bool) {
 	if from == nil || index < 0 {
 		return
@@ -355,6 +373,8 @@ func (builder *Builder[E]) setCycleBarrier(from *Block[E], index int, barrier bo
 
 // enter makes blk the current block and settles its reachability, so every edge
 // that could make it reachable has to be linked before it is entered.
+//
+// Mutates: blk entering is what settles the block's reachability
 func (builder *Builder[E]) enter(blk *Block[E]) {
 	blk.Reachable = blk.hasIncoming
 	builder.cur = blk
@@ -378,6 +398,8 @@ func (builder *Builder[E]) makeUnreachable() {
 // one control arrives at, rather than when an edge into blk already is. It is
 // how a block whose only edge in is laid out later still gets laid out here,
 // which is the order ESLint traverses one in.
+//
+// Mutates: blk the block gains the walk's reachability as if an edge led in, then is entered
 func (builder *Builder[E]) enterDisconnected(blk *Block[E]) {
 	blk.hasIncoming = blk.hasIncoming || builder.cur.Reachable
 	builder.enter(blk)

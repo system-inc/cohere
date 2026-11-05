@@ -45,7 +45,7 @@ type GroupedAccessorPairsOptions struct {
 //
 // A value outside the enum is refused rather than folded into an arm. Upstream gets that refusal
 // from its schema before the rule runs; there is no schema layer here, so it lives here.
-func DecodeGroupedAccessorPairsOptions(list []byte) (any, error) {
+func DecodeGroupedAccessorPairsOptions(list []byte) (GroupedAccessorPairsOptions, error) {
 	options := GroupedAccessorPairsOptions{Order: GroupedAccessorPairsAnyOrder}
 	configured, optionElementsError := rule.OptionElements(list, 2)
 	if optionElementsError != nil || len(configured) == 0 {
@@ -145,12 +145,12 @@ var messageGroupedAccessorPairsInvalidOrder = rule.Message{
 // `get [k](): any`, renders upstream as `getter 'null'`, because upstream reads the signature's name
 // through `getStaticPropertyName` and quotes the null it gets back. A class accessor with the same
 // key renders as a bare `getter`, and so does a signature here. The finding and its span agree.
-var GroupedAccessorPairs = rule.Rule{
+var GroupedAccessorPairs = rule.Rule[GroupedAccessorPairsOptions]{
 	Name: "grouped-accessor-pairs",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[GroupedAccessorPairsOptions]) rule.Listeners {
 		// A rule configured as bare "error" is handed nil, so the fallback here is what keeps the
 		// order check from comparing against an empty string that matches no arm.
-		settings, isSettings := rule.OptionsAs[GroupedAccessorPairsOptions](options)
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = GroupedAccessorPairsOptions{Order: GroupedAccessorPairsAnyOrder}
 		}

@@ -35,12 +35,16 @@ var correctnessNoMockOnModuleNamespaceMockMethods = map[string]bool{
 // or `mock.property` called with an `import * as` namespace object as the object to patch, in a file
 // that runs as an ES module.
 //
-//	invalid: import * as NodeChildProcess from 'node:child_process'; test.mock.method(NodeChildProcess, 'execFileSync', fake);
+//	invalid: import * as NodeChildProcess from 'node:child_process';
+//	         test.mock.method(NodeChildProcess, 'execFileSync', fake);
 //	invalid: import * as Store from './Store.ts'; t.mock.method(Store, 'load');
 //	invalid: import * as NodeOs from 'node:os'; mock.property(NodeOs, 'EOL', '\r\n');
-//	valid:   const childProcess = NodeModule.createRequire(import.meta.url)('node:child_process') as typeof NodeChildProcess; test.mock.method(childProcess, 'execFileSync', fake);
-//	valid:   import * as NodeChildProcess from 'node:child_process'; test.mock.method(NodeChildProcess.default, 'execFileSync', fake);
-//	valid:   import NodeChildProcess from 'node:child_process'; test.mock.method(NodeChildProcess, 'execFileSync', fake);
+//	valid:   const childProcess = NodeModule.createRequire(import.meta.url)('node:child_process')
+//	         as typeof NodeChildProcess; test.mock.method(childProcess, 'execFileSync', fake);
+//	valid:   import * as NodeChildProcess from 'node:child_process';
+//	         test.mock.method(NodeChildProcess.default, 'execFileSync', fake);
+//	valid:   import NodeChildProcess from 'node:child_process';
+//	         test.mock.method(NodeChildProcess, 'execFileSync', fake);
 //	valid:   import * as Nonce from './Nonce'; jest.spyOn(Nonce, 'createNonce');
 //
 // # Where it came from
@@ -96,7 +100,7 @@ var correctnessNoMockOnModuleNamespaceMockMethods = map[string]bool{
 //
 // The repair depends on what the module is: a builtin's CommonJS exports through `createRequire`, a
 // seam the code under test takes as a parameter, or `mock.module`. A fixer would have to pick one.
-var CorrectnessNoMockOnModuleNamespace = rule.Rule{
+var CorrectnessNoMockOnModuleNamespace = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-mock-on-module-namespace",
 
 	// The mock call is told from any other `method` by its resolved declaration, and the namespace
@@ -110,7 +114,7 @@ var CorrectnessNoMockOnModuleNamespace = rule.Rule{
 	// it resolves the argument to is declared in the file itself.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 			// Telling node:test's MockTracker from any other `method`, and a namespace import from a
 			// value of the same type, are questions for the checker.

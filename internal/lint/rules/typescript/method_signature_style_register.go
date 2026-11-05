@@ -13,5 +13,8 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // zero value, so a generic decode would hand the rule an empty style matching neither arm and the
 // rule would register on every file and report nothing while every fixture stayed green.
 func init() {
-	rule.Register(rule.Registration{Rule: MethodSignatureStyle, Decode: DecodeMethodSignatureStyleOptions})
+	rule.Register(rule.Registration[MethodSignatureStyleOptions]{
+		Rule:   MethodSignatureStyle,
+		Decode: DecodeMethodSignatureStyleOptions,
+	})
 }

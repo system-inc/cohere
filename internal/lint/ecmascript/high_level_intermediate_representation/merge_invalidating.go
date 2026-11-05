@@ -34,7 +34,7 @@ import (
 // LastUsage records the last instruction at which each declaration is read.
 //
 // Upstream's `FindLastUsageVisitor`. Keyed by `DeclarationId` rather than `IdentifierId`, which is
-// upstream's choice and carries its own TODO saying so: declaration-keying is what makes the output
+// upstream's choice and carries its own `TODO` saying so: declaration-keying is what makes the output
 // compatible, and it is deliberately imprecise where a scope defines a variable whose version is
 // never read and is overwritten later. Do not "fix" this to `IdentifierId` -- upstream's note says
 // that is correct only once the pass leaves single-assignment form behind, which it has not.
@@ -341,6 +341,8 @@ func mergeAllowedInstruction(value InstructionValue) bool {
 //
 // Upstream traverses nested blocks with the enclosing dependency set before scanning the current
 // one. A nested scope with that same set is replaced by its body, separately from adjacent merges.
+//
+// Mutates: tree the merge rewrites the caller's reactive tree in place, so its body comes back merged
 func MergeReactiveScopesThatInvalidateTogether(tree *ReactiveFunction, function *Function,
 	dependencies *ScopeDependencies, typeChecker *shimchecker.Checker) MergeScopesResult {
 	if tree == nil || function == nil || dependencies == nil {
@@ -436,7 +438,6 @@ func (merger *scopeMerger) mergeBlock(block ReactiveBlock) ReactiveBlock {
 		}
 		rebuilt = append(rebuilt, statement)
 	}
-	block = rebuilt
 
 	var candidate *mergeCandidate
 	var committed []mergeCandidate
@@ -449,7 +450,7 @@ func (merger *scopeMerger) mergeBlock(block ReactiveBlock) ReactiveBlock {
 		candidate = nil
 	}
 
-	for index, statement := range block {
+	for index, statement := range rebuilt {
 		switch shape := statement.(type) {
 		case *ReactiveTerminalStatement:
 			// Upstream does not merge across terminals.
@@ -533,9 +534,9 @@ func (merger *scopeMerger) mergeBlock(block ReactiveBlock) ReactiveBlock {
 	commit()
 
 	if len(committed) == 0 {
-		return block
+		return rebuilt
 	}
-	return merger.rewrite(block, committed)
+	return merger.rewrite(rebuilt, committed)
 }
 
 // rewrite splices each committed candidate's statements into its surviving scope.

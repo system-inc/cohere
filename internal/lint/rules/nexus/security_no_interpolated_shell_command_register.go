@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // and an option widening it (to opaque commands, to an explicit `sh -c`) would reach the shapes the
 // rule's doc comment declines on purpose.
 func init() {
-	rule.Register(rule.Registration{Rule: SecurityNoInterpolatedShellCommand})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: SecurityNoInterpolatedShellCommand})
 }

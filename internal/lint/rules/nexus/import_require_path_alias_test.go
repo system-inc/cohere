@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -73,32 +74,57 @@ func TestImportRequirePathAliasStaysSilent(test *testing.T) {
 		name       string
 		fileName   string
 		sourceText string
-		options    any
+		options    rule.Given[ImportRequirePathAliasOptions]
 	}{
 		// One level stays relative on purpose: those are facts the reader already has.
-		{"sibling import", aliasImporter, "import { Sibling } from './Sibling';\n", pathAliasOptions},
-		{"parent import", aliasImporter, "import { Parent } from '../Parent';\n", pathAliasOptions},
-		{"already aliased", aliasImporter, "import { Thing } from '@base/source/Thing';\n", pathAliasOptions},
-		{"a package import", aliasImporter, "import * as NodePath from 'node:path';\n", pathAliasOptions},
+		{"sibling import", aliasImporter, "import { Sibling } from './Sibling';\n", rule.Configured(pathAliasOptions)},
+		{"parent import", aliasImporter, "import { Parent } from '../Parent';\n", rule.Configured(pathAliasOptions)},
+		{
+			"already aliased",
+			aliasImporter,
+			"import { Thing } from '@base/source/Thing';\n",
+			rule.Configured(pathAliasOptions),
+		},
+		{
+			"a package import",
+			aliasImporter,
+			"import * as NodePath from 'node:path';\n",
+			rule.Configured(pathAliasOptions),
+		},
 		// Reporting here would demand exactly what boundary-no-internal-import rejects.
 		{
 			"an internal path must stay relative",
 			aliasImporter,
 			"import { Detail } from '../../internal/Detail';\n",
-			pathAliasOptions,
+			rule.Configured(pathAliasOptions),
 		},
 		// A path leaving the repository is not ours to name.
 		{
 			"climbs out of the repository",
 			"/repository/Thing.ts",
 			"import { Thing } from '../../elsewhere/Thing';\n",
-			pathAliasOptions,
+			rule.Configured(pathAliasOptions),
 		},
 		// No alias covers the destination, so there is nothing to suggest.
-		{"no alias covers it", aliasImporter, "import { Thing } from '../../../other/Thing';\n", pathAliasOptions},
-		{"a computed dynamic import", aliasImporter, "const thing = import(somePath);\n", pathAliasOptions},
+		{
+			"no alias covers it",
+			aliasImporter,
+			"import { Thing } from '../../../other/Thing';\n",
+			rule.Configured(pathAliasOptions),
+		},
+		{
+			"a computed dynamic import",
+			aliasImporter,
+			"const thing = import(somePath);\n",
+			rule.Configured(pathAliasOptions),
+		},
 		// A misconfigured rule declines rather than guessing.
-		{"no options at all", aliasImporter, "import { Thing } from '../../foundation/Thing';\n", nil},
+		{
+			"no options at all",
+			aliasImporter,
+			"import { Thing } from '../../foundation/Thing';\n",
+			rule.Given[ImportRequirePathAliasOptions]{},
+		},
 		// These two carry a real options value with one half missing. Both stay silent even without
 		// the explicit guard, because aliasForPath finds nothing with an empty alias list and an
 		// empty root makes every path fall outside the repository. The guard is deliberate
@@ -108,25 +134,25 @@ func TestImportRequirePathAliasStaysSilent(test *testing.T) {
 			"no aliases configured",
 			aliasImporter,
 			"import { Thing } from '../../foundation/Thing';\n",
-			ImportRequirePathAliasOptions{RepositoryRoot: "/repository"},
+			rule.Configured(ImportRequirePathAliasOptions{RepositoryRoot: "/repository"}),
 		},
 		{
 			"no repository root",
 			aliasImporter,
 			"import { Thing } from '../../foundation/Thing';\n",
-			ImportRequirePathAliasOptions{Aliases: pathAliasOptions.Aliases},
+			rule.Configured(ImportRequirePathAliasOptions{Aliases: pathAliasOptions.Aliases}),
 		},
 		{
 			"file outside the repository",
 			"/elsewhere/Thing.ts",
 			"import { Thing } from '../../foundation/Thing';\n",
-			pathAliasOptions,
+			rule.Configured(pathAliasOptions),
 		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(
+			result := rule_testing.RunGiven(
 				test,
 				ImportRequirePathAlias,
 				testCase.fileName,

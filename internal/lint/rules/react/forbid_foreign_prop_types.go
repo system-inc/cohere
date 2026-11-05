@@ -134,20 +134,21 @@ type ForbidForeignPropTypesOptions struct {
 // All measured. `allowInPropTypes` is not consulted on this arm, upstream, which is visible in the
 // source rather than measured: the `ObjectPattern` handler calls neither `isAllowedAssignment` nor
 // anything like it. Reproduced.
-var ForbidForeignPropTypes = rule.Rule{
+var ForbidForeignPropTypes = rule.Rule[ForbidForeignPropTypesOptions]{
 	Name: "react/forbid-foreign-prop-types",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[ForbidForeignPropTypesOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ForbidForeignPropTypesOptions]) rule.Listeners {
+		settings, _ := options.Read()
 
 		// unwrapParentheses walks up past the parentheses our parser keeps and upstream's folds
 		// away. A loop rather than a single step, because `((x))` nests, and written here rather
 		// than with `ast.SkipParentheses`, which dereferences its argument.
 		unwrapParentheses := func(node *ast.Node) *ast.Node {
-			for node != nil && node.Kind == ast.KindParenthesizedExpression {
-				node = node.Parent
+			current := node
+			for current != nil && current.Kind == ast.KindParenthesizedExpression {
+				current = current.Parent
 			}
-			return node
+			return current
 		}
 
 		// isAssignmentTarget reproduces upstream's `ast.isAssignmentLHS`.

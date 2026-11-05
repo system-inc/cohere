@@ -10,5 +10,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // No decoder: the rule takes no options. Every `for...in` is the shape being retired, and an option
 // naming loops that may keep it would be the allowance the ruling declined.
 func init() {
-	rule.Register(rule.Registration{Rule: ConsistencyNoForIn})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: ConsistencyNoForIn})
 }

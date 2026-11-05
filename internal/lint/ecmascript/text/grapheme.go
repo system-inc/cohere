@@ -50,6 +50,8 @@ func GraphemeCount(value string) int {
 	return count
 }
 
+const zeroWidthJoiner = 0x200D
+
 // continuesCluster reports whether character belongs to the cluster previous is in.
 func continuesCluster(previous rune, character rune, startsWithPictograph bool, regionalIndicators int) bool {
 	switch {
@@ -69,9 +71,7 @@ func continuesCluster(previous rune, character rune, startsWithPictograph bool, 
 	return hangulJoins(previous, character)
 }
 
-const zeroWidthJoiner = 0x200D
-
-// isGraphemeExtend is `UAX #29`'s Extend, ZWJ and SpacingMark together: what never begins a cluster.
+// isGraphemeExtend is UAX #29's Extend, ZWJ and SpacingMark together: what never begins a cluster.
 func isGraphemeExtend(character rune) bool {
 	switch {
 	case unicode.In(character, unicode.Mn, unicode.Me, unicode.Mc):

@@ -12,7 +12,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // exactly as a rule handed upstream's defaults. That is the condition a generic decode needs, and it
 // is worth stating because it is not true of every optioned rule in this package.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[UnifiedSignaturesOptions]{
 		Rule:   UnifiedSignatures,
 		Decode: rule.DecodeOptionsInto[UnifiedSignaturesOptions](),
 	})

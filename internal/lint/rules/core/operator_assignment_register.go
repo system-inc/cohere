@@ -10,7 +10,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The decoder is hand-rolled because the option is a bare string enum whose default is `always`
 // rather than the zero value.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[OperatorAssignmentOptions]{
 		Rule:   OperatorAssignment,
 		Decode: DecodeOperatorAssignmentOptions,
 	})

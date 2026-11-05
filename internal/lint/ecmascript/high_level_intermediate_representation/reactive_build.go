@@ -330,6 +330,8 @@ func BuildReactiveFunctionWithFlattenedScopes(function *Function,
 }
 
 // measureBlock walks the produced tree counting what it holds, for the headline measurement.
+//
+// Mutates: result the walk adds every count into the caller's one result, so one tally covers the whole tree
 func measureBlock(block ReactiveBlock, depth int, result *ReactiveBuildResult) {
 	if depth > result.MaxDepth {
 		result.MaxDepth = depth
@@ -374,6 +376,8 @@ func measureBlock(block ReactiveBlock, depth int, result *ReactiveBuildResult) {
 // for a walk that had genuinely dropped a block. The instructions were preserved and the instrument
 // could not see them. Recorded because a measurement that under-reports looks exactly like a pass
 // that under-converts, and the two demand opposite responses.
+//
+// Mutates: result the walk adds every count into the caller's one result, so one tally covers the whole tree
 func measureValue(value ReactiveValue, result *ReactiveBuildResult) {
 	switch shape := value.(type) {
 	case *ReactiveInstructionValue:
@@ -473,6 +477,8 @@ func eachTerminalValue(terminal ReactiveTerminal, visit func(ReactiveValue)) {
 // The single most important property here is that a block is visited once. `emitted` is the check on
 // that and `scheduled` is the mechanism: a block a parent has committed to emitting is not emitted
 // by a child, which emits a break to it instead.
+//
+// Mutates: into the walk appends each statement it emits to the caller's block, so one block gathers a region
 func (reactiveContext *reactiveContext) visitBlock(block *BasicBlock, into *ReactiveBlock) {
 	if block == nil {
 		return
@@ -511,6 +517,8 @@ func (reactiveContext *reactiveContext) visitBlock(block *BasicBlock, into *Reac
 // fallthrough so nested blocks emit a break rather than re-emitting it, walk the arms, unschedule,
 // then visit the fallthrough as a sibling rather than as a child -- which is what flattens
 // `if (a) {...} rest` into two statements instead of nesting `rest` inside the if.
+//
+// Mutates: into the walk appends each statement it emits to the caller's block, so one block gathers a region
 func (reactiveContext *reactiveContext) visitTerminal(block *BasicBlock, into *ReactiveBlock) {
 	var scheduleIds []int
 
@@ -785,6 +793,9 @@ type reactiveValueTerminalResult struct {
 // A malformed or already-emitted value subtree declines without changing the walk. The caller can
 // then preserve the graph in statement form, which is preferable to producing a partial composite
 // and losing the unvisited arm.
+//
+// Mutates: into the walk appends each statement it emits to the caller's block, so one block gathers a region
+// Mutates: ids the caller's schedule ids, which this claims into and empties once it has unscheduled them
 func (reactiveContext *reactiveContext) emitStructuredValueTerminal(terminal Terminal, into *ReactiveBlock,
 	ids *[]int) bool {
 	var continuation static_single_assignment.BlockId
@@ -1110,6 +1121,8 @@ func (reactiveContext *reactiveContext) reactiveInstructions(ids []InstructionId
 //
 // Returns the block to visit as a sibling afterwards, and whether this call is the one that claimed
 // it. A fallthrough already scheduled by an enclosing construct is that construct's to emit.
+//
+// Mutates: ids the caller gathers every schedule id it claims, so it can unschedule them all together
 func (reactiveContext *reactiveContext) scheduleFallthrough(
 	block static_single_assignment.BlockId,
 	kind controlFlowKind,
@@ -1123,6 +1136,8 @@ func (reactiveContext *reactiveContext) scheduleFallthrough(
 }
 
 // scheduleLoopTargets claims a loop's fallthrough and its continue block together.
+//
+// Mutates: ids the caller gathers every schedule id it claims, so it can unschedule them all together
 func (reactiveContext *reactiveContext) scheduleLoopTargets(
 	fallthrough_, continueBlock static_single_assignment.BlockId,
 	ids *[]int,
@@ -1163,6 +1178,8 @@ func (reactiveContext *reactiveContext) labelFor(block static_single_assignment.
 // where control transfers implicitly, so upstream emits a terminal marked implicit rather than
 // omitting it -- keeping the statement lets a later pass decide, and dropping it here would lose the
 // information irrecoverably.
+//
+// Mutates: into the walk appends the statement it emits to the caller's block, so one block gathers a region
 func (reactiveContext *reactiveContext) emitGoto(terminal *Goto, into *ReactiveBlock) {
 	if terminal.Variant == GotoVariantContinue {
 		kind, matched := reactiveContext.continueTarget(terminal.Block)
@@ -1208,6 +1225,8 @@ func (reactiveContext *reactiveContext) emitGoto(terminal *Goto, into *ReactiveB
 // structured extractor does not understand. It preserves the test and both arms as a statement
 // subtree, then emits the continuation as a sibling. The source-expression form is lost, but no
 // graph instructions are guessed away.
+//
+// Mutates: into the walk appends each statement it emits to the caller's block, so one block gathers a region
 func (reactiveContext *reactiveContext) emitValueTerminal(
 	fallthrough_ static_single_assignment.BlockId,
 	into *ReactiveBlock,

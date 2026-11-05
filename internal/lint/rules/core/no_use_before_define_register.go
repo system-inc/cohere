@@ -14,7 +14,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // judges almost nothing. And upstream's schema is a `oneOf`, so the option can arrive as the bare
 // string `"nofunc"` rather than an object, which no struct unmarshal can accept.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoUseBeforeDefineOptions]{
 		Rule:   NoUseBeforeDefine,
 		Decode: DecodeNoUseBeforeDefineOptions,
 	})

@@ -8,5 +8,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // shared edit. The decoder is hand-written rather than `rule.DecodeOptionsInto` so a bare `"error"`
 // configuration resolves to the documented default; see DecodeNoMultiCompOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: NoMultiComp, Decode: DecodeNoMultiCompOptions})
+	rule.Register(rule.Registration[NoMultiCompOptions]{Rule: NoMultiComp, Decode: DecodeNoMultiCompOptions})
 }

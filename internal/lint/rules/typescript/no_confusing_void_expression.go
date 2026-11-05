@@ -35,7 +35,7 @@ type noConfusingVoidExpressionWire struct {
 }
 
 // DecodeNoConfusingVoidExpressionOptions reads the option object off the config.
-func DecodeNoConfusingVoidExpressionOptions(raw []byte) (any, error) {
+func DecodeNoConfusingVoidExpressionOptions(raw []byte) (NoConfusingVoidExpressionSettings, error) {
 	settings := DefaultNoConfusingVoidExpressionSettings()
 	if len(raw) == 0 {
 		return settings, nil
@@ -152,15 +152,15 @@ var messageInvalidVoidExprWrapVoid = rule.Message{
 // Upstream ships a fix on the arrow arm and on both return arms, and a suggestion on the generic
 // arm under `ignoreVoidOperator`. Two of the three fixes are reproduced here and the third is
 // declined; see `noConfusingVoidExpressionReturnFix` for which and why.
-var NoConfusingVoidExpression = rule.Rule{
+var NoConfusingVoidExpression = rule.Rule[NoConfusingVoidExpressionSettings]{
 	Name: "@typescript-eslint/no-confusing-void-expression",
 
 	// Every judgment is a question about a type, so the checker is not optional here.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoConfusingVoidExpressionSettings](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoConfusingVoidExpressionSettings]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultNoConfusingVoidExpressionSettings()
 		}

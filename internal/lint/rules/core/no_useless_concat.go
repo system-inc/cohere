@@ -84,9 +84,9 @@ var messageUnexpectedConcat = rule.Message{
 // Upstream declares none and marks the rule frozen. Joining the two literals is not always a
 // spelling change: the halves may use different quote styles, one may be a template carrying a
 // substitution, and the line break the author chose is often what makes a long string readable.
-var NoUselessConcat = rule.Rule{
+var NoUselessConcat = rule.Rule[rule.NoOptions]{
 	Name: "no-useless-concat",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				expression := node.AsBinaryExpression()

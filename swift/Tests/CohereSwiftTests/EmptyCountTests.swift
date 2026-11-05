@@ -109,9 +109,17 @@ struct EmptyCountTests {
         #expect(run.complete)
     }
 
-    /* Lint alone on a package never built: no index, no recorded compile, so the file is unchecked and the run says so. */
+    /*
+     Lint alone on a package never built, whose build fails before compiling (a dependency `--no-fix` cannot
+     resolve): no index, no recorded compile, so the file is unchecked and the run says so.
+     */
     @Test func aFileNoSourceDescribesIsUncheckedNotClean() async throws {
         let package = try Package(source: Self.source)
+        try PipelineControlTests.unresolvableManifest.write(
+            to: package.root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
         let run = try await package.run(["--lint"])
         #expect(run.lines.isEmpty)
         #expect(run.crashes == 1)

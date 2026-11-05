@@ -89,13 +89,13 @@ type NoCondAssignOptions = NoCondAssignMode
 // second thing to fix, and it double-counts in any total. The walk under `always` already covers
 // the direct case on its own, so this reports through one path per mode and emits one finding. The
 // divergence is stated rather than silent, and the fixtures assert the single count.
-var NoCondAssign = rule.Rule{
+var NoCondAssign = rule.Rule[NoCondAssignOptions]{
 	Name: "no-cond-assign",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoCondAssignOptions]) rule.Listeners {
 		// Unrecognized and absent both land on the permissive mode. A rule enabled with a bare
 		// severity must not silently run the strict half, and a typo must not silently escalate.
 		always := false
-		if mode, configured := rule.OptionsAs[NoCondAssignOptions](options); configured && mode == NoCondAssignAlways {
+		if mode, configured := options.Read(); configured && mode == NoCondAssignAlways {
 			always = true
 		}
 

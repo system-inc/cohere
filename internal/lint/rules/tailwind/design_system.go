@@ -237,7 +237,12 @@ func loadDesignSystemThrough(
 		}
 	}
 
-	resolve, stylesheetResolverAtError := stylesheetResolverAt(location.cwdFrom(projectRoot), location.Tsconfig, packageRoot, fileSystem)
+	resolve, stylesheetResolverAtError := stylesheetResolverAt(
+		location.cwdFrom(projectRoot),
+		location.Tsconfig,
+		packageRoot,
+		fileSystem,
+	)
 	if stylesheetResolverAtError != nil {
 		return DesignSystemResult{EntryPoint: entryPoint, Error: stylesheetResolverAtError}
 	}

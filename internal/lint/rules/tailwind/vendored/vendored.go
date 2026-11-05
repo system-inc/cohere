@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"testing"
 )
 
 // TailwindVersion is the version of tailwindcss the snapshot holds.
@@ -21,18 +22,30 @@ const TailwindVersion = "4.3.3"
 // modulePath is cohere's module, which an import-path source file name begins with.
 const modulePath = "github.com/system-inc/cohere"
 
-// TailwindPackageRoot is the snapshot's directory, the root a node_modules/tailwindcss would be.
-func TailwindPackageRoot() string {
+// TailwindPackageRoot is the snapshot's directory, the root a node_modules/tailwindcss would be. It fails when
+// the working directory cannot be read, or when a -trimpath build's working directory is outside cohere's module.
+func TailwindPackageRoot() (string, error) {
 	_, file, _, _ := runtime.Caller(0)
-	working, workingDirectoryError := os.Getwd()
-	if workingDirectoryError != nil {
-		panic(fmt.Sprintf("locating the tailwindcss snapshot: %v", workingDirectoryError))
+	working, workingError := os.Getwd()
+	if workingError != nil {
+		return "", fmt.Errorf("reading the working directory: %w", workingError)
 	}
 	directory, sourceDirectoryError := sourceDirectory(file, working)
 	if sourceDirectoryError != nil {
-		panic(fmt.Sprintf("locating the tailwindcss snapshot: %v", sourceDirectoryError))
+		return "", sourceDirectoryError
 	}
-	return filepath.Join(directory, "testdata", "tailwindcss")
+	return filepath.Join(directory, "testdata", "tailwindcss"), nil
+}
+
+// TailwindPackageRootForTest is TailwindPackageRoot for a test, which fails the test when the snapshot cannot be
+// found, every caller of the snapshot being a test that has nothing to run without it.
+func TailwindPackageRootForTest(test *testing.T) string {
+	test.Helper()
+	root, rootError := TailwindPackageRoot()
+	if rootError != nil {
+		test.Fatalf("locating the tailwindcss snapshot: %v", rootError)
+	}
+	return root
 }
 
 // sourceDirectory is the directory of the source file runtime.Caller named. Built without -trimpath that is a

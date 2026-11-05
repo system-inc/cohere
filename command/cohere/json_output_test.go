@@ -128,6 +128,11 @@ func TestOutputSchemaMatchesTheTypes(test *testing.T) {
 		"summary.phase": {*summary.Properties["phases"].Items, phaseJSON{}},
 		"summary.cache": {summary.Properties["cache"], cacheUse{}},
 		"summary.gaps":  {summary.Properties["gaps"], runGaps{}},
+		"summary.gaps.uncheckedSwift": {
+			*summary.Properties["gaps"].Properties["uncheckedSwift"].Items,
+			uncheckedSwiftFile{},
+		},
+		"summary.gaps.crashes": {*summary.Properties["gaps"].Properties["crashes"].Items, runCrash{}},
 	} {
 		fields, required := jsonFields(reflect.TypeOf(check.value))
 		if got := schemaPropertyNames(check.object.Properties); strings.Join(got, ",") != strings.Join(fields, ",") {

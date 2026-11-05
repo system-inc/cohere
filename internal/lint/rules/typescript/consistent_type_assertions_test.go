@@ -66,7 +66,7 @@ func applyConsistentTypeAssertionsSuggestion(test *testing.T, source string, sug
 // The option surface is a discriminated union upstream: `{assertionStyle: "never"}` admits no other
 // key, while the two style values that are not never carry two independent literal-assertion
 // settings. Nothing but the decoder can tell a port that reads that shape from one that guesses.
-func decodeConsistentTypeAssertionsOptionsForTest(test *testing.T, raw string) any {
+func decodeConsistentTypeAssertionsOptionsForTest(test *testing.T, raw string) ConsistentTypeAssertionsOptions {
 	test.Helper()
 	decoded, decodeConsistentTypeAssertionsOptionsError := DecodeConsistentTypeAssertionsOptions(json.RawMessage(raw))
 	if decodeConsistentTypeAssertionsOptionsError != nil {
@@ -1669,12 +1669,8 @@ func TestConsistentTypeAssertionsDecoderReadsUpstreamsUnion(test *testing.T) {
 		test.Run(testCase.raw, func(test *testing.T) {
 			test.Parallel()
 			decoded := decodeConsistentTypeAssertionsOptionsForTest(test, testCase.raw)
-			settings, isSettings := decoded.(ConsistentTypeAssertionsOptions)
-			if !isSettings {
-				test.Fatalf("the decoder returned %T rather than the rule's own options type", decoded)
-			}
-			if settings != testCase.want {
-				test.Errorf("decoded to %+v, wanted %+v", settings, testCase.want)
+			if decoded != testCase.want {
+				test.Errorf("decoded to %+v, wanted %+v", decoded, testCase.want)
 			}
 		})
 	}
@@ -1687,8 +1683,8 @@ func TestConsistentTypeAssertionsDecoderReadsUpstreamsUnion(test *testing.T) {
 func TestConsistentTypeAssertionsFallsBackWhenHandedNilOptions(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(test, ConsistentTypeAssertions,
-		consistentTypeAssertionsFile, "declare const foo: any;\nconst x = <Foo>foo;\n", nil)
+	result := rule_testing.RunTyped(test, ConsistentTypeAssertions,
+		consistentTypeAssertionsFile, "declare const foo: any;\nconst x = <Foo>foo;\n")
 	rule_testing.ExpectFindings(test, result, "as")
 }
 

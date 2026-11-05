@@ -54,9 +54,9 @@ func messageOutsideInternal() rule.Message {
 // That original compared two paths both made relative to cwd, so it agreed with this one whenever
 // the linter ran from the repository root and silently stopped enforcing anything when it did not.
 // Resolving against the importing file has no such dependence.
-var BoundaryNoInternalImport = rule.Rule{
+var BoundaryNoInternalImport = rule.Rule[rule.NoOptions]{
 	Name: "nexus/boundary-no-internal-import",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

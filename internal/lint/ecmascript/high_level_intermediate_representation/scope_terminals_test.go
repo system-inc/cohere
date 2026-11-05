@@ -638,10 +638,10 @@ func TestScopeTerminalsRecoverEveryScopeFromTheGraph(test *testing.T) {
 			continue
 		}
 		fileName := "/corpus/" + filepath.Base(path)
-		probe := rule.Rule{
+		probe := rule.Rule[rule.NoOptions]{
 			Name:             "scope-terminals-corpus",
 			NeedsTypeChecker: true,
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						if ruleContext.TypeChecker == nil {

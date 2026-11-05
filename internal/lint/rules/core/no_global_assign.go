@@ -103,7 +103,7 @@ type NoGlobalAssignOptions struct {
 //
 // No fix. The repair is a new binding, which means choosing a name and deciding which later uses of
 // the old one meant the global.
-var NoGlobalAssign = rule.Rule{
+var NoGlobalAssign = rule.Rule[NoGlobalAssignOptions]{
 	Name: "no-global-assign",
 
 	// See the doc above: `Object = 1` and `function f(Object) { Object = 1; }` are textually
@@ -111,12 +111,12 @@ var NoGlobalAssign = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoGlobalAssignOptions]) rule.Listeners {
 		// An absent or malformed option block means no exceptions, which is upstream's default
 		// (`defaultOptions: [{ exceptions: [] }]`). A config typo must not silently exempt
 		// everything, so the failure direction here is "report as usual".
 		exempt := map[string]bool{}
-		if decoded, ok := rule.OptionsAs[NoGlobalAssignOptions](options); ok {
+		if decoded, ok := options.Read(); ok {
 			for _, name := range decoded.Exceptions {
 				exempt[name] = true
 			}

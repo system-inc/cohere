@@ -77,7 +77,7 @@ var messageNoScriptComponentInHead = rule.Message{
 //
 // No fix. The repair moves an element out of a subtree and has to choose where it lands, which
 // changes what the page does.
-var NoScriptComponentInHead = rule.Rule{
+var NoScriptComponentInHead = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-script-component-in-head` and matching strips
 	// the namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files while
 	// its own tests pass.
@@ -88,7 +88,7 @@ var NoScriptComponentInHead = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The clause each `next/head` default import declares. A file can write more than one such
 		// import, so this is a set rather than a single anchor.
 		headImportClauses := map[*ast.Node]bool{}

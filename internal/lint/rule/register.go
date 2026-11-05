@@ -1,49 +1,108 @@
 package rule
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
 )
 
-// Registration is one rule plus everything the tool needs to know about it.
-//
-// A rule's options decoder lives here rather than on Rule itself, because Rule is the type a rule
-// author writes and a decoder is the config layer's business. Keeping them in one Registration
-// means a rule is declared in exactly one place while neither package has to import the other: the
-// rule package builds the decoder with a generic helper and hands it over as an opaque function.
-type Registration struct {
-	Rule Rule
-	// Decode turns this rule's single option element into its own options struct, or nil if the
-	// rule takes no options, which is the common case. A config giving a rule with Decode more than
-	// one option element is refused by name, never truncated.
-	Decode func(raw []byte) (any, error)
-	// DecodeOptionList is Decode for a rule whose upstream schema takes more than one option
-	// element: `eqeqeq`'s `["error", "always", {"null": "ignore"}]`, or `consistent-this`'s
-	// variadic `["error", "self", "vm"]`. It is handed every element after the severity as one JSON
-	// array, which is upstream's `context.options`, or nil for a bare severity. Set at most one of
-	// Decode and DecodeOptionList; which one is set is how the config layer learns the rule's arity.
-	DecodeOptionList func(list []byte) (any, error)
-	// DecodeAt is Decode for a rule whose options name a place on disk, so decoding needs to know
-	// where the config was written and which project is being checked. It takes one option element,
-	// as Decode does, and is handed nil for a bare severity so it can fill in a default from the base.
-	// Set at most one of Decode, DecodeOptionList and DecodeAt.
-	//
-	// It exists because a path in a committed config is read on every machine and in every worktree.
-	// An absolute one is right on exactly one of them, and a rule whose root matches none of the files
-	// it is handed declines them all, which is the inert-rule defect with a path in front of it.
-	DecodeAt func(raw []byte, base OptionsBase) (any, error)
-	// RequiresOptions is whether the rule declines every file without its options.
-	//
-	// The load-bearing field, and the whole lesson of the inert-rule defect.
-	// `boundary-no-project-import` was enabled and inert for months, declining every file because
-	// its configured directory was empty, which is correct behavior for a misconfigured guard and
-	// indistinguishable from a rule with nothing to report. Marking it required turns that silence
-	// into a failure.
+// EntryOf is a registration as Register would hold it, for a test that hands rules to the walk without
+// registering them in the process-wide catalog.
+func EntryOf[Options any](registration Registration[Options]) (Entry, error) {
+	return registration.entry()
+}
+
+// runPackage is the import path of the package whose code run is, read off the function itself, so the docs
+// tell a bare house rule from an ESLint core port by where its Run lives rather than by a list. It is read from
+// the author's Run before Bind wraps it, since the wrapper lives in this package.
+func runPackage[Options any](run func(ruleContext Context, options Given[Options]) Listeners) string {
+	function := runtime.FuncForPC(reflect.ValueOf(run).Pointer())
+	if function == nil {
+		return ""
+	}
+	// A function's name is its import path, then a dot, then the symbol and any closure suffixes. The
+	// path's last segment may hold dots of its own only in a domain, which comes before the last slash.
+	name := function.Name()
+	slash := strings.LastIndex(name, "/")
+	dot := strings.Index(name[slash+1:], ".")
+	if dot < 0 {
+		return name
+	}
+	return name[:slash+1+dot]
+}
+
+// Bind is the rule with its options decided: Run and ProgramFingerprint closed over options, so the walk hands
+// a file to Bound.Run and never sees the options' type. The framework binds through an Entry; a test harness
+// holding the Rule itself binds it here.
+func Bind[Options any](subject Rule[Options], options Given[Options]) Bound {
+	bound := Bound{
+		Traits: traitsOf(subject),
+		Run: func(ruleContext Context) Listeners {
+			return subject.Run(ruleContext, options)
+		},
+	}
+	if subject.ProgramFingerprint != nil {
+		bound.ProgramFingerprint = func(program Program) [sha256.Size]byte {
+			return subject.ProgramFingerprint(program, options)
+		}
+	}
+	return bound
+}
+
+// traitsOf copies what a rule declares about itself into the Traits the framework reads.
+func traitsOf[Options any](subject Rule[Options]) Traits {
+	return Traits{
+		Name:                    subject.Name,
+		NoListener:              subject.NoListener,
+		NeedsTypeChecker:        subject.NeedsTypeChecker,
+		ProgramReads:            subject.ProgramReads,
+		TypeReach:               subject.TypeReach,
+		ResolvesReactValueTypes: subject.ResolvesReactValueTypes,
+		HasProgramFingerprint:   subject.ProgramFingerprint != nil,
+	}
+}
+
+// Registrant is a Registration of any options type, which is what Register takes, so one call registers rules
+// whose options differ. Only Registration implements it.
+type Registrant interface {
+	entry() (Entry, error)
+}
+
+// Entry is a registered rule as the framework holds it, whatever its options type.
+type Entry struct {
+	Traits
+	Arity           OptionArity
 	RequiresOptions bool
+
+	// Unconfigured is the rule as a bare severity runs it, handed no options.
+	Unconfigured Bound
+
+	// RunPackage is the import path of the package the rule's own Run is written in, which the docs read to
+	// tell a bare house rule from an ESLint core port.
+	RunPackage string
+
+	// Bind decodes the rule's options and returns the rule ready to run with them. raw is the one option
+	// element for OptionArityOne and OptionArityAt (nil for a bare severity under OptionArityAt, so the
+	// decoder can fill a default from base), and the JSON array of every element for OptionArityList. base is
+	// read only under OptionArityAt. Nil under OptionArityNone.
+	Bind func(raw []byte, base OptionsBase) (Bound, error)
+}
+
+// Bound is a rule with its options decided, ready to run on files.
+type Bound struct {
+	Traits
+
+	// Run is the rule's Run with its options already handed in.
+	Run func(ruleContext Context) Listeners
+
+	// ProgramFingerprint is the rule's ProgramFingerprint with its options already handed in, and nil when the
+	// rule declares none (Traits.HasProgramFingerprint is false).
+	ProgramFingerprint func(program Program) [sha256.Size]byte
 }
 
 // OptionsBase is what a decoder registered with DecodeAt knows beyond its own option element: where
@@ -102,8 +161,8 @@ func RegisteredSettings() []SettingsRegistration {
 // OptionKeys returns every key an options struct declares, the way UnmarshalOptions reads them: the
 // `json` tag's name, or the Go field name for an untagged field, with an embedded struct's keys
 // promoted. Sorted.
-func OptionKeys(target any) []string {
-	targetType := reflect.TypeOf(target)
+func OptionKeys[Options any]() []string {
+	targetType := reflect.TypeFor[Options]()
 	for targetType != nil && targetType.Kind() == reflect.Pointer {
 		targetType = targetType.Elem()
 	}
@@ -125,7 +184,7 @@ func OptionKeys(target any) []string {
 // quietly. The cost is paid once per rule at startup.
 var (
 	registeredMutex sync.Mutex
-	registered      = map[string]Registration{}
+	registered      = map[string]Entry{}
 )
 
 // Register adds a rule to the catalog, and panics if the name is already taken.
@@ -141,46 +200,32 @@ var (
 // unreachable while its tests kept passing, which is the same shape as the inert-rule defect this
 // tool exists to catch. Failing at startup makes it a crash in the first second rather than a gap
 // nobody measures.
-func Register(registrations ...Registration) {
+func Register(registrations ...Registrant) {
 	registeredMutex.Lock()
 	defer registeredMutex.Unlock()
 
 	for _, registration := range registrations {
-		name := registration.Rule.Name
-		if name == "" {
+		entry, entryError := registration.entry()
+		if entryError != nil {
+			// Invariant: a registration sets at most one decoder, and Register runs from package init, so a
+			// contradiction stops the program the moment it starts.
+			panic("rule.Register: " + entryError.Error())
+		}
+		if entry.Name == "" {
 			// Invariant: every rule names itself, and Register runs from package init, so a nameless rule
 			// stops the program the moment it starts, as the comment above explains.
 			panic("rule.Register: a rule was registered with an empty name, so the config could never address it")
 		}
-		decoders := 0
-		for _, set := range []bool{
-			registration.Decode != nil,
-			registration.DecodeOptionList != nil,
-			registration.DecodeAt != nil,
-		} {
-			if set {
-				decoders++
-			}
-		}
-		if decoders > 1 {
-			// Invariant: a registration sets at most one decoder, and Register runs from package init, so a
-			// contradiction stops the program the moment it starts.
-			panic(fmt.Sprintf(
-				"rule.Register: %q sets more than one of Decode, DecodeOptionList and DecodeAt; the "+
-					"config layer reads which one is set as the rule's option arity, so two is a contradiction",
-				name,
-			))
-		}
-		if existing, taken := registered[name]; taken {
+		if _, taken := registered[entry.Name]; taken {
 			// Invariant: rule names are unique, and Register runs from package init, so a duplicate stops the
 			// program the moment it starts, as the comment above explains.
 			panic(fmt.Sprintf(
-				"rule.Register: two rules answer to %q (%T and %T); the config addresses rules by "+
-					"name, so one of them would be permanently unreachable while its tests passed",
-				name, existing.Rule.Run, registration.Rule.Run,
+				"rule.Register: two rules answer to %q; the config addresses rules by name, so one of them "+
+					"would be permanently unreachable while its tests passed",
+				entry.Name,
 			))
 		}
-		registered[name] = registration
+		registered[entry.Name] = entry
 	}
 }
 
@@ -190,7 +235,7 @@ func Register(registrations ...Registration) {
 // same sequence, which is what makes a diff between them meaningful. Sorting here rather than
 // relying on registration order also removes the last thing that depended on `init` ordering across
 // packages, which Go defines but which no reader should have to reason about.
-func Registered() []Registration {
+func Registered() []Entry {
 	registeredMutex.Lock()
 	defer registeredMutex.Unlock()
 
@@ -200,7 +245,7 @@ func Registered() []Registration {
 	}
 	sort.Strings(names)
 
-	ordered := make([]Registration, 0, len(names))
+	ordered := make([]Entry, 0, len(names))
 	for _, name := range names {
 		ordered = append(ordered, registered[name])
 	}
@@ -246,8 +291,8 @@ func OptionElements(list []byte, maximum int) ([]json.RawMessage, error) {
 // Nothing here is config-specific. It decodes JSON into a struct, which is what the rule declared
 // and what only the rule's own package knows the type of. The config layer's job is deciding
 // whether a rule that got no options may still run, and that judgment stays there.
-func DecodeOptionsInto[Options any]() func(raw []byte) (any, error) {
-	return func(raw []byte) (any, error) {
+func DecodeOptionsInto[Options any]() func(raw []byte) (Options, error) {
+	return func(raw []byte) (Options, error) {
 		var decoded Options
 		if len(raw) == 0 {
 			return decoded, fmt.Errorf("no options were configured")

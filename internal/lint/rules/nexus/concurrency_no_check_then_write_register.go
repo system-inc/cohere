@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // written, and an option widening the writes or the path shapes it accepts would reach the guesses
 // its doc comment declines on purpose.
 func init() {
-	rule.Register(rule.Registration{Rule: ConcurrencyNoCheckThenWrite})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: ConcurrencyNoCheckThenWrite})
 }

@@ -451,7 +451,12 @@ func applyEveryParameterPropertySuggestion(test *testing.T, source string, resul
 	edited := source
 	for _, edit := range edits {
 		if edit.start < 0 || edit.end > len(edited) || edit.start > edit.end {
-			test.Fatalf("suggestion range [%d,%d) is outside the source of length %d", edit.start, edit.end, len(edited))
+			test.Fatalf(
+				"suggestion range [%d,%d) is outside the source of length %d",
+				edit.start,
+				edit.end,
+				len(edited),
+			)
 		}
 		edited = edited[:edit.start] + edit.text + edited[edit.end:]
 	}

@@ -45,9 +45,9 @@ func messageNoInvalidateCacheInOnSuccess() rule.Message {
 //
 // No fix. Moving an invalidation into the option means deciding which keys belong there and whether
 // anything else in the handler depended on running at that moment.
-var NetworkNoInvalidateCacheInOnSuccess = rule.Rule{
+var NetworkNoInvalidateCacheInOnSuccess = rule.Rule[rule.NoOptions]{
 	Name: "structure/network-no-invalidate-cache-in-on-success",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		reportInvalidations := func(body *ast.Node) {
 			if body == nil {
 				return

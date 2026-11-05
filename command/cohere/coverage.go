@@ -126,12 +126,6 @@ type ruleCoverageEntry struct {
 	OffWithoutReason bool
 }
 
-// coverageCrash is one file a rule could not finish, in either engine's terms.
-type coverageCrash struct {
-	File  string
-	Cause string
-}
-
 // coverageRuleCrash is one rule that panicked on one file while the file's other rules finished.
 type coverageRuleCrash struct {
 	Rule  string
@@ -167,7 +161,9 @@ type coverageSummary struct {
 	// PartialFacts are facts about rules the record counts and does not name, said once by name under
 	// `--coverage`: a Swift rule counted as quiet that the record also names as off for some files.
 	PartialFacts []string
-	Crashes      []coverageCrash
+	// Crashes is each file a rule could not finish, as the run names it in every view, so the coverage notes
+	// and the human view say the same words of it.
+	Crashes      []runCrash
 	RuleCrashes  []coverageRuleCrash
 	FilesIgnored int
 	Suppression  *suppressionCoverage
@@ -212,7 +208,7 @@ var noListenerReasons = map[rule.NoListenerKind]string{
 // nothing is described by why it was offered nothing, and the config's two reasons are told apart
 // there: a rule turned off and a rule nobody configured are different decisions.
 func classifyTypeScriptCoverage(
-	rules []rule.Rule,
+	rules []rule.Entry,
 	coverage program.Coverage,
 	lintConfiguration *configuration.Config,
 ) coverageSummary {
@@ -299,7 +295,7 @@ func classifyTypeScriptCoverage(
 	// A crashed file produced no findings, and a run that lost a file to a panic must not read as a run
 	// that found nothing in it. Named rather than counted, because the panic message is the defect.
 	for _, crash := range coverage.FilesCrashed {
-		summary.Crashes = append(summary.Crashes, coverageCrash{File: crash.FileName, Cause: fmt.Sprint(crash.Cause)})
+		summary.Crashes = append(summary.Crashes, runCrash{Path: crash.FileName, Cause: fmt.Sprint(crash.Cause)})
 	}
 	for _, crash := range coverage.RulesCrashed {
 		summary.RuleCrashes = append(
@@ -633,10 +629,11 @@ func writeDeadSuppressions(out *bufio.Writer, sites []program.DeadSuppression) {
 	}
 }
 
-// writeCrashedNote names one file a rule could not finish. Printed in full in both modes and before the
-// details, because a file nothing checked needs action.
-func writeCrashedNote(out *bufio.Writer, fileName string, cause string) {
-	fmt.Fprintf(out, "  crashed: %s: %s\n", fileName, runCrash{Path: fileName, Cause: cause}.message())
+// writeCrashedNote names one file a rule could not finish, or one rule's verdict on it. Printed in full under
+// `--verbose` and before the details, because a file nothing checked needs action; the human view prints it
+// for a crash no other file shares (writeCrashGroups).
+func writeCrashedNote(out *bufio.Writer, crash runCrash) {
+	fmt.Fprintf(out, "  crashed: %s: %s\n", crash.Path, crash.message())
 }
 
 // namedGapsSentence is what "this run did not check everything" says when every phase ran and a file
@@ -658,7 +655,7 @@ const namedRuleGapsSentence = "the notes above name the rules that could not fin
 // and named in no rules block; they are held in `configuration.PluginDefaultRules` and resolved into
 // the config's rules on load, so a denominator taken from the block alone would understate by exactly
 // the rules nobody wrote down.
-func unportedConfiguredRules(rules []rule.Rule, lintConfiguration *configuration.Config) []string {
+func unportedConfiguredRules(rules []rule.Entry, lintConfiguration *configuration.Config) []string {
 	if lintConfiguration == nil {
 		return nil
 	}
@@ -701,7 +698,7 @@ func wantedConfiguredRules(lintConfiguration *configuration.Config) int {
 // within weeks: the figures drift with every rule that lands, while the reason they matter does not.
 // The live numbers belong in the line this prints, which is derived, and not in a comment. This is
 // the same omission the differential harness carried until `7b590f6`.
-func writeParityCoverage(out *bufio.Writer, rules []rule.Rule, lintConfiguration *configuration.Config) {
+func writeParityCoverage(out *bufio.Writer, rules []rule.Entry, lintConfiguration *configuration.Config) {
 	if lintConfiguration == nil {
 		return
 	}
@@ -718,7 +715,7 @@ func writeParityCoverage(out *bufio.Writer, rules []rule.Rule, lintConfiguration
 // and every category a reader must act on can be tested to print by default.
 type lintReport struct {
 	Result     program.Result
-	Rules      []rule.Rule
+	Rules      []rule.Entry
 	LintConfig *configuration.Config
 	// WalkCost says how the walk was paid for: `in 5.64s`, or which phase walked it.
 	WalkCost string
@@ -737,9 +734,11 @@ func writeLintReport(out *bufio.Writer, report lintReport) {
 		printRuleDiagnostic(out, diagnostic, report.LintConfig)
 	}
 	coverage := report.Result.Coverage
-	for _, crash := range crashesFrom(coverage) {
+	crashes := crashesFrom(coverage)
+	for _, crash := range crashes {
 		printCrash(out, crash)
 	}
+	printCrashGroups(out, crashes)
 	// The account below is `--verbose`'s; the footer carries what a reader needs of it in every view.
 	account := accountOutput(out)
 	// The dash is escaped, not changed: internal/differential finds this line by it, and swift/Contract.md
@@ -782,6 +781,7 @@ func writeLintReport(out *bufio.Writer, report lintReport) {
 	activeSummary.WarningFindings += lintWarningCount(report.Result.Diagnostics, report.LintConfig)
 	activeSummary.Gaps.CrashedFiles = len(summary.Crashes)
 	activeSummary.Gaps.RuleCrashes = len(summary.RuleCrashes)
+	activeSummary.Gaps.Crashes = crashes
 	activeSummary.Skips = rulesSkippingEveryFile(summary.Notes, coverage.RulesOffered)
 }
 
@@ -892,15 +892,10 @@ func (summary coverageSummary) offWithoutReasonCount() int {
 // full, then the rules that need action by default or every rule once with details.
 func writeCoverageNotes(out *bufio.Writer, summary coverageSummary, details bool) {
 	for _, crash := range summary.Crashes {
-		writeCrashedNote(out, crash.File, crash.Cause)
+		writeCrashedNote(out, crash)
 	}
 	for _, crash := range summary.RuleCrashes {
-		fmt.Fprintf(
-			out,
-			"  crashed: %s: %s\n",
-			crash.File,
-			runCrash{Path: crash.File, Rule: crash.Rule, Cause: crash.Cause}.message(),
-		)
+		writeCrashedNote(out, runCrash{Path: crash.File, Rule: crash.Rule, Cause: crash.Cause})
 	}
 	if details {
 		writeCoverageDetails(out, summary)

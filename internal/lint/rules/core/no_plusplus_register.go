@@ -8,5 +8,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // shared edit. The decoder is hand-written so a bare `"error"` configuration resolves to the
 // documented default; see DecodeNoPlusplusOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: NoPlusplus, Decode: DecodeNoPlusplusOptions})
+	rule.Register(rule.Registration[NoPlusplusOptions]{Rule: NoPlusplus, Decode: DecodeNoPlusplusOptions})
 }

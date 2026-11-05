@@ -130,8 +130,8 @@ func TestNoImplicitCoercionFixKeepsNarrowing(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoImplicitCoercion, noImplicitCoercionFile,
-				narrowingDeclarations+testCase.source, nil)
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				narrowingDeclarations+testCase.source)
 			rule_testing.ExpectFindings(test, result, "implicitCoercion")
 			rule_testing.ExpectFixedSource(test, result, narrowingDeclarations+testCase.want)
 			if errors := compileErrors(test, narrowingDeclarations+testCase.want); len(errors) > 0 {
@@ -158,8 +158,8 @@ func TestNoImplicitCoercionFixKeepsNarrowing(test *testing.T) {
 	} {
 		test.Run("declines: "+testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoImplicitCoercion, noImplicitCoercionFile,
-				narrowingDeclarations+testCase.source, nil)
+			result := rule_testing.RunTyped(test, NoImplicitCoercion, noImplicitCoercionFile,
+				narrowingDeclarations+testCase.source)
 			rule_testing.ExpectFindings(test, result, "implicitCoercion")
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) > 0 {

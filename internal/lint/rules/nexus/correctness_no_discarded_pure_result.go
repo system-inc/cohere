@@ -78,7 +78,7 @@ func correctnessNoDiscardedPureResultMessage() rule.Message {
 //
 // Whether the result should be assigned back, kept in a new binding, or the statement deleted depends
 // on what the author meant, and assigning back is not even possible for a `const`.
-var CorrectnessNoDiscardedPureResult = rule.Rule{
+var CorrectnessNoDiscardedPureResult = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-discarded-pure-result",
 
 	// The method is identified by its declaration in the default library, and an argument's type
@@ -91,7 +91,7 @@ var CorrectnessNoDiscardedPureResult = rule.Rule{
 	// The rule reads types and the default library's declarations, never an imported body.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

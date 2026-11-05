@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
 type guardOptions struct {
@@ -15,6 +17,35 @@ type tuningOptions struct {
 	MaximumLineCount int `json:"maximumLineCount"`
 }
 
+// configuredName and unconfiguredName mark which Bound Decode returned: the decoder's, or the rule's own
+// Unconfigured.
+const (
+	configuredName   = "configured"
+	unconfiguredName = "unconfigured"
+)
+
+// recordingDecoder is a Decoder the way the registry builds one for a rule taking Options: the rule
+// package's own decoder, its result bound into a rule.Bound. It keeps each decoded value, since a Bound
+// closes over its options and a test has no other way to read what the rule was handed, and the second
+// return reads them back. The Bound it returns is named configuredName, so a test can tell it from the
+// rule's Unconfigured.
+func recordingDecoder[Options any]() (Decoder, func() []Options) {
+	decode := rule.DecodeOptionsInto[Options]()
+	var received []Options
+	record := func(raw json.RawMessage) (rule.Bound, error) {
+		decoded, decodeError := decode(raw)
+		if decodeError != nil {
+			return rule.Bound{}, decodeError
+		}
+		received = append(received, decoded)
+		return rule.Bound{Traits: rule.Traits{Name: configuredName}}, nil
+	}
+	return record, func() []Options { return received }
+}
+
+// unconfigured is a rule's Unconfigured as these tests declare it, marked so Decode returning it shows.
+var unconfigured = rule.Bound{Traits: rule.Traits{Name: unconfiguredName}}
+
 // TestRequiredOptionsFailLoudlyWhenAbsent is the whole point of this file.
 //
 // boundary-no-project-import was enabled and inert for months under the gate cohere replaces: it
@@ -23,8 +54,9 @@ type tuningOptions struct {
 // liveness harness reporting `fixtures=54 live=53 dead=1` was the only thing that ever noticed.
 func TestRequiredOptionsFailLoudlyWhenAbsent(test *testing.T) {
 	test.Parallel()
+	decoder, received := recordingDecoder[guardOptions]()
 	registry := OptionsRegistry{
-		"guard": {Decode: DecodeInto[guardOptions](), Required: true},
+		"guard": {Decode: decoder, Required: true, Unconfigured: unconfigured},
 	}
 
 	if _, decodeError := registry.Decode("guard", nil); decodeError == nil {
@@ -33,22 +65,19 @@ func TestRequiredOptionsFailLoudlyWhenAbsent(test *testing.T) {
 		)
 	}
 
-	decoded, decodeError := registry.Decode(
+	bound, decodeError := registry.Decode(
 		"guard",
 		[]json.RawMessage{json.RawMessage(`{"libraryDirectory":"/libraries/structure/"}`)},
 	)
 	if decodeError != nil {
 		test.Fatalf("valid options failed to decode: %v", decodeError)
 	}
-	typed, isTyped := decoded.(guardOptions)
-	if !isTyped {
-		test.Fatalf(
-			"options decoded to %T rather than the rule's own type, which fails its type assertion and makes it decline every file",
-			decoded,
-		)
+	if bound.Name != configuredName {
+		test.Fatalf("the rule was bound as %q rather than to its decoded options, so it declines every file",
+			bound.Name)
 	}
-	if typed.LibraryDirectory != "/libraries/structure/" {
-		test.Fatalf("the decoded value is wrong: %+v", typed)
+	if len(received()) != 1 || received()[0].LibraryDirectory != "/libraries/structure/" {
+		test.Fatalf("the decoded value is wrong: %+v", received())
 	}
 }
 
@@ -56,28 +85,34 @@ func TestRequiredOptionsFailLoudlyWhenAbsent(test *testing.T) {
 // must run on its own defaults rather than fail, or every unconfigured tunable becomes a hard error.
 func TestTuningOptionsFallBackToDefaults(test *testing.T) {
 	test.Parallel()
+	decoder, _ := recordingDecoder[tuningOptions]()
 	registry := OptionsRegistry{
-		"tunable": {Decode: DecodeInto[tuningOptions]()},
+		"tunable": {Decode: decoder, Unconfigured: unconfigured},
 	}
 
-	decoded, decodeError := registry.Decode("tunable", nil)
+	bound, decodeError := registry.Decode("tunable", nil)
 	if decodeError != nil {
 		test.Fatalf("an absent optional option was treated as fatal: %v", decodeError)
 	}
-	if decoded != nil {
-		test.Fatalf("expected nil so the rule uses its own defaults, got %+v", decoded)
+	if bound.Name != unconfiguredName {
+		test.Fatalf("expected the rule's Unconfigured so it uses its own defaults, got %q", bound.Name)
 	}
 }
 
-// TestARuleWithNoDecoderGetsNil keeps the common case cheap: most rules take no options at all.
-func TestARuleWithNoDecoderGetsNil(test *testing.T) {
+// TestARuleWithNoDecoderGetsUnconfigured keeps the common case cheap: most rules take no options at all.
+func TestARuleWithNoDecoderGetsUnconfigured(test *testing.T) {
 	test.Parallel()
-	decoded, decodeError := OptionsRegistry{}.Decode("plain", nil)
+	bound, decodeError := OptionsRegistry{"plain": {Unconfigured: unconfigured}}.Decode("plain", nil)
 	if decodeError != nil {
 		test.Fatalf("a rule with no decoder errored on a bare severity: %v", decodeError)
 	}
-	if decoded != nil {
-		test.Fatalf("expected nil for a rule that takes no options, got %+v", decoded)
+	if bound.Name != unconfiguredName {
+		test.Fatalf("expected the rule's Unconfigured for a rule that takes no options, got %q", bound.Name)
+	}
+
+	// A name nothing registered gets no error either, and the zero Bound, since there is no rule to bind.
+	if _, decodeError := (OptionsRegistry{}).Decode("plain", nil); decodeError != nil {
+		test.Fatalf("an unregistered rule errored on a bare severity: %v", decodeError)
 	}
 }
 
@@ -107,7 +142,8 @@ func TestARuleWithNoDecoderRefusesAnOption(test *testing.T) {
  */
 func TestASecondElementOnASingleElementRuleIsRefused(test *testing.T) {
 	test.Parallel()
-	registry := OptionsRegistry{"tunable": {Decode: DecodeInto[tuningOptions]()}}
+	decoder, received := recordingDecoder[tuningOptions]()
+	registry := OptionsRegistry{"tunable": {Decode: decoder, Unconfigured: unconfigured}}
 
 	_, decodeError := registry.Decode("tunable", []json.RawMessage{
 		json.RawMessage(`{"maximumLineCount": 3}`),
@@ -124,12 +160,14 @@ func TestASecondElementOnASingleElementRuleIsRefused(test *testing.T) {
 
 	// The control: the same rule with only its first element decodes, so the refusal above is about
 	// the count and not about the first element.
-	decoded, decodeError := registry.Decode("tunable", []json.RawMessage{json.RawMessage(`{"maximumLineCount": 3}`)})
-	if decodeError != nil {
+	if _, decodeError = registry.Decode(
+		"tunable",
+		[]json.RawMessage{json.RawMessage(`{"maximumLineCount": 3}`)},
+	); decodeError != nil {
 		test.Fatalf("one element on a one-element rule was refused: %v", decodeError)
 	}
-	if decoded.(tuningOptions).MaximumLineCount != 3 {
-		test.Fatalf("the single element did not reach the decoder: %+v", decoded)
+	if len(received()) != 1 || received()[0].MaximumLineCount != 3 {
+		test.Fatalf("the single element did not reach the decoder: %+v", received())
 	}
 }
 
@@ -139,9 +177,9 @@ func TestASecondElementOnASingleElementRuleIsRefused(test *testing.T) {
 func TestAListRuleReceivesEveryElement(test *testing.T) {
 	test.Parallel()
 	var received []string
-	registry := OptionsRegistry{"listed": {DecodeList: func(raw json.RawMessage) (any, error) {
+	registry := OptionsRegistry{"listed": {DecodeList: func(raw json.RawMessage) (rule.Bound, error) {
 		received = append(received, string(raw))
-		return string(raw), nil
+		return rule.Bound{Traits: rule.Traits{Name: configuredName}}, nil
 	}}}
 
 	if _, decodeError := registry.Decode("listed", []json.RawMessage{
@@ -171,7 +209,7 @@ func TestAListRuleReceivesEveryElement(test *testing.T) {
 // decoders below accept anything, which is what proves the refusal is the config layer's.
 func TestANullIsRefusedBeforeAnyDecoderSeesIt(test *testing.T) {
 	test.Parallel()
-	acceptAll := func(raw json.RawMessage) (any, error) { return string(raw), nil }
+	acceptAll := func(json.RawMessage) (rule.Bound, error) { return rule.Bound{}, nil }
 	registry := OptionsRegistry{"single": {Decode: acceptAll}, "listed": {DecodeList: acceptAll}}
 
 	for _, testCase := range []struct {
@@ -182,6 +220,8 @@ func TestANullIsRefusedBeforeAnyDecoderSeesIt(test *testing.T) {
 		{"single", []string{`null`}, "element 1 is null"},
 		{"single", []string{`{"b": 1, "a": {"c": [0, null]}}`}, "element 1 at a.c.1 is null"},
 		{"listed", []string{`"always"`, `{"null": null}`}, "element 2 at null is null"},
+		// A number past float64's range once failed the untyped decode and let the null beside it through.
+		{"single", []string{`{"a": 1e400, "b": null}`}, "element 1 at b is null"},
 	} {
 		elements := make([]json.RawMessage, 0, len(testCase.elements))
 		for _, element := range testCase.elements {
@@ -218,7 +258,8 @@ func TestANullIsRefusedBeforeAnyDecoderSeesIt(test *testing.T) {
 // JSON did not parse.
 func TestMalformedOptionsAreAnError(test *testing.T) {
 	test.Parallel()
-	registry := OptionsRegistry{"guard": {Decode: DecodeInto[guardOptions](), Required: true}}
+	decoder, _ := recordingDecoder[guardOptions]()
+	registry := OptionsRegistry{"guard": {Decode: decoder, Required: true}}
 
 	if _, decodeError := registry.Decode(
 		"guard",

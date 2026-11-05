@@ -125,10 +125,10 @@ var noArrayIndexKeyIteratorPositions = map[string]int{
 // than the call, which is upstream passing `node.arguments[0]` at that one site and the whole node
 // at the other four. A message-id fixture cannot see the difference and the corpus does not assert
 // it, so the span cases below do.
-var NoArrayIndexKey = rule.Rule{
+var NoArrayIndexKey = rule.Rule[rule.NoOptions]{
 	Name:             "react/no-array-index-key",
 	NeedsTypeChecker: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

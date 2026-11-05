@@ -7,7 +7,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // A file of its own rather than a line in the package's shared `register.go`, which is the file
 // every porter used to conflict on.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoLabelsOptions]{
 		Rule:   NoLabels,
 		Decode: rule.DecodeOptionsInto[NoLabelsOptions](),
 	})

@@ -16,7 +16,7 @@ import (
 // `directives.RegisterSubject`, and `coversAFindingAboutADirective` in the suppression package for
 // the measurements.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[RequireDescriptionOptions]{
 		Rule:   RequireDescription,
 		Decode: DecodeRequireDescriptionOptions,
 	})

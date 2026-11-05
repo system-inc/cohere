@@ -409,15 +409,18 @@ func (analysis *PathAnalysis[E]) findFinalPathDominators(graph *Graph[E]) {
 	}
 	immediate[0] = 0
 	intersect := func(left int, right int) int {
-		for left != right {
-			for rpoPosition[left] > rpoPosition[right] {
-				left = immediate[left]
+		// Each finger climbs the dominator tree from its own block until the two meet.
+		leftFinger := left
+		rightFinger := right
+		for leftFinger != rightFinger {
+			for rpoPosition[leftFinger] > rpoPosition[rightFinger] {
+				leftFinger = immediate[leftFinger]
 			}
-			for rpoPosition[right] > rpoPosition[left] {
-				right = immediate[right]
+			for rpoPosition[rightFinger] > rpoPosition[leftFinger] {
+				rightFinger = immediate[rightFinger]
 			}
 		}
-		return left
+		return leftFinger
 	}
 
 	changed := true

@@ -6,19 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
-
-// Resolve by registration so the identical fixtures run on the old engine.
-func voidWideningSubject() rule.Rule {
-	for _, registration := range rule.Registered() {
-		if registration.Rule.Name == "adamic/no-void-widening" {
-			return registration.Rule
-		}
-	}
-	return rule.Rule{Name: "adamic/no-void-widening", Run: func(rule.Context, any) rule.Listeners { return nil }}
-}
 
 func TestNoVoidWidening(test *testing.T) {
 	test.Parallel()
@@ -40,18 +29,20 @@ func TestNoVoidWidening(test *testing.T) {
 			if count := typeErrorCount(test, source); count != 0 {
 				test.Fatalf("type diagnostics: %d, want 0", count)
 			}
-			result := runAdamic(test, voidWideningSubject(), source)
+			result := runAdamic(test, NoVoidWidening, source)
 			if strings.HasPrefix(filepath.Base(file), "legal-") {
 				rule_testing.ExpectClean(test, result)
 				// Plant the same runtime hole in every quiet fixture. Its assertion must detect it.
-				source += "\n{ const make: () => void = () => 'x'; const wider: () => number | void = make; const next = wider(); if (next) console.log(next.toFixed(1)); }\n"
-				rule_testing.ExpectFindings(test, runAdamic(test, voidWideningSubject(), source), "voidWidening")
+				source += "\n{ const make: () => void = () => 'x'; const wider: () => number | void = make; " +
+					"const next = wider(); if (next) console.log(next.toFixed(1)); }\n"
+				rule_testing.ExpectFindings(test, runAdamic(test, NoVoidWidening, source), "voidWidening")
 				return
 			}
 			rule_testing.ExpectFindings(test, result, "voidWidening")
 			span := "make"
 			switch filepath.Base(file) {
-			case "array.ts", "object.ts", "tuple.ts", "map.ts", "promise-any.ts", "promise-union.ts", "mutable-promise.ts", "promise-union-origin.ts":
+			case "array.ts", "object.ts", "tuple.ts", "map.ts", "promise-any.ts", "promise-union.ts",
+				"mutable-promise.ts", "promise-union-origin.ts":
 				span = "narrow"
 			case "promise-body-call.ts":
 				span = "make()"

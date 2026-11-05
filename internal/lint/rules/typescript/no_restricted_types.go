@@ -86,11 +86,11 @@ var noRestrictedTypesKeywordKinds = map[string]ast.Kind{
 //
 // Every listener is registered only when the configuration bans something it could match, so a
 // project banning nothing registers nothing and the rule costs a map lookup per file.
-var NoRestrictedTypes = rule.Rule{
+var NoRestrictedTypes = rule.Rule[NoRestrictedTypesOptions]{
 	Name: "@typescript-eslint/no-restricted-types",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoRestrictedTypesOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoRestrictedTypesOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok || len(settings.Types) == 0 {
 			// Configured nothing, so there is nothing to enforce. Upstream defaults `types` to an
 			// empty object and reaches the same silence one lookup later.
@@ -309,7 +309,7 @@ type noRestrictedTypesRawOptions struct {
 // an object, and a generic decode into any single Go type discards two of the three. It also has to
 // distinguish three falsy-looking spellings that mean different things: `true` bans with no message,
 // `false` and `null` do not ban at all, and an object with no `message` bans with no message.
-func DecodeNoRestrictedTypesOptions(raw []byte) (any, error) {
+func DecodeNoRestrictedTypesOptions(raw []byte) (NoRestrictedTypesOptions, error) {
 	settings := DefaultNoRestrictedTypesOptions()
 	if len(raw) == 0 {
 		return settings, nil
@@ -317,13 +317,13 @@ func DecodeNoRestrictedTypesOptions(raw []byte) (any, error) {
 
 	var wire noRestrictedTypesRawOptions
 	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
-		return nil, unmarshalOptionsError
+		return NoRestrictedTypesOptions{}, unmarshalOptionsError
 	}
 
 	for spelling, entry := range wire.Types {
 		ban, include, decodeNoRestrictedTypesBanError := decodeNoRestrictedTypesBan(entry)
 		if decodeNoRestrictedTypesBanError != nil {
-			return nil, fmt.Errorf("types[%q]: %w", spelling, decodeNoRestrictedTypesBanError)
+			return NoRestrictedTypesOptions{}, fmt.Errorf("types[%q]: %w", spelling, decodeNoRestrictedTypesBanError)
 		}
 		if !include {
 			continue

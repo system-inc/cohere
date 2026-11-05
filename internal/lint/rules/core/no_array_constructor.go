@@ -129,7 +129,7 @@ var messageUseAnArrayLiteral = rule.Message{
 // both as well and carries the pairs commented out under `TODO: Preserve comments around callee`.
 // Acceptable only because this is a suggestion a human reads before accepting; it would be a defect
 // in a fix.
-var NoArrayConstructor = rule.Rule{
+var NoArrayConstructor = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-array-constructor",
 
 	// See the doc above: a local binding named `Array` makes the reported shapes correct code, and
@@ -137,7 +137,7 @@ var NoArrayConstructor = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node) {
 			callee, arguments, typeArguments, isOptionalCall := arrayConstructorCallParts(node)
 

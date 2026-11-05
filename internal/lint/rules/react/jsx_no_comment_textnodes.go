@@ -102,11 +102,11 @@ var messageJsxNoCommentTextnodes = rule.Message{
 //
 // Trivia skipping is not wanted here in any case: upstream's span deliberately includes the
 // surrounding whitespace, so the node's own range is the correct answer as well as the safe one.
-var JsxNoCommentTextnodes = rule.Rule{
+var JsxNoCommentTextnodes = rule.Rule[rule.NoOptions]{
 	// No namespace prefix beyond the plugin's own. The config writes
 	// `react/jsx-no-comment-textnodes` and the parity guard strips the namespace on a `/` boundary.
 	Name: "react/jsx-no-comment-textnodes",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		sourceText := ruleContext.SourceFile.Text()
 
 		return rule.Listeners{

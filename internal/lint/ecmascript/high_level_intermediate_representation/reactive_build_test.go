@@ -420,11 +420,9 @@ func TestBuildReactiveFunctionCorpusConservation(test *testing.T) {
 	// composite-value cases initially stayed unchanged. Immutable alias-edge refinement closes
 	// findBottomBarDataKey's one-instruction loss; IMMUTABLE_ALIAS_EDGES.md attributes that movement.
 	// The genuinely unexplained-loss count stays zero.
-	const (
-		knownLostWithValueTerminal = 4
-		knownLostWithScopedLoop    = 0
-		knownDoubleEmitted         = 4
-	)
+	const knownLostWithValueTerminal = 4
+	const knownLostWithScopedLoop = 0
+	const knownDoubleEmitted = 4
 	if lostWithValueTerminal != knownLostWithValueTerminal ||
 		lostWithScopedLoopValue != knownLostWithScopedLoop || lostWithout != 0 {
 		test.Errorf("instruction loss: composite-value=%d (want %d), scoped-loop-value=%d (want %d), "+

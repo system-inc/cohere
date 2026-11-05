@@ -37,6 +37,12 @@ package high_level_intermediate_representation
 
 import "github.com/system-inc/cohere/static_single_assignment"
 
+// postDominatorExit is the synthetic block every return flows into.
+//
+// `InvalidBlock` is zero and lowering never mints block zero, so zero is free to mean the exit here
+// and cannot collide with a real id.
+const postDominatorExit static_single_assignment.BlockId = InvalidBlock
+
 // UnconditionalBlocks returns the blocks that execute on every non-throwing path through function.
 //
 // This is upstream's `computeUnconditionalBlocks`: walk the post-dominator chain from the entry
@@ -92,12 +98,6 @@ func UnconditionalBlocks(function *Function) map[static_single_assignment.BlockI
 	return unconditional
 }
 
-// postDominatorExit is the synthetic block every return flows into.
-//
-// `InvalidBlock` is zero and lowering never mints block zero, so zero is free to mean the exit here
-// and cannot collide with a real id.
-const postDominatorExit static_single_assignment.BlockId = InvalidBlock
-
 // postDominanceTree holds the immediate post-dominator of each block.
 //
 // A block absent from `immediate` reaches no return, so it post-dominates nothing and nothing
@@ -129,9 +129,7 @@ func computePostDominance(function *Function) *postDominanceTree {
 		if _, isReturn := block.Terminal.(*Return); isReturn {
 			reverseSuccessors[postDominatorExit] = append(reverseSuccessors[postDominatorExit], block.Id)
 		}
-		for _, predecessorId := range block.Predecessors {
-			reverseSuccessors[block.Id] = append(reverseSuccessors[block.Id], predecessorId)
-		}
+		reverseSuccessors[block.Id] = append(reverseSuccessors[block.Id], block.Predecessors...)
 	}
 
 	order := reversePostorderFrom(postDominatorExit, reverseSuccessors)
@@ -155,21 +153,23 @@ func computePostDominance(function *Function) *postDominanceTree {
 	// The two pointers walk toward the root, which sits at position zero, so the larger position is
 	// always the one further from it and is the one that steps.
 	intersect := func(left, right int) int {
-		for left != right {
-			for left > right {
-				if immediate[left] == -1 || immediate[left] == left {
-					return right
+		// The pointers start at the two inputs and step from there, leaving the inputs as given.
+		x, y := left, right
+		for x != y {
+			for x > y {
+				if immediate[x] == -1 || immediate[x] == x {
+					return y
 				}
-				left = immediate[left]
+				x = immediate[x]
 			}
-			for right > left {
-				if immediate[right] == -1 || immediate[right] == right {
-					return left
+			for y > x {
+				if immediate[y] == -1 || immediate[y] == y {
+					return x
 				}
-				right = immediate[right]
+				y = immediate[y]
 			}
 		}
-		return left
+		return x
 	}
 
 	// Predecessors in the reversed graph, which the fixed point reads.

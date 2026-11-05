@@ -22,7 +22,7 @@ import (
 // and which must be recorded present.
 func TestDesignSystemReadsAreRunCacheInputs(test *testing.T) {
 	test.Parallel()
-	packageRoot := classOrderFixturePackageRoot()
+	packageRoot := classOrderFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Skip("no installed tailwindcss on this machine, so there is no design system to load")
 	}

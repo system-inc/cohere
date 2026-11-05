@@ -83,7 +83,11 @@ func TestMemoizationLevelOfMatchesUpstreamGroups(test *testing.T) {
 		{name: "declare context", want: MemoizationMemoized, value: &DeclareContext{}},
 		{name: "store context", want: MemoizationMemoized, value: &StoreContext{}},
 
-		{name: "primitive under forceMemoizePrimitives", want: MemoizationConditional, value: &Primitive{}},
+		{
+			name:  "primitive under forceMemoizePrimitives",
+			want:  MemoizationConditional,
+			value: &Primitive{Value: PrimitiveUndefined{}},
+		},
 		{name: "binary under forceMemoizePrimitives", want: MemoizationConditional, value: &BinaryExpression{}},
 		{name: "unary under forceMemoizePrimitives", want: MemoizationConditional, value: &UnaryExpression{}},
 		{

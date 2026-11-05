@@ -443,15 +443,15 @@ func (flows *flowAnalysis) define(variable types.Object, value flowingValue) {
 // it is, the container it is read from, or the result of the function it calls. A value built where it stands, a
 // literal of another kind or a conversion, comes from no declaration.
 func (flows *flowAnalysis) referenceOf(expression ast.Expr, resultIndex int) reference {
-	expression = ast.Unparen(expression)
-	if call, isCall := expression.(*ast.CallExpr); isCall {
+	unwrapped := ast.Unparen(expression)
+	if call, isCall := unwrapped.(*ast.CallExpr); isCall {
 		return flows.referenceToResult(call, max(resultIndex, 0))
 	}
 	// The second value of a comma-ok form is a bool the form makes, not anything its operand holds.
 	if resultIndex > 0 {
 		return reference{}
 	}
-	switch operand := expression.(type) {
+	switch operand := unwrapped.(type) {
 	case *ast.Ident:
 		return flows.referenceToObject(flows.pass.TypesInfo.Uses[operand])
 	case *ast.SelectorExpr:
@@ -509,21 +509,22 @@ func (flows *flowAnalysis) referenceToResult(call *ast.CallExpr, index int) refe
 // referenceToObject is the declaration object is: one of this package's variables, fields or functions, by its
 // generic origin when it is an instantiation's, or another package's.
 func (flows *flowAnalysis) referenceToObject(object types.Object) reference {
+	var origin types.Object
 	switch declared := object.(type) {
 	case *types.Var:
-		object = declared.Origin()
+		origin = declared.Origin()
 	case *types.Func:
-		object = declared.Origin()
+		origin = declared.Origin()
 	default:
 		return reference{}
 	}
-	if object.Pkg() == nil {
+	if origin.Pkg() == nil {
 		return reference{}
 	}
-	if object.Pkg() != flows.pass.Pkg {
+	if origin.Pkg() != flows.pass.Pkg {
 		return reference{foreign: true}
 	}
-	return reference{key: flowKey{object: object}}
+	return reference{key: flowKey{object: origin}}
 }
 
 // candidateAt is node as a candidate when it is any or an empty interface written in a declaration's type.

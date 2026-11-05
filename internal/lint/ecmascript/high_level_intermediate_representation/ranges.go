@@ -123,40 +123,40 @@ func MutationSites(function *Function) []MutationSite {
 			if instruction == nil {
 				continue
 			}
-			switch value := instruction.Value.(type) {
+			switch shape := instruction.Value.(type) {
 			case *PropertyStore:
 				sites = append(sites, MutationSite{
 					Instruction: instructionId,
 					Order:       instruction.Order,
-					Target:      value.Object.Identifier,
+					Target:      shape.Object.Identifier,
 					Kind:        MutationSitePropertyStore,
 				})
 			case *ComputedStore:
 				sites = append(sites, MutationSite{
 					Instruction: instructionId,
 					Order:       instruction.Order,
-					Target:      value.Object.Identifier,
+					Target:      shape.Object.Identifier,
 					Kind:        MutationSiteComputedStore,
 				})
 			case *StoreContext:
 				sites = append(sites, MutationSite{
 					Instruction: instructionId,
 					Order:       instruction.Order,
-					Target:      value.Value.Identifier,
+					Target:      shape.Value.Identifier,
 					Kind:        MutationSiteStoreContext,
 				})
 			case *CallExpression:
 				sites = append(sites, MutationSite{
 					Instruction: instructionId,
 					Order:       instruction.Order,
-					Target:      value.Callee.Identifier,
+					Target:      shape.Callee.Identifier,
 					Kind:        MutationSiteCall,
 				})
 			case *MethodCall:
 				sites = append(sites, MutationSite{
 					Instruction: instructionId,
 					Order:       instruction.Order,
-					Target:      value.Receiver.Identifier,
+					Target:      shape.Receiver.Identifier,
 					Kind:        MutationSiteCall,
 				})
 			}

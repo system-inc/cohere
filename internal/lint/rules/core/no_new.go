@@ -58,9 +58,9 @@ var messageNoNewStatement = rule.Message{
 //
 // Nesting reports once rather than twice. `new new Foo();` is one finding, because only the outer
 // `new` is the statement's expression and the inner one is its callee.
-var NoNew = rule.Rule{
+var NoNew = rule.Rule[rule.NoOptions]{
 	Name: "no-new",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindExpressionStatement: func(node *ast.Node) {
 				// See the doc above: our tree keeps parentheses that ESTree discards, so the

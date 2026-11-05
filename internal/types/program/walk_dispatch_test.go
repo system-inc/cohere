@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -57,18 +58,18 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(test *testing.T) {
 			ruleContext.ReportNode(node, rule.Message{Id: "sawConstant", Description: "saw a constant"})
 		}}
 	}
-	runCrashes := rule.Rule{
+	runCrashes := rule.Rule[rule.NoOptions]{
 		Name: "test-run-crashes-on-a",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			if isA(ruleContext) {
 				panic("planted in Run")
 			}
 			return reportsEachConstant(ruleContext)
 		},
 	}
-	listenerCrashes := rule.Rule{
+	listenerCrashes := rule.Rule[rule.NoOptions]{
 		Name: "test-listener-crashes-on-a",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				if isA(ruleContext) {
 					panic("planted in a listener")
@@ -77,9 +78,9 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(test *testing.T) {
 			}}
 		},
 	}
-	functionsOnlyInA := rule.Rule{
+	functionsOnlyInA := rule.Rule[rule.NoOptions]{
 		Name: "test-functions-only-in-a",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			if !isA(ruleContext) {
 				return nil
 			}
@@ -91,9 +92,9 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(test *testing.T) {
 			}}
 		},
 	}
-	notes := rule.Rule{
+	notes := rule.Rule[rule.NoOptions]{
 		Name: "test-notes",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) { ruleContext.Note("constant") }}
 		},
 	}
@@ -101,7 +102,7 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(test *testing.T) {
 	result, err := graph.Walk(
 		context.Background(),
 		graph.ProjectFiles(),
-		[]rule.Rule{runCrashes, listenerCrashes, functionsOnlyInA, notes},
+		rule_testing.EntriesOf(test, runCrashes, listenerCrashes, functionsOnlyInA, notes),
 	)
 	if err != nil {
 		test.Fatalf("walking: %v", err)
@@ -156,14 +157,18 @@ func TestAReportKeptPastItsFilePanicsNamingTheRule(test *testing.T) {
 	}
 
 	var kept func(rule.Diagnostic)
-	keeper := rule.Rule{
+	keeper := rule.Rule[rule.NoOptions]{
 		Name: "test-keeps-its-report",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			kept = ruleContext.Report
 			return nil
 		},
 	}
-	if _, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{keeper}); walkError != nil {
+	if _, walkError := graph.Walk(
+		context.Background(),
+		graph.ProjectFiles(),
+		rule_testing.EntriesOf(test, keeper),
+	); walkError != nil {
 		test.Fatalf("walking: %v", walkError)
 	}
 	if kept == nil {

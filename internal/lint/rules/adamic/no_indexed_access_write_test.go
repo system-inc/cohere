@@ -5,20 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
-
-// Resolve by registration so these fixtures also run on the pre-change engine,
-// where no rule owns this hole and the empty subject reports no findings.
-func indexedAccessSubject() rule.Rule {
-	for _, registration := range rule.Registered() {
-		if registration.Rule.Name == "adamic/no-indexed-access-write" {
-			return registration.Rule
-		}
-	}
-	return rule.Rule{Name: "adamic/no-indexed-access-write", Run: func(rule.Context, any) rule.Listeners { return nil }}
-}
 
 func TestIndexedAccessWrite(test *testing.T) {
 	test.Parallel()
@@ -52,7 +40,7 @@ test<{ readonly value: 1 }>();`,
 			if count := typeErrorCount(test, source); count != 0 {
 				test.Fatalf("tsgo diagnostics: %d, want 0", count)
 			}
-			result := runAdamic(test, indexedAccessSubject(), source)
+			result := runAdamic(test, NoIndexedAccessWrite, source)
 			rule_testing.ExpectFindings(test, result, "indexedAccessWrite")
 			expectSpans(test, source, result, "2")
 			if len(result.Diagnostics) == 1 {
@@ -76,7 +64,7 @@ test<{ readonly value: 1 }>();`,
 			if count := typeErrorCount(test, source); count != 0 {
 				test.Fatalf("tsgo diagnostics: %d, want 0", count)
 			}
-			rule_testing.ExpectClean(test, runAdamic(test, indexedAccessSubject(), source))
+			rule_testing.ExpectClean(test, runAdamic(test, NoIndexedAccessWrite, source))
 			// Plant a concrete source into the same slot: each clean fixture must expose a refusal.
 			plant := strings.NewReplacer(
 				"source.value",
@@ -88,7 +76,7 @@ test<{ readonly value: 1 }>();`,
 				"return source;",
 				"return { value: 2 };",
 			).Replace(source)
-			result := runAdamic(test, indexedAccessSubject(), plant)
+			result := runAdamic(test, NoIndexedAccessWrite, plant)
 			rule_testing.ExpectFindings(test, result, "indexedAccessWrite")
 			expectSpans(test, plant, result, "2")
 		})
@@ -113,7 +101,7 @@ func TestIndexedAccessWriteEdges(test *testing.T) {
 			if count := typeErrorCount(test, source); count != 0 {
 				test.Fatalf("tsgo diagnostics: %d, want 0", count)
 			}
-			result := runAdamic(test, indexedAccessSubject(), source)
+			result := runAdamic(test, NoIndexedAccessWrite, source)
 			rule_testing.ExpectFindings(test, result, "indexedAccessWrite")
 			expectSpans(test, source, result, span)
 		})
@@ -157,12 +145,12 @@ func TestIndexedAccessWriteEdgesStayClean(test *testing.T) {
 			if count := typeErrorCount(test, fixture.source); count != 0 {
 				test.Fatalf("tsgo diagnostics: %d, want 0", count)
 			}
-			rule_testing.ExpectClean(test, runAdamic(test, indexedAccessSubject(), fixture.source))
+			rule_testing.ExpectClean(test, runAdamic(test, NoIndexedAccessWrite, fixture.source))
 			plant := strings.Replace(fixture.source, fixture.old, fixture.plant, 1)
 			if count := typeErrorCount(test, plant); count != 0 {
 				test.Fatalf("plant tsgo diagnostics: %d, want 0", count)
 			}
-			result := runAdamic(test, indexedAccessSubject(), plant)
+			result := runAdamic(test, NoIndexedAccessWrite, plant)
 			rule_testing.ExpectFindings(test, result, "indexedAccessWrite")
 			expectSpans(test, plant, result, fixture.span)
 		})

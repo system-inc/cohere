@@ -68,6 +68,12 @@ The front door resolves the project root (the nearest directory holding `Package
 cohere-swift --contract 2 --root <absolute package root> [flags] [paths]
 ```
 
+The root may also be an Xcode project's directory, one holding `project.yml` (an xcodegen spec) or
+exactly one `*.xcodeproj`, and no `Package.swift` (#ybspptb). A `Package.swift` beside them wins. The
+engine generates a spec's project into its own scratch, never beside the spec, and reads the targets and
+their Swift files from the project file. A root holding two projects, or a workspace and no project, is
+refused with exit 2 and a sentence, as is a spec xcodegen refuses and a machine without xcodegen.
+
 `--contract` is the version the front door speaks. An engine speaking a different version refuses
 the run, prints a sentence on stderr naming both versions, and exits 2. The first record the engine
 writes is `provenance`, which carries its own `contract` field. The front door refuses a mismatch
@@ -107,6 +113,15 @@ nothing else.
 - `elapsedMilliseconds` is the time spent describing the package. The accounting line bills it as
   the graph, because it is the step nothing can skip.
 - Written on every run that checks anything, since every such run describes the package first.
+- `projectKind` says what `package` was read from: `SwiftPackage`, `XcodeGen` (a spec, generated into the
+  engine's scratch) or `XcodeProject` (a committed project, read where it stands). It is additive within
+  contract 3, and an engine from before it writes none. For an Xcode project, `package` is the project's
+  name, and each native target's kind is Xcode's product type in SwiftPM's words: an app or an extension
+  is `application`, a unit-test or interface-test bundle `test`, a framework or library `library`, a
+  command-line tool `executable`.
+- An Xcode project's types are built with xcodebuild (see `types`). Its index is not read yet, so `--unused`
+  is `notReached` there (#9ktapz2). The package rules, which judge settings an Xcode project keeps elsewhere,
+  are offered no package there and listed as silent.
 
 Rendered (whole package, then scoped):
 
@@ -298,6 +313,22 @@ prune runs after such a build, at most once an hour per scratch. It removes the 
 no unit names and the scratch of a package that is no longer local, each unused for an hour, and never
 touches a build in flight or the build descriptions, whose cache the build system bounds itself.
 
+At an Xcode root (#gg0x95n) the build is xcodebuild, one per native target that compiles a file of ours,
+through the scheme Xcode makes for it, for the generic device of the platform its `SDKROOT` names: `build`, or
+`build-for-testing` for a test bundle. It writes only into the scratch (`xcode-build` as derived data,
+`xcode-packages` for packages), never into `~/Library/Developer/Xcode/DerivedData`, signs nothing, and holds
+run-script phases to their declared files (`ENABLE_USER_SCRIPT_SANDBOXING=YES`). Packages resolve into the scratch,
+under `--no-fix` too (#s8p20fe): a generated bundle is in the scratch already, and under `--no-fix` a committed
+bundle is built through a workspace in the scratch that names it, so its pins land there and the bundle is left as
+it was found. A resolution the repository commits (a committed bundle's own, or one kept in the bundle beside a
+spec that git does not ignore) is preferred, and under `--no-fix` the build is held to it as it stands. A resolve
+that fails is a finding at the spec or the committed project file that says so in xcodebuild's words. Its records
+are judged by the same rules as a package's, and `build` reads
+`xcodebuild of <n> targets for <platforms>, derived data <path>`, or that the last build's records were reused
+because no input changed, then names each build that failed and the step it failed at, and each target not built and why (an `SDKROOT` naming no platform the engine knows). A failure no file of
+ours carries an error for is a finding at the spec or the committed project file, and a build that left no
+record leaves every file it was for in `filesWithoutRecord`, never an empty report.
+
 **Only compiler errors cut lint off.** In TypeScript every diagnostic the checker reports is an
 error, so "any type diagnostic bails" and "any type error bails" were the same rule. In Swift they
 are not. A warning (`variable was never mutated`) is a finding and fails the run, but the code
@@ -387,15 +418,15 @@ it where a run that did not finish prints green.
 
 | Flag | Swift meaning in phase 1 |
 |---|---|
-| `--no-fix` | Writes nothing to the project: no source, no `.build`, no `Package.resolved`. Builds go to the engine's cache outside the project, and package resolution is disabled. The fix phase runs in check mode, recorded as `ran`: each file the formatter would rewrite becomes one `format` finding at its first changed line. |
+| `--no-fix` | Writes nothing to the project: no source, no `.build`, no `Package.resolved`. Builds go to the engine's cache outside the project. A package is built from its own `Package.resolved` with resolution disabled, since SwiftPM keeps pins nowhere else, so one with remote dependencies and none fails by name; an Xcode project resolves into the engine's scratch, held to a resolution the repository commits when there is one. The fix phase runs in check mode, recorded as `ran`: each file the formatter would rewrite becomes one `format` finding at its first changed line. |
 | `--fix` | Fix and format only. |
-| `--types`, `--lint` | That phase alone, as for TypeScript. |
+| `--types`, `--lint` | That phase alone, as for TypeScript. A `--lint` run whose typed rules apply to a file still builds, skipped when no input changed, because those rules read the build's index and compile commands, the way TypeScript's lint still loads the checker (#q1574nq). Nothing the compiler said is reported, and types stays `skipped` as `not requested`. |
 | `--format` | Formatting is on by default for Swift, unlike TypeScript, where it waits on parity with the existing gate. For Swift that parity is measured: swift-format 604.0.0 as a library is byte-identical to `xcrun swift-format` on 952 of our files. The flag is accepted and changes nothing. |
 | `--format-all` | Accepted and changes nothing. Swift formats every file in scope by default, because formatting all of Presence costs a few seconds, not the minutes that made TypeScript format only changed files. Named paths still narrow the scope. |
 | `--format-only` | The fix phase narrowed to formatting, as TypeScript's `--format-only`: no rule is asked for a fix, and types, lint and unused are skipped as not requested, so nothing is compiled. With `--no-fix` it is the format gate: each file the formatter would change is a `format` finding, and nothing is written. `--format-all` widens it to every file. Named with `--fix`, `--types`, `--lint`, `--unused` or `--no-format`, the run is refused with exit 2. |
 | `--no-format` | Formatting left out of a bare run, `--fix` or `--no-fix`, as TypeScript's `--no-format`: the fixers run, types and lint run, and no file is formatted or reported unformatted. The `fix` record counts nothing formatted, and its `formatScope` says formatting was left out. Named with `--format`, `--format-all` or `--format-only`, the run is refused with exit 2. |
 | `--no-cache` | Every phase from source, as TypeScript's `--no-cache`. The run uses a scratch of its own in the system's temporary directory and removes it when it ends, so it reads no package description, build, compiler record or index a run before it left, and writes nothing to the project's `.cache`. Every cache the engine keeps lives under its scratch, so this is all of them. It costs a cold build. |
-| `--covered-packages` | Prints one `coveredPackages` record after `provenance` and exits 0, building nothing: `checked` is the root and each local package inside it whose files a run at this root checks, and `vendored` each local package under `Vendor/`, whose files the run lists as not checked. It comes from the run's own traversal (manifests only), so the front door can skip a nested package a run already covers (#sxs26s3). Paths are absolute, standardized as Foundation spells them; compare after resolving symlinks on both sides. |
+| `--covered-packages` | Prints one `coveredPackages` record after `provenance` and exits 0, building nothing: `checked` is the root and each local package inside it whose files a run at this root checks, and `vendored` each local package under `Vendor/`, whose files the run lists as not checked. It comes from the run's own traversal (manifests only), so the front door can skip a nested package a run already covers (#sxs26s3). At an Xcode root `checked` is the root alone: a local package the project links is outside it and runs as its own. Paths are absolute, standardized as Foundation spells them; compare after resolving symlinks on both sides. |
 | `[paths]` | Narrow fix, format and lint to the scope. Types still reports the whole package (see `types`). |
 | `--lint-config <file>` | The `CohereSettings.json` whose `swift` block configures rules. |
 | `--fix-passes <n>`, `--single-threaded` | As for TypeScript. |
@@ -409,6 +440,12 @@ it where a run that did not finish prints green.
 
 Rules are configured in the `swift` block of `CohereSettings.json`. Keys are `cohere-swift/<rule>`,
 and values are severities and strictness options, never allow lists or ignore names.
+
+A value is a severity, or an array of a severity and one object of options. Only a rule that reads an
+option may be given it: today that is `cohere-swift/file-length`'s `max`, a whole number at or below the
+house's 2,000, which the rule then judges by. An option no rule reads, a value of the wrong type, a `max`
+above the house's (an allowance) and more than one object are each refused by name with exit 2, never
+dropped (#4x9h976).
 
 **Formatting is not configured.** Swift has one house format, built into the engine
 (`Sources/CohereSwift/Format/HouseSwiftFormat.swift`, ruled 2026-10-03 in #mg4dgjm), the way

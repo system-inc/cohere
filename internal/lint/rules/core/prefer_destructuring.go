@@ -72,7 +72,7 @@ type preferDestructuringRenamedWire struct {
 // Each element refuses keys its schema does not declare, which is upstream's
 // `additionalProperties: false` and is how a misplaced `enforceForRenamedProperties` in the first
 // element is caught rather than ignored. A third element is refused by `rule.OptionElements`.
-func DecodePreferDestructuringOptions(list []byte) (any, error) {
+func DecodePreferDestructuringOptions(list []byte) (PreferDestructuringOptions, error) {
 	enabled := true
 	options := PreferDestructuringOptions{
 		VariableDeclarator:   PreferDestructuringKindOptions{Array: &enabled, Object: &enabled},
@@ -126,7 +126,7 @@ func DecodePreferDestructuringOptions(list []byte) (any, error) {
 }
 
 // preferDestructuringDecodeStrictly decodes one element as an object and refuses unknown keys.
-func preferDestructuringDecodeStrictly(element json.RawMessage, into any) error {
+func preferDestructuringDecodeStrictly[Target any](element json.RawMessage, into *Target) error {
 	// Go whitespace: raw JSON bytes of the rule's options, whose whitespace is the same in both sets.
 	if bytes.Equal(bytes.TrimSpace(element), []byte("null")) {
 		return fmt.Errorf("takes an object, got null")
@@ -198,10 +198,10 @@ var messagePreferDestructuring = rule.Message{
 //
 // Measured against the installed 10.8.1 build: `var foo = object.foo;` reports columns 5 to 21,
 // which is the declarator without `var`, and `foo = array[0];` reports columns 1 to 15.
-var PreferDestructuring = rule.Rule{
+var PreferDestructuring = rule.Rule[PreferDestructuringOptions]{
 	Name: "prefer-destructuring",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[PreferDestructuringOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[PreferDestructuringOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			enabled := true
 			settings = PreferDestructuringOptions{

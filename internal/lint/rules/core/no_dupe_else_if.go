@@ -37,9 +37,9 @@ var messageUnexpectedDuplicateElseIf = rule.Message{
 //
 // A chain of length n costs O(n squared) comparisons, which the original accepts and so do we. An
 // if-else-if chain long enough to matter is a defect this rule is not the one to report.
-var NoDupeElseIf = rule.Rule{
+var NoDupeElseIf = rule.Rule[rule.NoOptions]{
 	Name: "no-dupe-else-if",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIfStatement: func(node *ast.Node) {
 				test := node.AsIfStatement().Expression

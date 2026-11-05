@@ -280,7 +280,7 @@ var messageUseMemoCallbackReassignsOuterVariable = rule.Message{
 // span. The whole-call span for the no-arguments case, the callback span for async and generator,
 // the first-parameter span for parameters, and the assignment-target span for a reassignment are
 // four different anchors in one rule, and nothing but a span assertion separates them.
-var UseMemo = rule.Rule{
+var UseMemo = rule.Rule[CompilerRuleOptions]{
 	// No namespace prefix. The config writes `react/use-memo`, and the parity guard strips the
 	// namespace on a `/` boundary, so a self-namespaced `react-use-memo` would match no inventory
 	// entry while still passing every fixture in this package.
@@ -292,7 +292,7 @@ var UseMemo = rule.Rule{
 	// reassignment check asks the same kind of question about the assignment target.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

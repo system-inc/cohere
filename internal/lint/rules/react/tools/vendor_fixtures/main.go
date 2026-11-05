@@ -24,7 +24,8 @@
 // `recursive=1` reports `truncated`, and this tool refuses to proceed when it is true. That check
 // is the difference between a measurement and a guess.
 //
-//	go run ./internal/lint/rules/react/tools/vendor_fixtures -sha <commit> -out internal/react_conformance/testdata/fixtures
+//	go run ./internal/lint/rules/react/tools/vendor_fixtures -sha <commit> \
+//		-out internal/react_conformance/testdata/fixtures
 //
 // Pass -dry-run to report the counts without writing.
 package main

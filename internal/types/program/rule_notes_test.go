@@ -10,6 +10,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/rules/nexus"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -19,10 +20,10 @@ import (
 // does not appear.
 func TestNotesAreCountedPerFilePerRulePerKey(test *testing.T) {
 	test.Parallel()
-	notingEachDeclaration := func(name string, key func(declaration *ast.Node) string) rule.Rule {
-		return rule.Rule{
+	notingEachDeclaration := func(name string, key func(declaration *ast.Node) string) rule.Rule[rule.NoOptions] {
+		return rule.Rule[rule.NoOptions]{
 			Name: name,
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 					ruleContext.Note(key(node))
 				}}
@@ -50,7 +51,11 @@ func TestNotesAreCountedPerFilePerRulePerKey(test *testing.T) {
 	if err != nil {
 		test.Fatalf("loading the config: %v", err)
 	}
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{byName, constant})
+	result, err := graph.Walk(
+		context.Background(),
+		graph.ProjectFiles(),
+		rule_testing.EntriesOf(test, byName, constant),
+	)
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}
@@ -95,7 +100,7 @@ func TestTheCallerDataRuleNotesEachProcessStateExemption(test *testing.T) {
 	result, err := graph.Walk(
 		context.Background(),
 		graph.ProjectFiles(),
-		[]rule.Rule{nexus.CorrectnessNoCallerDataMutation},
+		[]rule.Entry{rule_testing.EntryOf(test, nexus.CorrectnessNoCallerDataMutation)},
 	)
 	if err != nil {
 		test.Fatalf("walking: %v", err)
@@ -133,7 +138,8 @@ func TestTheCallerDataRuleNotesEachOutParameterContract(test *testing.T) {
 			"}\n",
 		"job.ts": "import { RecordInterface, ScheduledExecutable } from './base';\n" +
 			"export class Job extends ScheduledExecutable {\n" +
-			"    protected run(job: RecordInterface, context: RecordInterface): void { job.status = 'done'; job.log.push('done'); context.status = 'x'; }\n" +
+			"    protected run(job: RecordInterface, context: RecordInterface): void { job.status = 'done'; " +
+			"job.log.push('done'); context.status = 'x'; }\n" +
 			"}\n",
 	})
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
@@ -147,7 +153,7 @@ func TestTheCallerDataRuleNotesEachOutParameterContract(test *testing.T) {
 	result, err := graph.Walk(
 		context.Background(),
 		graph.ProjectFiles(),
-		[]rule.Rule{nexus.CorrectnessNoCallerDataMutation},
+		[]rule.Entry{rule_testing.EntryOf(test, nexus.CorrectnessNoCallerDataMutation)},
 	)
 	if err != nil {
 		test.Fatalf("walking: %v", err)

@@ -33,10 +33,13 @@ func correctnessNoCallbackInParseTryMessage() rule.Message {
 //	invalid: try { onEvent(JSON.parse(line)); } catch { /* heartbeat or partial frame */ }
 //	invalid: try { callback(null, JSON.parse(text)); } catch { callback(new Error('bad JSON')); }
 //	invalid: try { return parseJsonOrThrow(read(), 'settings', isSettings); } catch { return null; }
-//	valid:   let message: unknown; try { message = JSON.parse(line); } catch { onUnparseable?.(line); continue; } onMessage(message);
-//	valid:   const lineParse = parseJson(line, 'stream line', isMessage); if(lineParse.outcome === 'Parsed') onMessage(lineParse.value);
+//	valid:   let message: unknown; try { message = JSON.parse(line); } catch { onUnparseable?.(line); continue; }
+//	         onMessage(message);
+//	valid:   const lineParse = parseJson(line, 'stream line', isMessage);
+//	         if(lineParse.outcome === 'Parsed') onMessage(lineParse.value);
 //	valid:   try { onMessage(JSON.parse(line)); } catch(error) { if(!(error instanceof SyntaxError)) throw error; }
-//	valid:   new Promise(function(resolve, reject) { try { resolve(JSON.parse(text)); } catch { reject(new Error('bad')); } });
+//	valid:   new Promise(function(resolve, reject) { try { resolve(JSON.parse(text)); }
+//	         catch { reject(new Error('bad')); } });
 //
 // # Where it came from
 //
@@ -91,14 +94,14 @@ func correctnessNoCallbackInParseTryMessage() rule.Message {
 //
 // Moving the callback out of the `try` changes which errors propagate, and the caller may have come
 // to rely on the swallowing. Each site is the author's call.
-var CorrectnessNoCallbackInParseTry = rule.Rule{
+var CorrectnessNoCallbackInParseTry = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-callback-in-parse-try",
 
 	// Symbol identity tells the platform's `JSON.parse` from a local `parse`, nexus's
 	// `parseJsonOrThrow` from any function of that name, and a parameter from a local of its name.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

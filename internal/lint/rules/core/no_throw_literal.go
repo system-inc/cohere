@@ -78,11 +78,11 @@ var messageNoThrowLiteralUndef = rule.Message{
 // first. It reports `undef` only when the name resolves to the global; upstream asks
 // `isGlobalReference` and the corpus pins it with `function foo(undefined) { throw undefined; }`,
 // which is clean because the parameter shadows the global and could hold anything.
-var NoThrowLiteral = rule.Rule{
+var NoThrowLiteral = rule.Rule[rule.NoOptions]{
 	Name:             "no-throw-literal",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindThrowStatement: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

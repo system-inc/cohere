@@ -11,10 +11,8 @@ import (
 // answers in JavaScript.
 func TestTest(test *testing.T) {
 	test.Parallel()
-	const (
-		LS = "\u2028"
-		PS = "\u2029"
-	)
+	const LS = "\u2028"
+	const PS = "\u2029"
 
 	tests := []struct {
 		name    string

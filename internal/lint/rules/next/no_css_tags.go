@@ -34,11 +34,11 @@ var messageNoCssTags = rule.Message{
 // Both attributes must be plain string literals for the rule to decide. `href={path}` and a spread
 // carry a value the rule would have to evaluate, and upstream declines rather than guessing, which
 // is why the corpus contains a passing `<link {...props} />`.
-var NoCssTags = rule.Rule{
+var NoCssTags = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-css-tags` and matching strips the namespace on
 	// a `/` boundary, so a prefixed name matches nothing and runs on no files while its tests pass.
 	Name: "@next/next/no-css-tags",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node) {
 			tagName, attributes := jsx.ElementParts(node)
 			if !jsx.IsIntrinsicElementNamed(tagName, "link") {

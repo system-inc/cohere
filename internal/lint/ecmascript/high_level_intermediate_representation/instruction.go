@@ -239,8 +239,10 @@ type PostfixUpdate struct {
 	Value     Place
 }
 
-// Primitive is a literal number, string, boolean, null, or undefined.
-type Primitive struct{ Value any }
+// Primitive is a literal number, string, bigint, boolean, null, or undefined.
+//
+// Value says which, as a variant of `PrimitiveValue` in primitive_value.go.
+type Primitive struct{ Value PrimitiveValue }
 
 // RegExpLiteral is a regular expression literal.
 type RegExpLiteral struct {

@@ -20,11 +20,11 @@ var unionWriteText = policy.MessageOf("adamic/union-write", "unionWrite")
 // its types, so the same check covers arbitrary target depth without recovering
 // declared types and undoing narrowing. A generic receiver uses its constraint.
 // Each refused syntax has a strict-tsc-accepted, Node-failing testdata probe.
-var UnionWrite = rule.Rule{
+var UnionWrite = rule.Rule[rule.NoOptions]{
 	Name:             "adamic/union-write",
 	NeedsTypeChecker: true,
 	ProgramReads:     rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -178,7 +178,8 @@ var UnionWrite = rule.Rule{
 				// A logical assignment writes only its RHS. The expression's type also
 				// contains the old value, which need not fit another member's slot.
 				switch operator {
-				case ast.KindEqualsToken, ast.KindQuestionQuestionEqualsToken, ast.KindBarBarEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
+				case ast.KindEqualsToken, ast.KindQuestionQuestionEqualsToken, ast.KindBarBarEqualsToken,
+					ast.KindAmpersandAmpersandEqualsToken:
 				default:
 					value = node // arithmetic compound assignment writes the operation's result
 				}

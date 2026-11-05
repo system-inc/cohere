@@ -251,7 +251,7 @@ func render(systems []staticsFile, shared []staticEntry, dropped []string) ([]by
 //
 // `+"`getClassList()`"+` enumerates classes, so a utility advertising none is invisible to it. That
 // hid fourteen functional roots until 33e12df and 6347b07, and it hides 21 statics here: the
-// deprecated-but-registered ones such as `+"`bg-gradient-to-r`"+`, `+"`break-words`"+` and
+// deprecated-but-registered ones such as `+"`bg-gradient-to-r`, `break-words`"+` and
 // `+"`max-w-screen`"+`, which the base descriptor table never carried. enumerate.mjs reads
 // `+"`utilities.keys('static')`"+` instead.
 //

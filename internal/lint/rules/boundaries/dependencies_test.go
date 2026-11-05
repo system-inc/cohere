@@ -41,7 +41,8 @@ const projectModuleMessage = "A module cannot import from a worker. It is regist
 const projectModuleOptions = `{
 	"default": "allow",
 	"policies": [
-		{"from": {"element": {"type": "project-module"}}, "disallow": {"to": {"element": {"type": "project-worker"}}}, "message": "` + projectModuleMessage + `"}
+		{"from": {"element": {"type": "project-module"}}, ` +
+	`"disallow": {"to": {"element": {"type": "project-worker"}}}, "message": "` + projectModuleMessage + `"}
 	],
 	"elements": [
 		{"type": "project-module", "pattern": "source/modules/*", "capture": ["moduleName"]},
@@ -56,11 +57,7 @@ func decodeForTest(test *testing.T, raw string) DependenciesOptions {
 	if decodeDependenciesOptionsError != nil {
 		test.Fatalf("decoding the options: %v", decodeDependenciesOptionsError)
 	}
-	options, isOptions := decoded.(DependenciesOptions)
-	if !isOptions {
-		test.Fatalf("decoding the options gave a %T, want DependenciesOptions", decoded)
-	}
-	return options
+	return decoded
 }
 
 // baseLayout is the slice of Base the package-boundary cases import across.
@@ -450,7 +447,8 @@ func TestDependenciesEntrySelectorWinsOverThePolicys(test *testing.T) {
 
 	entryWins := decodeForTest(
 		test,
-		`{"default": "allow", "policies": [{"from": {"element": {"type": "cli"}}, "disallow": {"from": {"element": {"type": "foundation"}}, "to": {"element": {"type": "cli"}}}}], `+
+		`{"default": "allow", "policies": [{"from": {"element": {"type": "cli"}}, `+
+			`"disallow": {"from": {"element": {"type": "foundation"}}, "to": {"element": {"type": "cli"}}}}], `+
 			elements+
 			`}`,
 	)
@@ -458,7 +456,8 @@ func TestDependenciesEntrySelectorWinsOverThePolicys(test *testing.T) {
 
 	outerOnly := decodeForTest(
 		test,
-		`{"default": "allow", "policies": [{"from": {"element": {"type": "cli"}}, "disallow": {"to": {"element": {"type": "cli"}}}}], `+
+		`{"default": "allow", "policies": [{"from": {"element": {"type": "cli"}}, `+
+			`"disallow": {"to": {"element": {"type": "cli"}}}}], `+
 			elements+
 			`}`,
 	)
@@ -476,7 +475,8 @@ func TestDependenciesEntryTypesWinOverThePolicys(test *testing.T) {
 	source := "import { CompileCommand } from '../../../command-line/commands/CompileCommand';\nexport const x = CompileCommand;"
 	options := decodeForTest(
 		test,
-		`{"default": "allow", "policies": [{"to": {"element": {"types": {"anyOf": ["foundation"]}}}, "disallow": {"to": {"element": {"types": {"anyOf": ["cli"]}}}}}], `+
+		`{"default": "allow", "policies": [{"to": {"element": {"types": {"anyOf": ["foundation"]}}}, `+
+			`"disallow": {"to": {"element": {"types": {"anyOf": ["cli"]}}}}}], `+
 			elements+
 			`}`,
 	)
@@ -617,7 +617,8 @@ func TestDependenciesRefusesWhatItDoesNotPort(test *testing.T) {
 		},
 		{
 			"a captured selector",
-			`{"policies": [{"from": {"element": {"type": "api", "captured": {"name": "x"}}}, "allow": {"to": {"element": {"type": "api"}}}}], ` +
+			`{"policies": [{"from": {"element": {"type": "api", "captured": {"name": "x"}}}, ` +
+				`"allow": {"to": {"element": {"type": "api"}}}}], ` +
 				elements +
 				`}`,
 			"captured",
@@ -631,7 +632,8 @@ func TestDependenciesRefusesWhatItDoesNotPort(test *testing.T) {
 		},
 		{
 			"an allOf query",
-			`{"policies": [{"from": {"element": {"types": {"allOf": ["api"]}}}, "allow": {"to": {"element": {"type": "api"}}}}], ` +
+			`{"policies": [{"from": {"element": {"types": {"allOf": ["api"]}}}, ` +
+				`"allow": {"to": {"element": {"type": "api"}}}}], ` +
 				elements +
 				`}`,
 			"allOf",
@@ -692,11 +694,7 @@ func TestDependenciesDecodesBasesOwnBlocksAndAnchorsTheRoot(test *testing.T) {
 		if decodeDependenciesOptionsError != nil {
 			test.Fatalf("Base's own block was refused: %v", decodeDependenciesOptionsError)
 		}
-		options, isOptions := decoded.(DependenciesOptions)
-		if !isOptions {
-			test.Fatalf("Base's own block decoded to a %T, want DependenciesOptions", decoded)
-		}
-		if root := options.Root; root != "/repo" {
+		if root := decoded.Root; root != "/repo" {
 			test.Fatalf("expected the root at the config's directory, got %q", root)
 		}
 	}
@@ -707,11 +705,7 @@ func TestDependenciesDecodesBasesOwnBlocksAndAnchorsTheRoot(test *testing.T) {
 	if decodeDependenciesOptionsError != nil {
 		test.Fatal(decodeDependenciesOptionsError)
 	}
-	options, isOptions := decoded.(DependenciesOptions)
-	if !isOptions {
-		test.Fatalf("the project module block decoded to a %T, want DependenciesOptions", decoded)
-	}
-	if root := options.Root; root != "/project" {
+	if root := decoded.Root; root != "/project" {
 		test.Fatalf("expected the project root when the config's directory is unknown, got %q", root)
 	}
 

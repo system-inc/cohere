@@ -21,7 +21,7 @@ var (
 // Building the settings struct directly would leave the decoder untested, and this rule's
 // default is `true`, which is the one shape a generic decoder gets wrong: a zero-value struct
 // sets allowElseIf false, and false is not a no-op here but a different judgment.
-func elseReturnOptions(test *testing.T, allowElseIf *bool) any {
+func elseReturnOptions(test *testing.T, allowElseIf *bool) NoElseReturnSettings {
 	test.Helper()
 	if allowElseIf == nil {
 		decoded, decodeNoElseReturnOptionsError := DecodeNoElseReturnOptions(nil)
@@ -641,11 +641,7 @@ func TestDecodeNoElseReturnOptions(test *testing.T) {
 		if decodeNoElseReturnOptionsError != nil {
 			test.Fatalf("the decoder refused an absent option: %v", decodeNoElseReturnOptionsError)
 		}
-		settings, ok := decoded.(NoElseReturnSettings)
-		if !ok {
-			test.Fatalf("decoded options are not NoElseReturnSettings: got %T", decoded)
-		}
-		if !settings.AllowElseIf {
+		if !decoded.AllowElseIf {
 			test.Error("expected allowElseIf to default to true")
 		}
 	})
@@ -656,11 +652,7 @@ func TestDecodeNoElseReturnOptions(test *testing.T) {
 		if decodeNoElseReturnOptionsError != nil {
 			test.Fatalf("the decoder refused an empty object: %v", decodeNoElseReturnOptionsError)
 		}
-		settings, ok := decoded.(NoElseReturnSettings)
-		if !ok {
-			test.Fatalf("decoded options are not NoElseReturnSettings: got %T", decoded)
-		}
-		if !settings.AllowElseIf {
+		if !decoded.AllowElseIf {
 			test.Error("expected allowElseIf to stay true")
 		}
 	})
@@ -671,25 +663,21 @@ func TestDecodeNoElseReturnOptions(test *testing.T) {
 		if decodeNoElseReturnOptionsError != nil {
 			test.Fatalf("the decoder refused an explicit false: %v", decodeNoElseReturnOptionsError)
 		}
-		settings, ok := decoded.(NoElseReturnSettings)
-		if !ok {
-			test.Fatalf("decoded options are not NoElseReturnSettings: got %T", decoded)
-		}
-		if settings.AllowElseIf {
+		if decoded.AllowElseIf {
 			test.Error("expected allowElseIf to be false")
 		}
 	})
 
 	test.Run("a bare severity leaves the rule allowing else if", func(test *testing.T) {
 		test.Parallel()
-		// A rule configured as "error" is handed nil options, which arrives at Run as an untyped
-		// nil rather than as settings. This covers the fallback inside Run, which no decoder test
+		// A rule configured as "error" is handed no options, which arrives at Run unconfigured
+		// rather than as settings. This covers the fallback inside Run, which no decoder test
 		// can reach, and it is the case the config actually uses.
 		chain := "function f() { if (a) { return 1; } else if (b) { return 2; } }"
-		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoElseReturn,
-			elseReturnFile, chain, nil))
-		rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoElseReturn,
-			elseReturnFile, "function f() { if (a) { return 1; } else { return 2; } }", nil),
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoElseReturn,
+			elseReturnFile, chain))
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoElseReturn,
+			elseReturnFile, "function f() { if (a) { return 1; } else { return 2; } }"),
 			"unexpected")
 	})
 }

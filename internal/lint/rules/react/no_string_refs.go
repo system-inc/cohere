@@ -225,16 +225,16 @@ type noStringRefsWireOptions struct {
 //
 // The finding underlines the whole attribute, `ref="hello"`, which is the node handed to `report`,
 // rather than the name span that `no-children-prop` in this same package reports.
-var NoStringRefs = rule.Rule{
+var NoStringRefs = rule.Rule[NoStringRefsOptions]{
 	// No namespace prefix. The config writes `react/no-string-refs` and the parity guard strips the
 	// namespace on a `/` boundary, so `react-no-string-refs` would match no inventory entry and lint
 	// no files while passing every fixture in this package.
 	Name: "react/no-string-refs",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoStringRefsOptions]) rule.Listeners {
 		// An unconfigured rule is handed nil, and the zero value is upstream's answer under this
 		// repository's configuration: template refs unreported, and the `this.refs` half off
 		// because no configured React version means `999.999.999`.
-		settings, _ := rule.OptionsAs[NoStringRefsOptions](options)
+		settings, _ := options.Read()
 
 		listeners := rule.Listeners{
 			ast.KindJsxAttribute: func(node *ast.Node) {
@@ -296,8 +296,8 @@ var NoStringRefs = rule.Rule{
 // 'ThisExpression'`, where the parenthesis skip is what reproduces ESTree rather than what widens
 // past it.
 func reportRefsUsage(ruleContext rule.Context, node *ast.Node, object *ast.Node) {
-	object = ast.SkipParentheses(object)
-	if object == nil || object.Kind != ast.KindThisKeyword {
+	unwrapped := ast.SkipParentheses(object)
+	if unwrapped == nil || unwrapped.Kind != ast.KindThisKeyword {
 		return
 	}
 	if !hasEnclosingComponent(node) {
@@ -527,7 +527,7 @@ func isStringRefValue(initializer *ast.Node, noTemplateLiterals bool) bool {
 // resolution is a decision rather than a bind. It happens to land on the same value as the zero
 // value today, and it is written out anyway so that the reasoning is at the line if the config ever
 // grows a settings surface.
-func DecodeNoStringRefsOptions(raw []byte) (any, error) {
+func DecodeNoStringRefsOptions(raw []byte) (NoStringRefsOptions, error) {
 	var wire noStringRefsWireOptions
 	if len(raw) == 0 {
 		return NoStringRefsOptions{}, nil

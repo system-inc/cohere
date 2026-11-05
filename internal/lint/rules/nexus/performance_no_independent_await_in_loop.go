@@ -29,7 +29,8 @@ func messagePerformanceNoIndependentAwaitInLoop() rule.Message {
 // each other for no reason the code can show.
 //
 //	invalid: for (const tree of trees) { results.push(await checkTree(tree)); }
-//	invalid: for (const adapter of this.adapters) { try { results.push(await adapter.fetch()); } catch (error) { results.push(failed(error)); } }
+//	invalid: for (const adapter of this.adapters) { try { results.push(await adapter.fetch()); }
+//	         catch (error) { results.push(failed(error)); } }
 //	invalid: for (let index = 0; index < files.length; index++) { await upload(files[index]); }
 //	valid:   while (hasMore) { const page = await list(cursor); cursor = page.next; }
 //	valid:   for (const page of pages) { cursor = await fetchPage(page, cursor); }
@@ -134,14 +135,14 @@ func messagePerformanceNoIndependentAwaitInLoop() rule.Message {
 //
 // The rewrite is `Promise.all`, a bounded pool, or a deliberate suppression, and which one depends
 // on how large the collection is and what the far side tolerates, which the syntax cannot say.
-var PerformanceNoIndependentAwaitInLoop = rule.Rule{
+var PerformanceNoIndependentAwaitInLoop = rule.Rule[rule.NoOptions]{
 	Name: "nexus/performance-no-independent-await-in-loop",
 
 	// Every identifier in the loop body is resolved to its declaration to decide whether it outlives
 	// an iteration, and the binder that answers that runs only with the program.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

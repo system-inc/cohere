@@ -15,7 +15,7 @@ const idDenylistFile = "/repository/source/IdDenylist.ts"
 //
 // Routed through the rule's own exported decoder rather than filling the struct, so a defect in
 // the decoder is under test rather than bypassed by every fixture.
-func idDenylistOf(names ...string) any {
+func idDenylistOf(names ...string) IdDenylistSettings {
 	encoded, encodeError := json.Marshal(names)
 	if encodeError != nil {
 		panic(encodeError)
@@ -62,7 +62,7 @@ func TestIdDenylistFires(test *testing.T) {
 	cases := []struct {
 		source string
 		// settings is what the rule's own decoder produces for this case's options.
-		settings any
+		settings IdDenylistSettings
 		// findings is one message id per expected finding, in report order, taken from what the
 		// installed rule produced rather than assumed: the private-name cases report through a
 		// different id and no count could tell them apart.
@@ -514,7 +514,7 @@ func TestIdDenylistStaysSilent(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings IdDenylistSettings
 	}{
 		{source: "foo = \"bar\"", settings: idDenylistOf("bar")},
 		{source: "bar = \"bar\"", settings: idDenylistOf("foo")},
@@ -616,7 +616,7 @@ func TestIdDenylistDivergesOnTheEslintGlobalsSurface(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings IdDenylistSettings
 		findings int
 		upstream int
 		why      string
@@ -720,7 +720,7 @@ func TestIdDenylistSpansAndMessages(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings IdDenylistSettings
 		spans    []string
 		messages []string
 	}{
@@ -791,13 +791,9 @@ func TestIdDenylistSpansAndMessages(test *testing.T) {
 func TestIdDenylistDecoderReadsTheNameArray(test *testing.T) {
 	test.Parallel()
 
-	decoded, decodeIdDenylistOptionsError := DecodeIdDenylistOptions([]byte(`["data", "err", "cb"]`))
+	settings, decodeIdDenylistOptionsError := DecodeIdDenylistOptions([]byte(`["data", "err", "cb"]`))
 	if decodeIdDenylistOptionsError != nil {
 		test.Fatalf("decoding a name array: %v", decodeIdDenylistOptionsError)
-	}
-	settings, ok := decoded.(IdDenylistSettings)
-	if !ok {
-		test.Fatalf("expected IdDenylistSettings, got %T", decoded)
 	}
 	for _, name := range []string{"data", "err", "cb"} {
 		if !settings.Denied[name] {
@@ -810,17 +806,16 @@ func TestIdDenylistDecoderReadsTheNameArray(test *testing.T) {
 
 	// An empty array denies nothing rather than erroring, which is what an explicitly empty
 	// configuration means.
-	decoded, decodeIdDenylistOptionsError = DecodeIdDenylistOptions([]byte(`[]`))
+	settings, decodeIdDenylistOptionsError = DecodeIdDenylistOptions([]byte(`[]`))
 	if decodeIdDenylistOptionsError != nil {
 		test.Fatalf("decoding an empty array: %v", decodeIdDenylistOptionsError)
 	}
-	settings, _ = decoded.(IdDenylistSettings)
 	if len(settings.Denied) != 0 {
 		test.Errorf("expected an empty configuration to deny nothing, got %+v", settings.Denied)
 	}
 
 	// A rule handed nil options denies nothing rather than reading a nil map as "everything".
-	result := rule_testing.RunTypedWithOptions(test, IdDenylist, idDenylistFile, "var data = 1;", nil)
+	result := rule_testing.RunTyped(test, IdDenylist, idDenylistFile, "var data = 1;")
 	if len(result.Diagnostics) != 0 {
 		test.Errorf("expected an unconfigured rule to report nothing, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())
@@ -978,19 +973,14 @@ func TestIdDenylistDecoderAcceptsTheConfigLayersShape(test *testing.T) {
 			test.Errorf("decoding %s: %v", testCase.raw, decodeIdDenylistOptionsError)
 			continue
 		}
-		settings, ok := decoded.(IdDenylistSettings)
-		if !ok {
-			test.Errorf("decoding %s: expected IdDenylistSettings, got %T", testCase.raw, decoded)
-			continue
-		}
-		if len(settings.Denied) != len(testCase.denied) {
+		if len(decoded.Denied) != len(testCase.denied) {
 			test.Errorf("decoding %s: expected %d denied names, got %v",
-				testCase.raw, len(testCase.denied), settings.Denied)
+				testCase.raw, len(testCase.denied), decoded.Denied)
 			continue
 		}
 		for _, name := range testCase.denied {
-			if !settings.Denied[name] {
-				test.Errorf("decoding %s: expected %q to be denied, got %v", testCase.raw, name, settings.Denied)
+			if !decoded.Denied[name] {
+				test.Errorf("decoding %s: expected %q to be denied, got %v", testCase.raw, name, decoded.Denied)
 			}
 		}
 	}

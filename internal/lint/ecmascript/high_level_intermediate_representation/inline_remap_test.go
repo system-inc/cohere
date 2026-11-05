@@ -1,15 +1,5 @@
 package high_level_intermediate_representation
 
-// branchingParentSource is the fixture both copy tests lower.
-//
-// Two properties are load-bearing and neither is incidental. The nested body branches, so it holds
-// more than one block and its terminals name blocks -- a single-block body has no reference a
-// skipped remap could leave stale. And the parent branches before it ever reaches the call, which
-// pushes the parent's own block ids past the low numbers a freshly lowered nested body starts at.
-// Measured: with a straight-line parent, the two id spaces coincided exactly, so a mutation that
-// skipped the block remap left ids that were still inside the copied set and the test passed. The
-// spread is what gives the assertion something to see.
-
 import (
 	"testing"
 
@@ -19,6 +9,32 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/static_single_assignment"
 )
+
+// branchingParentSource is the fixture both copy tests lower.
+//
+// Two properties are load-bearing and neither is incidental. The nested body branches, so it holds
+// more than one block and its terminals name blocks -- a single-block body has no reference a
+// skipped remap could leave stale. And the PARENT branches before it ever reaches the call, which
+// pushes the parent's own block ids past the low numbers a freshly lowered nested body starts at.
+// Measured: with a straight-line parent, the two id spaces coincided exactly, so a mutation that
+// skipped the block remap left ids that were still inside the copied set and the test passed. The
+// spread is what gives the assertion something to see.
+const branchingParentSource = `
+	function Component(properties: {value: number; flag: boolean; ready: boolean}) {
+		if (!properties.ready) {
+			return null;
+		}
+		if (properties.value < 0) {
+			return [0];
+		}
+		const compute = () => {
+			let doubled = properties.value * 2;
+			if (properties.flag) { doubled = doubled + 1; }
+			return [doubled];
+		};
+		return compute();
+	}
+`
 
 // TestCopyNestedBodyLeavesNoUnresolvedReference is the guard the whole file exists for.
 //
@@ -292,12 +308,13 @@ func sortedBlockIds(set map[static_single_assignment.BlockId]bool) []static_sing
 // loweredParentAndNested lowers source and returns the first function holding a nested one.
 func loweredParentAndNested(test *testing.T, source string) (*Function, *Function, []Place) {
 	test.Helper()
-	var parent, nested *Function
+	var parent *Function
+	var nested *Function
 	var captures []Place
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "inline-remap-fixture",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {
@@ -406,23 +423,6 @@ func TestCopyNestedBodyLeavesTheNestedFunctionUntouched(test *testing.T) {
 		})
 	}
 }
-
-const branchingParentSource = `
-	function Component(properties: {value: number; flag: boolean; ready: boolean}) {
-		if (!properties.ready) {
-			return null;
-		}
-		if (properties.value < 0) {
-			return [0];
-		}
-		const compute = () => {
-			let doubled = properties.value * 2;
-			if (properties.flag) { doubled = doubled + 1; }
-			return [doubled];
-		};
-		return compute();
-	}
-`
 
 // overlappingIdsParentSource is a memo callback long enough that its own identifier ids run past the
 // first fresh id the parent mints for the copy, so some fresh parent id is also a nested id the remap

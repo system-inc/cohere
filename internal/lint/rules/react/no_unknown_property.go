@@ -974,7 +974,7 @@ type noUnknownPropertyWireOptions struct {
 // list and `requireDataLowercase` false. Both zero values happen to be correct here, which is worth
 // stating rather than relying on silently, because the sibling `jsx-no-target-blank` needed the
 // opposite and a zero-value struct would have inverted it.
-func DecodeNoUnknownPropertyOptions(raw []byte) (any, error) {
+func DecodeNoUnknownPropertyOptions(raw []byte) (NoUnknownPropertyOptions, error) {
 	options := NoUnknownPropertyOptions{}
 	if len(raw) == 0 {
 		return options, nil
@@ -1196,11 +1196,11 @@ func noUnknownPropertyTagOf(node *ast.Node) noUnknownPropertyTagInfo {
 // known ARIA name passes; `fbt` and `fbs` tags are skipped; a non-HTML-like tag passes; the
 // tag-restricted table returns either way once matched; and only then does the standard-name search
 // run. Moving any step changes verdicts, which the fixtures pin.
-var NoUnknownProperty = rule.Rule{
+var NoUnknownProperty = rule.Rule[NoUnknownPropertyOptions]{
 	Name: "react/no-unknown-property",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[NoUnknownPropertyOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnknownPropertyOptions]) rule.Listeners {
+		settings, _ := options.Read()
 		ignored := make(map[string]bool, len(settings.Ignore))
 		for _, name := range settings.Ignore {
 			ignored[name] = true

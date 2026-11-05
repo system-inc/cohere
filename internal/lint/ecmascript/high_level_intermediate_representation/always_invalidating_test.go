@@ -163,10 +163,10 @@ func invalidatingAnswers(test *testing.T, source string) map[string]bool {
 	test.Helper()
 
 	answers := map[string]bool{}
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "always-invalidating-harness",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {
@@ -210,10 +210,10 @@ func forEachCorpusFunctionWithChecker(test *testing.T, limit int,
 	for _, path := range files {
 		contents := contentsOf[path]
 		fileName := "/corpus/" + filepath.Base(path)
-		probe := rule.Rule{
+		probe := rule.Rule[rule.NoOptions]{
 			Name:             "invalidating-corpus",
 			NeedsTypeChecker: true,
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						if ruleContext.TypeChecker == nil {

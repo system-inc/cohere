@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -14,19 +15,19 @@ const groupedAccessorPairsFile = "/repository/source/GroupedAccessorPairs.ts"
 // decoder rather than building the value directly.
 //
 // An empty string means the rule is configured as bare "error", which is what the live config
-// does and what hands the rule nil. That row is what the decoder exists for: upstream's first
+// does and what hands the rule no options. That row is what the decoder exists for: upstream's first
 // option defaults to "anyOrder", so a decoder yielding a zero value would hand the rule an empty
 // string matching no arm and silently drop the order check.
-func decodedGroupedAccessorPairsOptions(test *testing.T, raw string) any {
+func decodedGroupedAccessorPairsOptions(test *testing.T, raw string) rule.Given[GroupedAccessorPairsOptions] {
 	test.Helper()
 	if raw == "" {
-		return nil
+		return rule.Given[GroupedAccessorPairsOptions]{}
 	}
 	options, decodeGroupedAccessorPairsOptionsError := DecodeGroupedAccessorPairsOptions(json.RawMessage(raw))
 	if decodeGroupedAccessorPairsOptionsError != nil {
 		test.Fatalf("the decoder refused %s: %v", raw, decodeGroupedAccessorPairsOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // The corpus is ESLint's own, at `tests/lib/rules/grouped-accessor-pairs.js`, extracted by loading
@@ -125,7 +126,7 @@ func TestGroupedAccessorPairsStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(
 				test,
 				GroupedAccessorPairs,
 				groupedAccessorPairsFile,
@@ -240,7 +241,7 @@ func TestGroupedAccessorPairsFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(
+			rule_testing.ExpectFindings(test, rule_testing.RunGiven(
 				test,
 				GroupedAccessorPairs,
 				groupedAccessorPairsFile,
@@ -340,7 +341,7 @@ func TestGroupedAccessorPairsSpans(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, GroupedAccessorPairs, groupedAccessorPairsFile,
+			result := rule_testing.RunGiven(test, GroupedAccessorPairs, groupedAccessorPairsFile,
 				testCase.sourceText, decodedGroupedAccessorPairsOptions(test, testCase.options))
 			if testCase.index >= len(result.Diagnostics) {
 				test.Fatalf("want a finding at index %d, got %d findings", testCase.index, len(result.Diagnostics))
@@ -437,7 +438,7 @@ func TestGroupedAccessorPairsTypeMembers(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText+" "+testCase.options, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, GroupedAccessorPairs, groupedAccessorPairsFile,
+			result := rule_testing.RunGiven(test, GroupedAccessorPairs, groupedAccessorPairsFile,
 				testCase.sourceText, decodedGroupedAccessorPairsOptions(test, testCase.options))
 			if testCase.wantId == "" {
 				rule_testing.ExpectClean(test, result)
@@ -445,7 +446,8 @@ func TestGroupedAccessorPairsTypeMembers(test *testing.T) {
 			}
 			rule_testing.ExpectFindings(test, result, testCase.wantId)
 			diagnostic := result.Diagnostics[0]
-			if got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; got != testCase.wantSpan {
+			got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
+			if got != testCase.wantSpan {
 				test.Errorf("the finding points at %q, want %q", got, testCase.wantSpan)
 			}
 		})
@@ -490,7 +492,7 @@ func TestGroupedAccessorPairsTypeMemberMessageText(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, GroupedAccessorPairs, groupedAccessorPairsFile,
+			result := rule_testing.RunGiven(test, GroupedAccessorPairs, groupedAccessorPairsFile,
 				testCase.sourceText, decodedGroupedAccessorPairsOptions(test, testCase.options))
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
@@ -534,12 +536,8 @@ func TestDecodeGroupedAccessorPairsOptions(test *testing.T) {
 			if decodeGroupedAccessorPairsOptionsError != nil {
 				test.Fatalf("the decoder refused %q: %v", testCase.raw, decodeGroupedAccessorPairsOptionsError)
 			}
-			options, isOptions := decoded.(GroupedAccessorPairsOptions)
-			if !isOptions {
-				test.Fatalf("the decoder returned %T rather than GroupedAccessorPairsOptions", decoded)
-			}
-			if string(options.Order) != testCase.want {
-				test.Errorf("the order decodes to %q, want %q", options.Order, testCase.want)
+			if string(decoded.Order) != testCase.want {
+				test.Errorf("the order decodes to %q, want %q", decoded.Order, testCase.want)
 			}
 		})
 	}
@@ -573,19 +571,19 @@ func TestDecodeGroupedAccessorPairsOptionsRefusesAValueOutsideTheEnum(test *test
 	}
 }
 
-// A rule configured as bare "error" reaches Run with nil rather than with an options struct. This
-// asserts nil behaves as "anyOrder" rather than as no arm at all, which is the defect the
+// A rule configured as bare "error" reaches Run unconfigured rather than with an options struct. This
+// asserts that behaves as "anyOrder" rather than as no arm at all, which is the defect the
 // hand-rolled decoder exists to prevent and which no fixture routing through the decoder can see.
 func TestGroupedAccessorPairsWithNilOptionsDefaultsToAnyOrder(test *testing.T) {
 	test.Parallel()
 
 	// Ungrouped reports under every order, including the default.
-	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, GroupedAccessorPairs,
-		groupedAccessorPairsFile, "({ get a(){}, b:1, set a(foo){} })", nil), "notGrouped")
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, GroupedAccessorPairs,
+		groupedAccessorPairsFile, "({ get a(){}, b:1, set a(foo){} })"), "notGrouped")
 	// Grouped but set-before-get is clean under anyOrder and would report under getBeforeSet, so
 	// this row is what separates the default from the other two arms.
-	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, GroupedAccessorPairs,
-		groupedAccessorPairsFile, "({ set a(foo){}, get a(){} })", nil))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, GroupedAccessorPairs,
+		groupedAccessorPairsFile, "({ set a(foo){}, get a(){} })"))
 }
 
 // The rendered message text upstream asserts, for every finding in the corpus.
@@ -1074,7 +1072,7 @@ func TestGroupedAccessorPairsMessageText(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, GroupedAccessorPairs, groupedAccessorPairsFile,
+			result := rule_testing.RunGiven(test, GroupedAccessorPairs, groupedAccessorPairsFile,
 				testCase.sourceText, decodedGroupedAccessorPairsOptions(test, testCase.options))
 			if testCase.index >= len(result.Diagnostics) {
 				test.Fatalf("want a finding at index %d, got %d findings", testCase.index, len(result.Diagnostics))
@@ -1121,8 +1119,8 @@ func TestGroupedAccessorPairsComputedKeysDoNotPairWithStaticOnes(test *testing.T
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, GroupedAccessorPairs, groupedAccessorPairsFile,
-				testCase.sourceText, nil)
+			result := rule_testing.Run(test, GroupedAccessorPairs, groupedAccessorPairsFile,
+				testCase.sourceText)
 			if testCase.wantIds == nil {
 				rule_testing.ExpectClean(test, result)
 				return

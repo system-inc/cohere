@@ -44,19 +44,30 @@ func TestAControlWhereItsRuleCannotFireIsRefused(test *testing.T) {
 
 	ignoredPath := lintable
 	ignoredPath.RelativePath = filepath.Join("ignored-here", "Planted.ts")
-	checkControlsAreLintableError := checkControlsAreLintable(lintConfiguration, []differential.Control{ignoredPath}, nil)
+	checkControlsAreLintableError := checkControlsAreLintable(
+		lintConfiguration,
+		[]differential.Control{ignoredPath},
+		nil,
+	)
 	if checkControlsAreLintableError == nil {
 		test.Fatal("a control on an ignored path must be refused: it would miss for a reason unrelated to the harness")
 	}
 	// The message has to name the pattern. "Refused" alone sends the reader looking at the harness,
 	// which is the confusion this whole check exists to prevent.
 	if !strings.Contains(checkControlsAreLintableError.Error(), "ignored-here/**") {
-		test.Fatalf("the refusal must name the ignore pattern that would silence it, got %v", checkControlsAreLintableError)
+		test.Fatalf(
+			"the refusal must name the ignore pattern that would silence it, got %v",
+			checkControlsAreLintableError,
+		)
 	}
 
 	unconfiguredRule := lintable
 	unconfiguredRule.Rule = "import-require-path-alias"
-	checkControlsAreLintableError = checkControlsAreLintable(lintConfiguration, []differential.Control{unconfiguredRule}, nil)
+	checkControlsAreLintableError = checkControlsAreLintable(
+		lintConfiguration,
+		[]differential.Control{unconfiguredRule},
+		nil,
+	)
 	if checkControlsAreLintableError == nil {
 		test.Fatal("a control naming a rule the config does not enable must be refused")
 	}

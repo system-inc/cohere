@@ -550,7 +550,8 @@ func TestLowerLogicalIsControlFlow(test *testing.T) {
 	}
 
 	// The call must not be in the same block as the test: if it were, it would look unconditional.
-	var testBlock, callBlock static_single_assignment.BlockId
+	var testBlock static_single_assignment.BlockId
+	var callBlock static_single_assignment.BlockId
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			if global, ok := function.Instructions[instructionId].Value.(*LoadGlobal); ok {

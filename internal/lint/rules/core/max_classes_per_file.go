@@ -80,7 +80,7 @@ type maxClassesPerFileObjectShape struct {
 // A maximum below 1 is refused, which is upstream's `minimum: 1` in the schema. Measured: eslint
 // rejects both `0` and `{max: 0}` at configuration load rather than at lint time, so refusing here
 // is the same decision arriving through the only surface this port has.
-func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
+func DecodeMaxClassesPerFileOptions(raw []byte) (MaxClassesPerFileOptions, error) {
 	if len(raw) == 0 {
 		return DefaultMaxClassesPerFileSettings(), nil
 	}
@@ -164,13 +164,13 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
 //
 // Upstream declares none, and the repair is a human decision: which class moves, to which file, and
 // what the new file is called. The audit measured 18 sites in this tree for exactly that reason.
-var MaxClassesPerFile = rule.Rule{
+var MaxClassesPerFile = rule.Rule[MaxClassesPerFileOptions]{
 	Name: "max-classes-per-file",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[MaxClassesPerFileOptions]) rule.Listeners {
 		// A rule configured as a bare severity is handed nil, which the assertion turns into a zero
 		// struct whose pointers are nil. Falling back matters more here than usual: a nil Maximum
 		// read as 0 would report every file holding one class.
-		settings, _ := rule.OptionsAs[MaxClassesPerFileOptions](options)
+		settings, _ := options.Read()
 		defaults := DefaultMaxClassesPerFileSettings()
 		if settings.Maximum == nil {
 			settings.Maximum = defaults.Maximum

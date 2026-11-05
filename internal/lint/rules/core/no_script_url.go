@@ -74,9 +74,9 @@ var messageScriptUrl = rule.Message{
 //
 // The rule reports without a repair, matching upstream, which ships no fixer. There is no
 // mechanical repair: replacing the URL means writing a handler somewhere else.
-var NoScriptUrl = rule.Rule{
+var NoScriptUrl = rule.Rule[rule.NoOptions]{
 	Name: "no-script-url",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindStringLiteral: func(node *ast.Node) {
 				if !beginsWithScriptScheme(node.Text()) {

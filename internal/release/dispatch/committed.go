@@ -92,7 +92,10 @@ func (paths Paths) CompilerDirectory() string {
 //
 // The returned string is the commit the binary was built from, so the caller can say which one ran,
 // and the boolean reports whether a build happened.
-func ResolveCommitted(paths Paths, packagePath string) (binaryPath string, commit string, built bool, resolveCommittedError error) {
+func ResolveCommitted(
+	paths Paths,
+	packagePath string,
+) (binaryPath string, commit string, built bool, resolveCommittedError error) {
 	build, resolveCommittedError := readCommittedBuild(paths.ModuleDirectory)
 	if resolveCommittedError != nil {
 		return "", "", false, resolveCommittedError

@@ -8,5 +8,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // shared edit. The decoder is hand-written because `allowKeywords` defaults to `true` and the generic
 // helper would decode an absent option to false, inverting the rule; see DecodeDotNotationOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: DotNotation, Decode: DecodeDotNotationOptions})
+	rule.Register(rule.Registration[DotNotationOptions]{Rule: DotNotation, Decode: DecodeDotNotationOptions})
 }

@@ -10,5 +10,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // No decoder: the rule takes no options. What counts as a runtime edge and as a read at load is the
 // language's, not a project's, so there is nothing for a configuration to say.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessNoImportCycleLoadTimeRead})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessNoImportCycleLoadTimeRead})
 }

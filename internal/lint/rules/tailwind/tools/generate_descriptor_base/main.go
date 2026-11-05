@@ -275,7 +275,7 @@ func systems0Version(systems []system) string {
 	return systems[0].table.TailwindVersion
 }
 
-func readJSON(path string, into any) {
+func readJSON[Target any](path string, into *Target) {
 	raw, readError := os.ReadFile(path)
 	if readError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
@@ -622,8 +622,8 @@ var FrameworkNamespaces = map[string]bool{
 	fmt.Fprintf(&body, `// baseStatics is every static utility whose reading is a fact about Tailwind.
 //
 // %d of them. A static one system registers and another does not is a repository `+"`@utility`"+`
-// block `+"\u2014"+` ahra declares `+"`markdown-content`"+` and `+"`typing-dots`"+`, www-connected-app declares
-// neither `+"\u2014"+` and NewTable adds those from the live evaluator rather than this file carrying one
+// block — ahra declares `+"`markdown-content` and `typing-dots`"+`, www-connected-app declares
+// neither — and NewTable adds those from the live evaluator rather than this file carrying one
 // repository's utilities as framework facts.
 var baseStatics = map[string]Reading{
 `, stats.statics)

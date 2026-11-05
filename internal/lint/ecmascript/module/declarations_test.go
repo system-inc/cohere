@@ -13,9 +13,9 @@ import (
 func withSourceFile(test *testing.T, source string, ask func(sourceFile *ast.SourceFile)) {
 	test.Helper()
 	called := false
-	rule_testing.Run(test, rule.Rule{
+	rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 		Name: "declaration-probe",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					called = true

@@ -15,7 +15,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // almost nothing. `DecodeAccessorPairsOptions` returns the defaults on empty input instead, and the
 // fields behind it are pointers so an absent key stays distinguishable from an explicit false.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[AccessorPairsOptions]{
 		Rule:   AccessorPairs,
 		Decode: DecodeAccessorPairsOptions,
 	})

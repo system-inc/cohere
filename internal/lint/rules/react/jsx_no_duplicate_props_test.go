@@ -311,7 +311,9 @@ func TestJsxNoDuplicatePropsIgnoreCase(test *testing.T) {
 		})
 	}
 
-	if _, decodeOptionsError := rule.DecodeOptionsInto[JsxNoDuplicatePropsOptions]()([]byte(`{"ignorecase": true}`)); decodeOptionsError == nil {
+	if _, decodeOptionsError := rule.DecodeOptionsInto[JsxNoDuplicatePropsOptions]()(
+		[]byte(`{"ignorecase": true}`),
+	); decodeOptionsError == nil {
 		test.Error("a misspelled ignoreCase decoded")
 	}
 }

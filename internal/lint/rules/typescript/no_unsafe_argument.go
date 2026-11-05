@@ -57,14 +57,14 @@ import (
 // Two anchors, both common. The first thing each does is test the argument count, so a call with no
 // arguments costs a slice length, and the checker is only asked once the call has arguments to
 // judge.
-var NoUnsafeArgument = rule.Rule{
+var NoUnsafeArgument = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unsafe-argument",
 
 	// Every judgment is a comparison between an argument's type and a parameter's type.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()

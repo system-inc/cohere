@@ -23,6 +23,12 @@ import (
 	"reflect"
 )
 
+// hirPackagePath is this package, used to decide what deepCopyValue descends into.
+//
+// Taken from a declared type rather than written as a string so a package move cannot silently turn
+// the copy shallow again.
+var hirPackagePath = reflect.TypeOf(Place{}).PkgPath()
+
 // InlineRemap is the correspondence between a nested function's ids and the parent's.
 //
 // Returned rather than applied, so a caller can rewrite the terminals it owns -- the call site's
@@ -67,6 +73,8 @@ type InlineRemap struct {
 // names the same values in the parent. Index i of the two is one binding seen from both sides, so
 // the mapping starts by pairing them: a capture must resolve to the parent's existing value, not to
 // a fresh copy of it, or the inlined body reads a different variable than the code around it.
+//
+// Mutates: parent the copy is made into it, its identifiers, blocks, instructions and nested functions
 func CopyNestedBodyInto(parent *Function, nested *Function, captures []Place) (*InlineRemap, bool) {
 	if parent == nil || nested == nil {
 		return nil, false
@@ -258,14 +266,7 @@ func remapNestedFunctionIds(value InstructionValue, functionRemap map[FunctionId
 // So the copy follows pointers and slices to the bottom. `deepCopyValue` is the one implementation
 // and both terminals and instruction values go through it.
 func copyTerminal(terminal Terminal) Terminal {
-	if terminal == nil {
-		return nil
-	}
-	clone, ok := deepCopyAny(terminal).(Terminal)
-	if !ok {
-		return terminal
-	}
-	return clone
+	return deepCopy(terminal)
 }
 
 // copyInstructionValue returns an instruction value sharing no mutable storage with its argument.
@@ -274,18 +275,11 @@ func copyTerminal(terminal Terminal) Terminal {
 // pointers into the value, so a copied instruction that still holds the original's `*CallExpression`
 // has its operands renamed in the nested function rather than in the copy.
 func copyInstructionValue(value InstructionValue) InstructionValue {
-	if value == nil {
-		return nil
-	}
-	clone, ok := deepCopyAny(value).(InstructionValue)
-	if !ok {
-		return value
-	}
-	return clone
+	return deepCopy(value)
 }
 
-// deepCopyAny duplicates a value and everything reachable from it through pointers, slices, maps
-// and interfaces.
+// deepCopy duplicates a value and everything reachable from it through pointers, slices, maps and
+// interfaces.
 //
 // Written by reflection rather than as one arm per type because the arms would say nothing. A
 // hand-written `case *If: return &If{...}` restates the struct definition, and the restatement is
@@ -298,12 +292,18 @@ func copyInstructionValue(value InstructionValue) InstructionValue {
 // syntax tree, shared by every consumer in the process and never rewritten by a remap. Following
 // them would copy the program. The stop condition is therefore structural rather than a type list:
 // a pointer to a struct declared outside this package is kept as-is.
-func deepCopyAny(value any) any {
-	if value == nil {
-		return nil
-	}
-	source := reflect.ValueOf(value)
-	return deepCopyValue(source).Interface()
+//
+// Generic so the copy comes back as the type it was handed, and no caller asserts it back.
+func deepCopy[Value any](value Value) Value {
+	var copied Value
+	// Reflected through a pointer so the value keeps its static type. `reflect.ValueOf(value)` on an
+	// interface type sees only the dynamic value inside, and on a nil interface sees nothing at all;
+	// through the pointer a nil `Terminal` is a nil interface value, and deepCopyValue hands it back
+	// as the nil it was. The pointer is to a local holding the value, so nothing can reach the
+	// parameter through it.
+	original := value
+	reflect.ValueOf(&copied).Elem().Set(deepCopyValue(reflect.ValueOf(&original).Elem()))
+	return copied
 }
 
 func deepCopyValue(source reflect.Value) reflect.Value {
@@ -370,9 +370,3 @@ func deepCopyValue(source reflect.Value) reflect.Value {
 		return source
 	}
 }
-
-// hirPackagePath is this package, used to decide what deepCopyValue descends into.
-//
-// Taken from a declared type rather than written as a string so a package move cannot silently turn
-// the copy shallow again.
-var hirPackagePath = reflect.TypeOf(Place{}).PkgPath()

@@ -117,16 +117,16 @@ type Context struct {
 
 // FileCache memoizes per-file derived work across the rules that share it.
 //
-// Deliberately untyped and keyed by string rather than holding named fields. This package must not
-// know what a comment scan is, or a scope table, or whatever the next expensive shared derivation
-// turns out to be. The rule packages own those; this owns only the fact that they are worth
-// computing once.
+// Keyed by string rather than holding named fields, each entry of whatever type its derivation computes.
+// This package must not know what a comment scan is, or a scope table, or whatever the next expensive
+// shared derivation turns out to be. The rule packages own those; this owns only the fact that they are
+// worth computing once.
 //
 // Not safe for concurrent use, and it does not need to be: one cache is created per file and every
 // rule for that file runs on the one goroutine that owns it. Sharing a cache across files or
 // workers would be a bug, which is why nothing here has a mutex to make that look safe.
 type FileCache struct {
-	entries map[string]any
+	entries map[string]cacheEntry
 
 	// fills counts how many times each derivation was computed, keyed the same way the entries are.
 	// Once per key is the cache working.
@@ -146,7 +146,7 @@ type FileCache struct {
 // NewFileCache returns a cache for one file.
 func NewFileCache() *FileCache {
 	return &FileCache{
-		entries: map[string]any{},
+		entries: map[string]cacheEntry{},
 		fills:   map[string]int{},
 	}
 }
@@ -179,8 +179,8 @@ func Cached[Value any](cache *FileCache, key string, compute func() Value) Value
 		return compute()
 	}
 	if existing, isCached := cache.entries[key]; isCached {
-		if typed, isTyped := existing.(Value); isTyped {
-			return typed
+		if typed, isTyped := existing.(cachedValue[Value]); isTyped {
+			return typed.value
 		}
 		// Two callers used one key for different types. Recomputing is the safe answer, and it is
 		// silent on purpose: the alternative is a rule package crashing a lint run over a cache.
@@ -194,9 +194,22 @@ func Cached[Value any](cache *FileCache, key string, compute func() Value) Value
 	}
 	cache.fills[key]++
 
-	cache.entries[key] = computed
+	cache.entries[key] = cachedValue[Value]{value: computed}
 	return computed
 }
+
+// cacheEntry is one derivation's value in a FileCache, whatever its type. It is sealed: only cachedValue
+// implements it, so Cached reads an entry back as the one type it was stored with.
+type cacheEntry interface {
+	fileCacheEntry()
+}
+
+// cachedValue is a derivation's value as a FileCache stores it.
+type cachedValue[Value any] struct {
+	value Value
+}
+
+func (cachedValue[Value]) fileCacheEntry() {}
 
 // Listeners maps an AST node kind to the function a rule wants called when the walk reaches it.
 //
@@ -248,9 +261,18 @@ const (
 // ctx.SourceFile while deciding whether to listen at all. Returning nil listeners is how a rule
 // declines a file cheaply, the discipline that matters most for speed, since the cheapest rule is
 // one that looks at a filename and stops.
-type Rule struct {
+//
+// Options is the type the rule's options decode into, and NoOptions for a rule that takes none. Run and
+// ProgramFingerprint are handed exactly that type, and Registration ties it to the decoder's result, so a
+// decoder returning a pointer while the rule reads a value no longer compiles (#ymag4q6). Before this, options
+// travelled as `any` and each rule asserted its own type at runtime, and that drift went unseen in
+// unified-signatures until a fixture configured the rule (#qmvkf83).
+//
+// The framework never holds a Rule, since rules of different option types share one list. It holds an Entry
+// (registered) or a Bound (options decided), which carry the rule's Traits by name.
+type Rule[Options any] struct {
 	Name string
-	Run  func(ruleContext Context, options any) Listeners
+	Run  func(ruleContext Context, options Given[Options]) Listeners
 
 	// NoListener declares why this rule may register no listener on a file it was offered and still
 	// have done its job. See NoListenerKind. Left undeclared, a rule offered files that registers no
@@ -351,7 +373,7 @@ type Rule struct {
 	// outside this hash replays a stale finding when it changes. So it is proven both ways for each rule, a
 	// planted change to the indexed data moving it and an edit elsewhere leaving it alone. A rule that declares
 	// ReadsOtherFiles without one is walked on every file, as before: the default is always the sound one.
-	ProgramFingerprint func(program Program, options any) [sha256.Size]byte
+	ProgramFingerprint func(program Program, options Given[Options]) [sha256.Size]byte
 
 	// TypeReach declares what a type-aware rule can see of the files its file imports, and so what its
 	// cached findings are keyed on. Contents, the default, keys them on the bytes of every file in the
@@ -389,6 +411,27 @@ type Rule struct {
 	// makes this field cheaper to get wrong than the two above it.
 	ResolvesReactValueTypes bool
 }
+
+// Traits is what a rule declares about itself apart from how it runs: the facts the walk, the findings cache,
+// the coverage report and the docs read without running it. Each field means what the Rule field of the same
+// name means, and traitsOf copies them, so the framework reads `subject.NeedsTypeChecker` off an Entry or a
+// Bound without knowing the rule's options type. TestTraitsCarryEveryRuleField holds the two field lists equal.
+type Traits struct {
+	Name                    string
+	NoListener              NoListenerKind
+	NeedsTypeChecker        bool
+	ProgramReads            ProgramRead
+	TypeReach               TypeReach
+	ResolvesReactValueTypes bool
+
+	// HasProgramFingerprint is whether the rule declares a ProgramFingerprint, which the findings cache reads
+	// before any options are decided.
+	HasProgramFingerprint bool
+}
+
+// NoOptions is the options type of a rule that takes none: `rule.Rule[rule.NoOptions]`. A config giving such
+// a rule an option element is refused by name, since nothing would read it.
+type NoOptions struct{}
 
 // ReportNode is the common case: this node is wrong, here is why.
 //
@@ -506,7 +549,11 @@ func (ruleContext Context) ReportRange(textRange core.TextRange, message Message
 // The shape was already settled elsewhere. The tsgolint adapter has exactly this method, because an
 // adapted rule needed it first. Native rules simply did not have it, which is the kind of asymmetry
 // that is invisible until someone writes the rule that falls in the gap.
-func (ruleContext Context) ReportRangeWithSuggestions(textRange core.TextRange, message Message, suggestions ...Suggestion) {
+func (ruleContext Context) ReportRangeWithSuggestions(
+	textRange core.TextRange,
+	message Message,
+	suggestions ...Suggestion,
+) {
 	ruleContext.Report(Diagnostic{
 		Range:       textRange,
 		Message:     message,

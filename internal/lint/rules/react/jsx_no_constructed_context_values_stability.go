@@ -88,18 +88,19 @@ func jsxNoConstructedContextValuesMemoHookName(call *ast.Node) string {
 // jsxNoConstructedContextValuesUnwrap strips the wrappers that do not change identity: parentheses,
 // `as`, `satisfies` and a non-null assertion.
 func jsxNoConstructedContextValuesUnwrap(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	unwrapped := node
+	for unwrapped != nil {
+		switch unwrapped.Kind {
 		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
+			unwrapped = unwrapped.AsParenthesizedExpression().Expression
 		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
+			unwrapped = unwrapped.AsAsExpression().Expression
 		case ast.KindSatisfiesExpression:
-			node = node.AsSatisfiesExpression().Expression
+			unwrapped = unwrapped.AsSatisfiesExpression().Expression
 		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
+			unwrapped = unwrapped.AsNonNullExpression().Expression
 		default:
-			return node
+			return unwrapped
 		}
 	}
 	return nil
@@ -192,17 +193,17 @@ func jsxNoConstructedContextValuesRunsWith(owner *ast.Node, scope *ast.Node, ren
 // jsxNoConstructedContextValuesMemoOf finds the memo call behind a provider's value expression: the
 // call written inline, or the call a render-scoped `const` was initialized with.
 func jsxNoConstructedContextValuesMemoOf(ruleContext rule.Context, value *ast.Node, scope *ast.Node) *ast.Node {
-	value = jsxNoConstructedContextValuesUnwrap(value)
-	if value == nil {
+	unwrapped := jsxNoConstructedContextValuesUnwrap(value)
+	if unwrapped == nil {
 		return nil
 	}
-	if jsxNoConstructedContextValuesMemoHookName(value) != "" {
-		return value
+	if jsxNoConstructedContextValuesMemoHookName(unwrapped) != "" {
+		return unwrapped
 	}
-	if value.Kind != ast.KindIdentifier {
+	if unwrapped.Kind != ast.KindIdentifier {
 		return nil
 	}
-	declaration := jsxNoConstructedContextValuesRenderConst(ruleContext, value, scope, scope)
+	declaration := jsxNoConstructedContextValuesRenderConst(ruleContext, unwrapped, scope, scope)
 	if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
 		return nil
 	}
@@ -390,27 +391,27 @@ func (walk *jsxNoConstructedContextValuesStabilityWalk) evaluate(
 	scope *ast.Node,
 	depth int,
 ) jsxNoConstructedContextValuesEvaluation {
-	node = jsxNoConstructedContextValuesUnwrap(node)
-	if node == nil {
+	unwrapped := jsxNoConstructedContextValuesUnwrap(node)
+	if unwrapped == nil {
 		return jsxNoConstructedContextValuesEvaluation{}
 	}
 	if depth > jsxNoConstructedContextValuesStabilityDepthLimit {
 		return jsxNoConstructedContextValuesUnknown
 	}
-	if walk.isPrimitive(node) {
+	if walk.isPrimitive(unwrapped) {
 		return jsxNoConstructedContextValuesEvaluation{}
 	}
 
-	if kind := jsxNoConstructedContextValuesConstructionKind(node); kind != "" {
+	if kind := jsxNoConstructedContextValuesConstructionKind(unwrapped); kind != "" {
 		return jsxNoConstructedContextValuesEvaluation{fresh: &jsxNoConstructedContextValuesInstability{
-			origin: node,
+			origin: unwrapped,
 			reason: fmt.Sprintf("is a new %s built during render", kind),
 		}}
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindConditionalExpression:
-		conditional := node.AsConditionalExpression()
+		conditional := unwrapped.AsConditionalExpression()
 		return walk.evaluate(conditional.WhenTrue, scope, depth+1).
 			combine(walk.evaluate(conditional.WhenFalse, scope, depth+1))
 
@@ -420,7 +421,7 @@ func (walk *jsxNoConstructedContextValuesStabilityWalk) evaluate(
 		// and into anything else (a property, an element, an outer variable) it is an escape, which
 		// proves nothing. Every other binary operator produces a primitive, which the type check
 		// above has already let through.
-		binary := node.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		switch binary.OperatorToken.Kind {
 		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
 			return walk.evaluate(binary.Left, scope, depth+1).combine(walk.evaluate(binary.Right, scope, depth+1))
@@ -441,8 +442,8 @@ func (walk *jsxNoConstructedContextValuesStabilityWalk) evaluate(
 		return jsxNoConstructedContextValuesUnknown
 
 	case ast.KindCallExpression:
-		if name := jsxNoConstructedContextValuesMemoHookName(node); name != "" {
-			inner, other := walk.memoFinding(node, scope, depth+1)
+		if name := jsxNoConstructedContextValuesMemoHookName(unwrapped); name != "" {
+			inner, other := walk.memoFinding(unwrapped, scope, depth+1)
 			if inner == nil {
 				return jsxNoConstructedContextValuesUnknown
 			}
@@ -456,10 +457,10 @@ func (walk *jsxNoConstructedContextValuesStabilityWalk) evaluate(
 				other: other,
 			}
 		}
-		return walk.callEvaluation(node, depth+1)
+		return walk.callEvaluation(unwrapped, depth+1)
 
 	case ast.KindIdentifier:
-		declaration := jsxNoConstructedContextValuesRenderConst(walk.ctx, node, scope, walk.render)
+		declaration := jsxNoConstructedContextValuesRenderConst(walk.ctx, unwrapped, scope, walk.render)
 		if declaration == nil || walk.active[declaration] {
 			return jsxNoConstructedContextValuesUnknown
 		}

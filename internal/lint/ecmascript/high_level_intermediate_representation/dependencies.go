@@ -477,10 +477,11 @@ type dependencyTree struct {
 // roots, one carrying a property and marked non-null. So ordering and conflicts are now reachable
 // and this note is a live caveat rather than a dormant one.
 func newDependencyTree(hoistable map[static_single_assignment.IdentifierId]*hoistableNode) *dependencyTree {
-	if hoistable == nil {
-		hoistable = map[static_single_assignment.IdentifierId]*hoistableNode{}
+	seeded := hoistable
+	if seeded == nil {
+		seeded = map[static_single_assignment.IdentifierId]*hoistableNode{}
 	}
-	return &dependencyTree{hoistable: hoistable, roots: map[static_single_assignment.IdentifierId]*dependencyNode{}}
+	return &dependencyTree{hoistable: seeded, roots: map[static_single_assignment.IdentifierId]*dependencyNode{}}
 }
 
 // addDependency records one access path, truncating it where the path stops being safe to hoist.
@@ -570,6 +571,8 @@ func (tree *dependencyTree) deriveMinimalDependencies() []ReactiveScopeDependenc
 //
 // Recursion depth is the longest access path, and the tree is finite and fully built before this
 // runs, so this terminates without any convergence argument. See the package comment on termination.
+//
+// Mutates: results the walk appends every minimal path it finds, so one slice gathers a whole tree
 func collectMinimalInSubtree(node *dependencyNode, root static_single_assignment.IdentifierId,
 	path []DependencyPathEntry, results *[]ReactiveScopeDependency) {
 	if isDependencyAccess(node.access) {
@@ -669,6 +672,8 @@ func collectTemporaries(function *Function, usedOutside map[static_single_assign
 // function resolves to the nested value rather than to a path through the outer one, so a path is
 // reported shallower rather than wrong. Recorded because a reader diffing against the bundle will
 // see the shared map missing.
+//
+// Mutates: into the walk records every temporary it resolves, so one map gathers a whole function
 func collectTemporariesInto(
 	function *Function,
 	usedOutside map[static_single_assignment.DeclarationId]bool,
@@ -977,13 +982,14 @@ func (collector *dependencyCollector) visitDependency(dep ReactiveScopeDependenc
 	// named `current` on a non-ref object would be truncated where upstream keeps the path, which
 	// costs precision in the safe direction -- the scope depends on the whole object and
 	// invalidates more often, never less.
+	recorded := dep
 	if len(dep.Path) > 0 && dep.Path[0].Property == "current" {
-		dep = ReactiveScopeDependency{
+		recorded = ReactiveScopeDependency{
 			Identifier: dep.Identifier,
 			Reactive:   dep.Reactive,
 		}
 	}
-	identifier := collector.function.Identifiers[dep.Identifier]
+	identifier := collector.function.Identifiers[recorded.Identifier]
 	if identifier == nil {
 		return
 	}
@@ -995,9 +1001,9 @@ func (collector *dependencyCollector) visitDependency(dep ReactiveScopeDependenc
 			if collector.result.declarations == nil {
 				collector.result.declarations = map[ScopeId][]static_single_assignment.IdentifierId{}
 			}
-			if !containsIdentifier(collector.result.declarations[declaringScope], dep.Identifier) {
+			if !containsIdentifier(collector.result.declarations[declaringScope], recorded.Identifier) {
 				collector.result.declarations[declaringScope] =
-					append(collector.result.declarations[declaringScope], dep.Identifier)
+					append(collector.result.declarations[declaringScope], recorded.Identifier)
 			}
 			// The origin is the innermost scope on the stack recorded at declaration time, which is
 			// the last entry: the stack is pushed outermost-first as scopes open.
@@ -1011,16 +1017,16 @@ func (collector *dependencyCollector) visitDependency(dep ReactiveScopeDependenc
 			if collector.result.declarationOrigin == nil {
 				collector.result.declarationOrigin = map[static_single_assignment.IdentifierId]ScopeId{}
 			}
-			collector.result.declarationOrigin[dep.Identifier] =
+			collector.result.declarationOrigin[recorded.Identifier] =
 				original.scopeStack[len(original.scopeStack)-1]
 		}
 	}
 	if len(collector.dependencies) == 0 {
 		return
 	}
-	if collector.checkValidDependency(dep) {
+	if collector.checkValidDependency(recorded) {
 		collector.dependencies[len(collector.dependencies)-1] =
-			append(collector.dependencies[len(collector.dependencies)-1], dep)
+			append(collector.dependencies[len(collector.dependencies)-1], recorded)
 	}
 }
 
@@ -1321,11 +1327,11 @@ func (collector *dependencyCollector) handleInstruction(instruction *Instruction
 		return
 	}
 
-	switch value := instruction.Value.(type) {
+	switch instructionValue := instruction.Value.(type) {
 	case *FunctionExpression:
 		// The recursion replaces the bare capture visit: `EachPlace` would record each capture as
 		// a rootless access, and that bare root prunes away every deeper path in the same subtree.
-		collector.visitNestedFunction(value.Function, value.Captures)
+		collector.visitNestedFunction(instructionValue.Function, instructionValue.Captures)
 	case *StartMemoize:
 		// The marker's operands are the dependencies the developer wrote, and reading them as
 		// dependencies of the enclosing scope is what makes writing `[x]` change what we infer.
@@ -1359,38 +1365,42 @@ func (collector *dependencyCollector) handleInstruction(instruction *Instruction
 		// `checkValidDependency` is this file's line for line. Something downstream of collection
 		// resolves the bare root for them, and until that is found this arm is the measured answer
 		// rather than the understood one.
-		_ = value
+		_ = instructionValue
 	case *PropertyLoad:
-		collector.visitDependency(collector.temporaries.getProperty(value.Object, value.Property, value.Optional))
+		collector.visitDependency(collector.temporaries.getProperty(
+			instructionValue.Object,
+			instructionValue.Property,
+			instructionValue.Optional,
+		))
 	case *StoreLocal:
-		collector.visitDependency(collector.temporaries.resolve(value.Value))
-		if value.Kind == InstructionKindReassign {
-			collector.visitReassignment(value.LValue)
-			collector.reassignments[value.LValue.Identifier] = decl
+		collector.visitDependency(collector.temporaries.resolve(instructionValue.Value))
+		if instructionValue.Kind == InstructionKindReassign {
+			collector.visitReassignment(instructionValue.LValue)
+			collector.reassignments[instructionValue.LValue.Identifier] = decl
 		}
-		collector.declare(value.LValue.Identifier, decl)
+		collector.declare(instructionValue.LValue.Identifier, decl)
 	case *StoreContext:
-		collector.visitDependency(collector.temporaries.resolve(value.Value))
-		if value.Kind == InstructionKindReassign {
-			collector.visitReassignment(value.LValue)
-			collector.reassignments[value.LValue.Identifier] = decl
+		collector.visitDependency(collector.temporaries.resolve(instructionValue.Value))
+		if instructionValue.Kind == InstructionKindReassign {
+			collector.visitReassignment(instructionValue.LValue)
+			collector.reassignments[instructionValue.LValue.Identifier] = decl
 		}
-		collector.declare(value.LValue.Identifier, decl)
+		collector.declare(instructionValue.LValue.Identifier, decl)
 	case *DeclareLocal:
-		collector.declare(value.LValue.Identifier, decl)
+		collector.declare(instructionValue.LValue.Identifier, decl)
 	case *DeclareContext:
-		collector.declare(value.LValue.Identifier, decl)
+		collector.declare(instructionValue.LValue.Identifier, decl)
 	case *Destructure:
-		collector.visitDependency(collector.temporaries.resolve(value.Value))
-		// The shared `eachPatternPlace` yields defaults and computed keys as uses alongside the
+		collector.visitDependency(collector.temporaries.resolve(instructionValue.Value))
+		// The shared `eachPatternPlace` yields defaults and computed keys as USES alongside the
 		// bindings, which is richer than upstream's `eachPatternOperand` and exactly right here: a
 		// default value is read by the destructure and is a genuine dependency.
-		eachPatternPlace(value.LValue, func(place Place, role PlaceRole) {
+		eachPatternPlace(instructionValue.LValue, func(place Place, role PlaceRole) {
 			if role != PlaceRoleDefine {
 				collector.visitDependency(collector.temporaries.resolve(place))
 				return
 			}
-			if value.Kind == InstructionKindReassign {
+			if instructionValue.Kind == InstructionKindReassign {
 				collector.visitReassignment(place)
 				collector.reassignments[place.Identifier] = decl
 			}
@@ -1868,6 +1878,8 @@ func appendWithoutOptionalDuplicates(seed []ReactiveScopeDependency,
 //
 // First writer wins per prefix, matching `hoistableTreeFor`, which keeps the node it already built
 // and only counts a disagreement.
+//
+// Mutates: into each prefix not yet recorded is written, so one map commits the optionality of every path
 func recordPrefixOptionality(path ReactiveScopeDependency, into map[string]bool) {
 	var builder strings.Builder
 	builder.WriteString(strconv.Itoa(int(path.Identifier)))

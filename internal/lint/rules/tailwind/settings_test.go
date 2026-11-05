@@ -1,6 +1,7 @@
 package tailwind
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -44,23 +45,60 @@ var settingsSamples = map[string][2]string{
 	"allowMultiline":         {`false`, `true`},
 }
 
-// tailwindDecoders is every better-tailwindcss rule's registered decoder, by name.
-func tailwindDecoders(test *testing.T) map[string]func(raw []byte, base rule.OptionsBase) (any, error) {
+// tailwindOptions is what every better-tailwindcss rule's options carry: the class literal surfaces its Run
+// reads. It is the one thing a table over every rule needs of options whose types differ.
+type tailwindOptions interface {
+	ClassLiteralSurfaces() *ClassLiteralSurfaces
+}
+
+// tailwindDecoderOf is subject's decoder as tailwindRegistration registers it, returning what it decoded as
+// tailwindOptions so one table can hold every rule's.
+func tailwindDecoderOf[Options tailwindOptions, Settled interface {
+	*Options
+	anchorAt(directory string)
+	compileClassLiterals() error
+}](subject rule.Rule[Options]) func(raw []byte, base rule.OptionsBase) (tailwindOptions, error) {
+	decode := decodeTailwindOptionsAt[Options, Settled]()
+	return func(raw []byte, base rule.OptionsBase) (tailwindOptions, error) {
+		// Returned as the decoder returned it, error and all, so a caller reads exactly what the rule's
+		// registration would hand on.
+		decoded, decodeError := decode(raw, base)
+		return decoded, decodeError
+	}
+}
+
+// tailwindDecoders is every better-tailwindcss rule's decoder, by name. Held against tailwindOptionKeys, which
+// registration fills, so a rule registered and missing here fails rather than going untested.
+func tailwindDecoders(test *testing.T) map[string]func(raw []byte, base rule.OptionsBase) (tailwindOptions, error) {
 	test.Helper()
-	decoders := map[string]func(raw []byte, base rule.OptionsBase) (any, error){}
-	for _, registration := range rule.Registered() {
-		if _, isTailwind := tailwindOptionKeys[registration.Rule.Name]; isTailwind {
-			decoders[registration.Rule.Name] = registration.DecodeAt
+	decoders := map[string]func(raw []byte, base rule.OptionsBase) (tailwindOptions, error){
+		EnforceConsistentClassOrder.Name:        tailwindDecoderOf(EnforceConsistentClassOrder),
+		EnforceConsistentVariantOrder.Name:      tailwindDecoderOf(EnforceConsistentVariantOrder),
+		EnforceConsistentImportantPosition.Name: tailwindDecoderOf(EnforceConsistentImportantPosition),
+		EnforceConsistentVariableSyntax.Name:    tailwindDecoderOf(EnforceConsistentVariableSyntax),
+		EnforceShorthandClasses.Name:            tailwindDecoderOf(EnforceShorthandClasses),
+		EnforceCanonicalClasses.Name:            tailwindDecoderOf(EnforceCanonicalClasses),
+		NoConcatenatedClasses.Name:              tailwindDecoderOf(NoConcatenatedClasses),
+		NoConflictingClasses.Name:               tailwindDecoderOf(NoConflictingClasses),
+		NoDeprecatedClasses.Name:                tailwindDecoderOf(NoDeprecatedClasses),
+		NoDuplicateClasses.Name:                 tailwindDecoderOf(NoDuplicateClasses),
+		NoUnknownClasses.Name:                   tailwindDecoderOf(NoUnknownClasses),
+		NoUnnecessaryWhitespace.Name:            tailwindDecoderOf(NoUnnecessaryWhitespace),
+	}
+	for ruleName := range tailwindOptionKeys {
+		if _, isListed := decoders[ruleName]; !isListed {
+			test.Fatalf("%s is registered as a better-tailwindcss rule and tailwindDecoders does not list it", ruleName)
 		}
 	}
-	if len(decoders) != 12 {
-		test.Fatalf("found %d better-tailwindcss decoders, want 12", len(decoders))
+	if len(decoders) != 12 || len(tailwindOptionKeys) != 12 {
+		test.Fatalf("found %d better-tailwindcss decoders and %d registered rules, want 12 of each",
+			len(decoders), len(tailwindOptionKeys))
 	}
 	return decoders
 }
 
 // decodedKey re-encodes decoded options and returns one key's value, compacted.
-func decodedKey(test *testing.T, decoded any, key string) string {
+func decodedKey[Options any](test *testing.T, decoded Options, key string) string {
 	test.Helper()
 	encoded, encodeError := json.Marshal(decoded)
 	if encodeError != nil {
@@ -73,14 +111,56 @@ func decodedKey(test *testing.T, decoded any, key string) string {
 	return compactJsonForTest(test, fields[key])
 }
 
+// compactJsonForTest is raw compacted with every object's keys sorted, so two spellings of one value compare
+// equal. Raw that is not JSON, such as the empty value of a key the decoded options never wrote, comes back as
+// written.
 func compactJsonForTest(test *testing.T, raw json.RawMessage) string {
 	test.Helper()
-	var value any
-	if decodeError := json.Unmarshal(raw, &value); decodeError != nil {
+	if !json.Valid(raw) {
 		return string(raw)
 	}
-	compacted, _ := json.Marshal(value)
-	return string(compacted)
+	return string(canonicalJsonForTest(test, raw))
+}
+
+// canonicalJsonForTest is one well-formed JSON value read as raw text, so each object and array is decoded only
+// as far as its members, into types that hold no value of unknown kind. An object is re-encoded from a map, which
+// encoding/json writes with its keys sorted.
+func canonicalJsonForTest(test *testing.T, raw json.RawMessage) json.RawMessage {
+	test.Helper()
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) > 0 && trimmed[0] == '{' {
+		members := map[string]json.RawMessage{}
+		if decodeError := json.Unmarshal(trimmed, &members); decodeError != nil {
+			test.Fatalf("reading an object's members: %v\n%s", decodeError, trimmed)
+		}
+		for key, member := range members {
+			members[key] = canonicalJsonForTest(test, member)
+		}
+		encoded, encodeError := json.Marshal(members)
+		if encodeError != nil {
+			test.Fatalf("encoding an object's members: %v\n%s", encodeError, trimmed)
+		}
+		return encoded
+	}
+	if len(trimmed) > 0 && trimmed[0] == '[' {
+		var elements []json.RawMessage
+		if decodeError := json.Unmarshal(trimmed, &elements); decodeError != nil {
+			test.Fatalf("reading an array's elements: %v\n%s", decodeError, trimmed)
+		}
+		for index, element := range elements {
+			elements[index] = canonicalJsonForTest(test, element)
+		}
+		encoded, encodeError := json.Marshal(elements)
+		if encodeError != nil {
+			test.Fatalf("encoding an array's elements: %v\n%s", encodeError, trimmed)
+		}
+		return encoded
+	}
+	var compacted bytes.Buffer
+	if compactError := json.Compact(&compacted, trimmed); compactError != nil {
+		test.Fatalf("compacting a value: %v\n%s", compactError, trimmed)
+	}
+	return compacted.Bytes()
 }
 
 func settingsBase(block string) rule.OptionsBase {
@@ -135,28 +215,25 @@ func TestSettingsSitBetweenDefaultsAndOptions(test *testing.T) {
 // is shallow: an options key replaces the settings key whole, never merging into it.
 func TestSettingsReachOnlyTheRulesThatDeclareThem(test *testing.T) {
 	test.Parallel()
-	decoders := tailwindDecoders(test)
 	base := settingsBase(`{"order": "desc", "callees": ["a", "b"]}`)
 
-	decoded, err := decoders[NoDuplicateClasses.Name](nil, base)
-	if err != nil {
-		test.Fatalf("no-duplicate-classes read a key it does not declare instead of leaving it to its sibling: %v", err)
-	}
-	duplicateOptions, isDuplicateOptions := decoded.(NoDuplicateClassesOptions)
-	if !isDuplicateOptions {
-		test.Fatalf("no-duplicate-classes decoded %T, want NoDuplicateClassesOptions", decoded)
+	duplicateOptions, decodeTailwindOptionsError := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(nil, base)
+	if decodeTailwindOptionsError != nil {
+		test.Fatalf(
+			"no-duplicate-classes read a key it does not declare instead of leaving it to its sibling: %v",
+			decodeTailwindOptionsError,
+		)
 	}
 	if callees := legacyNames(duplicateOptions.Callees); callees != "a,b" {
 		test.Fatalf("no-duplicate-classes' callees = %v, want settings' [a b]", callees)
 	}
 
-	ordered, err := decoders[EnforceConsistentClassOrder.Name]([]byte(`{"callees": ["c"]}`), base)
-	if err != nil {
-		test.Fatal(err)
-	}
-	options, isOrderOptions := ordered.(EnforceConsistentClassOrderOptions)
-	if !isOrderOptions {
-		test.Fatalf("enforce-consistent-class-order decoded %T, want EnforceConsistentClassOrderOptions", ordered)
+	options, decodeTailwindOptionsError := decodeTailwindOptionsAt[EnforceConsistentClassOrderOptions]()(
+		[]byte(`{"callees": ["c"]}`),
+		base,
+	)
+	if decodeTailwindOptionsError != nil {
+		test.Fatal(decodeTailwindOptionsError)
 	}
 	if options.Order != "desc" || legacyNames(options.Callees) != "c" {
 		test.Fatalf("class order decoded order %q and callees %v, want settings' desc and options' [c] alone",
@@ -176,7 +253,7 @@ func legacyNames(selectors []LegacySelector) string {
 // The rule's own element is decoded strictly before anything merges, so its error names its own key.
 func TestARulesOwnOptionsAreDecodedBeforeSettingsMerge(test *testing.T) {
 	test.Parallel()
-	decode := tailwindDecoders(test)[NoDuplicateClasses.Name]
+	decode := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()
 	_, decodeError := decode([]byte(`{"callee": ["cn"]}`), settingsBase(`{"callees": ["mergeClassNames"]}`))
 	if decodeError == nil || !strings.Contains(decodeError.Error(), "callee") {
 		test.Fatalf("a misspelled key in the rule's own options was not refused by name: %v", decodeError)
@@ -233,9 +310,12 @@ const ourSettings = `{
 // #gj5nm6e the defaults were ours, so every one of these went unchecked.
 func TestAnOutsiderIsReadWithUpstreamsDefaults(test *testing.T) {
 	test.Parallel()
-	decoded, err := tailwindDecoders(test)[NoDuplicateClasses.Name](nil, rule.OptionsBase{ConfigDirectory: "/repo"})
-	if err != nil {
-		test.Fatal(err)
+	decoded, decodeTailwindOptionsError := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(
+		nil,
+		rule.OptionsBase{ConfigDirectory: "/repo"},
+	)
+	if decodeTailwindOptionsError != nil {
+		test.Fatal(decodeTailwindOptionsError)
 	}
 	read := []string{
 		`const merged = cn('flex flex');`,
@@ -287,9 +367,12 @@ func TestAnOutsiderIsReadWithUpstreamsDefaults(test *testing.T) {
 // its defaults.
 func TestOurSettingsReadOurMatchers(test *testing.T) {
 	test.Parallel()
-	decoded, err := tailwindDecoders(test)[NoDuplicateClasses.Name](nil, settingsBase(ourSettings))
-	if err != nil {
-		test.Fatal(err)
+	decoded, decodeTailwindOptionsError := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(
+		nil,
+		settingsBase(ourSettings),
+	)
+	if decodeTailwindOptionsError != nil {
+		test.Fatal(decodeTailwindOptionsError)
 	}
 	read := []string{
 		`const merged = mergeClassNames('flex flex');`,
@@ -320,9 +403,12 @@ func TestOurSettingsReadOurMatchers(test *testing.T) {
 // An empty list replaces its kind's defaults with nothing, as upstream's `callees !== undefined` does.
 func TestAnEmptyKindReadsNothingOfIt(test *testing.T) {
 	test.Parallel()
-	decoded, err := tailwindDecoders(test)[NoDuplicateClasses.Name](nil, settingsBase(`{"callees": []}`))
-	if err != nil {
-		test.Fatal(err)
+	decoded, decodeTailwindOptionsError := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(
+		nil,
+		settingsBase(`{"callees": []}`),
+	)
+	if decodeTailwindOptionsError != nil {
+		test.Fatal(decodeTailwindOptionsError)
 	}
 	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(
 		test,

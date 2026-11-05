@@ -91,33 +91,47 @@ func isModuleHookCall(function *Function, producers *calleeProducers, instructio
 		}
 		seen[identifier] = true
 		defer delete(seen, identifier)
-		switch value := producers.producer(identifier).(type) {
+		switch definition := producers.producer(identifier).(type) {
 		case *LoadGlobal:
-			if value.BindingKind == GlobalBindingKindGlobal || value.Source == "react" {
+			if definition.BindingKind == GlobalBindingKindGlobal || definition.Source == "react" {
 				return false
 			}
-			return !requireHook || isHookName(value.Name) || isHookName(value.Imported)
+			return !requireHook || isHookName(definition.Name) || isHookName(definition.Imported)
 		case *LoadLocal:
-			return resolve(value.Place.Identifier, requireHook)
+			return resolve(definition.Place.Identifier, requireHook)
 		case *StoreLocal:
-			return resolve(value.Value.Identifier, requireHook)
+			return resolve(definition.Value.Identifier, requireHook)
 		case *PropertyLoad:
-			return (!requireHook || isHookName(string(value.Property))) && resolve(value.Object.Identifier, false)
+			return (!requireHook || isHookName(string(definition.Property))) &&
+				resolve(definition.Object.Identifier, false)
 		case *ComputedLoad:
-			property, ok := producers.producer(value.Property.Identifier).(*Primitive)
+			property, ok := producers.producer(definition.Property.Identifier).(*Primitive)
 			if !ok {
 				return false
 			}
-			name, ok := property.Value.(string)
-			return ok && (!requireHook || isHookName(name)) && resolve(value.Object.Identifier, false)
+			// A numeric or bigint key names a property as much as a string does, so
+			// `modules[0].useThing()` reaches its module through the first entry. Only a string can
+			// pass the hook test, but an object on the way to the callee need not.
+			var name string
+			switch key := property.Value.(type) {
+			case PrimitiveString:
+				name = string(key)
+			case PrimitiveNumber:
+				name = string(key)
+			case PrimitiveBigInt:
+				name = string(key)
+			default:
+				return false
+			}
+			return (!requireHook || isHookName(name)) && resolve(definition.Object.Identifier, false)
 		default:
 			return false
 		}
 	}
 	if call, ok := instruction.Value.(*MethodCall); ok {
 		if property, ok := producers.producer(call.Property.Identifier).(*Primitive); ok {
-			name, ok := property.Value.(string)
-			return ok && isHookName(name) && resolve(call.Receiver.Identifier, false)
+			name, ok := property.Value.(PrimitiveString)
+			return ok && isHookName(string(name)) && resolve(call.Receiver.Identifier, false)
 		}
 	}
 	return resolve(callee.Identifier, true)

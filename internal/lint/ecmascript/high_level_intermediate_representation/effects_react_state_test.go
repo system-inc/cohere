@@ -56,10 +56,10 @@ func TestStateEffectsFollowImportOrigin(test *testing.T) {
 				testCase.callee +
 				`({value: 0}); }`
 			visited := 0
-			probe := rule.Rule{
+			probe := rule.Rule[rule.NoOptions]{
 				Name:             "state-effects-origin",
 				NeedsTypeChecker: true,
-				Run: func(ruleContext rule.Context, options any) rule.Listeners {
+				Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 					return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 						forEachFunctionLike(node, func(node *ast.Node) {
 							if node.Name() == nil || node.Name().Text() != "Component" {
@@ -87,7 +87,8 @@ func TestStateEffectsFollowImportOrigin(test *testing.T) {
 								}
 								wantFrozen := testCase.frozen || testCase.name == "wrong package" ||
 									testCase.name == "overridden star export" || testCase.name == "typed impostor"
-								var frozenResult, frozenArgument bool
+								var frozenResult bool
+								var frozenArgument bool
 								for _, effect := range effects.Get(instruction.Id) {
 									if effect.Kind == mutation_aliasing.AliasingEffectCreate &&
 										effect.Into.Identifier == instruction.LValue.Identifier {
@@ -154,11 +155,12 @@ return <div onClick={() => toggle('a')}>{canGo ? 'y' : 'n'}</div>;
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			var findings, markers int
-			probe := rule.Rule{
+			var findings int
+			var markers int
+			probe := rule.Rule[rule.NoOptions]{
 				Name:             "state-method-memoization",
 				NeedsTypeChecker: true,
-				Run: func(ruleContext rule.Context, options any) rule.Listeners {
+				Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 					return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 						forEachFunctionLike(node, func(node *ast.Node) {
 							function := Lower(node, ruleContext.TypeChecker)
@@ -206,10 +208,10 @@ useEffect(() => { setState(someGlobal.value); }, [someGlobal]);
 return <div>{String(state)}</div>;
 }`
 	visited := 0
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "state-setter-dependency-pruning",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				forEachFunctionLike(node, func(node *ast.Node) {
 					function := Lower(node, ruleContext.TypeChecker)

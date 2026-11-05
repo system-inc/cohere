@@ -496,7 +496,10 @@ func GetEnumTypes(
 	typeChecker *checker.Checker,
 	subjectType *checker.Type,
 ) []*checker.Type {
-	return Map(GetEnumLiterals(subjectType), func(literal *checker.Type) *checker.Type { return getBaseEnumType(typeChecker, literal) })
+	return Map(
+		GetEnumLiterals(subjectType),
+		func(literal *checker.Type) *checker.Type { return getBaseEnumType(typeChecker, literal) },
+	)
 }
 
 type DiscriminatedAnyType uint8

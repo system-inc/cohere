@@ -150,14 +150,14 @@ func correctnessRequireResponseStatusCheckDiscardMessage() rule.Message {
 //
 // What a failure should do is the author's call: throw, return an empty result, retry, or show the
 // server's message. Any one of them written in by a fixer would be wrong for most sites.
-var CorrectnessRequireResponseStatusCheck = rule.Rule{
+var CorrectnessRequireResponseStatusCheck = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-require-response-status-check",
 
 	// Symbol identity is what tells the platform's fetch from a local function of that name, a
 	// Structure NetworkService method from any other `request`, and one binding from a shadowing one.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

@@ -12,7 +12,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // shape outright and would turn an absent option into a maximum of zero, which reports every file
 // holding a single class.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[MaxClassesPerFileOptions]{
 		Rule:   MaxClassesPerFile,
 		Decode: DecodeMaxClassesPerFileOptions,
 	})

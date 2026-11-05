@@ -555,7 +555,7 @@ func TestCorrectnessNoIdenticalBranchesDeclinesWithoutAChecker(test *testing.T) 
 	if !CorrectnessNoIdenticalBranches.NeedsTypeChecker {
 		test.Fatal("the rule must declare NeedsTypeChecker")
 	}
-	if listeners := CorrectnessNoIdenticalBranches.Run(rule.Context{}, nil); listeners != nil {
+	if listeners := CorrectnessNoIdenticalBranches.Run(rule.Context{}, rule.Given[rule.NoOptions]{}); listeners != nil {
 		test.Errorf("with no checker the rule must register no listeners, got %d", len(listeners))
 	}
 }

@@ -60,8 +60,8 @@ type listedModule struct {
 }
 
 // listedFields are the fields asked of go list, so it computes nothing else.
-var listedFields = "ImportPath,Name,Dir,Standard,DepOnly,GoFiles,CgoFiles,Imports,ImportMap,Deps,Module,Error,DepsErrors," +
-	"TestGoFiles,XTestGoFiles,TestImports,XTestImports"
+var listedFields = "ImportPath,Name,Dir,Standard,DepOnly,GoFiles,CgoFiles,Imports,ImportMap,Deps,Module,Error," +
+	"DepsErrors,TestGoFiles,XTestGoFiles,TestImports,XTestImports"
 
 // listing is one `go list -deps -json` run: every package the patterns name and everything they import, in
 // the order go prints them, dependencies first.

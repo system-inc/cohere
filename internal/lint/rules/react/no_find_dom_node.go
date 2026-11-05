@@ -102,12 +102,12 @@ const findDOMNodeName = "findDOMNode"
 // different node. That is upstream being narrow rather than upstream being right, and it is
 // reproduced rather than improved on, because a differential run against oxlint is what this port
 // has to survive.
-var NoFindDOMNode = rule.Rule{
+var NoFindDOMNode = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/no-find-dom-node` and the parity guard strips
 	// the namespace on a `/` boundary, so `react-no-find-dom-node` would match no inventory entry,
 	// lint no files, and still pass every fixture in this package.
 	Name: "react/no-find-dom-node",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				name := findDOMNodeCalleeName(node.AsCallExpression().Expression)
@@ -135,22 +135,22 @@ var NoFindDOMNode = rule.Rule{
 // three measured cases, and note that this differs from `no-is-mounted` in this same package, which
 // deliberately does not skip them because *its* upstream does not.
 func findDOMNodeCalleeName(callee *ast.Node) *ast.Node {
-	callee = ast.SkipParentheses(callee)
-	if callee == nil {
+	unwrapped := ast.SkipParentheses(callee)
+	if unwrapped == nil {
 		return nil
 	}
 
-	switch callee.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		if callee.Text() == findDOMNodeName {
-			return callee
+		if unwrapped.Text() == findDOMNodeName {
+			return unwrapped
 		}
 		// oxc returns unconditionally from its identifier arm rather than falling through to the
 		// member check, and this arm reproduces that by answering for the whole switch.
 		return nil
 
 	case ast.KindPropertyAccessExpression:
-		access := callee.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		if !isReactDOMReceiver(access.Expression) {
 			return nil
 		}
@@ -164,7 +164,7 @@ func findDOMNodeCalleeName(callee *ast.Node) *ast.Node {
 		}
 
 	case ast.KindElementAccessExpression:
-		access := callee.AsElementAccessExpression()
+		access := unwrapped.AsElementAccessExpression()
 		if !isReactDOMReceiver(access.Expression) {
 			return nil
 		}
@@ -196,11 +196,11 @@ func findDOMNodeCalleeName(callee *ast.Node) *ast.Node {
 // Written as a helper rather than inline because both member arms above ask it, and because a
 // mutation to the accepted set should have one place to land.
 func isReactDOMReceiver(expression *ast.Node) bool {
-	expression = ast.SkipParentheses(expression)
-	if expression == nil || expression.Kind != ast.KindIdentifier {
+	unwrapped := ast.SkipParentheses(expression)
+	if unwrapped == nil || unwrapped.Kind != ast.KindIdentifier {
 		return false
 	}
-	switch expression.Text() {
+	switch unwrapped.Text() {
 	case "React", "ReactDOM", "ReactDom":
 		return true
 	}

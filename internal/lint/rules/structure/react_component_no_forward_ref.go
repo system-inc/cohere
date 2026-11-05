@@ -53,9 +53,9 @@ var forwardRefTypeNames = map[string]bool{
 // original's choice and its known limit: a local function named forwardRef would be reported. It is
 // the right direction here, since the alternative needs the binding resolved and would go quiet on
 // the aliased import (`import { forwardRef as fr }`) that the import arm exists to catch anyway.
-var ReactComponentNoForwardRef = rule.Rule{
+var ReactComponentNoForwardRef = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-component-no-forward-ref",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				reportForwardRefImport(ruleContext, node)

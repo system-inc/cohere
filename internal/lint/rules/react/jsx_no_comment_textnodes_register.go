@@ -8,5 +8,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // shared edit. No `Decode`, because upstream's `schema: []` is the authoritative statement that
 // this rule takes no options.
 func init() {
-	rule.Register(rule.Registration{Rule: JsxNoCommentTextnodes})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: JsxNoCommentTextnodes})
 }

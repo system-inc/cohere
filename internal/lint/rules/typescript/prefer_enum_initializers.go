@@ -79,10 +79,10 @@ import (
 //
 // One listener on `KindEnumDeclaration`, which is a rare anchor, and the body is a single pass over
 // the member list. No checker, no program, no per-file state.
-var PreferEnumInitializers = rule.Rule{
+var PreferEnumInitializers = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/prefer-enum-initializers",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {
 				// Members is never nil, so there is no guard here.

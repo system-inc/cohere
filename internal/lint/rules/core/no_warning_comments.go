@@ -89,7 +89,7 @@ const noWarningCommentsCharacterLimit = 40
 // Hand-rolled because a decoration entry has to be exactly one non-whitespace character, which
 // upstream expresses as a schema `pattern` and we have no schema layer for. The location is checked
 // by its own UnmarshalJSON.
-func DecodeNoWarningCommentsOptions(raw []byte) (any, error) {
+func DecodeNoWarningCommentsOptions(raw []byte) (NoWarningCommentsOptions, error) {
 	options := NoWarningCommentsOptions{}
 	if len(raw) == 0 {
 		return options, nil
@@ -144,11 +144,11 @@ func DecodeNoWarningCommentsOptions(raw []byte) (any, error) {
 // appending an ellipsis when it stopped early. So the quote never splits a word, and a comment whose
 // first word already exceeds the limit quotes as nothing but the ellipsis. Reproduced exactly,
 // because the quoted text is the part of the message a reader scans.
-var NoWarningComments = rule.Rule{
+var NoWarningComments = rule.Rule[NoWarningCommentsOptions]{
 	Name: "no-warning-comments",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoWarningCommentsOptions]) rule.Listeners {
 		settings := NoWarningCommentsOptions{}
-		if decoded, configured := rule.OptionsAs[NoWarningCommentsOptions](options); configured {
+		if decoded, configured := options.Read(); configured {
 			settings = decoded
 		}
 		terms := settings.Terms

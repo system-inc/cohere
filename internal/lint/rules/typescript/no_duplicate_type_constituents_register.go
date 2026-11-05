@@ -11,7 +11,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The Decode entry names the rule's own decoder rather than the generic helper, for the reason
 // recorded on the wire struct.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoDuplicateTypeConstituentsOptions]{
 		Rule:   NoDuplicateTypeConstituents,
 		Decode: DecodeNoDuplicateTypeConstituentsOptions,
 	})

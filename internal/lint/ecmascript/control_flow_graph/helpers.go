@@ -46,11 +46,11 @@ func labelsOf(node *ast.Node) []string {
 // isAlwaysTruthyTest mirrors ESLint's `getBooleanValueIfSimpleConstant`: only a
 // literal test can mark the loop infinite, so the code after it is unreachable.
 func isAlwaysTruthyTest(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return false
 	}
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindTrueKeyword, ast.KindRegularExpressionLiteral:
 		return true
 	case ast.KindNumericLiteral:
@@ -61,16 +61,16 @@ func isAlwaysTruthyTest(node *ast.Node) bool {
 		// exactly "0", and `0x1`, `1e2`, `1_0`, `1e400` arrive as "1", "100", "10", "Infinity".
 		// `internal/rules/core/no_compare_neg_zero.go` reached the same conclusion independently
 		// and reads `.Text == "0"` the same way.
-		return node.AsNumericLiteral().Text != "0"
+		return unwrapped.AsNumericLiteral().Text != "0"
 	case ast.KindBigIntLiteral:
 		// A BigInt literal is not normalized the way a numeric one is, which is the asymmetry that
 		// makes this branch load-bearing rather than redundant. Probed on our parser: `0n` arrives
 		// as "0n" and `0x0n` as "0x0n": the `n` suffix survives, and a hex or binary spelling
 		// survives with it, though `0b0n` and `0o0n` do arrive as "0n". So a bare `.Text != "0"`
 		// would call every zero BigInt truthy and mark the code after `while (0n)` unreachable.
-		return normalizeBigIntLiteral(node.AsBigIntLiteral().Text) != "0"
+		return normalizeBigIntLiteral(unwrapped.AsBigIntLiteral().Text) != "0"
 	case ast.KindStringLiteral:
-		return node.AsStringLiteral().Text != ""
+		return unwrapped.AsStringLiteral().Text != ""
 	}
 	return false
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -394,7 +395,7 @@ func TestPreferPromiseRejectErrorsAcrossFiles(test *testing.T) {
 				"/repository/source/Rejections.ts": testCase.sourceText,
 				"/repository/source/errors.ts":     preferPromiseRejectErrorsErrorsModule,
 			}
-			var decoded any
+			var decoded rule.Given[PreferPromiseRejectErrorsOptions]
 			if testCase.optionsJson != "" {
 				value, decodePreferPromiseRejectErrorsOptionsError := DecodePreferPromiseRejectErrorsOptions(
 					json.RawMessage(testCase.optionsJson),
@@ -402,9 +403,9 @@ func TestPreferPromiseRejectErrorsAcrossFiles(test *testing.T) {
 				if decodePreferPromiseRejectErrorsOptionsError != nil {
 					test.Fatalf("decoding %s: %v", testCase.optionsJson, decodePreferPromiseRejectErrorsOptionsError)
 				}
-				decoded = value
+				decoded = rule.Configured(value)
 			}
-			result := rule_testing.RunTypedFilesWithOptions(
+			result := rule_testing.RunTypedFilesGiven(
 				test,
 				PreferPromiseRejectErrors,
 				files,
@@ -656,12 +657,11 @@ func TestPreferPromiseRejectErrorsDefaultsAreOff(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			// nil options, exactly as a rule configured as bare "error" receives.
-			result := rule_testing.RunTypedWithOptions(
+			result := rule_testing.RunTyped(
 				test,
 				PreferPromiseRejectErrors,
 				preferPromiseRejectErrorsFile,
 				testCase.sourceText,
-				nil,
 			)
 			rule_testing.ExpectFindings(test, result, "rejectAnError")
 		})

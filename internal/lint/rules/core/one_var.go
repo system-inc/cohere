@@ -150,7 +150,7 @@ func DefaultOneVarSettings() OneVarSettings {
 // `oneVarGroup`, and into the comparisons. Collapsing any of the three to a zero value makes
 // `{ "var": "never" }` govern `let` and `const` too, and no fixture written from the string form
 // could see it.
-func DecodeOneVarOptions(raw []byte) (any, error) {
+func DecodeOneVarOptions(raw []byte) (OneVarSettings, error) {
 	if len(raw) == 0 {
 		return DefaultOneVarSettings(), nil
 	}
@@ -1436,10 +1436,10 @@ func oneVarLastCommentRunStart(text string, from int) int {
 // `NodeFlagsAwaitUsing` is defined as `NodeFlagsConst | NodeFlagsUsing`, so a mask against it is
 // true for every plain `const`. See `oneVarKindOf`, which tests both bits together instead and
 // carries the measured flag table.
-var OneVar = rule.Rule{
+var OneVar = rule.Rule[OneVarSettings]{
 	Name: "one-var",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[OneVarSettings](options)
+	Run: func(ruleContext rule.Context, options rule.Given[OneVarSettings]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			// A rule configured as a bare `"error"` is handed nil, and `options.(T)` on nil yields
 			// the zero value -- every group unconfigured, so the rule would register on every file

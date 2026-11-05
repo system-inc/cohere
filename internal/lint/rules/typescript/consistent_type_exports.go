@@ -93,11 +93,11 @@ func messageConsistentTypeExportsMultipleExportsAreTypes(names string) rule.Mess
 // Upstream gathers per module specifier and reports on `Program:exit`. There is no exit hook here,
 // so the gathering and the reporting both happen inside the source-file listener, which fires before
 // its children and can walk the tree itself.
-var ConsistentTypeExports = rule.Rule{
+var ConsistentTypeExports = rule.Rule[ConsistentTypeExportsOptions]{
 	Name:             "@typescript-eslint/consistent-type-exports",
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistentTypeExportsOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -106,7 +106,7 @@ var ConsistentTypeExports = rule.Rule{
 		// false, but the fallback is written anyway: a later option with a true default would
 		// otherwise invert silently, and a reader should not have to check the default to know
 		// whether nil is handled.
-		parsed, decoded := rule.OptionsAs[ConsistentTypeExportsOptions](options)
+		parsed, decoded := options.Read()
 		if !decoded {
 			parsed = DefaultConsistentTypeExportsOptions()
 		}
@@ -778,16 +778,15 @@ type consistentTypeExportsRawOptions struct {
 }
 
 // DecodeConsistentTypeExportsOptions maps the wire key onto the rule's setting.
-func DecodeConsistentTypeExportsOptions(raw []byte) (any, error) {
+func DecodeConsistentTypeExportsOptions(raw []byte) (ConsistentTypeExportsOptions, error) {
 	decoded, decodeOptionsError := rule.DecodeOptionsInto[consistentTypeExportsRawOptions]()(raw)
 	if decodeOptionsError != nil {
 		return DefaultConsistentTypeExportsOptions(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(consistentTypeExportsRawOptions)
 	options := DefaultConsistentTypeExportsOptions()
-	if wire.FixMixedExportsWithInlineTypeSpecifier != nil {
-		options.FixMixedExportsWithInlineTypeSpecifier = *wire.FixMixedExportsWithInlineTypeSpecifier
+	if decoded.FixMixedExportsWithInlineTypeSpecifier != nil {
+		options.FixMixedExportsWithInlineTypeSpecifier = *decoded.FixMixedExportsWithInlineTypeSpecifier
 	}
 	return options, nil
 }

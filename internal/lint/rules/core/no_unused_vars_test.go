@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -98,7 +99,7 @@ func TestNoUnusedVarsMessageIdAndDescription(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			var options any
+			var options rule.Given[NoUnusedVarsOptions]
 			if testCase.options != "" {
 				decoded, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(
 					json.RawMessage(testCase.options),
@@ -106,9 +107,9 @@ func TestNoUnusedVarsMessageIdAndDescription(test *testing.T) {
 				if decodeNoUnusedVariablesOptionsError != nil {
 					test.Fatalf("decoding failed: %v", decodeNoUnusedVariablesOptionsError)
 				}
-				options = decoded
+				options = rule.Configured(decoded)
 			}
-			result := rule_testing.RunTypedWithOptions(test, NoUnusedVars, "a.ts", testCase.source, options)
+			result := rule_testing.RunTypedGiven(test, NoUnusedVars, "a.ts", testCase.source, options)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
@@ -562,7 +563,9 @@ func TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern(test *testing.T) {
 			len(result.Diagnostics))
 	}
 	// The variables pattern does not reach a caught error.
-	varsOnly, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(`{"varsIgnorePattern":"^_"}`))
+	varsOnly, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(
+		json.RawMessage(`{"varsIgnorePattern":"^_"}`),
+	)
 	if decodeNoUnusedVariablesOptionsError != nil {
 		test.Fatalf("decoding failed: %v", decodeNoUnusedVariablesOptionsError)
 	}
@@ -576,7 +579,9 @@ func TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern(test *testing.T) {
 		test.Errorf("varsIgnorePattern does not cover a caught error; got %d", len(result.Diagnostics))
 	}
 	// And configuring its own pattern turns it off.
-	options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(`{"caughtErrorsIgnorePattern":"^_"}`))
+	options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(
+		json.RawMessage(`{"caughtErrorsIgnorePattern":"^_"}`),
+	)
 	if decodeNoUnusedVariablesOptionsError != nil {
 		test.Fatalf("decoding failed: %v", decodeNoUnusedVariablesOptionsError)
 	}
@@ -825,11 +830,11 @@ func TestNoUnusedVarsTreatsADecoratedClassOrParameterAsUsed(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			options := any(nil)
+			var options rule.Given[NoUnusedVarsOptions]
 			if strings.Contains(testCase.name, "args all") {
-				options = NoUnusedVarsOptions{Args: "all"}
+				options = rule.Configured(NoUnusedVarsOptions{Args: "all"})
 			}
-			result := rule_testing.RunTypedWithOptions(test, NoUnusedVars, "a.ts", testCase.source, options)
+			result := rule_testing.RunTypedGiven(test, NoUnusedVars, "a.ts", testCase.source, options)
 			var got []string
 			for _, diagnostic := range result.Diagnostics {
 				got = append(got, testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()])
@@ -938,7 +943,9 @@ func TestNoUnusedVarsIgnoreRestSiblings(test *testing.T) {
 func TestNoUnusedVarsAutofixRemovalWritesUpstreamsEdit(test *testing.T) {
 	test.Parallel()
 
-	options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(`{"enableAutofixRemoval": {"imports": true}}`))
+	options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(
+		json.RawMessage(`{"enableAutofixRemoval": {"imports": true}}`),
+	)
 	if decodeNoUnusedVariablesOptionsError != nil {
 		test.Fatal(decodeNoUnusedVariablesOptionsError)
 	}

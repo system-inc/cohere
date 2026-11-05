@@ -19,7 +19,8 @@ import (
 //
 //	T=internal/lint/rules/tailwind/tools/generate_signatures
 //	D=internal/lint/rules/tailwind/collapse/testdata
-//	node $T/signatures.mjs $D/public_theme/theme.css --resolve-root ahra: --targets $D/canonical_singles_public.json > $D/signatures_public.txt.gz
+//	node $T/signatures.mjs $D/public_theme/theme.css --resolve-root ahra: \
+//	    --targets $D/canonical_singles_public.json > $D/signatures_public.txt.gz
 //	node $T/signatures.mjs ahra:app/_theme/styles/theme.css --targets $D/canonical_singles.json > $D/signatures.txt.gz
 //	node $T/signatures.mjs connected:app/_theme/styles/theme.css > $D/signatures_connected.txt.gz
 var signatureOracles = []struct {
@@ -208,14 +209,14 @@ func signatureHash(signature string) string {
 
 // signatureRootOf is the part of a class before its last dash-separated value, for grouping a report.
 func signatureRootOf(className string) string {
-	className = strings.TrimPrefix(className, "-")
-	if index := strings.IndexAny(className, "/["); index > 0 {
-		className = className[:index]
+	root := strings.TrimPrefix(className, "-")
+	if index := strings.IndexAny(root, "/["); index > 0 {
+		root = root[:index]
 	}
-	if index := strings.LastIndex(className, "-"); index > 0 {
-		return className[:index]
+	if index := strings.LastIndex(root, "-"); index > 0 {
+		return root[:index]
 	}
-	return className
+	return root
 }
 
 // topCounts renders the largest counts of a map, largest first.
@@ -247,6 +248,7 @@ func readSignatureOracle(test *testing.T, name string) (string, []signatureOracl
 	if openError != nil {
 		test.Fatalf("open %s: %v", name, openError)
 	}
+	// Ignored: the file was only read, so a failed close loses nothing.
 	defer file.Close()
 	reader, gzipError := gzip.NewReader(file)
 	if gzipError != nil {

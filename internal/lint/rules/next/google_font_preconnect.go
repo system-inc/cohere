@@ -36,11 +36,11 @@ var messageGoogleFontPreconnect = rule.Message{
 // writes this as `is_none_or`, so `<link rel="stylesheet" href="https://fonts.gstatic.com">`
 // reports exactly as a bare href does. A port that only checked for an absent `rel` would pass the
 // more common of the two mistakes.
-var GoogleFontPreconnect = rule.Rule{
+var GoogleFontPreconnect = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/google-font-preconnect` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name: "@next/next/google-font-preconnect",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node) {
 			tagName, attributes := jsx.ElementParts(node)
 			if !jsx.IsIntrinsicElementNamed(tagName, "link") {

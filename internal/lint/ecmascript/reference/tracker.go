@@ -112,10 +112,11 @@ type bindingKey struct {
 
 // NewTracker prepares a tracker over one file. A nil globalObjectNames takes the defaults.
 func NewTracker(sourceFile *ast.SourceFile, typeChecker *checker.Checker, globalObjectNames []string) *Tracker {
-	if globalObjectNames == nil {
-		globalObjectNames = DefaultGlobalObjectNames
+	objectNames := globalObjectNames
+	if objectNames == nil {
+		objectNames = DefaultGlobalObjectNames
 	}
-	return &Tracker{sourceFile: sourceFile, typeChecker: typeChecker, globalObjectNames: globalObjectNames}
+	return &Tracker{sourceFile: sourceFile, typeChecker: typeChecker, globalObjectNames: objectNames}
 }
 
 // GlobalReferences returns every use of the globals in traceMap that the map asks for, in source
@@ -238,17 +239,20 @@ func (tracker *Tracker) followReads(
 // followValue climbs from an expression holding a traced value to what uses it, which is
 // eslint-utils' _iteratePropertyReferences.
 func (tracker *Tracker) followValue(node *ast.Node, path []string, traceMap *TraceMap) {
-	for isPassThrough(node) {
-		node = node.Parent
+	// The outermost expression that still holds the value, past any parentheses, casts or
+	// conditionals that hand it on unchanged.
+	holding := node
+	for isPassThrough(holding) {
+		holding = holding.Parent
 	}
-	parent := node.Parent
+	parent := holding.Parent
 	if parent == nil {
 		return
 	}
 
 	switch parent.Kind {
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-		if parent.Expression() != node {
+		if parent.Expression() != holding {
 			return
 		}
 		key, isStatic := memberKey(parent)
@@ -266,36 +270,36 @@ func (tracker *Tracker) followValue(node *ast.Node, path []string, traceMap *Tra
 		tracker.followValue(parent, nextPath, next)
 
 	case ast.KindCallExpression:
-		if parent.Expression() == node && traceMap.Call {
+		if parent.Expression() == holding && traceMap.Call {
 			tracker.add(parent, path, Call)
 		}
 
 	case ast.KindNewExpression:
-		if parent.Expression() == node && traceMap.Construct {
+		if parent.Expression() == holding && traceMap.Construct {
 			tracker.add(parent, path, Construct)
 		}
 
 	case ast.KindBinaryExpression:
 		assignment := parent.AsBinaryExpression()
-		if assignment.Right != node || !holdsTheAssignedValue(assignment.OperatorToken.Kind) {
+		if assignment.Right != holding || !holdsTheAssignedValue(assignment.OperatorToken.Kind) {
 			return
 		}
 		tracker.followTarget(assignment.Left, path, traceMap)
 		tracker.followValue(parent, path, traceMap)
 
 	case ast.KindVariableDeclaration:
-		if parent.Initializer() == node {
+		if parent.Initializer() == holding {
 			tracker.followTarget(parent.Name(), path, traceMap)
 		}
 
 	// The three spellings of a default value, which ESTree calls one AssignmentPattern: a parameter's,
 	// a binding element's, and a shorthand property's in a destructuring assignment.
 	case ast.KindParameter, ast.KindBindingElement:
-		if parent.Initializer() == node {
+		if parent.Initializer() == holding {
 			tracker.followTarget(parent.Name(), path, traceMap)
 		}
 	case ast.KindShorthandPropertyAssignment:
-		if parent.AsShorthandPropertyAssignment().ObjectAssignmentInitializer == node {
+		if parent.AsShorthandPropertyAssignment().ObjectAssignmentInitializer == holding {
 			tracker.followTarget(parent.Name(), path, traceMap)
 		}
 	}
@@ -316,10 +320,10 @@ func holdsTheAssignedValue(operator ast.Kind) bool {
 // _iterateLhsReferences: a name, whose reads are followed, or an object pattern, whose properties
 // named in the map are. An array pattern is not followed, as eslint-utils does not follow one.
 func (tracker *Tracker) followTarget(target *ast.Node, path []string, traceMap *TraceMap) {
-	target = ast.SkipParentheses(target)
-	switch target.Kind {
+	unwrapped := ast.SkipParentheses(target)
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		symbol := ReadSymbol(tracker.typeChecker, target)
+		symbol := ReadSymbol(tracker.typeChecker, unwrapped)
 		if symbol == nil {
 			// An assignment to an undeclared name creates a global nobody declared, which
 			// eslint-utils' findVariable does not find either.
@@ -327,14 +331,14 @@ func (tracker *Tracker) followTarget(target *ast.Node, path []string, traceMap *
 		}
 		tracker.followReads(
 			bindingKey{symbol: symbol},
-			tracker.bindingReferences(target.Text(), symbol),
+			tracker.bindingReferences(unwrapped.Text(), symbol),
 			path,
 			traceMap,
 			false,
 		)
 
 	case ast.KindObjectBindingPattern:
-		for _, element := range target.AsBindingPattern().Elements.Nodes {
+		for _, element := range unwrapped.AsBindingPattern().Elements.Nodes {
 			binding := element.AsBindingElement()
 			if binding.DotDotDotToken != nil {
 				continue
@@ -348,7 +352,7 @@ func (tracker *Tracker) followTarget(target *ast.Node, path []string, traceMap *
 
 	case ast.KindObjectLiteralExpression:
 		// A destructuring assignment's target, which the parser keeps as an object literal.
-		for _, member := range target.AsObjectLiteralExpression().Properties.Nodes {
+		for _, member := range unwrapped.AsObjectLiteralExpression().Properties.Nodes {
 			switch member.Kind {
 			case ast.KindPropertyAssignment:
 				tracker.followPatternProperty(member, member.Name(), member.Initializer(), path, traceMap)
@@ -360,8 +364,8 @@ func (tracker *Tracker) followTarget(target *ast.Node, path []string, traceMap *
 	case ast.KindBinaryExpression:
 		// A default inside a destructuring assignment's target, `{ JSON: j = x } = globalThis`,
 		// which ESTree calls an AssignmentPattern and the parser keeps as an assignment.
-		if target.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken {
-			tracker.followTarget(target.AsBinaryExpression().Left, path, traceMap)
+		if unwrapped.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken {
+			tracker.followTarget(unwrapped.AsBinaryExpression().Left, path, traceMap)
 		}
 	}
 }
@@ -457,16 +461,16 @@ func constantValue(
 	if expression == nil {
 		return "", false, false
 	}
-	expression = ast.SkipParentheses(expression)
+	unwrapped := ast.SkipParentheses(expression)
 	if resolve != nil &&
-		(expression.Kind == ast.KindIdentifier || expression.Kind == ast.KindRegularExpressionLiteral) {
-		return resolve(expression)
+		(unwrapped.Kind == ast.KindIdentifier || unwrapped.Kind == ast.KindRegularExpressionLiteral) {
+		return resolve(unwrapped)
 	}
-	switch expression.Kind {
+	switch unwrapped.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		return expression.Text(), true, true
+		return unwrapped.Text(), true, true
 	case ast.KindNumericLiteral:
-		return expression.Text(), false, true
+		return unwrapped.Text(), false, true
 	case ast.KindTrueKeyword:
 		return "true", false, true
 	case ast.KindFalseKeyword:
@@ -474,7 +478,7 @@ func constantValue(
 	case ast.KindNullKeyword:
 		return "null", false, true
 	case ast.KindTemplateExpression:
-		template := expression.AsTemplateExpression()
+		template := unwrapped.AsTemplateExpression()
 		var builder strings.Builder
 		builder.WriteString(template.Head.Text())
 		for _, span := range template.TemplateSpans.Nodes {
@@ -487,7 +491,7 @@ func constantValue(
 		}
 		return builder.String(), true, true
 	case ast.KindBinaryExpression:
-		binary := expression.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken.Kind != ast.KindPlusToken {
 			return "", false, false
 		}

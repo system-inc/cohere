@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -36,16 +37,16 @@ type noBitwiseCase struct {
 //
 // Not a hand-built options struct. A fixture constructing the options directly never exercises the
 // decoder, so a decoder wrong about the shape the config layer delivers passes every fixture.
-func decodeNoBitwiseOptionsForTest(test *testing.T, optionsJson string) any {
+func decodeNoBitwiseOptionsForTest(test *testing.T, optionsJson string) rule.Given[NoBitwiseOptions] {
 	test.Helper()
 	if optionsJson == "" {
-		return nil
+		return rule.Given[NoBitwiseOptions]{}
 	}
 	decoded, decodeNoBitwiseOptionsError := DecodeNoBitwiseOptions(json.RawMessage(optionsJson))
 	if decodeNoBitwiseOptionsError != nil {
 		test.Fatalf("the decoder refused %s: %v", optionsJson, decodeNoBitwiseOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 // noBitwiseOffsetOf converts a 1-based line and column into a byte offset.
@@ -66,7 +67,7 @@ func noBitwiseOffsetOf(test *testing.T, source string, line int, column int) int
 
 func runNoBitwise(test *testing.T, testCase noBitwiseCase) rule_testing.Result {
 	test.Helper()
-	return rule_testing.RunWithOptions(test, NoBitwise, noBitwiseFile, testCase.source,
+	return rule_testing.RunGiven(test, NoBitwise, noBitwiseFile, testCase.source,
 		decodeNoBitwiseOptionsForTest(test, testCase.optionsJson))
 }
 
@@ -363,15 +364,11 @@ func TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers(test *testing.T)
 			if decodeNoBitwiseOptionsError != nil {
 				test.Fatalf("the decoder refused %s: %v", testCase.raw, decodeNoBitwiseOptionsError)
 			}
-			options, ok := decoded.(NoBitwiseOptions)
-			if !ok {
-				test.Fatalf("the decoder returned %T rather than NoBitwiseOptions", decoded)
+			if decoded.Int32Hint != testCase.wantHint {
+				test.Errorf("int32Hint: expected %v, got %v", testCase.wantHint, decoded.Int32Hint)
 			}
-			if options.Int32Hint != testCase.wantHint {
-				test.Errorf("int32Hint: expected %v, got %v", testCase.wantHint, options.Int32Hint)
-			}
-			if strings.Join(options.Allow, ",") != strings.Join(testCase.wantAllow, ",") {
-				test.Errorf("allow: expected %v, got %v", testCase.wantAllow, options.Allow)
+			if strings.Join(decoded.Allow, ",") != strings.Join(testCase.wantAllow, ",") {
+				test.Errorf("allow: expected %v, got %v", testCase.wantAllow, decoded.Allow)
 			}
 		})
 	}

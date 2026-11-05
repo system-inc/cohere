@@ -34,7 +34,7 @@ func TestSSAOverRealCodebase(test *testing.T) {
 
 	root := corpusRoot(test)
 	var files []string
-	filepath.Walk(root, func(path string, info os.FileInfo, pathError error) error {
+	walkError := filepath.Walk(root, func(path string, info os.FileInfo, pathError error) error {
 		if pathError != nil || info.IsDir() {
 			return nil
 		}
@@ -43,6 +43,9 @@ func TestSSAOverRealCodebase(test *testing.T) {
 		}
 		return nil
 	})
+	if walkError != nil {
+		test.Fatalf("walking the corpus: %v", walkError)
+	}
 	sort.Strings(files)
 	limit := 400
 	if len(files) > limit {
@@ -58,10 +61,10 @@ func TestSSAOverRealCodebase(test *testing.T) {
 		if readError != nil {
 			continue
 		}
-		probe := rule.Rule{
+		probe := rule.Rule[rule.NoOptions]{
 			Name:             "ssa-corpus-harness",
 			NeedsTypeChecker: true,
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						forEachFunctionLike(node, func(fnNode *ast.Node) {

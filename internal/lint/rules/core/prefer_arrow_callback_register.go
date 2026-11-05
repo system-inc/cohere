@@ -10,7 +10,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The decoder is hand rolled because `allowUnboundThis` defaults to `true`, so a zero-value struct
 // would be a stricter rule rather than an unconfigured one.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[PreferArrowCallbackSettings]{
 		Rule:   PreferArrowCallback,
 		Decode: DecodePreferArrowCallbackOptions,
 	})

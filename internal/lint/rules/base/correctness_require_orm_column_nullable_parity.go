@@ -76,14 +76,14 @@ var ormRelationDecorators = map[string]struct{}{
 //
 // Anchored on a decorator, which is rare, and the checker is consulted only after the decorator name
 // and its `nullable: true` option have both matched.
-var CorrectnessRequireOrmColumnNullableParity = rule.Rule{
+var CorrectnessRequireOrmColumnNullableParity = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-orm-column-nullable-parity",
 
 	// The property's type decides every finding.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

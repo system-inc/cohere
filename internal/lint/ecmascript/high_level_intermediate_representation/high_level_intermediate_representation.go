@@ -609,8 +609,10 @@ func (function *Function) NewIdentifier(
 	declaration static_single_assignment.DeclarationId,
 ) *Identifier {
 	id := static_single_assignment.IdentifierId(len(function.Identifiers))
-	if declaration == 0 {
-		declaration = static_single_assignment.DeclarationId(id) + 1
+	// A zero declaration asks for a fresh one, numbered from the new id.
+	resolvedDeclaration := declaration
+	if resolvedDeclaration == 0 {
+		resolvedDeclaration = static_single_assignment.DeclarationId(id) + 1
 	}
 	// Identifiers are carved from a chunk this function owns rather than allocated one at a time,
 	// which was 1.28M objects on a cold ahra run, the most of any allocation in lowering (#rwsffzm).
@@ -625,7 +627,7 @@ func (function *Function) NewIdentifier(
 	}
 	function.identifierSlab = append(
 		function.identifierSlab,
-		Identifier{Id: id, Declaration: declaration, Name: name, Node: node},
+		Identifier{Id: id, Declaration: resolvedDeclaration, Name: name, Node: node},
 	)
 	identifier := &function.identifierSlab[len(function.identifierSlab)-1]
 	function.Identifiers = append(function.Identifiers, identifier)
@@ -633,6 +635,9 @@ func (function *Function) NewIdentifier(
 }
 
 // AddInstruction appends an instruction to the table and to the given block, returning its id.
+//
+// Mutates: block the instruction's id is appended to its list
+// Mutates: instruction it takes the id it is stored under
 func (function *Function) AddInstruction(block *BasicBlock, instruction *Instruction) InstructionId {
 	id := InstructionId(len(function.Instructions))
 	instruction.Id = id

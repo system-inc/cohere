@@ -34,8 +34,8 @@ const noUnknownPropertyFile = "/repository/source/NoUnknownProperty.tsx"
 // noUnknownPropertyOptions decodes a raw option body the way the config layer does.
 //
 // Fixtures route through the exported decoder rather than building the struct, which is what puts
-// the defaults under test. An empty body is the nil-options case.
-func noUnknownPropertyOptions(test *testing.T, raw string) any {
+// the defaults under test. An empty body is the bare-severity case.
+func noUnknownPropertyOptions(test *testing.T, raw string) NoUnknownPropertyOptions {
 	test.Helper()
 	decoded, decodeNoUnknownPropertyOptionsError := DecodeNoUnknownPropertyOptions([]byte(raw))
 	if decodeNoUnknownPropertyOptionsError != nil {
@@ -766,7 +766,7 @@ func TestNoUnknownPropertyHasNoFileSuffixGate(test *testing.T) {
 	}
 }
 
-// TestDecodeNoUnknownPropertyOptions covers both options and the nil-options path.
+// TestDecodeNoUnknownPropertyOptions covers both options and the empty-body path.
 func TestDecodeNoUnknownPropertyOptions(test *testing.T) {
 	test.Parallel()
 
@@ -776,14 +776,10 @@ func TestDecodeNoUnknownPropertyOptions(test *testing.T) {
 		if decodeNoUnknownPropertyOptionsError != nil {
 			test.Fatalf("decoding an empty body: %v", decodeNoUnknownPropertyOptionsError)
 		}
-		options, ok := decoded.(NoUnknownPropertyOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want NoUnknownPropertyOptions", decoded)
+		if len(decoded.Ignore) != 0 {
+			test.Fatalf("ignore list is %v, want empty", decoded.Ignore)
 		}
-		if len(options.Ignore) != 0 {
-			test.Fatalf("ignore list is %v, want empty", options.Ignore)
-		}
-		if options.RequireDataLowercase {
+		if decoded.RequireDataLowercase {
 			test.Fatal("requireDataLowercase defaulted to true, want false")
 		}
 	})
@@ -796,14 +792,10 @@ func TestDecodeNoUnknownPropertyOptions(test *testing.T) {
 		if decodeNoUnknownPropertyOptionsError != nil {
 			test.Fatalf("decoding both keys: %v", decodeNoUnknownPropertyOptionsError)
 		}
-		options, ok := decoded.(NoUnknownPropertyOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want NoUnknownPropertyOptions", decoded)
+		if strings.Join(decoded.Ignore, ",") != "a,b" {
+			test.Fatalf("ignore list is %v", decoded.Ignore)
 		}
-		if strings.Join(options.Ignore, ",") != "a,b" {
-			test.Fatalf("ignore list is %v", options.Ignore)
-		}
-		if !options.RequireDataLowercase {
+		if !decoded.RequireDataLowercase {
 			test.Fatal("requireDataLowercase is false, want true")
 		}
 	})

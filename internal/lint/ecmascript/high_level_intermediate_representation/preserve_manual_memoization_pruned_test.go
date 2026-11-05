@@ -51,10 +51,10 @@ func TestPrunedScopesAreRecordedRatherThanCompared(test *testing.T) {
 
 	live, pruned := 0, 0
 	var sharedDependencies int
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "pruned-scope-split",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {

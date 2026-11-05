@@ -41,7 +41,7 @@ type yodaObjectWire struct {
 // nested array, to reach them; both workarounds are refused now, since neither was ever upstream's.
 // A key the second element's schema does not declare is refused, which is its
 // `additionalProperties: false`, and so is a third element.
-func DecodeYodaOptions(list []byte) (any, error) {
+func DecodeYodaOptions(list []byte) (YodaSettings, error) {
 	settings := DefaultYodaSettings()
 	elements, optionElementsError := rule.OptionElements(list, 2)
 	if optionElementsError != nil || len(elements) == 0 {
@@ -161,10 +161,10 @@ var messageYodaExpected = rule.Message{
 // generic call, and comments in all three positions. The comment behaviour is worth stating because
 // it is not what a reader would guess: a comment between an operand and the operator stays with the
 // operator, so `'red' /* mid */ === color` becomes `color /* mid */ === 'red'`.
-var Yoda = rule.Rule{
+var Yoda = rule.Rule[YodaSettings]{
 	Name: "yoda",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[YodaSettings](options)
+	Run: func(ruleContext rule.Context, options rule.Given[YodaSettings]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultYodaSettings()
 		}

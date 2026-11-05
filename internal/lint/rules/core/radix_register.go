@@ -12,7 +12,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // changes nothing the rule reports, but its schema still accepts it, so `["error", "as-needed"]` has
 // to load rather than stop the run. A value outside the enum is still refused.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[RadixMode]{
 		Rule:   Radix,
 		Decode: DecodeRadixOptions,
 	})

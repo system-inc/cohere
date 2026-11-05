@@ -71,10 +71,10 @@ func messageNoHandBuiltDeclaredError() rule.Message {
 //
 // One kind test per `new` expression, and the checker is never consulted: the judgment is entirely
 // syntactic. The filename exemption is two suffix comparisons per file.
-var ConsistencyNoHandBuiltDeclaredError = rule.Rule{
+var ConsistencyNoHandBuiltDeclaredError = rule.Rule[rule.NoOptions]{
 	Name: "base/consistency-no-hand-built-declared-error",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

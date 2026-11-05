@@ -4,11 +4,14 @@
  */
 public enum RuleRegistry {
     /*
-     Every file rule, built from what a run loads. Today that is only the abbreviation vocabulary, which the
-     pipeline reads before anything is checked, so a vocabulary that is missing refuses the run instead of
-     leaving the naming rule judging nothing.
+     Every file rule, built from what a run loads: the abbreviation vocabulary, which the pipeline reads before
+     anything is checked, so a vocabulary that is missing refuses the run instead of leaving the naming rule judging
+     nothing; and the options the project's settings give the rules that read one (`RuleConfiguration.optionsRead`).
      */
-    public static func fileRules(vocabulary: AbbreviationVocabulary) -> [any FileRule] {
+    public static func fileRules(
+        vocabulary: AbbreviationVocabulary,
+        configuration: RuleConfiguration = RuleConfiguration(severities: [:], note: ""),
+    ) -> [any FileRule] {
         [
             ForceUnwrapping(),
             ForceTry(),
@@ -16,7 +19,7 @@ public enum RuleRegistry {
             ForceCast(),
             ImplicitlyUnwrappedOptional(),
             ConsistencyRequireMatchingFileName(),
-            FileLength(),
+            FileLength(maximum: configuration.options[FileLength().name]?["max"] ?? FileLength.maximumLines),
             ConsistencyNoPrint(),
             ConcurrencyRequireEscapeHatchReason(),
             FatalErrorMessage(),

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -392,12 +393,13 @@ func TestNoMisleadingCharacterClassAgreesWithEsLint(test *testing.T) {
 	}
 
 	for index, testCase := range cases {
-		result := rule_testing.RunTypedVerbatimWithOptions(
+		result := rule_testing.RunTypedVerbatimGiven(
 			test,
 			NoMisleadingCharacterClass,
 			"input.ts",
 			testCase.code,
-			nil,
+			// Unconfigured: every row of the corpus runs with no options.
+			rule.Given[NoMisleadingCharacterClassOptions]{},
 		)
 		source := result.SourceFile.Text()
 		got := []string{}

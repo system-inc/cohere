@@ -349,7 +349,7 @@ func TestNoUnsafeUnaryMinusRequiresTheTypedHarness(test *testing.T) {
 	// The guard the absorption made possible. Driving the listener with a checker-less Context must
 	// return rather than dereference nil, and this is the only path that reaches that branch, since
 	// registration always supplies a checker.
-	listeners := NoUnsafeUnaryMinus.Run(rule.Context{SourceFile: typed.SourceFile}, nil)
+	listeners := NoUnsafeUnaryMinus.Run(rule.Context{SourceFile: typed.SourceFile}, rule.Given[rule.NoOptions]{})
 	listener, hasListener := listeners[ast.KindPrefixUnaryExpression]
 	if !hasListener {
 		test.Fatal("the rule stopped listening on prefix unary expressions")

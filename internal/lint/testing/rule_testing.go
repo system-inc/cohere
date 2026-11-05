@@ -49,20 +49,63 @@ func (result Result) MessageIds() []string {
 // Rules that need a checker are exercised against a real program elsewhere; this path exists for
 // the syntax-only majority, where a full program would cost seconds to prove something a parse can
 // prove in microseconds.
-func Run(test *testing.T, subject rule.Rule, fileName string, sourceText string) Result {
+//
+// The rule runs unconfigured, as a config writing its bare severity runs it.
+func Run[Options any](test *testing.T, subject rule.Rule[Options], fileName string, sourceText string) Result {
 	test.Helper()
-	return RunWithOptions(test, subject, fileName, sourceText, nil)
+	return RunGiven(test, subject, fileName, sourceText, rule.Given[Options]{})
 }
 
-// RunWithOptions is Run for a rule that reads configuration.
+// RunWithOptions is Run for a rule that reads configuration, handed options as a config that wrote them
+// would hand them.
+func RunWithOptions[Options any](
+	test *testing.T,
+	subject rule.Rule[Options],
+	fileName string,
+	sourceText string,
+	options Options,
+) Result {
+	test.Helper()
+	return RunGiven(test, subject, fileName, sourceText, rule.Configured(options))
+}
+
+// RunGiven is Run with the options exactly as the rule receives them, configured or not, for a table whose
+// cases hold both.
 //
 // A configurable rule has a failure mode an unconfigured one does not: it can be registered without
 // its required option and then guard either everything or nothing. Which of those it does is a real
 // decision that belongs in fixtures, so the harness has to be able to hand a rule no options at all
 // as deliberately as it hands it good ones.
-func RunWithOptions(test *testing.T, subject rule.Rule, fileName string, sourceText string, options any) Result {
+func RunGiven[Options any](
+	test *testing.T,
+	subject rule.Rule[Options],
+	fileName string,
+	sourceText string,
+	options rule.Given[Options],
+) Result {
 	test.Helper()
-	captured := newCapturedRun(subject, fileName, 0, options)
+	// Bound as the framework binds a rule, so the fixture runs the rule as the walk would.
+	captured := newCapturedRun(subject.Name, fileName, 0, options)
+	return runParsed(test, rule.Bind(subject, options), fileName, sourceText, captured)
+}
+
+// RunBound is Run for a rule already bound to its options, as a registration's Bind returns it, for a test
+// that drives the registry's own decoders. No case it runs is captured for the docs, since its options are not
+// known here to be shown.
+func RunBound(test *testing.T, subject rule.Bound, fileName string, sourceText string) Result {
+	test.Helper()
+	return runParsed(test, subject, fileName, sourceText, nil)
+}
+
+// runParsed is the body Run's forms share: parse the file and walk it with the bound rule.
+func runParsed(
+	test *testing.T,
+	subject rule.Bound,
+	fileName string,
+	sourceText string,
+	captured *capturedRun,
+) Result {
+	test.Helper()
 
 	// A `.jsx` fixture has to parse as JSX too, and it did not until a fixture asked it to.
 	//
@@ -111,7 +154,7 @@ func RunWithOptions(test *testing.T, subject rule.Rule, fileName string, sourceT
 		},
 	}
 
-	listeners := subject.Run(context, options)
+	listeners := subject.Run(context)
 	if listeners != nil {
 		walk(sourceFile.AsNode(), listeners)
 	}
@@ -258,4 +301,26 @@ func ExpectFixedSource(test *testing.T, result Result, wantSource string) {
 		return
 	}
 	recordCase(test, result, capture.OutcomeFixed, source)
+}
+
+// EntryOf is a rule as the registry would hold it, for a test that hands the framework a rule it wrote or
+// picked rather than the registered catalog. It carries no decoder, so the rule runs as its Unconfigured unless
+// the test's own RuleOptions binds options for it.
+func EntryOf[Options any](test testing.TB, subject rule.Rule[Options]) rule.Entry {
+	test.Helper()
+	entry, entryError := rule.EntryOf(rule.Registration[Options]{Rule: subject})
+	if entryError != nil {
+		test.Fatalf("making the entry for %s: %v", subject.Name, entryError)
+	}
+	return entry
+}
+
+// EntriesOf is EntryOf for rules that take no options, in the order given.
+func EntriesOf(test testing.TB, subjects ...rule.Rule[rule.NoOptions]) []rule.Entry {
+	test.Helper()
+	entries := make([]rule.Entry, 0, len(subjects))
+	for _, subject := range subjects {
+		entries = append(entries, EntryOf(test, subject))
+	}
+	return entries
 }

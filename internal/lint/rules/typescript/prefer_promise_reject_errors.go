@@ -159,7 +159,7 @@ func buildPreferPromiseRejectErrorsMessage() rule.Message {
 // property name before asking the checker anything, and the new arm tests the argument shape before
 // resolving. The reference scan runs only for a `new Promise` whose executor has a named second
 // parameter.
-var PreferPromiseRejectErrors = rule.Rule{
+var PreferPromiseRejectErrors = rule.Rule[PreferPromiseRejectErrorsOptions]{
 	Name: "@typescript-eslint/prefer-promise-reject-errors",
 
 	// Every arm reads a type: the receiver's, the callee's, or the rejection reason's.
@@ -168,8 +168,8 @@ var PreferPromiseRejectErrors = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[PreferPromiseRejectErrorsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[PreferPromiseRejectErrorsOptions]) rule.Listeners {
+		settings, _ := options.Read()
 
 		// A rule configured as bare `"error"` is handed nil options, and `options.(T)` on nil yields
 		// the zero value. Every default here is false, so the zero value is already correct and no
@@ -512,20 +512,18 @@ func (specifier *preferPromiseRejectErrorsRawSpecifier) UnmarshalJSON(raw []byte
 // Hand-written rather than `rule.DecodeOptionsInto` because `allow` arrives as one heterogeneous
 // array and leaves as two typed fields, and because `from` is a string on the wire and an integer
 // enum in the struct.
-func DecodePreferPromiseRejectErrorsOptions(raw []byte) (any, error) {
+func DecodePreferPromiseRejectErrorsOptions(raw []byte) (PreferPromiseRejectErrorsOptions, error) {
 	decoded, decodeOptionsError := rule.DecodeOptionsInto[preferPromiseRejectErrorsRawOptions]()(raw)
 	if decodeOptionsError != nil {
 		return PreferPromiseRejectErrorsOptions{}, decodeOptionsError
 	}
 
-	wire, _ := decoded.(preferPromiseRejectErrorsRawOptions)
-
 	options := PreferPromiseRejectErrorsOptions{
-		AllowEmptyReject:     wire.AllowEmptyReject,
-		AllowThrowingAny:     wire.AllowThrowingAny,
-		AllowThrowingUnknown: wire.AllowThrowingUnknown,
+		AllowEmptyReject:     decoded.AllowEmptyReject,
+		AllowThrowingAny:     decoded.AllowThrowingAny,
+		AllowThrowingUnknown: decoded.AllowThrowingUnknown,
 	}
-	for _, entry := range wire.Allow {
+	for _, entry := range decoded.Allow {
 		if entry.inline != "" {
 			options.AllowInline = append(options.AllowInline, entry.inline)
 			continue

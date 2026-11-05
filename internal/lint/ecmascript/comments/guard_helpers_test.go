@@ -25,7 +25,7 @@ func realSourceFiles(test *testing.T, limit int) []realSourceFile {
 
 	var files []realSourceFile
 	root := corpus.Structure.Path(test, "source")
-	_ = filepath.Walk(root, func(path string, info os.FileInfo, pathError error) error {
+	walkError := filepath.Walk(root, func(path string, info os.FileInfo, pathError error) error {
 		if pathError != nil || info.IsDir() || len(files) >= limit {
 			return nil
 		}
@@ -52,6 +52,9 @@ func realSourceFiles(test *testing.T, limit int) []realSourceFile {
 		}
 		return nil
 	})
+	if walkError != nil {
+		test.Fatal(walkError)
+	}
 
 	// A corpus that failed to load would make every assertion pass over nothing.
 	if len(files) < 100 {

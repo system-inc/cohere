@@ -139,9 +139,9 @@ func messageBanTsCommentDescriptionFormat(directive string, pattern string) rule
 //
 // The first is tried first, and only on a line comment. A block comment's value is split into lines
 // and only the last is read, so a directive above the closing line is invisible.
-var BanTsComment = rule.Rule{
+var BanTsComment = rule.Rule[BanTsCommentOptions]{
 	Name: "@typescript-eslint/ban-ts-comment",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[BanTsCommentOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -155,7 +155,7 @@ var BanTsComment = rule.Rule{
 		// errors on empty input and the config layer turns that into nil. A bare type assertion
 		// would then yield four zero-valued directive settings, which match no arm, and the rule
 		// would register on every file and report nothing while every fixture stayed green.
-		parsed, decoded := rule.OptionsAs[BanTsCommentOptions](options)
+		parsed, decoded := options.Read()
 		if !decoded {
 			parsed = DefaultBanTsCommentOptions()
 		}
@@ -451,13 +451,12 @@ type banTsCommentRawOptions struct {
 // the rule, so the fallback only hid a typo (ruled on #pd2chkx). The config layer checks the shape
 // against typescript-eslint's schema before this runs, so the first two refusals are this
 // decoder's own guard for a caller that reaches it directly.
-func DecodeBanTsCommentOptions(raw []byte) (any, error) {
+func DecodeBanTsCommentOptions(raw []byte) (BanTsCommentOptions, error) {
 	decoded, decodeOptionsError := rule.DecodeOptionsInto[banTsCommentRawOptions]()(raw)
 	if decodeOptionsError != nil {
 		return DefaultBanTsCommentOptions(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(banTsCommentRawOptions)
 	options := DefaultBanTsCommentOptions()
 
 	for _, directive := range []struct {
@@ -465,10 +464,10 @@ func DecodeBanTsCommentOptions(raw []byte) (any, error) {
 		raw     json.RawMessage
 		setting *BanTsCommentSetting
 	}{
-		{"ts-expect-error", wire.TsExpectError, &options.TsExpectError},
-		{"ts-ignore", wire.TsIgnore, &options.TsIgnore},
-		{"ts-nocheck", wire.TsNoCheck, &options.TsNoCheck},
-		{"ts-check", wire.TsCheck, &options.TsCheck},
+		{"ts-expect-error", decoded.TsExpectError, &options.TsExpectError},
+		{"ts-ignore", decoded.TsIgnore, &options.TsIgnore},
+		{"ts-nocheck", decoded.TsNoCheck, &options.TsNoCheck},
+		{"ts-check", decoded.TsCheck, &options.TsCheck},
 	} {
 		setting, settingOrDefaultBanTsCommentError := settingOrDefaultBanTsComment(directive.raw, *directive.setting)
 		if settingOrDefaultBanTsCommentError != nil {
@@ -477,8 +476,8 @@ func DecodeBanTsCommentOptions(raw []byte) (any, error) {
 		*directive.setting = setting
 	}
 
-	if wire.MinimumDescriptionLength != nil {
-		options.MinimumDescriptionLength = *wire.MinimumDescriptionLength
+	if decoded.MinimumDescriptionLength != nil {
+		options.MinimumDescriptionLength = *decoded.MinimumDescriptionLength
 	}
 
 	return options, nil

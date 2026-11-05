@@ -84,7 +84,7 @@ func consistencyNoIsoStringDateCutMessage() rule.Message {
 //
 // The zone is the author's call, and choosing `'UTC'` or `userTimeZone()` for them is exactly the guess
 // the rule exists to stop.
-var ConsistencyNoIsoStringDateCut = rule.Rule{
+var ConsistencyNoIsoStringDateCut = rule.Rule[rule.NoOptions]{
 	Name: "nexus/consistency-no-iso-string-date-cut",
 
 	// Symbol identity is what tells the default library's `Date.prototype.toISOString` from a local
@@ -98,7 +98,7 @@ var ConsistencyNoIsoStringDateCut = rule.Rule{
 	// it is declared on, which no function body holds, so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 			return nil
 		}

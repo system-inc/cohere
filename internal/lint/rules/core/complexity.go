@@ -59,7 +59,7 @@ const complexityNeverReports = int(^uint(0) >> 1)
 // and the rule goes silent.
 //
 // Empty input decodes to the defaults, which is what a rule configured as a bare "error" is handed.
-func DecodeComplexityOptions(raw []byte) (any, error) {
+func DecodeComplexityOptions(raw []byte) (ComplexitySettings, error) {
 	settings := DefaultComplexitySettings()
 	if len(raw) == 0 {
 		return settings, nil
@@ -106,8 +106,8 @@ func DecodeComplexityOptions(raw []byte) (any, error) {
 }
 
 // complexitySettingsFrom recovers the settings from whatever the config layer handed over.
-func complexitySettingsFrom(options any) ComplexitySettings {
-	if settings, ok := rule.OptionsAs[ComplexitySettings](options); ok {
+func complexitySettingsFrom(options rule.Given[ComplexitySettings]) ComplexitySettings {
+	if settings, ok := options.Read(); ok {
 		return settings
 	}
 	return DefaultComplexitySettings()
@@ -186,10 +186,10 @@ var messageComplexityComplex = rule.Message{
 //
 // Upstream offers none and none is possible: reducing complexity means restructuring, and only the
 // author knows how.
-var Complexity = rule.Rule{
+var Complexity = rule.Rule[ComplexitySettings]{
 	Name: "complexity",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ComplexitySettings]) rule.Listeners {
 		settings := complexitySettingsFrom(options)
 
 		return rule.Listeners{

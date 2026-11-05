@@ -47,7 +47,7 @@ const (
 // registry or a changed set and watch the output move.
 type Inputs struct {
 	// Registrations is every registered rule, as rule.Registered returns them.
-	Registrations []rule.Registration
+	Registrations []rule.Entry
 
 	// SetNames is every rule set cohere carries, prefixed (`cohere:typescript`), and LoadSet resolves
 	// one the way a project extending it alone would see it. SetContents is a set's own text.
@@ -92,7 +92,7 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 
 	registered := map[string]bool{}
 	for _, registration := range inputs.Registrations {
-		registered[registration.Rule.Name] = true
+		registered[registration.Name] = true
 	}
 	for name, examples := range inputs.Examples {
 		if !registered[name] {

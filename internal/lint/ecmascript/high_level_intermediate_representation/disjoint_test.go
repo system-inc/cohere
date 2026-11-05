@@ -75,14 +75,12 @@ func classOfName(
 func TestDisjointSetMatchesReact(test *testing.T) {
 	test.Parallel()
 
-	const (
-		a static_single_assignment.IdentifierId = 1
-		b static_single_assignment.IdentifierId = 2
-		c static_single_assignment.IdentifierId = 3
-		d static_single_assignment.IdentifierId = 4
-		e static_single_assignment.IdentifierId = 5
-		f static_single_assignment.IdentifierId = 6
-	)
+	const a static_single_assignment.IdentifierId = 1
+	const b static_single_assignment.IdentifierId = 2
+	const c static_single_assignment.IdentifierId = 3
+	const d static_single_assignment.IdentifierId = 4
+	const e static_single_assignment.IdentifierId = 5
+	const f static_single_assignment.IdentifierId = 6
 
 	tests := []struct {
 		name     string
@@ -198,8 +196,8 @@ func TestDisjointSetMatchesReact(test *testing.T) {
 				if len(got[wantSetIndex]) != len(want) {
 					test.Fatalf("class %d is %v, want %v", wantSetIndex, got[wantSetIndex], want)
 				}
-				for j := range want {
-					if got[wantSetIndex][j] != want[j] {
+				for index := range want {
+					if got[wantSetIndex][index] != want[index] {
 						test.Fatalf("class %d is %v, want %v", wantSetIndex, got[wantSetIndex], want)
 					}
 				}
@@ -502,7 +500,7 @@ func TestDisjointMayAllocateMatchesReact(test *testing.T) {
 		{"PropertyDelete", &PropertyDelete{}, false},
 		{"ComputedLoad", &ComputedLoad{}, false},
 		{"ComputedDelete", &ComputedDelete{}, false},
-		{"Primitive", &Primitive{}, false},
+		{"Primitive", &Primitive{Value: PrimitiveUndefined{}}, false},
 		{"TemplateLiteral", &TemplateLiteral{}, false},
 		{"JsxText", &JsxText{}, false},
 		{"UnaryExpression", &UnaryExpression{}, false},
@@ -747,7 +745,8 @@ export function count(limit: number) {
 `)
 	set := FindDisjointMutableValuesWithRanges(function, ranges)
 
-	var phis, fired int
+	var phis int
+	var fired int
 	for _, block := range function.Blocks {
 		firstOrder := mutation_aliasing.BlockFirstOrder(rangeGraph{}, function, block)
 		for _, phi := range block.Phis {
@@ -1085,8 +1084,8 @@ export function repeat(seed: number) {
 		if len(firstSets[firstSetIndex]) != len(secondSets[firstSetIndex]) {
 			test.Fatalf("class %d: %v then %v", firstSetIndex, firstSets[firstSetIndex], secondSets[firstSetIndex])
 		}
-		for j := range firstSets[firstSetIndex] {
-			if firstSets[firstSetIndex][j] != secondSets[firstSetIndex][j] {
+		for index := range firstSets[firstSetIndex] {
+			if firstSets[firstSetIndex][index] != secondSets[firstSetIndex][index] {
 				test.Fatalf("class %d: %v then %v", firstSetIndex, firstSets[firstSetIndex], secondSets[firstSetIndex])
 			}
 		}
@@ -1216,7 +1215,11 @@ func TestDisjointClassSizesAreNotAllSingletons(test *testing.T) {
 		test.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
 	}
 
-	var functions, members, classes, singletons, largest int
+	var functions int
+	var members int
+	var classes int
+	var singletons int
+	var largest int
 
 	for _, path := range files {
 		contents, readError := os.ReadFile(path)
@@ -1224,10 +1227,10 @@ func TestDisjointClassSizesAreNotAllSingletons(test *testing.T) {
 			continue
 		}
 		fileName := "/corpus/" + filepath.Base(path)
-		probe := rule.Rule{
+		probe := rule.Rule[rule.NoOptions]{
 			Name:             "disjoint-corpus",
 			NeedsTypeChecker: true,
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						if ruleContext.TypeChecker == nil {

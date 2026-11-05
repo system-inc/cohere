@@ -88,7 +88,12 @@ func Generate(moduleDirectory string) (Files, error) {
 	if renderNoticeError != nil {
 		return nil, renderNoticeError
 	}
-	thirdParty, renderThirdPartyNoticesError := renderThirdPartyNotices(moduleDirectory, compiled, repositoryOnly, swiftPins)
+	thirdParty, renderThirdPartyNoticesError := renderThirdPartyNotices(
+		moduleDirectory,
+		compiled,
+		repositoryOnly,
+		swiftPins,
+	)
 	if renderThirdPartyNoticesError != nil {
 		return nil, renderThirdPartyNoticesError
 	}

@@ -26,7 +26,7 @@ func requireArraySortCompareCaseName(index int) string {
 //
 // An empty specifier means the case ran with no options at all, which is upstream's default and is
 // also what cohere hands a rule configured as a bare "error".
-func requireArraySortCompareOptionsFor(test *testing.T, optionsJson string) any {
+func requireArraySortCompareOptionsFor(test *testing.T, optionsJson string) RequireArraySortCompareOptions {
 	test.Helper()
 	if optionsJson == "" {
 		return DefaultRequireArraySortCompareSettings()
@@ -315,12 +315,8 @@ func TestDecodeRequireArraySortCompareOptionsKeepsTheDefaultWhenTheKeyIsAbsent(t
 			if decodeRequireArraySortCompareOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.raw, decodeRequireArraySortCompareOptionsError)
 			}
-			options, isOptions := decoded.(RequireArraySortCompareOptions)
-			if !isOptions {
-				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
-			}
-			if options.IgnoreStringArrays != testCase.want {
-				test.Fatalf("ignoreStringArrays: expected %v, got %v", testCase.want, options.IgnoreStringArrays)
+			if decoded.IgnoreStringArrays != testCase.want {
+				test.Fatalf("ignoreStringArrays: expected %v, got %v", testCase.want, decoded.IgnoreStringArrays)
 			}
 		})
 	}
@@ -340,8 +336,8 @@ func TestRequireArraySortCompareFallsBackToTheDefaultOnNilOptions(test *testing.
 
 	const stringArray = "['foo', 'bar', 'baz'].sort();"
 
-	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, RequireArraySortCompare,
-		requireArraySortCompareFile, stringArray, nil))
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, RequireArraySortCompare,
+		requireArraySortCompareFile, stringArray))
 
 	// The control: the same input with the exemption explicitly off must report, so the clean
 	// verdict above is the option working rather than the rule being inert.

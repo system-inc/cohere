@@ -109,14 +109,14 @@ var graphQlNullableParityInputClassDecorators = map[string]struct{}{
 // The original ships none. Both ways to satisfy the rule change behaviour: editing the flag changes
 // the schema clients see, editing the type changes the code. Which is right is not recoverable from
 // the source.
-var GraphQlNullableParity = rule.Rule{
+var GraphQlNullableParity = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-graphql-nullable-parity",
 
 	// One side of every comparison is a TypeScript type.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// checkNullability is the shared comparison: report when the declared flag and the type
 		// disagree, in whichever direction, and on an input, when a nullable type admits undefined
 		// but not the null a client can send.

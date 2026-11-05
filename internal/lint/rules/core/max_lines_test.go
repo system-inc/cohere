@@ -130,12 +130,7 @@ func TestMaxLinesDecodesUpstreamsShapes(test *testing.T) {
 			test.Errorf("%q: %v", testCase.raw, decodeMaximumLinesOptionsError)
 			continue
 		}
-		options, ok := decoded.(MaxLinesOptions)
-		if !ok {
-			test.Errorf("%q decoded to %T, not MaxLinesOptions", testCase.raw, decoded)
-			continue
-		}
-		if options != testCase.want {
+		if decoded != testCase.want {
 			test.Errorf("%q decoded to %+v, want %+v", testCase.raw, decoded, testCase.want)
 		}
 	}

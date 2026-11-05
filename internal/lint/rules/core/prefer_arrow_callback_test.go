@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -13,12 +14,12 @@ const preferArrowCallbackFile = "/repository/source/PreferArrowCallback.ts"
 // preferArrowCallbackOf builds the settings a config carrying this option would decode to.
 //
 // The argument is the option as JSON text, exactly the bytes the config layer hands the decoder.
-func preferArrowCallbackOf(optionJson string) any {
+func preferArrowCallbackOf(optionJson string) rule.Given[PreferArrowCallbackSettings] {
 	settings, decodePreferArrowCallbackOptionsError := DecodePreferArrowCallbackOptions([]byte(optionJson))
 	if decodePreferArrowCallbackOptionsError != nil {
 		panic(decodePreferArrowCallbackOptionsError)
 	}
-	return settings
+	return rule.Configured(settings)
 }
 
 // The corpus is ESLint's own, taken from
@@ -55,7 +56,7 @@ func TestPreferArrowCallbackFires(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings rule.Given[PreferArrowCallbackSettings]
 		findings int
 		// fixed is the source after one fix pass, which is what upstream's `output` records.
 		fixed *string
@@ -64,7 +65,6 @@ func TestPreferArrowCallbackFires(test *testing.T) {
 	}{
 		{
 			source:         "foo(function bar() {});",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(() => {});"),
 			declinesRepair: false,
@@ -85,70 +85,60 @@ func TestPreferArrowCallbackFires(test *testing.T) {
 		},
 		{
 			source:         "foo(function() {});",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(() => {});"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(nativeCb || function() {});",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(nativeCb || (() => {}));"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(bar ? function() {} : function() {});",
-			settings:       nil,
 			findings:       2,
 			fixed:          pointerTo("foo(bar ? () => {} : () => {});"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function() { (function() { this; }); });",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(() => { (function() { this; }); });"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function() { this; }.bind(this));",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(() => { this; });"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(bar || function() { this; }.bind(this));",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(bar || (() => { this; }));"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function() { (() => this); }.bind(this));",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(() => { (() => this); });"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function bar(a) { a; });",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo((a) => { a; });"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function(a) { a; });",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo((a) => { a; });"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function(arguments) { arguments; });",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo((arguments) => { arguments; });"),
 			declinesRepair: false,
@@ -169,52 +159,45 @@ func TestPreferArrowCallbackFires(test *testing.T) {
 		},
 		{
 			source:         "qux(function(foo, bar, baz) { return foo * 2; })",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("qux((foo, bar, baz) => { return foo * 2; })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "qux(function(foo, bar, baz) { return foo * bar; }.bind(this))",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("qux((foo, bar, baz) => { return foo * bar; })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "qux(function(foo, bar, baz) { return foo * this.qux; }.bind(this))",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("qux((foo, bar, baz) => { return foo * this.qux; })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function() {}.bind(this, somethingElse))",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo((() => {}).bind(this, somethingElse))"),
 			declinesRepair: false,
 		},
 		{
 			source:   "qux(function(foo = 1, [bar = 2] = [], {qux: baz = 3} = {foo: 'bar'}) { return foo + bar; });",
-			settings: nil,
 			findings: 1,
 			fixed: pointerTo(
 				"qux((foo = 1, [bar = 2] = [], {qux: baz = 3} = {foo: 'bar'}) => { return foo + bar; });",
 			),
 			declinesRepair: false,
 		},
-		{source: "qux(function(baz, baz) { })", settings: nil, findings: 1, fixed: nil, declinesRepair: true},
+		{source: "qux(function(baz, baz) { })", findings: 1, fixed: nil, declinesRepair: true},
 		{
 			source:         "qux(function( /* no params */ ) { })",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("qux(( /* no params */ ) => { })"),
 			declinesRepair: false,
 		},
 		{
 			source:   "qux(function( /* a */ foo /* b */ , /* c */ bar /* d */ , /* e */ baz /* f */ ) { return foo; })",
-			settings: nil,
 			findings: 1,
 			fixed: pointerTo(
 				"qux(( /* a */ foo /* b */ , /* c */ bar /* d */ , /* e */ baz /* f */ ) => { return foo; })",
@@ -223,91 +206,78 @@ func TestPreferArrowCallbackFires(test *testing.T) {
 		},
 		{
 			source:         "qux(async function (foo = 1, bar = 2, baz = 3) { return baz; })",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("qux(async (foo = 1, bar = 2, baz = 3) => { return baz; })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "qux(async function (foo = 1, bar = 2, baz = 3) { return this; }.bind(this))",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("qux(async (foo = 1, bar = 2, baz = 3) => { return this; })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(async function /*\n*/ () { return 1; });",
-			settings:       nil,
 			findings:       1,
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:         "foo(async function // c\n () { return 1; });",
-			settings:       nil,
 			findings:       1,
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:         "foo(async function\n () { return 1; });",
-			settings:       nil,
 			findings:       1,
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:         "foo(async function /* c */ () { return 1; });",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(async  /* c */ () => { return 1; });"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo((bar || function() {}).bind(this))",
-			settings:       nil,
 			findings:       1,
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:         "foo(function() {}.bind(this).bind(obj))",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo((() => {}).bind(obj))"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo?.(function() {});",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo?.(() => {});"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo?.(function() { return this; }.bind(this));",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo?.(() => { return this; });"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function() { return this; }?.bind(this));",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(() => { return this; });"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo((function() { return this; }?.bind)(this));",
-			settings:       nil,
 			findings:       1,
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:   "\n            test(\n                function ()\n                { }\n            );\n            ",
-			settings: nil,
 			findings: 1,
 			fixed: pointerTo(
 				"\n            test(\n                () =>\n                { }\n            );\n            ",
@@ -316,7 +286,6 @@ func TestPreferArrowCallbackFires(test *testing.T) {
 		},
 		{
 			source:   "\n            test(\n                function (\n                    ...args\n                ) /* Lorem ipsum\n                dolor sit amet. */ {\n                    return args;\n                }\n            );\n            ",
-			settings: nil,
 			findings: 1,
 			fixed: pointerTo(
 				"\n            test(\n                (\n                    ...args\n                ) => /* Lorem ipsum\n                dolor sit amet. */ {\n                    return args;\n                }\n            );\n            ",
@@ -325,7 +294,6 @@ func TestPreferArrowCallbackFires(test *testing.T) {
 		},
 		{
 			source:         "foo(function bar() {});",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(() => {});"),
 			declinesRepair: false,
@@ -346,70 +314,60 @@ func TestPreferArrowCallbackFires(test *testing.T) {
 		},
 		{
 			source:         "foo(function() {});",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(() => {});"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(nativeCb || function() {});",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(nativeCb || (() => {}));"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(bar ? function() {} : function() {});",
-			settings:       nil,
 			findings:       2,
 			fixed:          pointerTo("foo(bar ? () => {} : () => {});"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function() { (function() { this; }); });",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(() => { (function() { this; }); });"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function() { this; }.bind(this));",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(() => { this; });"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(bar || function() { this; }.bind(this));",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(bar || (() => { this; }));"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function() { (() => this); }.bind(this));",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(() => { (() => this); });"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function bar(a:string) { a; });",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo((a:string) => { a; });"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function(a:any) { a; });",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo((a:any) => { a; });"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function(arguments:any) { arguments; });",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo((arguments:any) => { arguments; });"),
 			declinesRepair: false,
@@ -430,35 +388,30 @@ func TestPreferArrowCallbackFires(test *testing.T) {
 		},
 		{
 			source:         "qux(function(foo:string, bar:number, baz:string) { return foo * 2; })",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("qux((foo:string, bar:number, baz:string) => { return foo * 2; })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "qux(function(foo:number, bar:number, baz:number) { return foo * bar; }.bind(this))",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("qux((foo:number, bar:number, baz:number) => { return foo * bar; })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "qux(function(foo:any, bar:any, baz:any) { return foo * this.qux; }.bind(this))",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("qux((foo:any, bar:any, baz:any) => { return foo * this.qux; })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function() {}.bind(this, somethingElse))",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo((() => {}).bind(this, somethingElse))"),
 			declinesRepair: false,
 		},
 		{
 			source:   "qux(function(foo = 1, [bar = 2] = [], {qux: baz = 3} = {foo: 'bar'}) { return foo + bar; });",
-			settings: nil,
 			findings: 1,
 			fixed: pointerTo(
 				"qux((foo = 1, [bar = 2] = [], {qux: baz = 3} = {foo: 'bar'}) => { return foo + bar; });",
@@ -467,21 +420,18 @@ func TestPreferArrowCallbackFires(test *testing.T) {
 		},
 		{
 			source:         "qux(function(baz:string, baz:string) { })",
-			settings:       nil,
 			findings:       1,
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:         "qux(function( /* no params */ ) { })",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("qux(( /* no params */ ) => { })"),
 			declinesRepair: false,
 		},
 		{
 			source:   "qux(function( /* a */ foo:string /* b */ , /* c */ bar:string /* d */ , /* e */ baz:string /* f */ ) { return foo; })",
-			settings: nil,
 			findings: 1,
 			fixed: pointerTo(
 				"qux(( /* a */ foo:string /* b */ , /* c */ bar:string /* d */ , /* e */ baz:string /* f */ ) => { return foo; })",
@@ -490,14 +440,12 @@ func TestPreferArrowCallbackFires(test *testing.T) {
 		},
 		{
 			source:         "qux(async function (foo:number = 1, bar:number = 2, baz:number = 3) { return baz; })",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("qux(async (foo:number = 1, bar:number = 2, baz:number = 3) => { return baz; })"),
 			declinesRepair: false,
 		},
 		{
 			source:   "qux(async function (foo:number = 1, bar:number = 2, baz:number = 3) { return this; }.bind(this))",
-			settings: nil,
 			findings: 1,
 			fixed: pointerTo(
 				"qux(async (foo:number = 1, bar:number = 2, baz:number = 3) => { return this; })",
@@ -506,49 +454,42 @@ func TestPreferArrowCallbackFires(test *testing.T) {
 		},
 		{
 			source:         "foo((bar || function() {}).bind(this))",
-			settings:       nil,
 			findings:       1,
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:         "foo(function() {}.bind(this).bind(obj))",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo((() => {}).bind(obj))"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo?.(function() {});",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo?.(() => {});"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo?.(function() { return this; }.bind(this));",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo?.(() => { return this; });"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo(function() { return this; }?.bind(this));",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(() => { return this; });"),
 			declinesRepair: false,
 		},
 		{
 			source:         "foo((function() { return this; }?.bind)(this));",
-			settings:       nil,
 			findings:       1,
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:   "\n            test(\n                function ()\n                { }\n            );\n            ",
-			settings: nil,
 			findings: 1,
 			fixed: pointerTo(
 				"\n            test(\n                () =>\n                { }\n            );\n            ",
@@ -557,7 +498,6 @@ func TestPreferArrowCallbackFires(test *testing.T) {
 		},
 		{
 			source:   "\n            test(\n                function (\n                    ...args\n                ) /* Lorem ipsum\n                dolor sit amet. */ {\n                    return args;\n                }\n            );\n            ",
-			settings: nil,
 			findings: 1,
 			fixed: pointerTo(
 				"\n            test(\n                (\n                    ...args\n                ) => /* Lorem ipsum\n                dolor sit amet. */ {\n                    return args;\n                }\n            );\n            ",
@@ -566,16 +506,15 @@ func TestPreferArrowCallbackFires(test *testing.T) {
 		},
 		{
 			source:         "foo(function():string { return 'foo' });",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("foo(():string => { return 'foo' });"),
 			declinesRepair: false,
 		},
-		{source: "test('foo', function (this: any) {});", settings: nil, findings: 1, fixed: nil, declinesRepair: true},
+		{source: "test('foo', function (this: any) {});", findings: 1, fixed: nil, declinesRepair: true},
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(
+		result := rule_testing.RunTypedGiven(
 			test,
 			PreferArrowCallback,
 			preferArrowCallbackFile,
@@ -620,51 +559,51 @@ func TestPreferArrowCallbackStaysSilent(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings rule.Given[PreferArrowCallbackSettings]
 	}{
-		{source: "foo(a => a);", settings: nil},
-		{source: "foo(function*() {});", settings: nil},
-		{source: "foo(function() { this; });", settings: nil},
+		{source: "foo(a => a);"},
+		{source: "foo(function*() {});"},
+		{source: "foo(function() { this; });"},
 		{source: "foo(function bar() {});", settings: preferArrowCallbackOf("{\"allowNamedFunctions\": true}")},
-		{source: "foo(function() { (() => this); });", settings: nil},
-		{source: "foo(function() { this; }.bind(obj));", settings: nil},
-		{source: "foo(function() { this; }.call(this));", settings: nil},
-		{source: "foo(a => { (function() {}); });", settings: nil},
-		{source: "var foo = function foo() {};", settings: nil},
-		{source: "(function foo() {})();", settings: nil},
-		{source: "foo(function bar() { bar; });", settings: nil},
-		{source: "foo(function bar() { arguments; });", settings: nil},
-		{source: "foo(function bar() { arguments; }.bind(this));", settings: nil},
-		{source: "foo(function bar() { new.target; });", settings: nil},
-		{source: "foo(function bar() { new.target; }.bind(this));", settings: nil},
-		{source: "foo(function bar() { this; }.bind(this, somethingElse));", settings: nil},
-		{source: "foo((function() {}).bind.bar)", settings: nil},
-		{source: "foo((function() { this.bar(); }).bind(obj).bind(this))", settings: nil},
-		{source: "foo(a => a);", settings: nil},
-		{source: "foo((a:string) => a);", settings: nil},
-		{source: "foo(function*() {});", settings: nil},
-		{source: "foo(function() { this; });", settings: nil},
+		{source: "foo(function() { (() => this); });"},
+		{source: "foo(function() { this; }.bind(obj));"},
+		{source: "foo(function() { this; }.call(this));"},
+		{source: "foo(a => { (function() {}); });"},
+		{source: "var foo = function foo() {};"},
+		{source: "(function foo() {})();"},
+		{source: "foo(function bar() { bar; });"},
+		{source: "foo(function bar() { arguments; });"},
+		{source: "foo(function bar() { arguments; }.bind(this));"},
+		{source: "foo(function bar() { new.target; });"},
+		{source: "foo(function bar() { new.target; }.bind(this));"},
+		{source: "foo(function bar() { this; }.bind(this, somethingElse));"},
+		{source: "foo((function() {}).bind.bar)"},
+		{source: "foo((function() { this.bar(); }).bind(obj).bind(this))"},
+		{source: "foo(a => a);"},
+		{source: "foo((a:string) => a);"},
+		{source: "foo(function*() {});"},
+		{source: "foo(function() { this; });"},
 		{source: "foo(function bar(a:string) {});", settings: preferArrowCallbackOf("{\"allowNamedFunctions\": true}")},
-		{source: "foo(function() { (() => this); });", settings: nil},
-		{source: "foo(function() { this; }.bind(obj));", settings: nil},
-		{source: "foo(function() { this; }.call(this));", settings: nil},
-		{source: "foo(a => { (function() {}); });", settings: nil},
-		{source: "var foo = function foo() {};", settings: nil},
-		{source: "(function foo() {})();", settings: nil},
-		{source: "foo(function bar() { bar; });", settings: nil},
-		{source: "foo(function bar() { arguments; });", settings: nil},
-		{source: "foo(function bar() { arguments; }.bind(this));", settings: nil},
-		{source: "foo(function bar() { new.target; });", settings: nil},
-		{source: "foo(function bar() { new.target; }.bind(this));", settings: nil},
-		{source: "foo(function bar() { this; }.bind(this, somethingElse));", settings: nil},
-		{source: "foo((function() {}).bind.bar)", settings: nil},
-		{source: "foo((function() { this.bar(); }).bind(obj).bind(this))", settings: nil},
-		{source: "test('clean', function (this: any) { this.foo = 'Cleaned!';});", settings: nil},
-		{source: "obj.test('clean', function (foo) { this.foo = 'Cleaned!'; });", settings: nil},
+		{source: "foo(function() { (() => this); });"},
+		{source: "foo(function() { this; }.bind(obj));"},
+		{source: "foo(function() { this; }.call(this));"},
+		{source: "foo(a => { (function() {}); });"},
+		{source: "var foo = function foo() {};"},
+		{source: "(function foo() {})();"},
+		{source: "foo(function bar() { bar; });"},
+		{source: "foo(function bar() { arguments; });"},
+		{source: "foo(function bar() { arguments; }.bind(this));"},
+		{source: "foo(function bar() { new.target; });"},
+		{source: "foo(function bar() { new.target; }.bind(this));"},
+		{source: "foo(function bar() { this; }.bind(this, somethingElse));"},
+		{source: "foo((function() {}).bind.bar)"},
+		{source: "foo((function() { this.bar(); }).bind(obj).bind(this))"},
+		{source: "test('clean', function (this: any) { this.foo = 'Cleaned!';});"},
+		{source: "obj.test('clean', function (foo) { this.foo = 'Cleaned!'; });"},
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(
+		result := rule_testing.RunTypedGiven(
 			test,
 			PreferArrowCallback,
 			preferArrowCallbackFile,
@@ -719,8 +658,7 @@ func TestPreferArrowCallbackSelfReferenceIsResolvedNotMatched(test *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(test, PreferArrowCallback, preferArrowCallbackFile,
-			testCase.source, nil)
+		result := rule_testing.RunTyped(test, PreferArrowCallback, preferArrowCallbackFile, testCase.source)
 		if len(result.Diagnostics) != testCase.findings {
 			test.Errorf("%q: expected %d findings, got %d %v",
 				testCase.source, testCase.findings, len(result.Diagnostics), result.MessageIds())
@@ -774,8 +712,7 @@ func TestPreferArrowCallbackHandlesNewExpressions(test *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(test, PreferArrowCallback, preferArrowCallbackFile,
-			testCase.source, nil)
+		result := rule_testing.RunTyped(test, PreferArrowCallback, preferArrowCallbackFile, testCase.source)
 		if len(result.Diagnostics) != testCase.findings {
 			test.Errorf("%q: expected %d findings, got %d %v",
 				testCase.source, testCase.findings, len(result.Diagnostics), result.MessageIds())

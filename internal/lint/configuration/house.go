@@ -141,7 +141,13 @@ func LoadHouse(path string, registeredNames []string, detection HouseDetection) 
 	}
 
 	tailwind := detection.TailwindEntryPoint != ""
-	whole, loadHouseVariantError := loadHouseVariant(ownLayers, root, registeredNames, houseVariant{react: true, next: true}, true)
+	whole, loadHouseVariantError := loadHouseVariant(
+		ownLayers,
+		root,
+		registeredNames,
+		houseVariant{react: true, next: true},
+		true,
+	)
 	if loadHouseVariantError != nil {
 		return nil, loadHouseVariantError
 	}
@@ -313,7 +319,10 @@ func (configuration *Config) DetectionFingerprint() string {
 		return ""
 	}
 	digest := sha256.New()
-	for _, files := range []map[string]bool{configuration.house.detection.ReactFiles, configuration.house.detection.NextFiles} {
+	for _, files := range []map[string]bool{
+		configuration.house.detection.ReactFiles,
+		configuration.house.detection.NextFiles,
+	} {
 		names := make([]string, 0, len(files))
 		for name := range files {
 			names = append(names, name)

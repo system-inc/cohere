@@ -21,7 +21,7 @@ func returnAwaitCaseName(index int) string {
 // the default lives. That default is `in-try-catch` rather than `always`, so a rule configured as
 // a plain "error" arrives with nil options and must land on it; the zero value is an empty mode
 // matching no arm, which would make the rule silently inert.
-func returnAwaitOptionsFor(test *testing.T, optionsJson string) any {
+func returnAwaitOptionsFor(test *testing.T, optionsJson string) ReturnAwaitOptions {
 	test.Helper()
 	if optionsJson == "" || optionsJson == "null" {
 		return DefaultReturnAwaitSettings()

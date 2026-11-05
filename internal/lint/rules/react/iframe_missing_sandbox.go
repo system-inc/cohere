@@ -230,7 +230,7 @@ func iframeMissingSandboxInvalidValue(value string) rule.Message {
 // wins over `src`, are same-origin. A plain `string`, a template whose head stops before the host is
 // complete, a bare `src` and a spread after the last `src` are unknown. Both report. The
 // invalid-token and missing-attribute reports are untouched and remain exactly upstream's.
-var IframeMissingSandbox = rule.Rule{
+var IframeMissingSandbox = rule.Rule[rule.NoOptions]{
 	Name: "react/iframe-missing-sandbox",
 
 	// Declared for the bare-call branch of `isPragmaCreateElementCall`, which asks the checker
@@ -239,7 +239,7 @@ var IframeMissingSandbox = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// validateSandboxValue splits a sandbox attribute's text and reports each rejected token,
 		// then the invalid pairing. Upstream reports every unknown token separately and the
 		// combination once, in that order, which is what the two-finding corpus case pins.
@@ -499,22 +499,22 @@ func iframeMissingSandboxValueIsCrossOrigin(ruleContext rule.Context, value *ast
 	if value == nil {
 		return false
 	}
-	value = ast.SkipParentheses(value)
-	switch value.Kind {
+	unwrapped := ast.SkipParentheses(value)
+	switch unwrapped.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		return iframeMissingSandboxClassifyUrl(value.Text(), true) == iframeMissingSandboxOriginCross
+		return iframeMissingSandboxClassifyUrl(unwrapped.Text(), true) == iframeMissingSandboxOriginCross
 	case ast.KindTemplateExpression:
 		return iframeMissingSandboxClassifyUrl(
-			value.AsTemplateExpression().Head.Text(),
+			unwrapped.AsTemplateExpression().Head.Text(),
 			false,
 		) == iframeMissingSandboxOriginCross
 	}
 	if ruleContext.TypeChecker == nil {
 		return false
 	}
-	if followConst && ast.IsIdentifier(value) {
+	if followConst && ast.IsIdentifier(unwrapped) {
 		if symbol := ruleContext.TypeChecker.GetSymbolAtLocation(
-			value,
+			unwrapped,
 		); symbol != nil && symbol.ValueDeclaration != nil &&
 			ast.IsVariableDeclaration(symbol.ValueDeclaration) &&
 			ast.GetCombinedNodeFlags(symbol.ValueDeclaration)&ast.NodeFlagsConst != 0 {
@@ -524,7 +524,7 @@ func iframeMissingSandboxValueIsCrossOrigin(ruleContext rule.Context, value *ast
 			}
 		}
 	}
-	valueType := ruleContext.TypeChecker.GetTypeAtLocation(value)
+	valueType := ruleContext.TypeChecker.GetTypeAtLocation(unwrapped)
 	if valueType == nil {
 		return false
 	}
@@ -569,12 +569,12 @@ func iframeMissingSandboxValueIsCrossOrigin(ruleContext rule.Context, value *ast
 // backslash as a slash, and ignores how many slashes follow a special scheme, so `\\host` and
 // `/\nhost` are protocol-relative too. The text is normalised the same way first.
 func iframeMissingSandboxClassifyUrl(text string, complete bool) iframeMissingSandboxOrigin {
-	text = strings.TrimLeftFunc(text, func(character rune) bool { return character <= ' ' })
-	text = strings.NewReplacer("\t", "", "\n", "", "\r", "", `\`, "/").Replace(strings.ToLower(text))
-	if rest, isProtocolRelative := strings.CutPrefix(text, "//"); isProtocolRelative {
+	normalized := strings.TrimLeftFunc(text, func(character rune) bool { return character <= ' ' })
+	normalized = strings.NewReplacer("\t", "", "\n", "", "\r", "", `\`, "/").Replace(strings.ToLower(normalized))
+	if rest, isProtocolRelative := strings.CutPrefix(normalized, "//"); isProtocolRelative {
 		return iframeMissingSandboxHostOrigin(rest, complete)
 	}
-	end := strings.IndexAny(text, ":/?#")
+	end := strings.IndexAny(normalized, ":/?#")
 	if end == -1 {
 		// A bare reference like `embed.html` is relative. A prefix with no delimiter yet is not decided:
 		// `${scheme}` may still follow it.
@@ -583,16 +583,16 @@ func iframeMissingSandboxClassifyUrl(text string, complete bool) iframeMissingSa
 		}
 		return iframeMissingSandboxOriginUnknown
 	}
-	if text[end] == ':' && iframeMissingSandboxIsScheme(text[:end]) {
-		switch scheme := text[:end]; scheme {
+	if normalized[end] == ':' && iframeMissingSandboxIsScheme(normalized[:end]) {
+		switch scheme := normalized[:end]; scheme {
 		case "about", "blob", "javascript":
 			return iframeMissingSandboxOriginSame
 		case "http", "https":
-			return iframeMissingSandboxHostOrigin(strings.TrimLeft(text[end+1:], "/"), complete)
+			return iframeMissingSandboxHostOrigin(strings.TrimLeft(normalized[end+1:], "/"), complete)
 		}
 		return iframeMissingSandboxOriginCross
 	}
-	if end == 0 && text == "/" && !complete {
+	if end == 0 && normalized == "/" && !complete {
 		// A lone slash becomes protocol-relative if the substitution after it starts with another.
 		return iframeMissingSandboxOriginUnknown
 	}

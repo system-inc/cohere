@@ -29,7 +29,8 @@ var exportRanges = flag.String(
 //
 // It skips unless -export-ranges names a directory:
 //
-//	go test -count=1 -run '^TestExportRangesForAdamic$' ./internal/lint/ecmascript/high_level_intermediate_representation -args -export-ranges <dir>
+//	go test -count=1 -run '^TestExportRangesForAdamic$' \
+//		./internal/lint/ecmascript/high_level_intermediate_representation -args -export-ranges <dir>
 //
 // Each fixture becomes one file of cases, named for the fixture, holding its outermost functions and
 // every function nested in them, as ForFunction gives them. A fixture whose source names useMemo or

@@ -29,8 +29,17 @@ func TestFilesThatResolveAlikeShareOneSelectionAndStillCountPerFile(test *testin
 			},
 		},
 	}}
-	rules := []rule.Rule{{Name: "runs"}, {Name: "off"}, {Name: "nobody-configured"}}
-	selections := map[any]*ruleSelection{}
+	var rules []rule.Entry
+	for _, name := range []string{"runs", "off", "nobody-configured"} {
+		entry, entryError := rule.EntryOf(
+			rule.Registration[rule.NoOptions]{Rule: rule.Rule[rule.NoOptions]{Name: name}},
+		)
+		if entryError != nil {
+			test.Fatal(entryError)
+		}
+		rules = append(rules, entry)
+	}
+	selections := map[*configuration.ResolutionIdentity]*ruleSelection{}
 	scopedOff, unconfigured := map[string]int{}, map[string]int{}
 
 	first, _ := graph.rulesFor("source/a.ts", rules, selections, scopedOff, unconfigured)
@@ -71,6 +80,26 @@ func TestSelectionsFingerprintADerivedRuleOncePerOptionsForTheWholeWalk(test *te
 			Options:  []json.RawMessage{json.RawMessage(`"` + marker + `"`)},
 		}
 	}
+	var calls atomic.Int32
+	derived := rule.Rule[string]{
+		Name:         "derived",
+		ProgramReads: rule.ReadsOtherFiles,
+		ProgramFingerprint: func(_ rule.Program, options rule.Given[string]) [sha256.Size]byte {
+			calls.Add(1)
+			marker, configured := options.Read()
+			if !configured {
+				// Invariant: every selection here configures the rule with an option, and RuleOptions binds it to
+				// that option.
+				panic("the derived rule has no marker")
+			}
+			return sha256.Sum256([]byte(marker))
+		},
+	}
+	derivedEntry, entryError := rule.EntryOf(rule.Registration[string]{Rule: derived})
+	if entryError != nil {
+		test.Fatal(entryError)
+	}
+	rules := []rule.Entry{derivedEntry}
 	graph := &Graph{
 		LintConfig: &configuration.Config{
 			Rules: map[string]configuration.RuleSetting{"derived": setting("red")},
@@ -82,27 +111,14 @@ func TestSelectionsFingerprintADerivedRuleOncePerOptionsForTheWholeWalk(test *te
 				{Files: []string{"again/**"}, Rules: map[string]configuration.RuleSetting{"derived": setting("red")}},
 			},
 		},
-		RuleOptions: configuration.OptionsRegistry{"derived": {Decode: func(raw json.RawMessage) (any, error) {
+		RuleOptions: configuration.OptionsRegistry{"derived": {Decode: func(raw json.RawMessage) (rule.Bound, error) {
 			var marker string
-			decodeError := json.Unmarshal(raw, &marker)
-			return marker, decodeError
+			if decodeError := json.Unmarshal(raw, &marker); decodeError != nil {
+				return rule.Bound{}, decodeError
+			}
+			return rule.Bind(derived, rule.Configured(marker)), nil
 		}}},
 	}
-	var calls atomic.Int32
-	rules := []rule.Rule{{
-		Name:         "derived",
-		ProgramReads: rule.ReadsOtherFiles,
-		ProgramFingerprint: func(_ rule.Program, options any) [sha256.Size]byte {
-			calls.Add(1)
-			marker, isMarker := options.(string)
-			if !isMarker {
-				// Invariant: every selection here configures the rule with an option, and RuleOptions decodes it into a
-				// string.
-				panic("the derived rule's options are not a marker")
-			}
-			return sha256.Sum256([]byte(marker))
-		},
-	}}
 	memo := &programFingerprintMemo{entries: map[programFingerprintKey]*programFingerprintEntry{}}
 
 	const workers = 16
@@ -112,7 +128,7 @@ func TestSelectionsFingerprintADerivedRuleOncePerOptionsForTheWholeWalk(test *te
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			selections := map[any]*ruleSelection{}
+			selections := map[*configuration.ResolutionIdentity]*ruleSelection{}
 			scopedOff, unconfigured := map[string]int{}, map[string]int{}
 			for file, want := range map[string]string{
 				"source/a.ts":  "red",

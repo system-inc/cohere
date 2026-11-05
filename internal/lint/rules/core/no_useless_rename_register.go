@@ -16,7 +16,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // three options already default to false, so that costs nothing today and keeps the shape right if a
 // default ever moves.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoUselessRenameSettings]{
 		Rule:   NoUselessRename,
 		Decode: DecodeNoUselessRenameOptions,
 	})

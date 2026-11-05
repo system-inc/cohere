@@ -3,8 +3,6 @@ package docsdata
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
-	"runtime"
 	"sort"
 	"strings"
 
@@ -144,17 +142,17 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 
 	rows := make([]RuleRow, 0, len(inputs.Registrations))
 	for _, registration := range inputs.Registrations {
-		name := registration.Rule.Name
+		name := registration.Name
 		row := RuleRow{
 			Name:      name,
 			Language:  "TypeScript",
-			TypeAware: registration.Rule.NeedsTypeChecker,
+			TypeAware: registration.NeedsTypeChecker,
 			Sets:      enabledBy[name],
 		}
 		if slash := strings.LastIndex(name, "/"); slash >= 0 {
 			row.Namespace = name[:slash]
 		}
-		origin, originOfError := originOf(row.Namespace, registeringPackage(registration.Rule))
+		origin, originOfError := originOf(row.Namespace, registration.RunPackage)
 		if originOfError != nil {
 			return Rules{}, fmt.Errorf("docsdata: %s: %w", name, originOfError)
 		}
@@ -305,33 +303,17 @@ func originOf(namespace string, packagePath string) (string, error) {
 	return origin, nil
 }
 
-// registeringPackage is the import path of the package whose code a rule's Run is, read off the function
-// itself, so a bare house rule is told from an ESLint core port by where it lives rather than by a list.
-func registeringPackage(subject rule.Rule) string {
-	function := runtime.FuncForPC(reflect.ValueOf(subject.Run).Pointer())
-	if function == nil {
-		return ""
-	}
-	// A function's name is its import path, then a dot, then the symbol and any closure suffixes. The
-	// path's last segment may hold dots of its own only in a domain, which comes before the last slash.
-	name := function.Name()
-	slash := strings.LastIndex(name, "/")
-	dot := strings.Index(name[slash+1:], ".")
-	if dot < 0 {
-		return name
-	}
-	return name[:slash+1+dot]
-}
-
 // optionsOf reads what a registration declares about its options, or nil for a rule that takes none.
-func optionsOf(registration rule.Registration) *RuleOptions {
-	switch {
-	case registration.DecodeOptionList != nil:
+func optionsOf(registration rule.Entry) *RuleOptions {
+	switch registration.Arity {
+	case rule.OptionArityList:
 		return &RuleOptions{Elements: "many", Required: registration.RequiresOptions}
-	case registration.DecodeAt != nil:
+	case rule.OptionArityAt:
 		return &RuleOptions{Elements: "one", AnchorsPaths: true, Required: registration.RequiresOptions}
-	case registration.Decode != nil:
+	case rule.OptionArityOne:
 		return &RuleOptions{Elements: "one", Required: registration.RequiresOptions}
+	case rule.OptionArityNone:
+		// A rule that takes no options has no options row.
 	}
 	return nil
 }

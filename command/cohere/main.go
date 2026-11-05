@@ -1629,6 +1629,16 @@ func configureLint(
 	if err != nil {
 		return nil, fmt.Errorf("loading the lint config: %w", err)
 	}
+	// The project's own file, which discovery may not have read: a run naming a directory, a tsconfig or a
+	// path discovers nothing. A file the command line named is the Swift engine's to read wherever it sits
+	// (see configuration.CheckSwiftBlockHasAReader), and a missing one is zero config, with no block.
+	if !location.LintConfigFileNameGiven && isRegularFile(location.LintConfigFileName) {
+		if checkSwiftBlockHasAReaderError := configuration.CheckSwiftBlockHasAReader(
+			location.LintConfigFileName,
+		); checkSwiftBlockHasAReaderError != nil {
+			return nil, fmt.Errorf("loading the lint config: %w", checkSwiftBlockHasAReaderError)
+		}
+	}
 	// Validated against the whole program rather than against a narrowed scope. The question
 	// this check asks is whether a config override reaches any file at all, which is a property
 	// of the tree and not of one run: scoping to a single file legitimately leaves `modules/**`
@@ -1803,7 +1813,12 @@ func releaseEarlyTypeCheck() {
 
 // finishTypeCheck waits for the check, writes the build info if asked, and returns the diagnostics that
 // belong to files, plus the program's own.
-func finishTypeCheck(callerContext context.Context, check *typeCheck, files []*ast.SourceFile, persist bool) []*ast.Diagnostic {
+func finishTypeCheck(
+	callerContext context.Context,
+	check *typeCheck,
+	files []*ast.SourceFile,
+	persist bool,
+) []*ast.Diagnostic {
 	<-check.done
 
 	// The read already happened when the session began; only the write is conditional.
@@ -1963,7 +1978,7 @@ func lintConfigSources(path string) []string {
 // Keys naming a rule cohere has not ported yet are the expected case and not an error: a decision
 // recorded ahead of the rule is how this migration is supposed to work. They are counted and named
 // separately so the two are never confused.
-func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Rule, lintConfiguration *configuration.Config) {
+func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Entry, lintConfiguration *configuration.Config) {
 	if lintConfiguration == nil {
 		return
 	}

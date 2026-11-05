@@ -135,7 +135,11 @@ func FormatSCSS(text string, prettierOptions formatoptions.Options) (string, err
 }
 
 // formatWithParser is Format under the parser named, "css" or "scss".
-func formatWithParser(text string, prettierOptions formatoptions.Options, parser string) (formatted string, formatWithParserError error) {
+func formatWithParser(
+	text string,
+	prettierOptions formatoptions.Options,
+	parser string,
+) (formatted string, formatWithParserError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			formatted, formatWithParserError = "", fmt.Errorf("%s: %v", parser, recovered)

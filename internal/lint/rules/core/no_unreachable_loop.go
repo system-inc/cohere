@@ -115,19 +115,19 @@ var messageUnreachableLoop = rule.Message{
 // the file's, and emitting as they are found would interleave roots. `for (a in b) { while (foo) {
 // if(baz) { break; } else { break; } } break; }` is the case that pins it: upstream reports the
 // outer loop then the inner one, and `ExpectFindings` asserts ids in order.
-var NoUnreachableLoop = rule.Rule{
+var NoUnreachableLoop = rule.Rule[NoUnreachableLoopOptions]{
 	Name: "no-unreachable-loop",
 
 	// No type information. Reachability is a control-flow question over the syntax tree, and
 	// upstream asks its scope analysis nothing here either.
 	NeedsTypeChecker: false,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnreachableLoopOptions]) rule.Listeners {
 		// A rule configured as a bare severity is handed nil, which `options.(T)` turns into the
 		// zero value. Upstream's default is `{ ignore: [] }`, so the zero value is right, and the
 		// fallback is still written out rather than relied on.
 		settings := NoUnreachableLoopOptions{}
-		if decoded, configured := rule.OptionsAs[NoUnreachableLoopOptions](options); configured {
+		if decoded, configured := options.Read(); configured {
 			settings = decoded
 		}
 

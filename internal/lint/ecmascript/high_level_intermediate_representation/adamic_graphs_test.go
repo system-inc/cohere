@@ -30,7 +30,8 @@ var exportGraphs = flag.String(
 //
 // It skips unless -export-graphs names a directory:
 //
-//	go test -count=1 -run '^TestExportGraphsForAdamic$' ./internal/lint/ecmascript/high_level_intermediate_representation -args -export-graphs <dir>
+//	go test -count=1 -run '^TestExportGraphsForAdamic$' \
+//		./internal/lint/ecmascript/high_level_intermediate_representation -args -export-graphs <dir>
 //
 // Each fixture becomes one file of cases, named for the fixture, with its outermost functions and every
 // function nested in them, each read through ssaGraph and the module's Graph, as construction reads it.
@@ -149,10 +150,10 @@ func lowerReactCompilerFixture(
 ) []*Function {
 	test.Helper()
 	var lowered []*Function
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "adamic-graphs-export",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {

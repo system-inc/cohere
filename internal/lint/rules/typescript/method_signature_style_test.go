@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -20,21 +21,21 @@ func methodSignatureStyleCaseName(index int) string {
 //
 // The decoder holds the only default in this rule and reads a bare JSON string rather than an
 // object, which is the one line with no upstream counterpart. An empty configuration is the bare
-// `"error"` case, which the config layer turns into nil options, and it reaches the rule the same
+// `"error"` case, which the config layer turns into no options, and it reaches the rule the same
 // way here.
-func decodeMethodSignatureStyleOptions(test *testing.T, configuration string) any {
+func decodeMethodSignatureStyleOptions(test *testing.T, configuration string) rule.Given[MethodSignatureStyleOptions] {
 	test.Helper()
 
 	if configuration == "" {
-		// A rule configured as a bare `"error"` is handed nil, not an empty struct. Passing nil
-		// here is what puts the rule's own fallback under test rather than the decoder's.
-		return nil
+		// A rule configured as a bare `"error"` is handed no options, not an empty struct. Handing
+		// it none here is what puts the rule's own fallback under test rather than the decoder's.
+		return rule.Given[MethodSignatureStyleOptions]{}
 	}
 	options, decodeMethodSignatureStyleOptionsError := DecodeMethodSignatureStyleOptions([]byte(configuration))
 	if decodeMethodSignatureStyleOptionsError != nil {
 		test.Fatalf("could not decode %s: %v", configuration, decodeMethodSignatureStyleOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // TestMethodSignatureStyleStaysSilentOnUpstreamPassCases is the imported clean corpus.
@@ -150,7 +151,7 @@ func TestMethodSignatureStyleStaysSilentOnUpstreamPassCases(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(methodSignatureStyleCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, MethodSignatureStyle,
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(test, MethodSignatureStyle,
 				methodSignatureStyleFile, testCase.sourceText,
 				decodeMethodSignatureStyleOptions(test, testCase.configuration)))
 		})
@@ -506,7 +507,7 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(methodSignatureStyleCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, MethodSignatureStyle,
+			result := rule_testing.RunGiven(test, MethodSignatureStyle,
 				methodSignatureStyleFile, testCase.sourceText,
 				decodeMethodSignatureStyleOptions(test, testCase.configuration))
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
@@ -648,7 +649,7 @@ func TestMethodSignatureStylePreservesEverythingInsideTheSignature(test *testing
 	for index, testCase := range cases {
 		test.Run(methodSignatureStyleCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, MethodSignatureStyle,
+			result := rule_testing.RunGiven(test, MethodSignatureStyle,
 				methodSignatureStyleFile, testCase.sourceText,
 				decodeMethodSignatureStyleOptions(test, testCase.configuration))
 			rule_testing.ExpectFindings(test, result, "errorMethod")
@@ -740,7 +741,7 @@ func TestMethodSignatureStyleDiscriminatesOnCasesUpstreamDoesNotWrite(test *test
 	for index, testCase := range cases {
 		test.Run(methodSignatureStyleCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, MethodSignatureStyle,
+			result := rule_testing.RunGiven(test, MethodSignatureStyle,
 				methodSignatureStyleFile, testCase.sourceText,
 				decodeMethodSignatureStyleOptions(test, testCase.configuration))
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
@@ -772,12 +773,8 @@ func TestMethodSignatureStyleDecoderResolvesTheStyle(test *testing.T) {
 			if decodeMethodSignatureStyleOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.configuration, decodeMethodSignatureStyleOptionsError)
 			}
-			options, ok := decoded.(MethodSignatureStyleOptions)
-			if !ok {
-				test.Fatalf("the decoder returned %T rather than MethodSignatureStyleOptions", decoded)
-			}
-			if options.Style != testCase.wantStyle {
-				test.Errorf("style resolved to %q, want %q", options.Style, testCase.wantStyle)
+			if decoded.Style != testCase.wantStyle {
+				test.Errorf("style resolved to %q, want %q", decoded.Style, testCase.wantStyle)
 			}
 		})
 	}
@@ -788,10 +785,10 @@ func TestMethodSignatureStyleNilOptionsFallsBackToUpstreamDefault(test *testing.
 	test.Parallel()
 
 	// `property` is the default, so a shorthand method reports and a function property does not.
-	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, MethodSignatureStyle,
-		methodSignatureStyleFile, "interface I { m(a: string): void; }", nil), "errorMethod")
-	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, MethodSignatureStyle,
-		methodSignatureStyleFile, "interface I { m: (a: string) => void; }", nil))
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, MethodSignatureStyle,
+		methodSignatureStyleFile, "interface I { m(a: string): void; }"), "errorMethod")
+	rule_testing.ExpectClean(test, rule_testing.Run(test, MethodSignatureStyle,
+		methodSignatureStyleFile, "interface I { m: (a: string) => void; }"))
 }
 
 // TestMethodSignatureStyleSurvivesMalformedSignatures is a crash fixture.
@@ -817,9 +814,9 @@ func TestMethodSignatureStyleSurvivesMalformedSignatures(test *testing.T) {
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.RunWithOptions(test, MethodSignatureStyle, methodSignatureStyleFile,
+			rule_testing.RunGiven(test, MethodSignatureStyle, methodSignatureStyleFile,
 				sourceText, decodeMethodSignatureStyleOptions(test, "\"property\""))
-			rule_testing.RunWithOptions(test, MethodSignatureStyle, methodSignatureStyleFile,
+			rule_testing.RunGiven(test, MethodSignatureStyle, methodSignatureStyleFile,
 				sourceText, decodeMethodSignatureStyleOptions(test, "\"method\""))
 		})
 	}

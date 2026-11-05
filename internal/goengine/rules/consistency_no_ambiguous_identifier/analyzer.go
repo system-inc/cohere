@@ -245,10 +245,11 @@ func isErrorConstructor(callee types.Object) bool {
 // receiverTypeName is the name of the type a receiver of declaredType is a value or pointer of, or empty when it is
 // not a named type.
 func receiverTypeName(declaredType types.Type) string {
+	dereferenced := declaredType
 	if pointer, isPointer := types.Unalias(declaredType).(*types.Pointer); isPointer {
-		declaredType = pointer.Elem()
+		dereferenced = pointer.Elem()
 	}
-	if named, isNamed := types.Unalias(declaredType).(*types.Named); isNamed {
+	if named, isNamed := types.Unalias(dereferenced).(*types.Named); isNamed {
 		return named.Obj().Name()
 	}
 	return ""

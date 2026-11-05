@@ -82,7 +82,7 @@ import (
 // Three anchors, all common, and each one asks the checker immediately. That is upstream's shape
 // too, and there is no cheaper pre-test available: whether a callee is `any` is precisely the
 // question, so nothing syntactic can decline first.
-var NoUnsafeCall = rule.Rule{
+var NoUnsafeCall = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unsafe-call",
 
 	// Every finding is a type question about the callee. The checker is required.
@@ -92,7 +92,7 @@ var NoUnsafeCall = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// checkCall is upstream's single body, shared by all three anchors.
 		//
 		// `subject` is the thing being called and `reportOn` is where the finding points. They are

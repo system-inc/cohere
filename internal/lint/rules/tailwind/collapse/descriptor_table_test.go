@@ -226,7 +226,7 @@ func readingPointer(value *extractedReading) *Reading {
 	return &Reading{Order: value.Order, Count: value.Count}
 }
 
-func readJSON(path string, into any) error {
+func readJSON[Contents any](path string, into *Contents) error {
 	raw, readError := os.ReadFile(path)
 	if readError != nil {
 		return readError

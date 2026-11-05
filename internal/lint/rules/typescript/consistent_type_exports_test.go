@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -59,18 +60,21 @@ func consistentTypeExportsFixtureFiles(subject string) map[string]string {
 }
 
 // decodeConsistentTypeExportsOptions runs a configuration through the real decoder.
-func decodeConsistentTypeExportsOptions(test *testing.T, configuration string) any {
+func decodeConsistentTypeExportsOptions(
+	test *testing.T,
+	configuration string,
+) rule.Given[ConsistentTypeExportsOptions] {
 	test.Helper()
 
 	if configuration == "" {
-		// A rule configured as a bare `"error"` is handed nil, not an empty struct.
-		return nil
+		// A rule configured as a bare `"error"` is handed no options, not an empty struct.
+		return rule.Given[ConsistentTypeExportsOptions]{}
 	}
 	options, decodeConsistentTypeExportsOptionsError := DecodeConsistentTypeExportsOptions([]byte(configuration))
 	if decodeConsistentTypeExportsOptionsError != nil {
 		test.Fatalf("could not decode %s: %v", configuration, decodeConsistentTypeExportsOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // TestConsistentTypeExportsStaysSilentOnUpstreamPassCases is the imported clean corpus.
@@ -190,7 +194,7 @@ func TestConsistentTypeExportsStaysSilentOnUpstreamPassCases(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(consistentTypeExportsCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithOptions(test,
+			rule_testing.ExpectClean(test, rule_testing.RunTypedFilesGiven(test,
 				ConsistentTypeExports, consistentTypeExportsFixtureFiles(testCase.sourceText),
 				consistentTypeExportsFile,
 				decodeConsistentTypeExportsOptions(test, testCase.configuration)))
@@ -404,7 +408,7 @@ func TestConsistentTypeExportsFiresOnUpstreamFailCases(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(consistentTypeExportsCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedFilesWithOptions(test, ConsistentTypeExports,
+			result := rule_testing.RunTypedFilesGiven(test, ConsistentTypeExports,
 				consistentTypeExportsFixtureFiles(testCase.sourceText),
 				consistentTypeExportsFile,
 				decodeConsistentTypeExportsOptions(test, testCase.configuration))
@@ -486,9 +490,9 @@ func TestConsistentTypeExportsSplitKeepsWhatTheSpecifierCarries(test *testing.T)
 	for index, testCase := range cases {
 		test.Run(consistentTypeExportsCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedFilesWithOptions(test, ConsistentTypeExports,
+			result := rule_testing.RunTypedFiles(test, ConsistentTypeExports,
 				consistentTypeExportsFixtureFiles(testCase.sourceText),
-				consistentTypeExportsFile, nil)
+				consistentTypeExportsFile)
 			if len(result.Diagnostics) == 0 {
 				test.Fatalf("expected a finding on %q", testCase.sourceText)
 			}
@@ -605,7 +609,7 @@ func TestConsistentTypeExportsDiscriminatesOnCasesUpstreamDoesNotWrite(test *tes
 	for index, testCase := range cases {
 		test.Run(consistentTypeExportsCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedFilesWithOptions(test, ConsistentTypeExports,
+			result := rule_testing.RunTypedFilesGiven(test, ConsistentTypeExports,
 				consistentTypeExportsFixtureFiles(testCase.sourceText),
 				consistentTypeExportsFile,
 				decodeConsistentTypeExportsOptions(test, testCase.configuration))
@@ -647,9 +651,9 @@ func TestConsistentTypeExportsNamesTheExportsUpstreamNames(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(consistentTypeExportsCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedFilesWithOptions(test, ConsistentTypeExports,
+			result := rule_testing.RunTypedFiles(test, ConsistentTypeExports,
 				consistentTypeExportsFixtureFiles(testCase.sourceText),
-				consistentTypeExportsFile, nil)
+				consistentTypeExportsFile)
 			rule_testing.ExpectFindings(test, result, testCase.wantId)
 
 			var want string
@@ -688,13 +692,9 @@ func TestConsistentTypeExportsDecoderResolvesTheOption(test *testing.T) {
 			if decodeConsistentTypeExportsOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.configuration, decodeConsistentTypeExportsOptionsError)
 			}
-			options, ok := decoded.(ConsistentTypeExportsOptions)
-			if !ok {
-				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
-			}
-			if options.FixMixedExportsWithInlineTypeSpecifier != testCase.wantInline {
+			if decoded.FixMixedExportsWithInlineTypeSpecifier != testCase.wantInline {
 				test.Errorf("the inline option resolved to %v, want %v",
-					options.FixMixedExportsWithInlineTypeSpecifier, testCase.wantInline)
+					decoded.FixMixedExportsWithInlineTypeSpecifier, testCase.wantInline)
 			}
 		})
 	}
@@ -709,8 +709,8 @@ func TestConsistentTypeExportsNilOptionsUsesTheSplittingRepair(test *testing.T) 
 	test.Parallel()
 
 	source := "import { Type1, value1 } from './consistent-type-exports/index';\nexport { Type1, value1 };"
-	result := rule_testing.RunTypedFilesWithOptions(test, ConsistentTypeExports,
-		consistentTypeExportsFixtureFiles(source), consistentTypeExportsFile, nil)
+	result := rule_testing.RunTypedFiles(test, ConsistentTypeExports,
+		consistentTypeExportsFixtureFiles(source), consistentTypeExportsFile)
 	rule_testing.ExpectFindings(test, result, "singleExportIsType")
 	rule_testing.ExpectFixedSource(test, result, consistentTypeExportsOnDisk(
 		"import { Type1, value1 } from './consistent-type-exports/index';\nexport type { Type1 };\nexport { value1 };"))

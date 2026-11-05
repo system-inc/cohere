@@ -137,9 +137,11 @@ func unseenDesignSystem(test *testing.T) *LoadedDesignSystem {
 	}
 
 	// The vendored snapshot of tailwindcss, so the unseen system resolves on any machine (#sycrdr6).
-	packageRoot := vendored.TailwindPackageRoot()
+	packageRoot := vendored.TailwindPackageRootForTest(test)
 
-	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	system, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+	)
 	if loadDesignSystemError != nil {
 		test.Fatalf("loading the unseen design system: %v", loadDesignSystemError)
 	}

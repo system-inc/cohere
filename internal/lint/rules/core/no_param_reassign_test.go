@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -15,7 +16,7 @@ const paramReassignFile = "/repository/source/ParamReassign.ts"
 // Building the struct directly would leave the decoder and its two regex lists untested, and the
 // regex list is the one field whose wire shape has no upstream counterpart: upstream compiles a
 // fresh pattern at every call and this compiles once and caches.
-func decodedParamOptions(test *testing.T, raw string) any {
+func decodedParamOptions(test *testing.T, raw string) NoParamReassignOptions {
 	test.Helper()
 	decoded, decodeNoParameterReassignOptionsError := DecodeNoParamReassignOptions([]byte(raw))
 	if decodeNoParameterReassignOptionsError != nil {
@@ -45,7 +46,7 @@ func TestNoParamReassignFires(test *testing.T) {
 
 	cases := []struct {
 		sourceText  string
-		options     any
+		options     rule.Given[NoParamReassignOptions]
 		messageId   string
 		messageText string
 		spanStart   int
@@ -53,7 +54,7 @@ func TestNoParamReassignFires(test *testing.T) {
 	}{
 		{
 			"function foo(bar) { bar = 13; }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'bar'.",
 			20,
@@ -61,7 +62,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { bar += 13; }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'bar'.",
 			20,
@@ -69,7 +70,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { (function() { bar = 13; })(); }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'bar'.",
 			34,
@@ -77,7 +78,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { ++bar; }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'bar'.",
 			22,
@@ -85,7 +86,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { bar++; }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'bar'.",
 			20,
@@ -93,7 +94,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { --bar; }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'bar'.",
 			22,
@@ -101,7 +102,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { bar--; }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'bar'.",
 			20,
@@ -109,7 +110,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo({bar}) { bar = 13; }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'bar'.",
 			22,
@@ -117,7 +118,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo([, {bar}]) { bar = 13; }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'bar'.",
 			26,
@@ -125,7 +126,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { ({bar} = {}); }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'bar'.",
 			22,
@@ -133,7 +134,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { ({x: [, bar = 0]} = {}); }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'bar'.",
 			28,
@@ -141,7 +142,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { for (bar in baz); }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'bar'.",
 			25,
@@ -149,7 +150,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { for (bar of baz); }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'bar'.",
 			25,
@@ -157,7 +158,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { bar.a = 0; }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'bar'.",
 			20,
@@ -165,7 +166,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { bar.get(0).a = 0; }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'bar'.",
 			20,
@@ -173,7 +174,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { delete bar.a; }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'bar'.",
 			27,
@@ -181,7 +182,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { ++bar.a; }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'bar'.",
 			22,
@@ -189,7 +190,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { for (bar.a in {}); }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'bar'.",
 			25,
@@ -197,7 +198,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { for (bar.a of []); }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'bar'.",
 			25,
@@ -205,7 +206,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { (bar ? bar : [])[0] = 1; }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'bar'.",
 			27,
@@ -213,7 +214,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { [bar.a] = []; }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'bar'.",
 			21,
@@ -221,7 +222,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { [bar.a] = []; }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'bar'.",
 			21,
@@ -229,7 +230,9 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { [bar.a] = []; }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`),
+			rule.Configured(
+				decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`),
+			),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'bar'.",
 			21,
@@ -237,7 +240,9 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { [bar.a] = []; }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^B.*$"]}`),
+			rule.Configured(
+				decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^B.*$"]}`),
+			),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'bar'.",
 			21,
@@ -247,7 +252,9 @@ func TestNoParamReassignFires(test *testing.T) {
 		// Node, /^(?!un)/u tests false on unsafe and /(?<=^my)Foo$/u tests false on yourFoo.
 		{
 			"function foo(unsafe) { unsafe.b = 0; }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^(?!un)"]}`),
+			rule.Configured(
+				decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^(?!un)"]}`),
+			),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'unsafe'.",
 			23,
@@ -255,7 +262,9 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(yourFoo) { yourFoo.b = 0; }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["(?<=^my)Foo$"]}`),
+			rule.Configured(
+				decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["(?<=^my)Foo$"]}`),
+			),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'yourFoo'.",
 			24,
@@ -263,7 +272,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(bar) { ({foo: bar.a} = {}); }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'bar'.",
 			27,
@@ -271,7 +280,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(a) { ({a} = obj); }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'a'.",
 			20,
@@ -279,7 +288,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(a) { ([...a] = obj); }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'a'.",
 			23,
@@ -287,7 +296,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(a) { ({...a} = obj); }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'a'.",
 			23,
@@ -295,7 +304,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(a) { ([...a.b] = obj); }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'a'.",
 			23,
@@ -303,7 +312,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(a) { ({...a.b} = obj); }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'a'.",
 			23,
@@ -311,7 +320,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(a) { for ({bar: a.b} in {}); }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'a'.",
 			29,
@@ -319,7 +328,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(a) { for ([a.b] of []); }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'a'.",
 			24,
@@ -327,7 +336,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(a) { a &&= b; }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'a'.",
 			18,
@@ -335,7 +344,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(a) { a ||= b; }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'a'.",
 			18,
@@ -343,7 +352,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(a) { a ??= b; }",
-			nil,
+			rule.Given[NoParamReassignOptions]{},
 			"assignmentToFunctionParam",
 			"Assignment to function parameter 'a'.",
 			18,
@@ -351,7 +360,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(a) { a.b &&= c; }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'a'.",
 			18,
@@ -359,7 +368,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(a) { a.b.c ||= d; }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'a'.",
 			18,
@@ -367,7 +376,7 @@ func TestNoParamReassignFires(test *testing.T) {
 		},
 		{
 			"function foo(a) { a[b] ??= c; }",
-			decodedParamOptions(test, `{"props": true}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
 			"assignmentToFunctionParamProp",
 			"Assignment to property of function parameter 'a'.",
 			18,
@@ -378,7 +387,7 @@ func TestNoParamReassignFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText+" "+testCase.messageId, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoParamReassign, paramReassignFile,
+			result := rule_testing.RunTypedGiven(test, NoParamReassign, paramReassignFile,
 				testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(test, result, testCase.messageId)
 
@@ -414,131 +423,148 @@ func TestNoParamReassignStaysSilent(test *testing.T) {
 
 	cases := []struct {
 		sourceText string
-		options    any
+		options    rule.Given[NoParamReassignOptions]
 	}{
-		{"function foo(a) { var b = a; }", nil},
-		{"function foo(a) { for (b in a); }", nil},
-		{"function foo(a) { for (b of a); }", nil},
-		{"function foo(a) { a.prop = 'value'; }", nil},
-		{"function foo(a) { for (a.prop in obj); }", nil},
-		{"function foo(a) { for (a.prop of arr); }", nil},
-		{"function foo(a) { (function() { var a = 12; a++; })(); }", nil},
-		{"function foo() { someGlobal = 13; }", nil},
-		{"function foo() { someGlobal = 13; }", nil},
-		{"function foo(a) { a.b = 0; }", nil},
-		{"function foo(a) { delete a.b; }", nil},
-		{"function foo(a) { ++a.b; }", nil},
-		{"function foo(a) { [a.b] = []; }", nil},
-		{"function foo(a) { bar(a.b).c = 0; }", decodedParamOptions(test, `{"props": true}`)},
-		{"function foo(a) { data[a.b] = 0; }", decodedParamOptions(test, `{"props": true}`)},
-		{"function foo(a) { +a.b; }", decodedParamOptions(test, `{"props": true}`)},
-		{"function foo(a) { (a ? [] : [])[0] = 1; }", decodedParamOptions(test, `{"props": true}`)},
-		{"function foo(a) { (a.b ? [] : [])[0] = 1; }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { var b = a; }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a) { for (b in a); }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a) { for (b of a); }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a) { a.prop = 'value'; }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a) { for (a.prop in obj); }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a) { for (a.prop of arr); }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a) { (function() { var a = 12; a++; })(); }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo() { someGlobal = 13; }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo() { someGlobal = 13; }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a) { a.b = 0; }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a) { delete a.b; }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a) { ++a.b; }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a) { [a.b] = []; }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a) { bar(a.b).c = 0; }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
+		{"function foo(a) { data[a.b] = 0; }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
+		{"function foo(a) { +a.b; }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
+		{"function foo(a) { (a ? [] : [])[0] = 1; }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
+		{"function foo(a) { (a.b ? [] : [])[0] = 1; }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
 		{
 			"function foo(a) { a.b = 0; }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)),
 		},
 		{
 			"function foo(a) { ++a.b; }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)),
 		},
 		{
 			"function foo(a) { delete a.b; }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)),
 		},
 		{
 			"function foo(a) { for (a.b in obj); }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)),
 		},
 		{
 			"function foo(a) { for (a.b of arr); }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)),
 		},
 		{
 			"function foo(a, z) { a.b = 0; x.y = 0; }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a", "x"]}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a", "x"]}`)),
 		},
 		{
 			"function foo(a) { a.b.c = 0;}",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`),
+			rule.Configured(decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)),
 		},
 		{
 			"function foo(aFoo) { aFoo.b = 0; }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`),
+			rule.Configured(
+				decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`),
+			),
 		},
 		{
 			"function foo(aFoo) { ++aFoo.b; }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`),
+			rule.Configured(
+				decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`),
+			),
 		},
 		{
 			"function foo(aFoo) { delete aFoo.b; }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`),
+			rule.Configured(
+				decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`),
+			),
 		},
 		{
 			"function foo(a, z) { aFoo.b = 0; x.y = 0; }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$", "^x.*$"]}`),
+			rule.Configured(
+				decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$", "^x.*$"]}`),
+			),
 		},
 		{
 			"function foo(aFoo) { aFoo.b.c = 0;}",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`),
+			rule.Configured(
+				decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`),
+			),
 		},
 		// #7mztrdd: a pattern is read as JavaScript reads it, `new RegExp(pattern, "u")`. RE2 refuses a lookahead and a
 		// lookbehind, so these were dropped and the write reported; in Node /^(?!un)/u tests true on safe and
 		// /(?<=^my)Foo$/u tests true on myFoo.
 		{
 			"function foo(safe) { safe.b = 0; }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^(?!un)"]}`),
+			rule.Configured(
+				decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^(?!un)"]}`),
+			),
 		},
 		{
 			"function foo(myFoo) { myFoo.b = 0; }",
-			decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["(?<=^my)Foo$"]}`),
+			rule.Configured(
+				decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["(?<=^my)Foo$"]}`),
+			),
 		},
-		{"function foo(a) { ({ [a]: variable } = value) }", decodedParamOptions(test, `{"props": true}`)},
-		{"function foo(a) { ([...a.b] = obj); }", decodedParamOptions(test, `{"props": false}`)},
-		{"function foo(a) { ({...a.b} = obj); }", decodedParamOptions(test, `{"props": false}`)},
-		{"function foo(a) { for (obj[a.b] in obj); }", decodedParamOptions(test, `{"props": true}`)},
-		{"function foo(a) { for (obj[a.b] of arr); }", decodedParamOptions(test, `{"props": true}`)},
-		{"function foo(a) { for (bar in a.b); }", decodedParamOptions(test, `{"props": true}`)},
-		{"function foo(a) { for (bar of a.b); }", decodedParamOptions(test, `{"props": true}`)},
-		{"function foo(a) { for (bar in baz) a.b; }", decodedParamOptions(test, `{"props": true}`)},
-		{"function foo(a) { for (bar of baz) a.b; }", decodedParamOptions(test, `{"props": true}`)},
-		{"function foo(bar, baz) { bar.a = true; baz.b = false; }", decodedParamOptions(
+		{
+			"function foo(a) { ({ [a]: variable } = value) }",
+			rule.Configured(decodedParamOptions(test, `{"props": true}`)),
+		},
+		{"function foo(a) { ([...a.b] = obj); }", rule.Configured(decodedParamOptions(test, `{"props": false}`))},
+		{"function foo(a) { ({...a.b} = obj); }", rule.Configured(decodedParamOptions(test, `{"props": false}`))},
+		{"function foo(a) { for (obj[a.b] in obj); }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
+		{"function foo(a) { for (obj[a.b] of arr); }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
+		{"function foo(a) { for (bar in a.b); }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
+		{"function foo(a) { for (bar of a.b); }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
+		{"function foo(a) { for (bar in baz) a.b; }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
+		{"function foo(a) { for (bar of baz) a.b; }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
+		{"function foo(bar, baz) { bar.a = true; baz.b = false; }", rule.Configured(decodedParamOptions(
 			test,
 			`{"props": true, "ignorePropertyModificationsForRegex": ["^(foo|bar)$"], "ignorePropertyModificationsFor": ["baz"]}`,
-		)},
+		))},
 
 		// A catch binding spelled like the parameter, which is not it.
-		{"function foo(a) { try {} catch (a) { a = 1; } }", nil},
+		{"function foo(a) { try {} catch (a) { a = 1; } }", rule.Given[NoParamReassignOptions]{}},
 
 		// A property named like the parameter, on some other object. `WritesToBinding` declines the
 		// name side of a property access, and this is the shape that reaches that guard.
-		{"function foo(a) { other.a = 1; }", nil},
+		{"function foo(a) { other.a = 1; }", rule.Given[NoParamReassignOptions]{}},
 
 		// A label and an object literal key spelled like the parameter.
-		{"function foo(a) { a: for(;;) break a; }", nil},
-		{"function foo(a) { var o = { a: 1 }; }", nil},
+		{"function foo(a) { a: for(;;) break a; }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a) { var o = { a: 1 }; }", rule.Given[NoParamReassignOptions]{}},
 
 		// A parameter property on the right of an assignment, which is a read of it rather than a
 		// write through it. The corpus writes every clean shape where the parameter is read to
 		// decide where a write lands and never the plainer one where it is simply the value being
 		// read, so a climb that forgot which side of the assignment it came up passes all 78
 		// imported cases and reports all three of these. Found by a mutant; measured silent.
-		{"function foo(a) { x = a.b; }", decodedParamOptions(test, `{"props": true}`)},
-		{"function foo(a) { x.y = a.b; }", decodedParamOptions(test, `{"props": true}`)},
-		{"function foo(a) { x += a.b; }", decodedParamOptions(test, `{"props": true}`)},
-		{"function foo(a) { var x = a.b; }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { x = a.b; }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
+		{"function foo(a) { x.y = a.b; }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
+		{"function foo(a) { x += a.b; }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
+		{"function foo(a) { var x = a.b; }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
 
 		// `props` off is the default, so a property write is clean unless the option turns it on.
 		// The corpus writes this shape under an explicit `false` and never under an absent option,
 		// which is the shape the live config actually produces.
-		{"function foo(a) { a.b = 0; }", nil},
-		{"function foo(a) { ++a.b; }", nil},
+		{"function foo(a) { a.b = 0; }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a) { ++a.b; }", rule.Given[NoParamReassignOptions]{}},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoParamReassign,
+			rule_testing.ExpectClean(test, rule_testing.RunTypedGiven(test, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options))
 		})
 	}
@@ -562,22 +588,22 @@ func TestNoParamReassignStopsAtAConciseArrowBody(test *testing.T) {
 	reporting := []struct {
 		sourceText string
 		messageId  string
-		options    any
+		options    rule.Given[NoParamReassignOptions]
 	}{
 		{"const f = (a) => a.b = 1;", "assignmentToFunctionParamProp",
-			decodedParamOptions(test, `{"props": true}`)},
+			rule.Configured(decodedParamOptions(test, `{"props": true}`))},
 		{"const f = (a) => a.b++;", "assignmentToFunctionParamProp",
-			decodedParamOptions(test, `{"props": true}`)},
+			rule.Configured(decodedParamOptions(test, `{"props": true}`))},
 		{"const f = (a) => delete a.b;", "assignmentToFunctionParamProp",
-			decodedParamOptions(test, `{"props": true}`)},
+			rule.Configured(decodedParamOptions(test, `{"props": true}`))},
 		{"const f = (a) => (a.b, a.c = 1);", "assignmentToFunctionParamProp",
-			decodedParamOptions(test, `{"props": true}`)},
-		{"const f = (a) => a = 1;", "assignmentToFunctionParam", nil},
+			rule.Configured(decodedParamOptions(test, `{"props": true}`))},
+		{"const f = (a) => a = 1;", "assignmentToFunctionParam", rule.Given[NoParamReassignOptions]{}},
 	}
 	for _, testCase := range reporting {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoParamReassign,
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedGiven(test, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options), testCase.messageId)
 		})
 	}
@@ -650,18 +676,18 @@ func TestNoParamReassignSeesIntoParameterDefaults(test *testing.T) {
 	reporting := []struct {
 		sourceText string
 		messageId  string
-		options    any
+		options    rule.Given[NoParamReassignOptions]
 	}{
-		{"function foo(a, b = (a = 1)) { }", "assignmentToFunctionParam", nil},
-		{"function foo(a = (a = 1)) { }", "assignmentToFunctionParam", nil},
-		{"function foo(a, b = ++a) { }", "assignmentToFunctionParam", nil},
+		{"function foo(a, b = (a = 1)) { }", "assignmentToFunctionParam", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a = (a = 1)) { }", "assignmentToFunctionParam", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a, b = ++a) { }", "assignmentToFunctionParam", rule.Given[NoParamReassignOptions]{}},
 		{"function foo(a, b = (a.c = 1)) { }", "assignmentToFunctionParamProp",
-			decodedParamOptions(test, `{"props": true}`)},
+			rule.Configured(decodedParamOptions(test, `{"props": true}`))},
 	}
 	for _, testCase := range reporting {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoParamReassign,
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedGiven(test, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options), testCase.messageId)
 		})
 	}
@@ -671,17 +697,17 @@ func TestNoParamReassignSeesIntoParameterDefaults(test *testing.T) {
 	// is a read.
 	silent := []struct {
 		sourceText string
-		options    any
+		options    rule.Given[NoParamReassignOptions]
 	}{
-		{"function foo(a = 1) { }", nil},
-		{"function foo(a, b = a) { }", nil},
-		{"function foo({a = 1}) { }", nil},
-		{"function foo({a, b = a.c}) { }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a = 1) { }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo(a, b = a) { }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo({a = 1}) { }", rule.Given[NoParamReassignOptions]{}},
+		{"function foo({a, b = a.c}) { }", rule.Configured(decodedParamOptions(test, `{"props": true}`))},
 	}
 	for _, testCase := range silent {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoParamReassign,
+			rule_testing.ExpectClean(test, rule_testing.RunTypedGiven(test, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options))
 		})
 	}
@@ -699,24 +725,28 @@ func TestNoParamReassignReachesIntoClassBodies(test *testing.T) {
 	cases := []struct {
 		sourceText string
 		messageId  string
-		options    any
+		options    rule.Given[NoParamReassignOptions]
 	}{
-		{"class C { m(a) { a = 1; } }", "assignmentToFunctionParam", nil},
-		{"class C { constructor(a) { a = 1; } }", "assignmentToFunctionParam", nil},
-		{"class C { set x(a) { a = 1; } }", "assignmentToFunctionParam", nil},
-		{"class C { static m(a) { a = 1; } }", "assignmentToFunctionParam", nil},
+		{"class C { m(a) { a = 1; } }", "assignmentToFunctionParam", rule.Given[NoParamReassignOptions]{}},
+		{"class C { constructor(a) { a = 1; } }", "assignmentToFunctionParam", rule.Given[NoParamReassignOptions]{}},
+		{"class C { set x(a) { a = 1; } }", "assignmentToFunctionParam", rule.Given[NoParamReassignOptions]{}},
+		{"class C { static m(a) { a = 1; } }", "assignmentToFunctionParam", rule.Given[NoParamReassignOptions]{}},
 		{"class C { m(a) { a.b = 1; } }", "assignmentToFunctionParamProp",
-			decodedParamOptions(test, `{"props": true}`)},
+			rule.Configured(decodedParamOptions(test, `{"props": true}`))},
 
 		// A getter takes no parameters, so it is here for the listener rather than for a finding;
 		// the property write is on the setter beside it.
-		{"class C { get x() { return 1; } set x(a) { a = 1; } }", "assignmentToFunctionParam", nil},
+		{
+			"class C { get x() { return 1; } set x(a) { a = 1; } }",
+			"assignmentToFunctionParam",
+			rule.Given[NoParamReassignOptions]{},
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoParamReassign, paramReassignFile,
+			result := rule_testing.RunTypedGiven(test, NoParamReassign, paramReassignFile,
 				testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(test, result, testCase.messageId)
 			if got := result.Diagnostics[0].Message.Description; got != "Assignment to function parameter 'a'." &&
@@ -758,8 +788,8 @@ func TestNoParamReassignAttributesAShadowedWriteToOneFunction(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoParamReassign, paramReassignFile,
-				testCase.sourceText, nil)
+			result := rule_testing.RunTyped(test, NoParamReassign, paramReassignFile,
+				testCase.sourceText)
 			rule_testing.ExpectFindings(test, result, "assignmentToFunctionParam")
 			want := "Assignment to function parameter '" + testCase.wantName + "'."
 			if got := result.Diagnostics[0].Message.Description; got != want {
@@ -790,10 +820,10 @@ func TestNoParamReassignOptions(test *testing.T) {
 
 	propertyWrite := "function foo(a) { a.b = 0; }"
 
-	test.Run("nil options, the shape the live config produces", func(test *testing.T) {
+	test.Run("no options, the shape the live config produces", func(test *testing.T) {
 		test.Parallel()
-		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoParamReassign,
-			paramReassignFile, propertyWrite, nil))
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoParamReassign,
+			paramReassignFile, propertyWrite))
 	})
 
 	test.Run("a zero-value struct declines property writes", func(test *testing.T) {
@@ -808,11 +838,7 @@ func TestNoParamReassignOptions(test *testing.T) {
 		if decodeNoParameterReassignOptionsError != nil {
 			test.Fatalf("decoding empty input: %v", decodeNoParameterReassignOptionsError)
 		}
-		options, ok := decoded.(NoParamReassignOptions)
-		if !ok {
-			test.Fatalf("decoded to %T", decoded)
-		}
-		if options.Props {
+		if decoded.Props {
 			test.Error("empty input decoded to props on, which widens the rule by default")
 		}
 	})
@@ -872,7 +898,8 @@ func TestNoParamReassignOptions(test *testing.T) {
 		result := rule_testing.RunTypedWithOptions(test, NoParamReassign, paramReassignFile,
 			"function foo(one, two, three) { one.a = 0; two.a = 0; three.a = 0; }", options)
 		rule_testing.ExpectFindings(test, result, "assignmentToFunctionParamProp")
-		if got := result.Diagnostics[0].Message.Description; got != "Assignment to property of function parameter 'three'." {
+		got := result.Diagnostics[0].Message.Description
+		if got != "Assignment to property of function parameter 'three'." {
 			test.Errorf("reported %q, want the third parameter", got)
 		}
 	})

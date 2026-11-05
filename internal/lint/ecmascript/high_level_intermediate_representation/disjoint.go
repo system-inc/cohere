@@ -412,11 +412,11 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 				operands = append(operands, instruction.LValue.Identifier)
 			}
 
-			switch value := instruction.Value.(type) {
+			switch instructionValue := instruction.Value.(type) {
 			case *DeclareLocal:
-				declareIdentifier(value.LValue)
+				declareIdentifier(instructionValue.LValue)
 			case *DeclareContext:
-				declareIdentifier(value.LValue)
+				declareIdentifier(instructionValue.LValue)
 			case *StoreLocal:
 				operands = appendStore(
 					function,
@@ -424,8 +424,8 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 					instruction,
 					declareIdentifier,
 					operands,
-					value.LValue,
-					value.Value,
+					instructionValue.LValue,
+					instructionValue.Value,
 				)
 			case *StoreContext:
 				operands = appendStore(
@@ -434,8 +434,8 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 					instruction,
 					declareIdentifier,
 					operands,
-					value.LValue,
-					value.Value,
+					instructionValue.LValue,
+					instructionValue.Value,
 				)
 			case *Destructure:
 				// Upstream walks `eachPatternOperand` of the pattern, declaring each bound place and
@@ -448,7 +448,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 				// Destructure now emits CreateFrom for every ordinary binding. A later mutation
 				// through a LoadLocal therefore reaches the bound place, giving this width test the
 				// same input upstream reads rather than leaving every pattern range one instruction.
-				eachPatternPlace(value.Pattern, func(place Place, role PlaceRole) {
+				eachPatternPlace(instructionValue.Pattern, func(place Place, role PlaceRole) {
 					if role != PlaceRoleDefine {
 						return
 					}
@@ -458,7 +458,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 						operands = append(operands, place.Identifier)
 					}
 				})
-				operands = appendMutableOperand(ranges, instruction, operands, value.Value)
+				operands = appendMutableOperand(ranges, instruction, operands, instructionValue.Value)
 			case *MethodCall:
 				operands = appendMutableOperands(instruction, ranges, operands)
 				// The property is added unconditionally, with no range test and no mutability test
@@ -466,7 +466,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 				// class on its identity alone. Upstream's reason is that a method call's receiver
 				// and the function it resolves to are inseparable: `o.f()` can mutate through `f`,
 				// so the property cannot be memoized apart from the call that reaches it.
-				operands = append(operands, value.Property.Identifier)
+				operands = append(operands, instructionValue.Property.Identifier)
 			default:
 				operands = appendMutableOperands(instruction, ranges, operands)
 			}
@@ -495,11 +495,12 @@ func appendStore(
 	value Place,
 ) []static_single_assignment.IdentifierId {
 	declareIdentifier(lvalue)
+	extended := operands
 	lvalueRange := ranges.Get(lvalue.Identifier)
 	if lvalueRange.End > lvalueRange.Start+1 {
-		operands = append(operands, lvalue.Identifier)
+		extended = append(extended, lvalue.Identifier)
 	}
-	return appendMutableOperand(ranges, instruction, operands, value)
+	return appendMutableOperand(ranges, instruction, extended, value)
 }
 
 // appendMutableOperand adds one operand when it is still being written at this instruction.
@@ -516,7 +517,7 @@ func appendMutableOperand(
 ) []static_single_assignment.IdentifierId {
 	operandRange := ranges.Get(operand.Identifier)
 	if operandRange.Contains(instruction.Order) && operandRange.Start > 0 {
-		operands = append(operands, operand.Identifier)
+		return append(operands, operand.Identifier)
 	}
 	return operands
 }
@@ -532,13 +533,14 @@ func appendMutableOperands(
 	ranges *mutation_aliasing.MutableRanges,
 	operands []static_single_assignment.IdentifierId,
 ) []static_single_assignment.IdentifierId {
+	extended := operands
 	EachPlace(instruction.Value, func(place Place, role PlaceRole) {
 		if role == PlaceRoleDefine {
 			return
 		}
-		operands = appendMutableOperand(ranges, instruction, operands, place)
+		extended = appendMutableOperand(ranges, instruction, extended, place)
 	})
-	return operands
+	return extended
 }
 
 // declarationOf returns the source binding a value belongs to.

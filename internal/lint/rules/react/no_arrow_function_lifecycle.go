@@ -222,10 +222,10 @@ func noArrowFunctionLifecycleParameterNames(parameters *ast.NodeList) (string, b
 // to cover them, and adds one character when the body is an object literal to account for the
 // wrapping parenthesis. Both behaviours are reproduced, and both are asserted by upstream's own
 // output vectors.
-var NoArrowFunctionLifecycle = rule.Rule{
+var NoArrowFunctionLifecycle = rule.Rule[rule.NoOptions]{
 	Name: "react/no-arrow-function-lifecycle",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		sourceText := ruleContext.SourceFile.Text()
 
 		textOf := func(node *ast.Node) string {

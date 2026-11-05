@@ -14,7 +14,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // decoder that silently inverts their rule, which is a real defect this package already has one
 // rule guarding against.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoMeaninglessVoidOperatorOptions]{
 		Rule:   NoMeaninglessVoidOperator,
 		Decode: DecodeNoMeaninglessVoidOperatorOptions,
 	})

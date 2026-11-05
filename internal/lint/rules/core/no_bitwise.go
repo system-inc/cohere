@@ -59,7 +59,7 @@ type NoBitwiseOptions struct {
 // from its schema before the rule runs; there is no schema layer here, so it lives here. A rule
 // silently dropping an unknown spelling would leave a project believing it had exempted `>>>` when
 // it had written `>>>=`, and the two differ.
-func DecodeNoBitwiseOptions(raw []byte) (any, error) {
+func DecodeNoBitwiseOptions(raw []byte) (NoBitwiseOptions, error) {
 	var options NoBitwiseOptions
 	if len(raw) == 0 {
 		return options, nil
@@ -187,12 +187,12 @@ var messageNoBitwise = rule.Message{
 //
 // `meta.fixable` is unset. There is no repair: whether `&` should have been `&&` is the question the
 // rule is asking, and a tool that answered it would be guessing at intent.
-var NoBitwise = rule.Rule{
+var NoBitwise = rule.Rule[NoBitwiseOptions]{
 	Name: "no-bitwise",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoBitwiseOptions]) rule.Listeners {
 		// A rule configured as bare "error" is handed nil, so the assertion yields the zero value.
 		// Correct here only because both options default to off.
-		settings, _ := rule.OptionsAs[NoBitwiseOptions](options)
+		settings, _ := options.Read()
 
 		report := func(node *ast.Node, operator ast.Kind) {
 			spelling, bitwise := noBitwiseOperatorSpellings[operator]

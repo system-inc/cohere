@@ -96,9 +96,9 @@ type privateClassMember struct {
 // often "add the reader I forgot" as "delete this". That is a choice a human makes, so nothing is
 // proposed here rather than proposing a rewrite the engine would apply while the reader is not
 // looking.
-var NoUnusedPrivateClassMembers = rule.Rule{
+var NoUnusedPrivateClassMembers = rule.Rule[rule.NoOptions]{
 	Name: "no-unused-private-class-members",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		check := func(members *ast.NodeList) {
 			if members == nil {
 				return

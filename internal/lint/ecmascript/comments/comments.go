@@ -298,6 +298,8 @@ func collectListInteriors(node *ast.Node, collectAt func(int)) {
 //
 // The walk reaches nodes in tree order, which is close to source order but not equal to it, and a
 // rule reporting findings out of order is a rule whose fixture assertions cannot be written down.
+//
+// Mutates: comments the sort is in place, so the slice the caller collected comes back in source order
 func sortByPosition(comments []Comment) {
 	for outerIndex := 1; outerIndex < len(comments); outerIndex++ {
 		current := comments[outerIndex]

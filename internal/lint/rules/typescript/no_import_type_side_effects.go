@@ -78,9 +78,9 @@ var messageUseTopLevelQualifier = rule.Message{
 // removes up to `A`. Here that is `PropertyName` when a rename is present and the specifier's own name
 // otherwise, which is the opposite of the reflexive choice: `Name()` alone would remove `type A as `
 // and produce `import type { AA } from 'mod'`, silently changing which export is imported.
-var NoImportTypeSideEffects = rule.Rule{
+var NoImportTypeSideEffects = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-import-type-side-effects",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				declaration := node.AsImportDeclaration()

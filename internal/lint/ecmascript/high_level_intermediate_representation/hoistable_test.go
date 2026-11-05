@@ -402,10 +402,10 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 	for _, path := range files {
 		contents := contentsOf[path]
 		fileName := "/corpus/" + filepath.Base(path)
-		probe := rule.Rule{
+		probe := rule.Rule[rule.NoOptions]{
 			Name:             "hoistable-corpus",
 			NeedsTypeChecker: true,
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						if ruleContext.TypeChecker == nil {

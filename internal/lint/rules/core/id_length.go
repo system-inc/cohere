@@ -58,7 +58,7 @@ type idLengthRawOptions struct {
 // An exception pattern that does not compile is returned as an error rather than dropped. Upstream
 // would throw at `new RegExp(pattern, "u")`, and silently dropping one would exempt fewer names
 // than the author asked for while looking configured.
-func DecodeIdLengthOptions(raw []byte) (any, error) {
+func DecodeIdLengthOptions(raw []byte) (IdLengthSettings, error) {
 	settings := DefaultIdLengthSettings()
 	if len(raw) == 0 {
 		return settings, nil
@@ -100,8 +100,8 @@ func DecodeIdLengthOptions(raw []byte) (any, error) {
 }
 
 // idLengthSettingsFrom recovers the settings from whatever the config layer handed over.
-func idLengthSettingsFrom(options any) IdLengthSettings {
-	if settings, ok := rule.OptionsAs[IdLengthSettings](options); ok {
+func idLengthSettingsFrom(options rule.Given[IdLengthSettings]) IdLengthSettings {
+	if settings, ok := options.Read(); ok {
 		return settings
 	}
 	return DefaultIdLengthSettings()
@@ -179,10 +179,10 @@ var messageIdLengthTooLongPrivate = rule.Message{
 //
 // Upstream offers none and none is possible: the repair is to rename, which is a refactor reaching
 // every reference rather than a lint edit.
-var IdLength = rule.Rule{
+var IdLength = rule.Rule[IdLengthSettings]{
 	Name: "id-length",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[IdLengthSettings]) rule.Listeners {
 		settings := idLengthSettingsFrom(options)
 
 		check := func(node *ast.Node) {

@@ -36,9 +36,9 @@ const jsxNoScriptUrlFile = "/repository/source/JsxNoScriptUrl.tsx"
 // jsxNoScriptUrlOptions decodes a raw option body the way the config layer does.
 //
 // Fixtures route through the exported decoder rather than building the struct, which is what puts
-// the positional union and the built-in default under test. An empty body is the nil-options case:
+// the positional union and the built-in default under test. An empty body is the bare-severity case:
 // upstream still checks `a` and `href`, so the answer is the built-in pair rather than an error.
-func jsxNoScriptUrlOptions(test *testing.T, raw string) any {
+func jsxNoScriptUrlOptions(test *testing.T, raw string) JsxNoScriptUrlOptions {
 	test.Helper()
 	decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(raw))
 	if decodeJsxNoScriptUrlOptionsError != nil {
@@ -303,7 +303,7 @@ func TestJsxNoScriptUrlHasNoFileSuffixGate(test *testing.T) {
 //
 // The two slots have different shapes and Go has no single type for that, so the decoder tries the
 // array arm first, matching upstream's own test on whether the first option is an array. An empty
-// body must yield the built-in pair rather than an error, which is the nil-options path a rule
+// body must yield the built-in pair rather than an error, which is the empty-input path a rule
 // configured as a bare severity takes.
 func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 	test.Parallel()
@@ -314,14 +314,10 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 		if decodeJsxNoScriptUrlOptionsError != nil {
 			test.Fatalf("decoding an empty body: %v", decodeJsxNoScriptUrlOptionsError)
 		}
-		options, ok := decoded.(JsxNoScriptUrlOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want JsxNoScriptUrlOptions", decoded)
+		if len(decoded.Legacy) != 0 {
+			test.Fatalf("legacy list is %v, want empty", decoded.Legacy)
 		}
-		if len(options.Legacy) != 0 {
-			test.Fatalf("legacy list is %v, want empty", options.Legacy)
-		}
-		components := jsxNoScriptUrlLinkComponents(options)
+		components := jsxNoScriptUrlLinkComponents(decoded)
 		if got := strings.Join(components["a"], ","); got != "href" {
 			test.Fatalf("built-in pair is %q, want %q", got, "href")
 		}
@@ -335,14 +331,10 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 		if decodeJsxNoScriptUrlOptionsError != nil {
 			test.Fatalf("decoding the array arm: %v", decodeJsxNoScriptUrlOptionsError)
 		}
-		options, ok := decoded.(JsxNoScriptUrlOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want JsxNoScriptUrlOptions", decoded)
+		if len(decoded.Legacy) != 1 || decoded.Legacy[0].Name != "Foo" {
+			test.Fatalf("legacy list is %v, want one entry named Foo", decoded.Legacy)
 		}
-		if len(options.Legacy) != 1 || options.Legacy[0].Name != "Foo" {
-			test.Fatalf("legacy list is %v, want one entry named Foo", options.Legacy)
-		}
-		if got := strings.Join(options.Legacy[0].Props, ","); got != "to,href" {
+		if got := strings.Join(decoded.Legacy[0].Props, ","); got != "to,href" {
 			test.Fatalf("props are %q, want %q", got, "to,href")
 		}
 	})
@@ -355,12 +347,8 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 		if decodeJsxNoScriptUrlOptionsError != nil {
 			test.Fatalf("decoding the object arm: %v", decodeJsxNoScriptUrlOptionsError)
 		}
-		options, ok := decoded.(JsxNoScriptUrlOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want JsxNoScriptUrlOptions", decoded)
-		}
-		if len(options.Legacy) != 0 {
-			test.Fatalf("legacy list is %v, want empty", options.Legacy)
+		if len(decoded.Legacy) != 0 {
+			test.Fatalf("legacy list is %v, want empty", decoded.Legacy)
 		}
 	})
 
@@ -372,12 +360,8 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 		if decodeJsxNoScriptUrlOptionsError != nil {
 			test.Fatalf("decoding both arms: %v", decodeJsxNoScriptUrlOptionsError)
 		}
-		options, ok := decoded.(JsxNoScriptUrlOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want JsxNoScriptUrlOptions", decoded)
-		}
-		if len(options.Legacy) != 1 || options.Legacy[0].Name != "Bar" {
-			test.Fatalf("legacy list is %v, want one entry named Bar", options.Legacy)
+		if len(decoded.Legacy) != 1 || decoded.Legacy[0].Name != "Bar" {
+			test.Fatalf("legacy list is %v, want one entry named Bar", decoded.Legacy)
 		}
 	})
 

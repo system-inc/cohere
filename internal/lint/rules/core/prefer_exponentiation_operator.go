@@ -85,11 +85,11 @@ var preferExponentiationOperatorPrecedence = operatorAssignmentBinaryPrecedence(
 // argument counts, spread arguments, and a comment in each of nine positions between `Math` and the
 // closing parenthesis. A comment cannot be preserved by a rewrite that replaces the whole call, so
 // the finding fires and the repair is withheld.
-var PreferExponentiationOperator = rule.Rule{
+var PreferExponentiationOperator = rule.Rule[rule.NoOptions]{
 	Name:             "prefer-exponentiation-operator",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

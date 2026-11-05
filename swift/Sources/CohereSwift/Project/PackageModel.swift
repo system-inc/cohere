@@ -62,8 +62,16 @@ public struct PackageModel: Equatable, Sendable {
         }
     }
 
+    /* What the model was read from: a SwiftPM package, or an Xcode project (`XcodeProject`) handed to the run in its shape. */
+    public enum ProjectKind: String, Equatable, Sendable {
+        case swiftPackage = "SwiftPackage"
+        case xcodeGen = "XcodeGen"
+        case xcodeProject = "XcodeProject"
+    }
+
     public var name: String
     public var root: URL
+    public var projectKind = ProjectKind.swiftPackage
     public var toolsVersion: String
     public var targets: [Target]
     /* Paths of the local packages this one depends on that sit inside its directory. */
@@ -79,6 +87,23 @@ public struct PackageModel: Equatable, Sendable {
     public var productTargets: [String: String] = [:]
     /* The targets a library product is built from: the package's API to whoever depends on it, so what they declare public is used by someone this build never sees. */
     public var libraryProductTargets: Set<String> = []
+    /* An Xcode project's targets whose product type this engine does not know, to the type: among the library product targets, so their public declarations are kept, and named so the report says why. */
+    public var unknownProductTypes: [String: String] = [:]
+    /*
+     At an Xcode root, what Xcode resolves each target's toolchain settings to (`XcodeBuildSettings`), which the
+     targets' language mode, features and strict memory safety are then taken from. Nil for a package, and for an
+     Xcode project whose settings this run did not ask for.
+     */
+    public var xcodeBuildSettings: XcodeBuildSettings?
+
+    /*
+     The targets the toolchain rules judge: every target of a package, as SwiftPM describes them all; at an Xcode
+     root only those whose settings Xcode gave, so a target nobody could read is never judged on or off.
+     */
+    public var toolchainTargets: [Target] {
+        guard projectKind != .swiftPackage else { return targets }
+        return targets.filter { xcodeBuildSettings?.targets[$0.name] != nil }
+    }
 
     public init(
         name: String,

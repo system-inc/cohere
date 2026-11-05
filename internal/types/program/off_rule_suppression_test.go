@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -20,17 +21,17 @@ import (
 // shape, so each count below is one directive's verdict.
 func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 	test.Parallel()
-	quiet := rule.Rule{
+	quiet := rule.Rule[rule.NoOptions]{
 		Name: "test-quiet",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				// Listens and reports nothing, so its directive is the one under test.
 			}}
 		},
 	}
-	registeredOff := rule.Rule{
+	registeredOff := rule.Rule[rule.NoOptions]{
 		Name: "test-registered-off",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				// Listens and reports nothing, so its directive is the one under test.
 			}}
@@ -39,9 +40,9 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 	// Registered with its plugin, as every typescript-eslint, nexus and structure rule is. A walk that
 	// keyed the rules it ran by full name and looked directives up bare filed this one's dead
 	// directives as unported (#6dc4f7k).
-	prefixed := rule.Rule{
+	prefixed := rule.Rule[rule.NoOptions]{
 		Name: "plugin/test-prefixed",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				// Listens and reports nothing, so its directive is the one under test.
 			}}
@@ -94,7 +95,7 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 			result, err := graph.Walk(
 				context.Background(),
 				graph.ProjectFiles(),
-				[]rule.Rule{quiet, registeredOff, prefixed},
+				rule_testing.EntriesOf(test, quiet, registeredOff, prefixed),
 			)
 			if err != nil {
 				test.Fatalf("walking: %v", err)
@@ -126,17 +127,17 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 // line, with the rules it names; the live one withheld a finding and is not listed.
 func TestADeadDirectiveIsNamedWhereItIs(test *testing.T) {
 	test.Parallel()
-	reporting := rule.Rule{
+	reporting := rule.Rule[rule.NoOptions]{
 		Name: "test-reporting",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				ruleContext.ReportNode(node, rule.Message{Id: "sawDeclaration", Description: "saw a declaration"})
 			}}
 		},
 	}
-	quiet := rule.Rule{
+	quiet := rule.Rule[rule.NoOptions]{
 		Name: "test-quiet",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				// Listens and reports nothing, so its directive is the one under test.
 			}}
@@ -158,7 +159,11 @@ func TestADeadDirectiveIsNamedWhereItIs(test *testing.T) {
 	if err != nil {
 		test.Fatalf("loading the config: %v", err)
 	}
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{reporting, quiet})
+	result, err := graph.Walk(
+		context.Background(),
+		graph.ProjectFiles(),
+		rule_testing.EntriesOf(test, reporting, quiet),
+	)
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}

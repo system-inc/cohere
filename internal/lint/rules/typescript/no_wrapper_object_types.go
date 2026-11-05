@@ -65,9 +65,9 @@ var messageBannedWrapperObjectType = rule.Message{
 // A fix is offered only in a plain type-reference position. oxc makes the same distinction: replacing
 // `Number` with `number` inside `implements` would produce code that does not compile, since a class
 // cannot implement a primitive.
-var NoWrapperObjectTypes = rule.Rule{
+var NoWrapperObjectTypes = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-wrapper-object-types",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

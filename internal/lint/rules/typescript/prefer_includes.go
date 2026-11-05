@@ -78,11 +78,11 @@ func messagePreferStringIncludes() rule.Message {
 // `a?.includes(b)` means when `a` is nullish, and `undefined !== -1` is true while
 // `undefined.includes` throws. Upstream passes `allowFixing: false` on that listener and both of
 // its optional-chain cases carry `output: null`. Reproduced as a report with no fix.
-var PreferIncludes = rule.Rule{
+var PreferIncludes = rule.Rule[rule.NoOptions]{
 	Name:             "@typescript-eslint/prefer-includes",
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

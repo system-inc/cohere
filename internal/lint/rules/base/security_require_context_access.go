@@ -43,7 +43,7 @@ type SecurityRequireContextAccessOptions struct {
 // schema layer for. `contextKey` and `requiresAny` are both `required`, and `requiresAny` carries
 // `minItems: 1` -- an empty list would be a requirement no decorator can ever satisfy, which reports
 // on every injection of that key with a message naming nothing to add.
-func DecodeContextRequiresAccessOptions(raw []byte) (any, error) {
+func DecodeContextRequiresAccessOptions(raw []byte) (SecurityRequireContextAccessOptions, error) {
 	var options SecurityRequireContextAccessOptions
 	if len(raw) == 0 {
 		return options, nil
@@ -109,10 +109,10 @@ var securityRequireContextAccessDownstreamResolvers = map[string]struct{}{
 //	                       what `decorators.Of` exists to hide.
 //	a parameter property   is an ordinary parameter carrying `private`/`readonly` modifiers rather
 //	                       than a `TSParameterProperty` wrapper, so no unwrapping step is needed.
-var SecurityRequireContextAccess = rule.Rule{
+var SecurityRequireContextAccess = rule.Rule[SecurityRequireContextAccessOptions]{
 	Name: "base/security-require-context-access",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, configured := rule.OptionsAs[SecurityRequireContextAccessOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[SecurityRequireContextAccessOptions]) rule.Listeners {
+		settings, configured := options.Read()
 		if !configured || len(settings.Requirements) == 0 {
 			// Nothing configured means nothing to enforce, and the source returns an empty visitor
 			// object rather than a no-op listener. Reproduced so the rule costs nothing at all in a

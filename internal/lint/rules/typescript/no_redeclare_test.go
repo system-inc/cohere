@@ -8,6 +8,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -179,7 +180,7 @@ func TestNoRedeclareScopesUpstreamNeverExamines(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectClean(
 				test,
-				rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, testCase.sourceText, nil),
+				rule_testing.RunTyped(test, NoRedeclare, redeclareFile, testCase.sourceText),
 			)
 		})
 	}
@@ -187,7 +188,7 @@ func TestNoRedeclareScopesUpstreamNeverExamines(test *testing.T) {
 	test.Run("control: an ordinary block reports", func(test *testing.T) {
 		test.Parallel()
 		rule_testing.ExpectFindings(test,
-			rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, "{\n  let a;\n  let a;\n}", nil),
+			rule_testing.RunTyped(test, NoRedeclare, redeclareFile, "{\n  let a;\n  let a;\n}"),
 			"redeclared")
 	})
 }
@@ -197,7 +198,7 @@ func TestNoRedeclareScopesUpstreamNeverExamines(test *testing.T) {
 // decoder is what puts the default inversion under test: `ignoreDeclarationMerge` defaults to true,
 // so a zero-valued struct silently turns the merge exemptions off and every merge case starts
 // reporting.
-func redeclareOptions(ignoreDeclarationMerge bool) any {
+func redeclareOptions(ignoreDeclarationMerge bool) NoRedeclareOptions {
 	raw, encodeError := json.Marshal(map[string]bool{"ignoreDeclarationMerge": ignoreDeclarationMerge})
 	if encodeError != nil {
 		panic(encodeError)
@@ -238,41 +239,35 @@ func TestNoRedeclareRequiresTheTypedHarness(test *testing.T) {
 func TestNoRedeclareDefaultsToIgnoringDeclarationMerge(test *testing.T) {
 	test.Parallel()
 
-	asOptions := func(decoded any) NoRedeclareOptions {
-		options, isType := decoded.(NoRedeclareOptions)
-		if !isType {
-			test.Fatalf("decoding the options gave %T, expected NoRedeclareOptions", decoded)
-		}
-		return options
-	}
-
 	decoded, decodeNoRedeclareOptionsError := DecodeNoRedeclareOptions(nil)
 	if decodeNoRedeclareOptionsError != nil {
 		test.Fatalf("DecodeNoRedeclareOptions(nil) errored: %v", decodeNoRedeclareOptionsError)
 	}
-	if got := asOptions(decoded); !got.IgnoreDeclarationMerge || !got.BuiltinGlobals {
-		test.Errorf("absent options: %+v, want both true", got)
+	if !decoded.IgnoreDeclarationMerge || !decoded.BuiltinGlobals {
+		test.Errorf("absent options: %+v, want both true", decoded)
 	}
 	builtinsOff, decodeNoRedeclareOptionsError := DecodeNoRedeclareOptions(json.RawMessage(`{"builtinGlobals":false}`))
 	if decodeNoRedeclareOptionsError != nil {
 		test.Fatalf("DecodeNoRedeclareOptions errored: %v", decodeNoRedeclareOptionsError)
 	}
-	if got := asOptions(builtinsOff); got.BuiltinGlobals || !got.IgnoreDeclarationMerge {
-		test.Errorf("builtinGlobals false: %+v, want it off and the merge exemption still on", got)
+	if builtinsOff.BuiltinGlobals || !builtinsOff.IgnoreDeclarationMerge {
+		test.Errorf("builtinGlobals false: %+v, want it off and the merge exemption still on", builtinsOff)
 	}
 
-	explicit, decodeNoRedeclareOptionsError := DecodeNoRedeclareOptions(json.RawMessage(`{"ignoreDeclarationMerge":false}`))
+	explicit, decodeNoRedeclareOptionsError := DecodeNoRedeclareOptions(
+		json.RawMessage(`{"ignoreDeclarationMerge":false}`),
+	)
 	if decodeNoRedeclareOptionsError != nil {
 		test.Fatalf("DecodeNoRedeclareOptions errored: %v", decodeNoRedeclareOptionsError)
 	}
-	if got := asOptions(explicit); got.IgnoreDeclarationMerge {
+	if explicit.IgnoreDeclarationMerge {
 		test.Errorf("explicit false: IgnoreDeclarationMerge = true, want false")
 	}
 
 	// And the same distinction reaching the rule, since the two lines above only prove the decoder
 	// parses. A bare "error" configuration is nil options, and the merge must stay exempt there.
 	rule_testing.ExpectClean(test,
-		rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, "interface A {}\ninterface A {}", nil))
+		rule_testing.RunTyped(test, NoRedeclare, redeclareFile, "interface A {}\ninterface A {}"))
 	rule_testing.ExpectFindings(test,
 		rule_testing.RunTypedWithOptions(
 			test,
@@ -302,22 +297,37 @@ func TestNoRedeclareSpans(test *testing.T) {
 	cases := []struct {
 		name       string
 		sourceText string
-		options    any
+		options    rule.Given[NoRedeclareOptions]
 		wantTexts  []string
 	}{
 		// The redeclared name, not the statement and not the initializer.
-		{"second variable", "var a = 3;\nvar a = 10;", nil, []string{"a"}},
+		{"second variable", "var a = 3;\nvar a = 10;", rule.Given[NoRedeclareOptions]{}, []string{"a"}},
 		// Every copy after the first, in source order.
-		{"third variable too", "var a = 3;\nvar a = 10;\nvar a = 15;", nil, []string{"a", "a"}},
+		{
+			"third variable too",
+			"var a = 3;\nvar a = 10;\nvar a = 15;",
+			rule.Given[NoRedeclareOptions]{},
+			[]string{"a", "a"},
+		},
 		// A longer name, so a span that is right by luck on a one-character name fails here.
-		{"a longer name", "type something = string;\nconst something = 2;", nil, []string{"something"}},
+		{
+			"a longer name",
+			"type something = string;\nconst something = 2;",
+			rule.Given[NoRedeclareOptions]{},
+			[]string{"something"},
+		},
 		// The class, not the namespace beside it: the namespace is a legitimate merge partner.
-		{"the extra class only", "class Alpha {}\nclass Alpha {}\nnamespace Alpha {}", nil, []string{"Alpha"}},
+		{
+			"the extra class only",
+			"class Alpha {}\nclass Alpha {}\nnamespace Alpha {}",
+			rule.Given[NoRedeclareOptions]{},
+			[]string{"Alpha"},
+		},
 		// With merging off, both the class and the namespace report, in source order.
 		{
 			"merging off reports both",
 			"function Beta() {}\nclass Beta {}\nnamespace Beta {}",
-			redeclareOptions(false),
+			rule.Configured(redeclareOptions(false)),
 			[]string{"Beta", "Beta"},
 		},
 	}
@@ -325,7 +335,7 @@ func TestNoRedeclareSpans(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(
+			result := rule_testing.RunTypedGiven(
 				test,
 				NoRedeclare,
 				redeclareFile,
@@ -354,7 +364,7 @@ func TestNoRedeclareSpans(test *testing.T) {
 func TestNoRedeclareMessage(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, "var a = 3;\nvar a = 10;", nil)
+	result := rule_testing.RunTyped(test, NoRedeclare, redeclareFile, "var a = 3;\nvar a = 10;")
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
@@ -387,14 +397,14 @@ func TestNoRedeclareMergeSetsSubsumeTheAllOneKindCases(test *testing.T) {
 		"namespace A {}\ninterface A {}\nnamespace A {}",
 	} {
 		rule_testing.ExpectClean(test,
-			rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, sourceText, nil))
+			rule_testing.RunTyped(test, NoRedeclare, redeclareFile, sourceText))
 	}
 
 	// The control, and the reason the four silences above are the sets working rather than the rule
 	// being inert on these kinds: add a second class and the class set's primary count passes one,
 	// so the exemption lapses and exactly the extra class reports.
 	rule_testing.ExpectFindings(test,
-		rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile,
-			"interface A {}\nclass A {}\nclass A {}\nnamespace A {}", nil),
+		rule_testing.RunTyped(test, NoRedeclare, redeclareFile,
+			"interface A {}\nclass A {}\nclass A {}\nnamespace A {}"),
 		"redeclared")
 }

@@ -40,7 +40,7 @@ func DefaultNoDangerOptions() NoDangerOptions {
 // brief describes costing a rule 3,407 inert registrations. Answering the default explicitly on
 // empty input makes the nil path a decision rather than a coincidence, and
 // `TestNoDangerDecodesOptions` exercises it directly.
-func DecodeNoDangerOptions(raw []byte) (any, error) {
+func DecodeNoDangerOptions(raw []byte) (NoDangerOptions, error) {
 	options := DefaultNoDangerOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -160,10 +160,10 @@ const dangerousPropertyName = "dangerouslySetInnerHTML"
 // One agreement worth naming, since it looks wrong: `MUI*` does not match `TextMUI`, and upstream's
 // corpus has exactly that pair in its `valid` list. Both matchers say false for the same reason, and a
 // port that "fixed" it would break an imported clean case.
-var NoDanger = rule.Rule{
+var NoDanger = rule.Rule[NoDangerOptions]{
 	Name: "react/no-danger",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoDangerOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoDangerOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			// A rule configured as a bare severity reaches here with nil rather than with the
 			// struct. Falling back to the documented default keeps that path a decision.

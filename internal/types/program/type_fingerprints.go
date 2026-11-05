@@ -73,7 +73,10 @@ func (graph *Graph) typeGraph() (
 		parts := &graph.typeGraphParts
 		parts.global, parts.edges, parts.contents, parts.resolutions = graph.computeTypeGraph()
 	})
-	return graph.typeGraphParts.global, graph.typeGraphParts.edges, graph.typeGraphParts.contents, graph.typeGraphParts.resolutions
+	return graph.typeGraphParts.global,
+		graph.typeGraphParts.edges,
+		graph.typeGraphParts.contents,
+		graph.typeGraphParts.resolutions
 }
 
 func (graph *Graph) computeTypeGraph() (

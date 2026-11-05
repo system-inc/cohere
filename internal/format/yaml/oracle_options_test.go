@@ -257,7 +257,12 @@ func TestPrettierRcEmbedsJSON(test *testing.T) {
 				expected, formatError := oracle.format(input, fileName, "yaml", options, "preserve")
 				if formatError != nil {
 					if trees[index].err == "" {
-						test.Errorf("%s, %q: the oracle failed (%v) but the parser did not", fileName, input, formatError)
+						test.Errorf(
+							"%s, %q: the oracle failed (%v) but the parser did not",
+							fileName,
+							input,
+							formatError,
+						)
 					}
 					if _, fullStackError := formatFullStack(
 						fileName,

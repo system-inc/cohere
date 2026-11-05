@@ -71,9 +71,9 @@ var declareRequiringColumnDecorators = map[string]bool{
 //
 // One listener on a property declaration, no checker, no program, and the decorator scan stops at the
 // first match, which is what makes the message name the triggering decorator rather than the last one.
-var CorrectnessRequireOrmColumnDeclare = rule.Rule{
+var CorrectnessRequireOrmColumnDeclare = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-orm-column-declare",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
 				modifiers := node.Modifiers()

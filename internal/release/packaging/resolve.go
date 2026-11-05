@@ -148,7 +148,12 @@ func Resolve(searchRoots []string) (string, error) {
 func resolveOverride(path string) (string, error) {
 	absolutePath, absolutePathError := filepath.Abs(path)
 	if absolutePathError != nil {
-		return "", fmt.Errorf("%s is set to %q, which is not a usable path: %w", BinaryOverrideVariable, path, absolutePathError)
+		return "", fmt.Errorf(
+			"%s is set to %q, which is not a usable path: %w",
+			BinaryOverrideVariable,
+			path,
+			absolutePathError,
+		)
 	}
 
 	information, statError := os.Stat(absolutePath)

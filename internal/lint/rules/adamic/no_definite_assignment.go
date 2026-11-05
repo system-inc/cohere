@@ -32,10 +32,10 @@ var noDefiniteAssignmentText = policy.MessageOf("adamic/no-definite-assignment",
  *
  * Removing the `!` leaves a compile error until the author assigns the binding or widens its type.
  */
-var NoDefiniteAssignment = rule.Rule{
+var NoDefiniteAssignment = rule.Rule[rule.NoOptions]{
 	Name: "adamic/no-definite-assignment",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(name *ast.Node) {
 			if name != nil {
 				ruleContext.ReportNode(name, rule.Message{

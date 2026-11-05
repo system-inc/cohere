@@ -21,10 +21,10 @@ func rangesFor(test *testing.T, source string) (*Function, *mutation_aliasing.Mu
 	test.Helper()
 
 	var outermost *Function
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "ranges-harness",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {
@@ -462,7 +462,8 @@ func TestMutatingMethodReceiverSurvivesArgumentControlFlow(test *testing.T) {
 					argumentIsPhi, testCase.wantArgumentPhi)
 			}
 
-			var initializer, storedX Place
+			var initializer Place
+			var storedX Place
 			foundStore := false
 			for _, instruction := range function.Instructions {
 				if instruction == nil {
@@ -688,13 +689,13 @@ func TestAliasingRefinementMatchesAbstractKinds(test *testing.T) {
 			}
 
 			from := place()
-			fromInstruction := &Instruction{LValue: from, Value: &Primitive{Value: 1}}
+			fromInstruction := &Instruction{LValue: from, Value: &Primitive{Value: PrimitiveNumber("1")}}
 			function.AddInstruction(block, fromInstruction)
 			into := place()
 			edgeInstruction := &Instruction{LValue: into, Value: &ObjectExpression{}}
 			function.AddInstruction(block, edgeInstruction)
 			result := place()
-			mutationInstruction := &Instruction{LValue: result, Value: &Primitive{Value: 0}}
+			mutationInstruction := &Instruction{LValue: result, Value: &Primitive{Value: PrimitiveNumber("0")}}
 			function.AddInstruction(block, mutationInstruction)
 			function.Returns = result
 			block.Terminal = &Return{Value: result}
@@ -868,7 +869,7 @@ func TestCreateFromMutationPropagatesTransitively(test *testing.T) {
 	derivedInstruction := &Instruction{LValue: derived, Value: &PropertyLoad{Object: source, Property: "value"}}
 	function.AddInstruction(block, derivedInstruction)
 	result := place()
-	mutationInstruction := &Instruction{LValue: result, Value: &Primitive{Value: 0}}
+	mutationInstruction := &Instruction{LValue: result, Value: &Primitive{Value: PrimitiveNumber("0")}}
 	function.AddInstruction(block, mutationInstruction)
 	function.Returns = result
 	block.Terminal = &Return{Value: result}
@@ -1231,8 +1232,13 @@ export function f(items: number[][]) {
 	if invalid := mutation_aliasing.ValidateMutableRanges(ranges); len(invalid) != 0 {
 		for _, id := range invalid {
 			mutableRange := ranges.Get(id)
-			test.Errorf("value %d has the invalid range [%d,%d); a loop-carried value whose end was "+
-				"widened below its own definition point must still come out non-empty", id, mutableRange.Start, mutableRange.End)
+			test.Errorf(
+				"value %d has the invalid range [%d,%d); a loop-carried value whose end was "+
+					"widened below its own definition point must still come out non-empty",
+				id,
+				mutableRange.Start,
+				mutableRange.End,
+			)
 		}
 	}
 
@@ -1243,7 +1249,9 @@ export function f(items: number[][]) {
 		if identifier == nil {
 			continue
 		}
-		if mutableRange := ranges.Get(identifier.Id); mutableRange.IsSet() && mutableRange.End-mutableRange.Start > widest {
+		if mutableRange := ranges.Get(
+			identifier.Id,
+		); mutableRange.IsSet() && mutableRange.End-mutableRange.Start > widest {
 			widest = mutableRange.End - mutableRange.Start
 		}
 	}

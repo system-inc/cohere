@@ -75,7 +75,7 @@ type NoEmptyFunctionOptions struct {
 // A kind outside upstream's enum is refused rather than ignored. Upstream gets that refusal from its
 // schema before the rule runs; there is no schema layer here, so it lives here, and a rule silently
 // dropping an unknown kind would leave a project believing it had exempted something it had not.
-func DecodeNoEmptyFunctionOptions(raw []byte) (any, error) {
+func DecodeNoEmptyFunctionOptions(raw []byte) (NoEmptyFunctionOptions, error) {
 	var options NoEmptyFunctionOptions
 	if len(raw) == 0 {
 		return options, nil
@@ -147,12 +147,12 @@ var messageNoEmptyFunctionSuggestComment = rule.Message{
 // Upstream sets `hasSuggestions` and no `fixable`. Writing `/* empty */` into a body asserts that
 // the emptiness is deliberate, which is a claim about intent rather than a change of spelling, so
 // nothing may apply it unattended.
-var NoEmptyFunction = rule.Rule{
+var NoEmptyFunction = rule.Rule[NoEmptyFunctionOptions]{
 	Name: "no-empty-function",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoEmptyFunctionOptions]) rule.Listeners {
 		// A rule configured as bare "error" is handed nil, so the type assertion yields the zero
 		// value. Correct here only because `allow` defaults to empty.
-		settings, _ := rule.OptionsAs[NoEmptyFunctionOptions](options)
+		settings, _ := options.Read()
 
 		report := func(node *ast.Node) {
 			body := node.Body()

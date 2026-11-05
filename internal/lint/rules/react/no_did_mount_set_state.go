@@ -104,12 +104,12 @@ var messageNoDidMountSetState = rule.Message{
 // exactly `this.setState`. The neighbouring `no-is-mounted` reports its whole call including the
 // parentheses, so the two rules in this package genuinely differ here and a message-id assertion
 // cannot see it. Every fixture below asserts the sliced text.
-var NoDidMountSetState = rule.Rule{
+var NoDidMountSetState = rule.Rule[NoMethodSetStateOptions]{
 	// No namespace prefix. The config writes `react/no-did-mount-set-state` and the parity guard
 	// strips the namespace on a `/` boundary, so `react-no-did-mount-set-state` would match no
 	// inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/no-did-mount-set-state",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoMethodSetStateOptions]) rule.Listeners {
 		// No file gate. oxc gated this on `source_type().is_jsx()`, and that gate came along when the
 		// rule was ported from oxc, but the authority here is eslint-plugin-react, which does not
 		// gate on the file name at all. A React class component in a `.ts` file is ordinary and
@@ -117,7 +117,7 @@ var NoDidMountSetState = rule.Rule{
 		// Measured before removal: the same class reported in `.tsx` and produced nothing in `.ts`.
 
 		// An unconfigured rule gets the zero value, which is upstream's `allow-in-func` default.
-		settings, _ := rule.OptionsAs[NoMethodSetStateOptions](options)
+		settings, _ := options.Read()
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

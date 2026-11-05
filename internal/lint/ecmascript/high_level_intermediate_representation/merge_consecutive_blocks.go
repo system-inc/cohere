@@ -59,6 +59,8 @@ import (
 // blocks are joined there is no join for it to sit at. Upstream rewrites each into a `LoadLocal` of
 // its single operand, appended to the predecessor before the merged instructions, and this does the
 // same. Dropping them instead would leave the phi's value undefined at every later read.
+//
+// Mutates: function the pass rewrites the caller's graph in place, its blocks and entry among them
 func MergeConsecutiveBlocks(function *Function) int {
 	if function == nil {
 		return 0

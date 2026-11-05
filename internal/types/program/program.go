@@ -712,7 +712,10 @@ func projectFilesMismatchMessage(named int, matched int) string {
 // meaningless, which is the worst failure shape available here.
 //
 // The release function must be called, conventionally by defer.
-func (graph *Graph) CheckerForFile(callerContext context.Context, sourceFile *ast.SourceFile) (*checker.Checker, func()) {
+func (graph *Graph) CheckerForFile(
+	callerContext context.Context,
+	sourceFile *ast.SourceFile,
+) (*checker.Checker, func()) {
 	return graph.Program.GetTypeCheckerForFileExclusive(callerContext, sourceFile)
 }
 

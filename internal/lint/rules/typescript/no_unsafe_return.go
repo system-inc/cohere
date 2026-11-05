@@ -66,7 +66,7 @@ import (
 //
 // Two anchors. A return statement with no argument returns immediately, and a concise arrow body is
 // a single kind test on the parent, so the checker is asked only where there is a value to judge.
-var NoUnsafeReturn = rule.Rule{
+var NoUnsafeReturn = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unsafe-return",
 
 	// Every judgment compares the returned value's type against the function's declared one.
@@ -75,7 +75,7 @@ var NoUnsafeReturn = rule.Rule{
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindReturnStatement: func(node *ast.Node) {
 				argument := node.AsReturnStatement().Expression

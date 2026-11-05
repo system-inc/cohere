@@ -80,10 +80,10 @@ type NoFallthroughOptions struct {
 // whether every path leaves the *switch*, so both are, and a nested loop or switch swallows them.
 // Sharing one walk would need a mode flag threaded through every arm, and the arms that would then
 // differ are the majority.
-var NoFallthrough = rule.Rule{
+var NoFallthrough = rule.Rule[NoFallthroughOptions]{
 	Name: "no-fallthrough",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		parsed, _ := rule.OptionsAs[NoFallthroughOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoFallthroughOptions]) rule.Listeners {
+		parsed, _ := options.Read()
 		excusesFallthrough, namesFallthrough := fallthroughCommentMatchers(parsed.CommentPattern)
 
 		return rule.Listeners{

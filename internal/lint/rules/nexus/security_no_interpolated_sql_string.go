@@ -166,12 +166,12 @@ var (
 // beside it, an edit across two expressions the rule cannot write safely. For a query language with
 // no parameters (GAQL, QuickBooks), the fix is a narrower type or the visible escape above, and which
 // one is right is the author's call.
-var SecurityNoInterpolatedSqlString = rule.Rule{
+var SecurityNoInterpolatedSqlString = rule.Rule[rule.NoOptions]{
 	Name:             "nexus/security-no-interpolated-sql-string",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			// Which values can hold a quote is a question about types. Without a checker every
 			// number and literal union would be reported, so the rule declines the file.

@@ -135,7 +135,7 @@ import (
 // shows `this | this` only because `cohereAndFix` re-lints until the source stops changing;
 // measured against a single application of the same messages, upstream writes `this | Foo` too.
 // This port is a single pass and matches it.
-var PreferReturnThisType = rule.Rule{
+var PreferReturnThisType = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/prefer-return-this-type",
 
 	// Every discrimination this rule makes is a type question. Name matching alone reports the
@@ -143,7 +143,7 @@ var PreferReturnThisType = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// checkFunction is upstream's `checkFunction`: the class must have a name, the function must
 		// carry a return type, that return type must mention the class name, and the function must
 		// really return only `this`.

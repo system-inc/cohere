@@ -4,10 +4,11 @@ import Testing
 @testable import CohereSwift
 
 /*
- A lint-only run after a file is renamed with plain mv. `--lint` does not build, so a typed rule that needs
- sourcekitd for a changed file asks it with the last build's compile arguments, and those name the file's old
- path. Presence, 2026-11-04 (#zggj9xy): "error opening input file" for the old names, and answers from a module
- that no longer exists. Such a command vouches for nothing, so the file is reported unchecked, with why.
+ A lint-only run after a file is renamed with plain mv, when the build that run makes for its typed rules fails
+ before compiling, so a typed rule that needs sourcekitd for a changed file has only the last build's compile
+ arguments, and those name the file's old path. Presence, 2026-11-04 (#zggj9xy): "error opening input file" for
+ the old names, and answers from a module that no longer exists. Such a command vouches for nothing, so the file
+ is reported unchecked, with why. (A lint-only run whose build succeeds builds the renamed module afresh, #q1574nq.)
  */
 struct RenamedFileTests {
     static func run(_ root: URL, _ arguments: [String]) async throws -> [[String: Any]] {
@@ -54,12 +55,22 @@ struct RenamedFileTests {
             to: sources.appendingPathComponent("New.swift"),
         )
         try (source + "\n").write(to: box, atomically: true, encoding: .utf8)
+        try PipelineControlTests.unresolvableManifest.write(
+            to: root.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8,
+        )
         let linted = try await Self.run(root, ["--lint"])
         let crashes = linted.first { $0["kind"] as? String == "lint" }?["crashes"] as? [[String: Any]] ?? []
         #expect(
             crashes.map { ($0["file"] as? String).map { URL(fileURLWithPath: $0).lastPathComponent } } == ["Box.swift"]
         )
         #expect((crashes.first?["error"] as? String)?.contains("Old.swift, which no longer exists") == true)
+        #expect(
+            (crashes.first?["error"] as? String)?.contains("since the build this run made for the typed rules failed")
+                == true,
+            "the rename case is reached only through a failed build: \(crashes)",
+        )
         #expect(
             !linted.contains { $0["rule"] as? String == "cohere-swift/empty-count" },
             "no answer from the old module",

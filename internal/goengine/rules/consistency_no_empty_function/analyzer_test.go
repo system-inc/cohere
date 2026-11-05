@@ -25,8 +25,10 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // The flagged fixtures carry a // want on every empty function, method, function literal and test, the ones whose
 // only comment sits outside the braces, is a doc comment above, or has no words included, and analysistest fails on
 // a finding no want expects as much as on a want nothing found, so the allowed and lookalike fixtures prove the rule
-// stays quiet on a body that says why, on its brace's line or a line of its own, a declaration without a body, and
-// empty braces that belong to no function.
+// stays quiet on a body that says why, on its brace's line or a line of its own, a declaration without a body, a
+// sealed union's never used marker, and empty braces that belong to no function. The flagged marker fixtures each fail
+// one of the marker's conditions: a method that is called or taken as a value, exported, taking a parameter, of an
+// interface with a second or an embedded method, or on a type that does not implement the interface of its name.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

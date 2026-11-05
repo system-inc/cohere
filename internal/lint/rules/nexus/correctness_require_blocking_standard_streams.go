@@ -155,7 +155,7 @@ var (
 //
 // Where the call belongs is the author's choice: the first statement of the module, or of the `main`
 // it runs, and above a guard that must not run unblocked. A fixer would pick one blindly.
-var CorrectnessRequireBlockingStandardStreams = rule.Rule{
+var CorrectnessRequireBlockingStandardStreams = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-require-blocking-standard-streams",
 
 	// Symbol identity is what tells `NodeJS.Process.exit` and the global console from look-alikes,
@@ -173,7 +173,7 @@ var CorrectnessRequireBlockingStandardStreams = rule.Rule{
 	// Only a file that calls `process.exit` can hold a finding, and most files do not.
 	NoListener: rule.NoListenerDeclinesIrrelevantFiles,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.Program == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -246,7 +246,10 @@ func correctnessRequireBlockingStandardStreamsIndexFor(
 // the imported set is the whole of it: an edit that makes a file imported or unimported moves this, and
 // an edit that does neither leaves it, and the findings replay. The rule takes no options, so none reach
 // it.
-func correctnessRequireBlockingStandardStreamsFingerprint(program rule.Program, _ any) [sha256.Size]byte {
+func correctnessRequireBlockingStandardStreamsFingerprint(
+	program rule.Program,
+	_ rule.Given[rule.NoOptions],
+) [sha256.Size]byte {
 	index := correctnessRequireBlockingStandardStreamsIndexFor(program)
 	var imported []string
 	for path := range index.imported {
@@ -655,7 +658,8 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) declarationMa
 		return true
 	}
 	switch declaration.Kind {
-	case ast.KindFunctionDeclaration, ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
+	case ast.KindFunctionDeclaration, ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor,
+		ast.KindSetAccessor:
 		if declaration.Body() == nil {
 			// An overload signature, whose implementation is another declaration of the same
 			// symbol and is read there. A `declare`d function, or an abstract or interface-shaped

@@ -3,6 +3,7 @@ package core
 import (
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -558,14 +559,14 @@ var preferTemplateSilentCases = []preferTemplateCase{
 
 // decodedPreferTemplate routes a row's raw JSON through the rule's own exported decoder.
 // prefer-template has no option surface (upstream's schema is []), so there is no decoder to
-// route through and the harness is handed nil, which is what the config layer passes for a bare
-// "error".
-func decodedPreferTemplate(test *testing.T, raw string) any {
+// route through and the harness is handed no options, which is what the config layer passes for a
+// bare "error".
+func decodedPreferTemplate(test *testing.T, raw string) rule.Given[rule.NoOptions] {
 	test.Helper()
 	if raw != "" {
 		test.Fatalf("prefer-template takes no options, got %q", raw)
 	}
-	return nil
+	return rule.Given[rule.NoOptions]{}
 }
 
 func TestPreferTemplateFires(test *testing.T) {
@@ -573,7 +574,7 @@ func TestPreferTemplateFires(test *testing.T) {
 	for _, testCase := range preferTemplateFiresCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, PreferTemplate, preferTemplateFile, testCase.source,
+			result := rule_testing.RunGiven(test, PreferTemplate, preferTemplateFile, testCase.source,
 				decodedPreferTemplate(test, testCase.options))
 			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
@@ -585,7 +586,7 @@ func TestPreferTemplateStaysSilent(test *testing.T) {
 	for _, testCase := range preferTemplateSilentCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, PreferTemplate, preferTemplateFile, testCase.source,
+			result := rule_testing.RunGiven(test, PreferTemplate, preferTemplateFile, testCase.source,
 				decodedPreferTemplate(test, testCase.options))
 			rule_testing.ExpectClean(test, result)
 		})
@@ -1011,7 +1012,7 @@ func TestPreferTemplateRepairsWhatUpstreamRepairs(test *testing.T) {
 	for _, testCase := range preferTemplateRepairCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, PreferTemplate, preferTemplateFile,
+			result := rule_testing.RunGiven(test, PreferTemplate, preferTemplateFile,
 				testCase.source, decodedPreferTemplate(test, ""))
 			rule_testing.ExpectFixedSource(test, result, testCase.wanted)
 		})
@@ -1023,7 +1024,7 @@ func TestPreferTemplateDeclinesTheRepairsUpstreamDeclines(test *testing.T) {
 	for _, testCase := range preferTemplateDeclineCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, PreferTemplate, preferTemplateFile,
+			result := rule_testing.RunGiven(test, PreferTemplate, preferTemplateFile,
 				testCase.source, decodedPreferTemplate(test, ""))
 			if len(result.Diagnostics) == 0 {
 				test.Fatalf("expected a finding; a decline withholds the FIX, not the report")

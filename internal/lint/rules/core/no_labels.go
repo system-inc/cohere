@@ -105,16 +105,16 @@ type NoLabelsOptions struct {
 //
 // No fix. Removing a label means restructuring the control flow it names, which is a rewrite rather
 // than a spelling change.
-var NoLabels = rule.Rule{
+var NoLabels = rule.Rule[NoLabelsOptions]{
 	Name: "no-labels",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoLabelsOptions]) rule.Listeners {
 		// A rule configured as a bare `"error"` is handed `nil` rather than a decoded struct, because
 		// `DecodeOptionsInto` errors on empty input and the config turns that into nil. Without this
 		// the type assertion yields the zero value anyway, which happens to be correct here, but
 		// relying on that means the rule is right by accident. Naming it makes the default a
 		// decision. `TestNoLabelsDefaultsWithoutTheDecoder` bypasses the decoder to pin it.
 		settings := NoLabelsOptions{}
-		if decoded, ok := rule.OptionsAs[NoLabelsOptions](options); ok {
+		if decoded, ok := options.Read(); ok {
 			settings = decoded
 		}
 

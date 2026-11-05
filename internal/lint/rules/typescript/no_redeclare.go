@@ -55,7 +55,7 @@ func DefaultNoRedeclareOptions() NoRedeclareOptions {
 // the difference between "no options were written" and "the option was written as false". For an
 // option defaulting to false that distinction is invisible. This one defaults to true, so the
 // generic helper's zero value inverts the rule rather than merely weakening it.
-func DecodeNoRedeclareOptions(raw []byte) (any, error) {
+func DecodeNoRedeclareOptions(raw []byte) (NoRedeclareOptions, error) {
 	options := DefaultNoRedeclareOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -224,7 +224,7 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 //
 // No fix. The repair is a rename or a deletion, and choosing which declaration is the dead one, and
 // what to call the survivor, is exactly what the rule cannot know.
-var NoRedeclare = rule.Rule{
+var NoRedeclare = rule.Rule[NoRedeclareOptions]{
 	Name: "@typescript-eslint/no-redeclare",
 
 	// See the doc above: the scope partition comes from the binder, which the program builds.
@@ -237,8 +237,8 @@ var NoRedeclare = rule.Rule{
 	// builtinGlobals asks whether a global's declarations live in a lib file.
 	ProgramReads: rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoRedeclareOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoRedeclareOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			// A rule configured as a bare "error" is handed nil, and `options.(T)` on nil yields the
 			// zero value, whose false `IgnoreDeclarationMerge` inverts this rule rather than

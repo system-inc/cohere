@@ -94,14 +94,14 @@ type JsxNoDuplicatePropsOptions struct {
 //
 // A dashed name is not the same case and does participate: `data-x` parses as a single identifier,
 // so `<App data-x data-x />` reports in both tools.
-var JsxNoDuplicateProps = rule.Rule{
+var JsxNoDuplicateProps = rule.Rule[JsxNoDuplicatePropsOptions]{
 	// No namespace prefix. The config writes `react/jsx-no-duplicate-props` and the parity guard
 	// strips the namespace on a `/` boundary, so a rule named `react-jsx-no-duplicate-props` would
 	// match no inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/jsx-no-duplicate-props",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[JsxNoDuplicatePropsOptions]) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's case-sensitive default.
-		settings, _ := rule.OptionsAs[JsxNoDuplicatePropsOptions](options)
+		settings, _ := options.Read()
 
 		report := func(node *ast.Node) {
 			_, attributes := jsx.ElementParts(node)

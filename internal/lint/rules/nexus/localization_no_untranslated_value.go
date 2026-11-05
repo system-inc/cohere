@@ -130,7 +130,7 @@ func messageIdenticalToSource(key string, locale string, value string) rule.Mess
 // translations, since the comparison basis is what is missing.
 //
 // No fix. The repair is a translation, which a rule cannot write.
-var LocalizationNoUntranslatedValue = rule.Rule{
+var LocalizationNoUntranslatedValue = rule.Rule[rule.NoOptions]{
 	Name: "nexus/localization-no-untranslated-value",
 
 	// The English translation table, en.ts, which this file does not import, and the current directory the
@@ -139,7 +139,7 @@ var LocalizationNoUntranslatedValue = rule.Rule{
 	// A file's verdict reads its own bytes and path and its directory's English tables, so every English
 	// table in the program is the fingerprint (#31ffaaa). See localizationNoUntranslatedValueFingerprint.
 	ProgramFingerprint: localizationNoUntranslatedValueFingerprint,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -494,7 +494,7 @@ var localizationNoUntranslatedValueFingerprints struct {
 // stands in for a version, since the rule reads the text, so an edit to a comment in en.ts moves it too.
 // Nothing else outside the file reaches a verdict: recognizing locale data reads only the file's own name.
 // The rule takes no options, so none reach it.
-func localizationNoUntranslatedValueFingerprint(program rule.Program, _ any) [sha256.Size]byte {
+func localizationNoUntranslatedValueFingerprint(program rule.Program, _ rule.Given[rule.NoOptions]) [sha256.Size]byte {
 	cache := &localizationNoUntranslatedValueFingerprints
 	cache.Lock()
 	defer cache.Unlock()

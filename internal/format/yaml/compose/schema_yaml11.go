@@ -179,7 +179,12 @@ func nodeBase64Decode(text []uint16) Binary {
 	maxI := len(text) / 4 * 4
 	index := 0
 	for index < maxI && len(destination) < maxK {
-		quad := [4]byte{unbase64(text[index]), unbase64(text[index+1]), unbase64(text[index+2]), unbase64(text[index+3])}
+		quad := [4]byte{
+			unbase64(text[index]),
+			unbase64(text[index+1]),
+			unbase64(text[index+2]),
+			unbase64(text[index+3]),
+		}
 		if binary.BigEndian.Uint32(quad[:])&0x80808080 != 0 {
 			var proceed bool
 			destination, index, proceed = base64DecodeGroupSlow(destination, destinationLength, text, index)

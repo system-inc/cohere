@@ -160,9 +160,9 @@ func messageRequireCorrectAlias(expected string, actual string, bare string) rul
 // The TypeScript original followed each binding through scope and re-rooted it at the namespace.
 // That needs scope analysis this rule does not have yet, so the finding is reported without a fix
 // rather than with one that breaks the build. Reporting honestly beats fixing wrongly.
-var ImportRequireNodeNamespace = rule.Rule{
+var ImportRequireNodeNamespace = rule.Rule[rule.NoOptions]{
 	Name: "nexus/import-require-node-namespace",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				declaration := node.AsImportDeclaration()

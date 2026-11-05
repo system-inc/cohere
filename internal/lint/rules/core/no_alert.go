@@ -78,11 +78,11 @@ var noAlertProhibited = map[string]bool{
 // reason they are clean in any module, and reproducing them as reporting would require a script-mode
 // file this tree cannot produce. There is deliberately no `this` arm below, and the two cases sit in
 // the silent list with this reasoning at the line.
-var NoAlert = rule.Rule{
+var NoAlert = rule.Rule[rule.NoOptions]{
 	Name:             "no-alert",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

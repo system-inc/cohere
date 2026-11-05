@@ -98,7 +98,7 @@ type NoInvalidHtmlAttributeOptions struct {
 
 // DecodeNoInvalidHtmlAttributeOptions reads upstream's list, refusing what its schema refuses: an
 // item other than "rel", and a duplicate, which `uniqueItems` forbids.
-func DecodeNoInvalidHtmlAttributeOptions(raw []byte) (any, error) {
+func DecodeNoInvalidHtmlAttributeOptions(raw []byte) (NoInvalidHtmlAttributeOptions, error) {
 	options := NoInvalidHtmlAttributeOptions{Attributes: noInvalidHtmlAttributeDefaultAttributes}
 	if len(raw) == 0 {
 		return options, nil
@@ -375,14 +375,12 @@ func noInvalidHtmlAttributeSpaceDelimited(attributeName string) rule.Message {
 // The raw read is kept anyway. It costs nothing, it is what upstream's arithmetic actually does,
 // and the equivalence is a property of the JSX arm alone -- a future attribute source that is
 // escape-processed would separate them again.
-var NoInvalidHtmlAttribute = rule.Rule{
+var NoInvalidHtmlAttribute = rule.Rule[NoInvalidHtmlAttributeOptions]{
 	Name: "react/no-invalid-html-attribute",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoInvalidHtmlAttributeOptions]) rule.Listeners {
 		// The only list besides the default is the empty one, which checks nothing, so the default
 		// check below is the whole rule whenever any attribute is configured.
-		if settings, configured := rule.OptionsAs[NoInvalidHtmlAttributeOptions](
-			options,
-		); configured && len(settings.Attributes) == 0 {
+		if settings, configured := options.Read(); configured && len(settings.Attributes) == 0 {
 			return rule.Listeners{}
 		}
 		return rule.Listeners{

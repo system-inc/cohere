@@ -55,11 +55,11 @@ var messageSymbolDescription = rule.Message{
 // them and reports `(Symbol)()` at columns 1 to 11. typescript-go produces one, so the callee is
 // skipped through before it is resolved, and the span stays on the whole call including those
 // parentheses.
-var SymbolDescription = rule.Rule{
+var SymbolDescription = rule.Rule[rule.NoOptions]{
 	Name:             "symbol-description",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				// Without this the rule goes completely silent under the plain harness rather than

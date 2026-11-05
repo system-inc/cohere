@@ -107,21 +107,21 @@ func helper(ctx rule.Context) bool { return ctx.Program.Options() != nil }`,
 			name: "a declaration in a comment",
 			source: `package probe
 // Every caller must declare ` + "`ProgramReads: rule.ReadsOtherFiles`" + `.
-var Probe = rule.Rule{Run: func(ctx rule.Context, options any) rule.Listeners { _ = ctx.Program.SourceFiles(); return nil }}`,
+var Probe = rule.Rule[rule.NoOptions]{Run: func(ctx rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners { _ = ctx.Program.SourceFiles(); return nil }}`,
 			want: programFacts{readsProgram: true, definesRule: true, reads: readsOtherFiles},
 		},
 		{
 			name: "a read in a comment only",
 			source: `package probe
 // This rule never touches ctx.Program.
-var Probe = rule.Rule{Run: func(ctx rule.Context, options any) rule.Listeners { return nil }}`,
+var Probe = rule.Rule[rule.NoOptions]{Run: func(ctx rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners { return nil }}`,
 			want: programFacts{definesRule: true},
 		},
 		{
 			// A context under another name, and reached through a struct, is still the context.
 			name: "a context under another name, through a chain",
 			source: `package probe
-var Probe = rule.Rule{ProgramReads: rule.ReadsModuleResolution, Run: func(c rule.Context, options any) rule.Listeners { _ = state{c}.c.Program.ResolveModule(nil, nil); return nil }}`,
+var Probe = rule.Rule[rule.NoOptions]{ProgramReads: rule.ReadsModuleResolution, Run: func(c rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners { _ = state{c}.c.Program.ResolveModule(nil, nil); return nil }}`,
 			want: programFacts{
 				readsProgram: true,
 				definesRule:  true,
@@ -133,7 +133,7 @@ var Probe = rule.Rule{ProgramReads: rule.ReadsModuleResolution, Run: func(c rule
 			// A read through a helper counts as the helper's reads.
 			name: "a read through a helper",
 			source: `package probe
-var Probe = rule.Rule{ProgramReads: rule.ReadsCompilerOptions, Run: func(ctx rule.Context, options any) rule.Listeners { _ = type_checking.IsPromiseLike(ctx.Program, nil, nil); return nil }}`,
+var Probe = rule.Rule[rule.NoOptions]{ProgramReads: rule.ReadsCompilerOptions, Run: func(ctx rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners { _ = type_checking.IsPromiseLike(ctx.Program, nil, nil); return nil }}`,
 			want: programFacts{
 				readsProgram: true,
 				definesRule:  true,
@@ -146,7 +146,7 @@ var Probe = rule.Rule{ProgramReads: rule.ReadsCompilerOptions, Run: func(ctx rul
 			// reads count as the rule's.
 			name: "a read through the program fingerprint",
 			source: `package probe
-var Probe = rule.Rule{ProgramReads: rule.ReadsCompilerOptions, ProgramFingerprint: fingerprint, Run: func(ctx rule.Context, options any) rule.Listeners { return nil }}`,
+var Probe = rule.Rule[rule.NoOptions]{ProgramReads: rule.ReadsCompilerOptions, ProgramFingerprint: fingerprint, Run: func(ctx rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners { return nil }}`,
 			want: programFacts{
 				readsProgram: true,
 				definesRule:  true,
@@ -157,13 +157,13 @@ var Probe = rule.Rule{ProgramReads: rule.ReadsCompilerOptions, ProgramFingerprin
 		{
 			name: "a program fingerprint this cannot see",
 			source: `package probe
-var Probe = rule.Rule{ProgramFingerprint: elsewhere, Run: func(ctx rule.Context, options any) rule.Listeners { return nil }}`,
+var Probe = rule.Rule[rule.NoOptions]{ProgramFingerprint: elsewhere, Run: func(ctx rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners { return nil }}`,
 			want: programFacts{readsProgram: true, definesRule: true, unseenCallees: []string{"probe.elsewhere"}},
 		},
 		{
 			name: "a Program handed to a function this cannot see",
 			source: `package probe
-var Probe = rule.Rule{Run: func(ctx rule.Context, options any) rule.Listeners { somewhere.Else(ctx.Program); return nil }}`,
+var Probe = rule.Rule[rule.NoOptions]{Run: func(ctx rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners { somewhere.Else(ctx.Program); return nil }}`,
 			want: programFacts{readsProgram: true, definesRule: true, unseenCallees: []string{"somewhere.Else"}},
 		},
 	}
@@ -433,7 +433,7 @@ func readProgramFacts(test *testing.T, path string, helpers map[string]programRe
 				})
 			}
 		case *ast.CompositeLit:
-			if isRuleSelector(typed.Type, "Rule") {
+			if selector, isRule := ruleLiteralSelector(typed.Type); isRule && isRuleSelector(selector, "Rule") {
 				facts.definesRule = true
 			}
 		}
@@ -476,6 +476,21 @@ func isRuleSelector(expression ast.Expr, name string) bool {
 	}
 	packageName, isIdentifier := selector.X.(*ast.Ident)
 	return isIdentifier && packageName.Name == "rule" && selector.Sel.Name == name
+}
+
+// ruleLiteralSelector is the `<qualifier>.Rule` a composite literal's type names, seen through the options type
+// argument: a Rule is generic over its options, so a rule's literal is `rule.Rule[Options]{...}`, and a scan that
+// matched only the bare selector would find no rule at all and pass on nothing.
+func ruleLiteralSelector(literalType ast.Expr) (*ast.SelectorExpr, bool) {
+	named := literalType
+	if indexed, isIndexed := literalType.(*ast.IndexExpr); isIndexed {
+		named = indexed.X
+	}
+	selector, isSelector := named.(*ast.SelectorExpr)
+	if !isSelector || selector.Sel.Name != "Rule" {
+		return nil, false
+	}
+	return selector, true
 }
 
 // ruleSourceFiles lists the non-test Go files under internal/lint/rules.

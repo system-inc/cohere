@@ -134,7 +134,9 @@ entity['clearChangedFields']();
 		"useDot",
 	)
 
-	allowed, decodeDotNotationOptionsError := DecodeDotNotationOptions([]byte(`{"allowProtectedClassPropertyAccess": true}`))
+	allowed, decodeDotNotationOptionsError := DecodeDotNotationOptions(
+		[]byte(`{"allowProtectedClassPropertyAccess": true}`),
+	)
 	if decodeDotNotationOptionsError != nil {
 		test.Fatal(decodeDotNotationOptionsError)
 	}
@@ -155,15 +157,11 @@ func TestDotNotationOptionsDecode(test *testing.T) {
 	if decodeDotNotationOptionsError != nil {
 		test.Fatal(decodeDotNotationOptionsError)
 	}
-	options, isType := decoded.(DotNotationOptions)
-	if !isType {
-		test.Fatalf("decoding the options gave %T, expected DotNotationOptions", decoded)
-	}
-	if options.AllowKeywords == nil ||
-		!*options.AllowKeywords ||
-		options.AllowIndexSignaturePropertyAccess ||
-		options.AllowPrivateClassPropertyAccess ||
-		options.AllowProtectedClassPropertyAccess {
-		test.Errorf("the defaults are %+v", options)
+	if decoded.AllowKeywords == nil ||
+		!*decoded.AllowKeywords ||
+		decoded.AllowIndexSignaturePropertyAccess ||
+		decoded.AllowPrivateClassPropertyAccess ||
+		decoded.AllowProtectedClassPropertyAccess {
+		test.Errorf("the defaults are %+v", decoded)
 	}
 }

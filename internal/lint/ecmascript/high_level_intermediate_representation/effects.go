@@ -619,7 +619,7 @@ func InferAliasingEffectsForNested(function *Function) map[FunctionId]*AliasingE
 // comment. Upstream caches the result per instruction for the same reason.
 func effectsForInstruction(function *Function, producers *calleeProducers, instruction *Instruction) []AliasingEffect {
 	lvalue := instruction.LValue
-	switch value := instruction.Value.(type) {
+	switch instructionValue := instruction.Value.(type) {
 
 	// --- Values that create something primitive and read their operands -------------------
 
@@ -629,19 +629,31 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 	case *BinaryExpression:
 		return []AliasingEffect{
 			mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValuePrimitive),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectImmutableCapture, value.Left, lvalue),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectImmutableCapture, value.Right, lvalue),
+			mutation_aliasing.FlowEffect(
+				mutation_aliasing.AliasingEffectImmutableCapture,
+				instructionValue.Left,
+				lvalue,
+			),
+			mutation_aliasing.FlowEffect(
+				mutation_aliasing.AliasingEffectImmutableCapture,
+				instructionValue.Right,
+				lvalue,
+			),
 		}
 
 	case *UnaryExpression:
 		return []AliasingEffect{
 			mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValuePrimitive),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectImmutableCapture, value.Value, lvalue),
+			mutation_aliasing.FlowEffect(
+				mutation_aliasing.AliasingEffectImmutableCapture,
+				instructionValue.Value,
+				lvalue,
+			),
 		}
 
 	case *TemplateLiteral:
 		out := []AliasingEffect{mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValuePrimitive)}
-		for _, part := range value.Subexprs {
+		for _, part := range instructionValue.Subexprs {
 			out = append(
 				out,
 				mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectImmutableCapture, part, lvalue),
@@ -654,20 +666,20 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 	case *PrefixUpdate:
 		return []AliasingEffect{
 			mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValuePrimitive),
-			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, value.Value),
+			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, instructionValue.Value),
 		}
 
 	case *PostfixUpdate:
 		return []AliasingEffect{
 			mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValuePrimitive),
-			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, value.Value),
+			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, instructionValue.Value),
 		}
 
 	// --- Loads and stores of locals ------------------------------------------------------
 
 	case *LoadLocal:
 		return []AliasingEffect{
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectAssign, value.Place, lvalue),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectAssign, instructionValue.Place, lvalue),
 		}
 
 	case *LoadContext:
@@ -675,13 +687,17 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 		// abstract kind; it does not make the temporary another name for the box itself. This is
 		// upstream's CreateFrom and the distinction matters when the box is frozen after the read.
 		return []AliasingEffect{
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCreateFrom, value.Place, lvalue),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCreateFrom, instructionValue.Place, lvalue),
 		}
 
 	case *StoreLocal:
 		return []AliasingEffect{
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectAssign, value.Value, value.LValue),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectAssign, value.Value, lvalue),
+			mutation_aliasing.FlowEffect(
+				mutation_aliasing.AliasingEffectAssign,
+				instructionValue.Value,
+				instructionValue.LValue,
+			),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectAssign, instructionValue.Value, lvalue),
 		}
 
 	case *StoreContext:
@@ -689,9 +705,13 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 		// shape alone here, with no effect facts needed; `ranges.go` reproduces that independently
 		// and this emits the matching Mutate so the two agree.
 		return []AliasingEffect{
-			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, value.LValue),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, value.Value, value.LValue),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectAssign, value.Value, lvalue),
+			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, instructionValue.LValue),
+			mutation_aliasing.FlowEffect(
+				mutation_aliasing.AliasingEffectCapture,
+				instructionValue.Value,
+				instructionValue.LValue,
+			),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectAssign, instructionValue.Value, lvalue),
 		}
 
 	case *DeclareLocal:
@@ -708,7 +728,7 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 
 	case *StoreGlobal:
 		return []AliasingEffect{
-			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, value.Value),
+			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, instructionValue.Value),
 			mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValuePrimitive),
 		}
 
@@ -731,53 +751,65 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 		// conditionally mutates it, its range widens across the call, and the three loads join a
 		// scope upstream leaves scopeless.
 		return []AliasingEffect{
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCreateFrom, value.Object, lvalue),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, value.Object, lvalue),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCreateFrom, instructionValue.Object, lvalue),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, instructionValue.Object, lvalue),
 		}
 
 	case *ComputedLoad:
 		return []AliasingEffect{
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCreateFrom, value.Object, lvalue),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, value.Object, lvalue),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectImmutableCapture, value.Property, lvalue),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCreateFrom, instructionValue.Object, lvalue),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, instructionValue.Object, lvalue),
+			mutation_aliasing.FlowEffect(
+				mutation_aliasing.AliasingEffectImmutableCapture,
+				instructionValue.Property,
+				lvalue,
+			),
 		}
 
 	case *PropertyStore:
 		return []AliasingEffect{
-			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, value.Object),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, value.Value, value.Object),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectAssign, value.Value, lvalue),
+			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, instructionValue.Object),
+			mutation_aliasing.FlowEffect(
+				mutation_aliasing.AliasingEffectCapture,
+				instructionValue.Value,
+				instructionValue.Object,
+			),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectAssign, instructionValue.Value, lvalue),
 		}
 
 	case *ComputedStore:
 		return []AliasingEffect{
-			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, value.Object),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, value.Value, value.Object),
+			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, instructionValue.Object),
+			mutation_aliasing.FlowEffect(
+				mutation_aliasing.AliasingEffectCapture,
+				instructionValue.Value,
+				instructionValue.Object,
+			),
 			mutation_aliasing.FlowEffect(
 				mutation_aliasing.AliasingEffectImmutableCapture,
-				value.Property,
-				value.Object,
+				instructionValue.Property,
+				instructionValue.Object,
 			),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectAssign, value.Value, lvalue),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectAssign, instructionValue.Value, lvalue),
 		}
 
 	case *PropertyDelete:
 		return []AliasingEffect{
 			mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValuePrimitive),
-			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, value.Object),
+			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, instructionValue.Object),
 		}
 
 	case *ComputedDelete:
 		return []AliasingEffect{
 			mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValuePrimitive),
-			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, value.Object),
+			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, instructionValue.Object),
 		}
 
 	// --- Aggregates -----------------------------------------------------------------------
 
 	case *ObjectExpression:
 		out := []AliasingEffect{mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValueMutable)}
-		for _, property := range value.Properties {
+		for _, property := range instructionValue.Properties {
 			if property.ComputedKey != nil {
 				out = append(out, mutation_aliasing.FlowEffect(
 					mutation_aliasing.AliasingEffectImmutableCapture,
@@ -794,7 +826,7 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 
 	case *ArrayExpression:
 		out := []AliasingEffect{mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValueMutable)}
-		for _, element := range value.Elements {
+		for _, element := range instructionValue.Elements {
 			if element.Hole {
 				continue
 			}
@@ -822,7 +854,7 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 		// tracked side effects. Mutable is the conservative seed; the range graph refines proven
 		// read-only closures once capture kinds are available.
 		out := []AliasingEffect{mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValueMutable)}
-		for _, capture := range value.Captures {
+		for _, capture := range instructionValue.Captures {
 			out = append(out, mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, capture, lvalue))
 		}
 		return out
@@ -833,32 +865,59 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 	// --- Calls, which is where the signature table enters ----------------------------------
 
 	case *CallExpression:
-		return effectsForCall(function, producers, instruction, value.Callee, value.Callee, value.Args, lvalue, true)
+		return effectsForCall(
+			function,
+			producers,
+			instruction,
+			instructionValue.Callee,
+			instructionValue.Callee,
+			instructionValue.Args,
+			lvalue,
+			true,
+		)
 
 	case *MethodCall:
 		return effectsForCall(
 			function,
 			producers,
 			instruction,
-			value.Receiver,
-			value.Property,
-			value.Args,
+			instructionValue.Receiver,
+			instructionValue.Property,
+			instructionValue.Args,
 			lvalue,
 			false,
 		)
 
 	case *NewExpression:
-		return effectsForCall(function, producers, instruction, value.Callee, value.Callee, value.Args, lvalue, false)
+		return effectsForCall(
+			function,
+			producers,
+			instruction,
+			instructionValue.Callee,
+			instructionValue.Callee,
+			instructionValue.Args,
+			lvalue,
+			false,
+		)
 
 	case *TaggedTemplateExpression:
 		// Upstream passes a Hole for the strings array then the subexpressions, and never trusts a
 		// primitive return type to mean the tag is pure. Reproduced by routing through the same
 		// unknown-callee default.
-		args := make([]Argument, 0, len(value.Subexprs))
-		for _, sub := range value.Subexprs {
+		args := make([]Argument, 0, len(instructionValue.Subexprs))
+		for _, sub := range instructionValue.Subexprs {
 			args = append(args, Argument{Place: sub})
 		}
-		return effectsForCall(function, producers, instruction, value.Tag, value.Tag, args, lvalue, true)
+		return effectsForCall(
+			function,
+			producers,
+			instruction,
+			instructionValue.Tag,
+			instructionValue.Tag,
+			args,
+			lvalue,
+			true,
+		)
 
 	// --- Async and iteration ---------------------------------------------------------------
 
@@ -870,9 +929,9 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 			mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValueMutable),
 			mutation_aliasing.MutationEffect(
 				mutation_aliasing.AliasingEffectMutateTransitiveConditionally,
-				value.Value,
+				instructionValue.Value,
 			),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, value.Value, lvalue),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, instructionValue.Value, lvalue),
 		}
 
 	case *GetIterator:
@@ -880,22 +939,26 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 			mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValueMutable),
 			mutation_aliasing.MutationEffect(
 				mutation_aliasing.AliasingEffectMutateTransitiveConditionally,
-				value.Value,
+				instructionValue.Value,
 			),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, value.Value, lvalue),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, instructionValue.Value, lvalue),
 		}
 
 	case *IteratorNext:
 		return []AliasingEffect{
 			mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValueMutable),
-			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, value.Iterator),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, value.Collection, lvalue),
+			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, instructionValue.Iterator),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, instructionValue.Collection, lvalue),
 		}
 
 	case *NextPropertyOf:
 		return []AliasingEffect{
 			mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValuePrimitive),
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectImmutableCapture, value.Value, lvalue),
+			mutation_aliasing.FlowEffect(
+				mutation_aliasing.AliasingEffectImmutableCapture,
+				instructionValue.Value,
+				lvalue,
+			),
 		}
 
 	// --- JSX ---------------------------------------------------------------------------------
@@ -906,20 +969,20 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 		// React-flavoured effect in the set, and it generalises: Freeze means "must not be mutated
 		// past this point", which is also what a readonly type and Object.freeze mean.
 		out := []AliasingEffect{mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValueFrozen)}
-		if value.Tag.Place != nil {
+		if instructionValue.Tag.Place != nil {
 			out = append(
 				out,
-				mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectFreeze, *value.Tag.Place),
+				mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectFreeze, *instructionValue.Tag.Place),
 			)
 		}
-		for _, property := range value.Props {
+		for _, property := range instructionValue.Props {
 			out = append(out, mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectFreeze, property.Value))
 			out = append(
 				out,
 				mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, property.Value, lvalue),
 			)
 		}
-		for _, child := range value.Children {
+		for _, child := range instructionValue.Children {
 			out = append(out, mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectFreeze, child))
 			out = append(out, mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, child, lvalue))
 		}
@@ -927,7 +990,7 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 
 	case *JsxFragment:
 		out := []AliasingEffect{mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValueFrozen)}
-		for _, child := range value.Children {
+		for _, child := range instructionValue.Children {
 			out = append(out, mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectFreeze, child))
 			out = append(out, mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, child, lvalue))
 		}
@@ -938,7 +1001,7 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 	case *StartMemoize:
 		out := []AliasingEffect{mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValuePrimitive)}
 		if preserveExistingMemoizationEnabled(function) {
-			for _, dependency := range value.Deps {
+			for _, dependency := range instructionValue.Deps {
 				if !dependency.Root.IsGlobal {
 					out = append(
 						out,
@@ -955,7 +1018,10 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 		// that value) are therefore refined away by the abstract-value state.
 		out := []AliasingEffect{mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValuePrimitive)}
 		if preserveExistingMemoizationEnabled(function) {
-			out = append(out, mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectFreeze, value.Value))
+			out = append(out, mutation_aliasing.MutationEffect(
+				mutation_aliasing.AliasingEffectFreeze,
+				instructionValue.Value,
+			))
 		}
 		return out
 
@@ -963,7 +1029,7 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 
 	case *TypeCastExpression:
 		return []AliasingEffect{
-			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectAssign, value.Value, lvalue),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectAssign, instructionValue.Value, lvalue),
 		}
 
 	case *Destructure:
@@ -975,16 +1041,20 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 		// the source into it. Upstream can prove some object rests non-mutating and create them Frozen;
 		// this reduced effect pass has no such sidemap, so Mutable is the conservative spelling.
 		out := []AliasingEffect{}
-		pattern := value.LValue
+		pattern := instructionValue.LValue
 		if pattern == nil {
-			pattern = value.Pattern
+			pattern = instructionValue.Pattern
 		}
 		eachDestructureBinding(pattern, func(place Place, rest bool) {
 			if rest {
 				out = append(
 					out,
 					mutation_aliasing.CreateEffect(place, mutation_aliasing.EffectValueMutable),
-					mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, value.Value, place),
+					mutation_aliasing.FlowEffect(
+						mutation_aliasing.AliasingEffectCapture,
+						instructionValue.Value,
+						place,
+					),
 				)
 				return
 			}
@@ -993,10 +1063,14 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 			// preserving the non-mutable kind needed by the ranges pass for frozen component props.
 			out = append(
 				out,
-				mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCreateFrom, value.Value, place),
+				mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCreateFrom, instructionValue.Value, place),
 			)
 		})
-		out = append(out, mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectAssign, value.Value, lvalue))
+		out = append(out, mutation_aliasing.FlowEffect(
+			mutation_aliasing.AliasingEffectAssign,
+			instructionValue.Value,
+			lvalue,
+		))
 		return out
 	}
 
@@ -1166,6 +1240,9 @@ func effectsForCall(
 // place in this file where a scalar `Effect` is read rather than produced, and it reads it as an
 // input off the signature table, which is exactly how upstream uses the type. See the package
 // comment for why that direction matters.
+//
+// Mutates: stores a stored operand is appended, so one slice gathers a call's stores across its operands
+// Mutates: captures a captured operand is appended, so one slice gathers a call's captures across its operands
 func visitSignatureOperand(
 	out []AliasingEffect,
 	place Place,
@@ -1174,33 +1251,43 @@ func visitSignatureOperand(
 	stores *[]Place,
 	captures *[]Place,
 ) []AliasingEffect {
+	extended := out
 	switch effect {
 	case EffectStore:
-		out = append(out, mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, place))
+		extended = append(extended, mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, place))
 		*stores = append(*stores, place)
 	case EffectCapture:
 		*captures = append(*captures, place)
 	case EffectConditionallyMutate:
-		out = append(
-			out,
+		extended = append(
+			extended,
 			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutateTransitiveConditionally, place),
 		)
 	case EffectConditionallyMutateIterator:
 		// Upstream suppresses the mutation for a builtin collection type and keeps the capture. No
 		// shape registry here, so the conservative form is emitted. See EffectGapTypeDirectedShapes.
-		out = append(
-			out,
+		extended = append(
+			extended,
 			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutateTransitiveConditionally, place),
 		)
-		out = append(out, mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, place, lvalue))
+		extended = append(
+			extended,
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, place, lvalue),
+		)
 	case EffectFreeze:
-		out = append(out, mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectFreeze, place))
+		extended = append(extended, mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectFreeze, place))
 	case EffectMutate:
-		out = append(out, mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutateTransitive, place))
+		extended = append(
+			extended,
+			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutateTransitive, place),
+		)
 	case EffectRead:
-		out = append(out, mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectImmutableCapture, place, lvalue))
+		extended = append(
+			extended,
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectImmutableCapture, place, lvalue),
+		)
 	}
-	return out
+	return extended
 }
 
 // effectsForUnknownCall is upstream's no-signature default, and it is not "no effect".
@@ -1451,7 +1538,8 @@ func ProjectEffects(
 		case effect.Kind == mutation_aliasing.AliasingEffectFreeze:
 			out[effect.Into.Identifier] = EffectFreeze
 
-		case effect.Kind == mutation_aliasing.AliasingEffectCreate, effect.Kind == mutation_aliasing.AliasingEffectApply:
+		case effect.Kind == mutation_aliasing.AliasingEffectCreate,
+			effect.Kind == mutation_aliasing.AliasingEffectApply:
 			// Upstream treats Create as a no-op here and raises an invariant on a surviving Apply.
 			// This pass never emits an Apply, so the arm exists to keep the switch total rather
 			// than because it is reachable; a later addition that emits one gets Read rather than
@@ -1619,9 +1707,9 @@ func nestedFunctionHeldBy(function *Function, id static_single_assignment.Identi
 			if instruction == nil {
 				continue
 			}
-			switch value := instruction.Value.(type) {
+			switch instructionValue := instruction.Value.(type) {
 			case *FunctionExpression:
-				held[instruction.LValue.Identifier] = value.Function
+				held[instruction.LValue.Identifier] = instructionValue.Function
 			case *LoadGlobal:
 				// An outlined function. `OutlineFunctions` rewrote a capture-free
 				// `FunctionExpression` into this load and recorded where the body went, so the
@@ -1634,18 +1722,18 @@ func nestedFunctionHeldBy(function *Function, id static_single_assignment.Identi
 				// passes were present.
 				if outlinedId, ok := function.Outlined[instruction.LValue.Identifier]; ok {
 					held[instruction.LValue.Identifier] = outlinedId
-				} else if outlinedId, ok := outlinedFunctionByName(function, value.Name); ok {
+				} else if outlinedId, ok := outlinedFunctionByName(function, instructionValue.Name); ok {
 					// The map is keyed by an identifier that a second `Construct` renumbers, which
 					// inlining an immediately invoked function expression forces. The name is the
 					// half that survives; see `outlinedFunctionByName`.
 					held[instruction.LValue.Identifier] = outlinedId
 				}
 			case *StoreLocal:
-				if id, ok := held[value.Value.Identifier]; ok {
-					held[value.LValue.Identifier] = id
+				if id, ok := held[instructionValue.Value.Identifier]; ok {
+					held[instructionValue.LValue.Identifier] = id
 				}
 			case *LoadLocal:
-				if id, ok := held[value.Place.Identifier]; ok {
+				if id, ok := held[instructionValue.Place.Identifier]; ok {
 					held[instruction.LValue.Identifier] = id
 				}
 			}
@@ -1692,11 +1780,15 @@ func mutatesOwnCapture(nested *Function) bool {
 		for _, instructionId := range block.Instructions {
 			for _, effect := range effects.Get(instructionId) {
 				switch effect.Kind {
-				case mutation_aliasing.AliasingEffectAssign, mutation_aliasing.AliasingEffectAlias, mutation_aliasing.AliasingEffectCreateFrom, mutation_aliasing.AliasingEffectCapture, mutation_aliasing.AliasingEffectMaybeAlias:
+				case mutation_aliasing.AliasingEffectAssign, mutation_aliasing.AliasingEffectAlias,
+					mutation_aliasing.AliasingEffectCreateFrom, mutation_aliasing.AliasingEffectCapture,
+					mutation_aliasing.AliasingEffectMaybeAlias:
 					if reaches[effect.From.Identifier] {
 						reaches[effect.Into.Identifier] = true
 					}
-				case mutation_aliasing.AliasingEffectMutate, mutation_aliasing.AliasingEffectMutateConditionally, mutation_aliasing.AliasingEffectMutateTransitive, mutation_aliasing.AliasingEffectMutateTransitiveConditionally:
+				case mutation_aliasing.AliasingEffectMutate, mutation_aliasing.AliasingEffectMutateConditionally,
+					mutation_aliasing.AliasingEffectMutateTransitive,
+					mutation_aliasing.AliasingEffectMutateTransitiveConditionally:
 					mutated = append(mutated, effect.Into.Identifier)
 				}
 			}
@@ -1732,7 +1824,8 @@ func mutatesOwnParameter(nested *Function) bool {
 		for _, instructionId := range block.Instructions {
 			for _, effect := range effects.Get(instructionId) {
 				switch effect.Kind {
-				case mutation_aliasing.AliasingEffectAssign, mutation_aliasing.AliasingEffectAlias, mutation_aliasing.AliasingEffectCreateFrom,
+				case mutation_aliasing.AliasingEffectAssign, mutation_aliasing.AliasingEffectAlias,
+					mutation_aliasing.AliasingEffectCreateFrom,
 
 					// `Capture` is followed here where the range-widening walk follows it only for a
 					// transitive mutation, and the difference is the question being asked. There the
@@ -1752,7 +1845,9 @@ func mutatesOwnParameter(nested *Function) bool {
 					if reaches[effect.From.Identifier] {
 						reaches[effect.Into.Identifier] = true
 					}
-				case mutation_aliasing.AliasingEffectMutate, mutation_aliasing.AliasingEffectMutateTransitive, mutation_aliasing.AliasingEffectMutateConditionally, mutation_aliasing.AliasingEffectMutateTransitiveConditionally:
+				case mutation_aliasing.AliasingEffectMutate, mutation_aliasing.AliasingEffectMutateTransitive,
+					mutation_aliasing.AliasingEffectMutateConditionally,
+					mutation_aliasing.AliasingEffectMutateTransitiveConditionally:
 					mutated = append(mutated, effect.Into.Identifier)
 				}
 			}

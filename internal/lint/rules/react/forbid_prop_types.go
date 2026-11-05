@@ -38,7 +38,7 @@ func DefaultForbidPropTypesOptions() ForbidPropTypesOptions {
 // nothing. The generic helper would decode both to a nil slice and silently turn `forbid: []` into
 // the default list, which is the opposite of what it asks for. Measured on the installed build:
 // `{forbid: []}` over `PropTypes.any` is clean.
-func DecodeForbidPropTypesOptions(raw []byte) (any, error) {
+func DecodeForbidPropTypesOptions(raw []byte) (ForbidPropTypesOptions, error) {
 	options := DefaultForbidPropTypesOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -183,7 +183,7 @@ func forbidPropTypesMessage(target string) rule.Message {
 // Recorded here rather than in a rule file of its own, because this is the file that already
 // explains the missing surface and the next reader chasing that audit line will arrive at the
 // setting before they arrive at the rule.
-var ForbidPropTypes = rule.Rule{
+var ForbidPropTypes = rule.Rule[ForbidPropTypesOptions]{
 	Name: "react/forbid-prop-types",
 	// Declared for one arm only: `C.propTypes = someIdentifier` resolves that identifier to the
 	// object literal it was declared with, which upstream answers from its own variable index.
@@ -191,8 +191,8 @@ var ForbidPropTypes = rule.Rule{
 	// and `resolveToObjectLiteral` guards for it. The fixture below pins that the typed harness is
 	// required, so a later revert fails loudly instead of silently losing one shape.
 	NeedsTypeChecker: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[ForbidPropTypesOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ForbidPropTypesOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			// A rule configured as bare `"error"` arrives with nil options, which type-asserts to
 			// the zero value. That happens to be the right default here, since a nil Forbid means
@@ -636,14 +636,15 @@ func (walker *forbidPropTypesWalker) checkPropertyValue(property *ast.Node, valu
 	if value == nil {
 		return
 	}
+	peeled := value
 
 	// `PropTypes.any.isRequired` peels to `PropTypes.any`.
-	if value.Kind == ast.KindPropertyAccessExpression {
-		access := value.AsPropertyAccessExpression()
+	if peeled.Kind == ast.KindPropertyAccessExpression {
+		access := peeled.AsPropertyAccessExpression()
 		if name := access.Name(); name != nil && name.Kind == ast.KindIdentifier &&
 			name.Text() == "isRequired" {
-			value = access.Expression
-			if value == nil {
+			peeled = access.Expression
+			if peeled == nil {
 				return
 			}
 		}
@@ -651,8 +652,8 @@ func (walker *forbidPropTypesWalker) checkPropertyValue(property *ast.Node, valu
 
 	// `PropTypes.arrayOf(PropTypes.object)` reports on the argument's name, then continues with the
 	// callee so the wrapper's own name is considered too.
-	if value.Kind == ast.KindCallExpression {
-		call := value.AsCallExpression()
+	if peeled.Kind == ast.KindCallExpression {
+		call := peeled.AsCallExpression()
 		if !walker.isPropTypesPackage(call.Expression) {
 			return
 		}
@@ -661,16 +662,16 @@ func (walker *forbidPropTypesWalker) checkPropertyValue(property *ast.Node, valu
 				walker.reportIfForbidden(property, forbidPropTypesTypeName(argument))
 			}
 		}
-		value = call.Expression
-		if value == nil {
+		peeled = call.Expression
+		if peeled == nil {
 			return
 		}
 	}
 
-	if !walker.isPropTypesPackage(value) {
+	if !walker.isPropTypesPackage(peeled) {
 		return
 	}
-	walker.reportIfForbidden(property, forbidPropTypesTypeName(value))
+	walker.reportIfForbidden(property, forbidPropTypesTypeName(peeled))
 }
 
 // forbidPropTypesTypeName reads the type name off a value, which upstream does two ways.

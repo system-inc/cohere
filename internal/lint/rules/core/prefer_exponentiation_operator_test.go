@@ -221,8 +221,9 @@ func TestPreferExponentiationOperatorFires(test *testing.T) {
 			}
 			rule_testing.ExpectFindings(test, result, wantIds...)
 
-			if got := result.Diagnostics[0].Message.Description; got != messagePreferExponentiationOperator.Description {
-				test.Fatalf("the reported description is not the rule's own:\n got %q", got)
+			description := result.Diagnostics[0].Message.Description
+			if description != messagePreferExponentiationOperator.Description {
+				test.Fatalf("the reported description is not the rule's own:\n got %q", description)
 			}
 
 			fixCount := 0

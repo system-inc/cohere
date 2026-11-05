@@ -33,12 +33,12 @@ func asTheHarnessWroteIt(sourceText string) string {
 }
 
 // unifiedSignaturesOptionsAsDecoded hands the rule what the config layer hands it: the options struct
-// by value, or nil when nothing was configured. The table keeps pointers only so a row can say nil.
-func unifiedSignaturesOptionsAsDecoded(options *UnifiedSignaturesOptions) any {
+// by value, or none when nothing was configured. The table keeps pointers only so a row can say nil.
+func unifiedSignaturesOptionsAsDecoded(options *UnifiedSignaturesOptions) rule.Given[UnifiedSignaturesOptions] {
 	if options == nil {
-		return nil
+		return rule.Given[UnifiedSignaturesOptions]{}
 	}
-	return *options
+	return rule.Configured(*options)
 }
 
 func unifiedSignaturesFileFor(isJsx bool) string {
@@ -331,7 +331,7 @@ func TestUnifiedSignaturesValid(test *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(
+		result := rule_testing.RunGiven(
 			test,
 			UnifiedSignatures,
 			unifiedSignaturesFileFor(testCase.isJsx),
@@ -933,7 +933,7 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(
+		result := rule_testing.RunGiven(
 			test,
 			UnifiedSignatures,
 			unifiedSignaturesFileFor(testCase.isJsx),
@@ -968,8 +968,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 	}
 }
 
-// TestUnifiedSignaturesOptionsArriveThroughTheDecoder starts from JSON and the registration's own
-// Decode, which is the only path a configured option takes in a real run.
+// TestUnifiedSignaturesOptionsArriveThroughTheDecoder starts from JSON and the registered entry's own
+// Bind, which decodes through the registration's Decode and is the only path a configured option takes
+// in a real run.
 //
 // Every other test here builds the options struct directly, so they all passed while the rule
 // asserted a pointer and the decoder returned a value: both options read false for every
@@ -978,13 +979,13 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 func TestUnifiedSignaturesOptionsArriveThroughTheDecoder(test *testing.T) {
 	test.Parallel()
 
-	var decode func(raw []byte) (any, error)
-	for _, registration := range rule.Registered() {
-		if registration.Rule.Name == UnifiedSignatures.Name {
-			decode = registration.Decode
+	var entry rule.Entry
+	for _, candidate := range rule.Registered() {
+		if candidate.Name == UnifiedSignatures.Name {
+			entry = candidate
 		}
 	}
-	if decode == nil {
+	if entry.Bind == nil {
 		test.Fatalf("%s is not registered with a Decode", UnifiedSignatures.Name)
 	}
 
@@ -1036,11 +1037,11 @@ func TestUnifiedSignaturesOptionsArriveThroughTheDecoder(test *testing.T) {
 
 			for _, value := range []string{"false", "true"} {
 				raw := `{"` + testCase.option + `": ` + value + `}`
-				decoded, decodeError := decode([]byte(raw))
-				if decodeError != nil {
-					test.Fatalf("decoding %s: %v", raw, decodeError)
+				bound, bindError := entry.Bind([]byte(raw), rule.OptionsBase{})
+				if bindError != nil {
+					test.Fatalf("decoding %s: %v", raw, bindError)
 				}
-				result := rule_testing.RunWithOptions(test, UnifiedSignatures, "file.ts", testCase.sourceText, decoded)
+				result := rule_testing.RunBound(test, bound, "file.ts", testCase.sourceText)
 				if value == "false" {
 					// The baseline: without the option this source reports, so the true row below
 					// can only go quiet because the option reached the rule.
