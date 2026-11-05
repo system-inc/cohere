@@ -2,7 +2,10 @@
 // and an out-parameter its function's doc comment declares with a reason.
 package allowed
 
-import "slices"
+import (
+	"io"
+	"slices"
+)
 
 type Record struct {
 	Name  string
@@ -79,4 +82,16 @@ func results() (values []int, record *Record) {
 	record = &Record{}
 	record.Name = "made here"
 	return values, record
+}
+
+// onesReader implements io.Reader, whose contract is that Read fills the caller's buffer, so its buffer needs no tag.
+type onesReader struct{}
+
+var _ io.Reader = onesReader{}
+
+func (reader onesReader) Read(buffer []byte) (int, error) {
+	for index := range buffer {
+		buffer[index] = 1
+	}
+	return len(buffer), nil
 }

@@ -2,6 +2,8 @@
 // lands in the caller's data, and a Mutates tag that names no parameter or gives no reason.
 package flagged
 
+import "io"
+
 type Record struct {
 	Name  string
 	Count int
@@ -185,4 +187,20 @@ func trailing(values []int) {
 
 func detached(values []int) {
 	values[0] = 1 // want "writes into data the caller passed in"
+}
+
+// A method named Read whose results are not io.Reader's implements nothing, and a function named Read has no receiver
+// to implement it with, so neither has a buffer by contract.
+type countingReader struct {
+	source io.Reader
+}
+
+func (reader *countingReader) Read(buffer []byte) int {
+	buffer[0] = 0 // want "writes into data the caller passed in"
+	return 1
+}
+
+func Read(buffer []byte) (int, error) {
+	buffer[0] = 0 // want "writes into data the caller passed in"
+	return 1, nil
 }
