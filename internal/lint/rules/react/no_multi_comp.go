@@ -307,7 +307,7 @@ func statelessComponentFor(ruleContext rule.Context, node *ast.Node, detectedNam
 		return nil, false
 	}
 
-	// A function RETURNED by another function is not a component unless it returns real JSX.
+	// A function returned by another function is not a component unless it returns real JSX.
 	//
 	//	const any = () => { return (props) => null }
 	//	const any = () => (props) => null
@@ -355,7 +355,7 @@ func statelessComponentFor(ruleContext rule.Context, node *ast.Node, detectedNam
 		// `{ Foo: () => <div/> }`, judged by the property key. Upstream requires real JSX here.
 		//
 		// Upstream's condition is `!node.id && !node.parent.computed`, so this arm claims only an
-		// ANONYMOUS function under a plain key. A named function expression written as
+		// anonymous function under a plain key. A named function expression written as
 		// `{ a: function A() {...} }` deliberately falls past this arm and is judged by its own
 		// name further down, which is why this breaks rather than returning.
 		//
@@ -851,7 +851,7 @@ func isNameFromReact(context *ast.Node, name string) bool {
 			// `imports.BindingsOf` decides which of the three shapes an import clause carries, so
 			// the named list arrives already separated from a default or a namespace binding.
 			for _, element := range imports.BindingsOf(node).Named {
-				// The element's own name is the LOCAL binding, so `import {memo as m}` is matched
+				// The element's own name is the local binding, so `import {memo as m}` is matched
 				// on `m` rather than on `memo`, which is what upstream's scope lookup answers too.
 				if local := element.Name(); local != nil && local.Text() == name {
 					found = true
@@ -914,6 +914,10 @@ func isNameFromReact(context *ast.Node, name string) bool {
 	return found
 }
 
+// reactIdentifier is the pragma name the namespaced spellings are read against, matching the rest
+// of this package.
+const reactIdentifier = "React"
+
 // isReactValueExpression reports whether an expression evaluates to the React module: the bare
 // `React` identifier, or a `require('react')` call.
 func isReactValueExpression(expression *ast.Node) bool {
@@ -945,10 +949,6 @@ func isReactValueExpression(expression *ast.Node) bool {
 func isReactModuleSpecifier(specifier *ast.Node) bool {
 	return specifier != nil && ast.IsStringLiteralLike(specifier) && specifier.Text() == "react"
 }
-
-// reactIdentifier is the pragma name the namespaced spellings are read against, matching the rest
-// of this package.
-const reactIdentifier = "React"
 
 // semanticParentOf returns the nearest ancestor that upstream's parser would have made the parent.
 //
@@ -1181,6 +1181,9 @@ func isReactComponentBaseName(name string) bool {
 	return name == "Component" || name == "PureComponent"
 }
 
+// createReactClassName is the only factory spelling upstream's default configuration accepts.
+const createReactClassName = "createReactClass"
+
 // isCreateReactClassCall reports whether a call is the ES5 component factory.
 //
 // Upstream's `getCreateClass` defaults to the single name `createReactClass`, and its member branch
@@ -1217,9 +1220,6 @@ func isCreateReactClassCall(node *ast.Node) bool {
 	}
 	return false
 }
-
-// createReactClassName is the only factory spelling upstream's default configuration accepts.
-const createReactClassName = "createReactClass"
 
 // createElementCallCounts reports whether a returned call constructs a React element.
 //

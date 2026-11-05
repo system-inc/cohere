@@ -44,14 +44,14 @@ func messageForbiddenTypeDefaultParam(propertyName string, forbiddenType string)
 //
 // Two of those are special cases rather than node kinds and both are narrow. A regular expression
 // is a literal upstream, separated from a string by the presence of a `regex` field. And the Symbol
-// case keys on the CALLEE being the bare identifier `Symbol`, so `Symbol.for(1)` is silent,
+// case keys on the callee being the bare identifier `Symbol`, so `Symbol.for(1)` is silent,
 // measured. Everything else is silent, including a plain call, a template literal, a tagged
 // template, a member access, and every primitive.
 //
 // # Only the first parameter, and only its top level
 //
 // Upstream reads `component.node.params[0]` and requires it to be an object pattern, then loops its
-// own properties without recursing. So a destructured SECOND parameter is silent, and a nested
+// own properties without recursing. So a destructured second parameter is silent, and a nested
 // pattern like `{x: {a = {}}}` is silent too. Both measured. That looks like an oversight and it is
 // reproduced rather than corrected, because widening it changes which files report.
 //
@@ -147,7 +147,7 @@ func reportForbiddenDefaults(ruleContext rule.Context, component *ast.Node) {
 
 // componentParameters returns the parameter list of a component node, or nil.
 //
-// The detector hands back a pragma wrapper CALL for a memo or forwardRef component and a class or
+// The detector hands back a pragma wrapper call for a memo or forwardRef component and a class or
 // an object literal for the older forms, none of which carry parameters. Upstream reads
 // `component.node.params` and gets undefined for those, so `hasUsedObjectDestructuringSyntax`
 // declines them; returning nil here is the same decline.
@@ -168,7 +168,7 @@ func componentParameters(component *ast.Node) *ast.NodeList {
 // destructuredPropertyName returns the name upstream would read from `prop.key.name`.
 //
 // A shorthand element carries no property name node and the bound identifier is the key. An
-// explicit `{key: value = default}` carries both, and the KEY is what upstream names in the
+// explicit `{key: value = default}` carries both, and the key is what upstream names in the
 // message, not the local binding.
 func destructuredPropertyName(binding *ast.BindingElement) (string, bool) {
 	if key := binding.PropertyName; key != nil {
@@ -177,13 +177,13 @@ func destructuredPropertyName(binding *ast.BindingElement) (string, bool) {
 			return key.Text(), true
 
 		case ast.KindComputedPropertyName:
-			// Upstream reads `prop.key.name`, and for a computed key the key node IS the inner
+			// Upstream reads `prop.key.name`, and for a computed key the key node is itself the inner
 			// expression, so `{[k]: a = {}}` renders as `k`. Measured: it reports and names `k`.
 			inner := key.AsComputedPropertyName().Expression
 			if inner != nil && inner.Kind == ast.KindIdentifier {
 				return inner.Text(), true
 			}
-			// A computed key that is not a plain identifier still REPORTS upstream, rendering the
+			// A computed key that is not a plain identifier still reports upstream, rendering the
 			// word "undefined". Measured on 2026-08-27 over `[k()]`, `['lit']`, `[1+1]` and
 			// `[o.p]`: all four report. An earlier draft of this port declined them and was
 			// silently narrower on four real shapes; a surviving mutant on this branch is what
@@ -201,7 +201,7 @@ func destructuredPropertyName(binding *ast.BindingElement) (string, bool) {
 			// to read. Measured on 2026-08-27: `{'str': a = {}}` and `{1: a = {}}` both report,
 			// both saying "undefined has a/an object literal as default prop".
 			//
-			// Which inputs report is reproduced exactly. What the message SAYS is not: rendering
+			// Which inputs report is reproduced exactly. What the message says is not: rendering
 			// the word "undefined" into user-facing text is a defect this port can see and does
 			// not have to carry, and our node holds the real key. So these render `str` and `1`.
 			//

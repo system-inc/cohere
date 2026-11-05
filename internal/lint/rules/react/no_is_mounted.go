@@ -115,6 +115,9 @@ var NoIsMounted = rule.Rule{
 	},
 }
 
+// isMountedName is the one method this rule is about.
+const isMountedName = "isMounted"
+
 // isThisIsMountedCallee reports whether a callee reads `isMounted` directly off `this`.
 //
 // Both member spellings answer, which is oxc's `static_property_name()` and not ESLint's `name`
@@ -163,9 +166,6 @@ func isThisIsMountedCallee(callee *ast.Node) bool {
 	}
 	return false
 }
-
-// isMountedName is the one method this rule is about.
-const isMountedName = "isMounted"
 
 // isThisKeyword reports whether an expression is the `this` keyword.
 //

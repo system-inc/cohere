@@ -76,7 +76,7 @@ var NoSetState = rule.Rule{
 // setStateCalleeOf returns the `this.setState` callee of a call, or nil.
 //
 // Upstream tests three things in one condition: the callee is a member expression, its object is a
-// `this` expression, and its property is NAMED setState. That last one is why a computed
+// `this` expression, and its property is named `setState`. That last one is why a computed
 // `this["setState"]({})` is silent, since upstream reads `callee.property.name` and a computed
 // member has no name there. Measured silent against the installed build on 2026-08-27, which is a
 // shape the corpus does not write.
@@ -101,7 +101,7 @@ func setStateCalleeOf(node *ast.Node) *ast.Node {
 	}
 
 	// Upstream reads `callee.property.name`, which for a private name node is the bare identifier
-	// with no hash, so `this.#setState({})` REPORTS upstream. Measured against the installed build
+	// with no hash, so `this.#setState({})` reports upstream. Measured against the installed build
 	// on 2026-08-27, beside a plain control that also reports.
 	//
 	// Our parser spells the same node as `KindPrivateIdentifier` whose `Text()` carries the hash,

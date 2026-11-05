@@ -41,7 +41,7 @@ var noTyposInstanceLifecycleMethods = []string{
 //
 // One name, and it carries two separate judgments: written without `static` it reports
 // `staticLifecycleMethod`, and written with the wrong casing it reports `typoLifecycleMethod` like
-// any other. A method spelled `getderivedstatefromprops` without `static` reports BOTH.
+// any other. A method spelled `getderivedstatefromprops` without `static` reports both.
 var noTyposStaticLifecycleMethods = []string{"getDerivedStateFromProps"}
 
 // noTyposPropTypeNames is `Object.keys(require('prop-types'))`, verbatim from version 15.8.1.
@@ -97,7 +97,7 @@ var noTyposPropTypeNames = []string{
 // the shelf answers. The fourth, the member-assignment arm, also accepts a non-class whose body
 // returns JSX, which is upstream's `utils.isReturningJSX`. That predicate is narrow and is
 // implemented directly here rather than reached for: measured against the installed build, it asks
-// only whether a `return` in the function's OWN body returns JSX. There is no name gate, `null` does
+// only whether a `return` in the function's own body returns JSX. There is no name gate, `null` does
 // not count, and JSX inside a nested callback does not count. Every row is pinned by fixture.
 //
 // This is the difference from `default-props-match-prop-types`, which I stopped on in the same
@@ -134,7 +134,7 @@ type noTyposState struct {
 // walk visits the file in source order, updating the bindings and checking each node.
 //
 // Source order matters and is not incidental: upstream's `ImportDeclaration` listener sets the
-// binding as ESLint reaches it, so a `propTypes` object written ABOVE the import sees no binding and
+// binding as ESLint reaches it, so a `propTypes` object written above the import sees no binding and
 // its prop-type arms stay silent. Pinned by fixture.
 func (s *noTyposState) walk(node *ast.Node) {
 	if node == nil {
@@ -166,7 +166,7 @@ func (s *noTyposState) walk(node *ast.Node) {
 
 // recordImport updates the package bindings from one import declaration.
 //
-// Upstream reads `node.specifiers[0].local.name` for both packages, which is the FIRST specifier
+// Upstream reads `node.specifiers[0].local.name` for both packages, which is the first specifier
 // whatever its kind, and then separately looks for a named `PropTypes` specifier in a react import.
 // A side-effect import with no specifiers is the reporting case for both packages.
 func (s *noTyposState) recordImport(node *ast.Node) {
@@ -224,7 +224,7 @@ type noTyposImportSpecifier struct {
 // noTyposImportSpecifiers flattens an import declaration into upstream's flat specifier list.
 //
 // Upstream's ESTree gives one array holding the default specifier, the namespace specifier and every
-// named specifier together, and this rule reads `specifiers[0]` and searches the rest, so the ORDER
+// named specifier together, and this rule reads `specifiers[0]` and searches the rest, so the order
 // matters and the flattening is this rule's business rather than the shelf's. Our parser splits the
 // three shapes across separate fields, which `imports.BindingsOf` reads; this reassembles them in
 // upstream's order, default first and then namespace or named.
@@ -290,7 +290,7 @@ func (s *noTyposState) checkClassMethod(node *ast.Node) {
 // checkMemberAssignment answers upstream's `MemberExpression` listener.
 //
 // This is the widest arm and the only one that accepts a non-class. It fires on `Foo.PropTypes = {}`
-// where `Foo` is a class component OR a function whose body returns JSX.
+// where `Foo` is a class component or a function whose body returns JSX.
 func (s *noTyposState) checkMemberAssignment(node *ast.Node) {
 	access := node.AsPropertyAccessExpression()
 	property := access.Name()
@@ -321,7 +321,7 @@ func (s *noTyposState) checkMemberAssignment(node *ast.Node) {
 	// on, so for the right-hand row it is the member itself, and `checkPropObject` declines it for
 	// not being an object literal.
 	//
-	// The nil test on `Right` is EQUIVALENT rather than discriminating, measured rather than argued
+	// The nil test on `Right` is equivalent rather than discriminating, measured rather than argued
 	// after a mutant dropping it survived: our parser's error recovery synthesizes a missing
 	// identifier rather than leaving the slot empty, probed over five shapes including
 	// `Foo.PropTypes =`, `Foo.PropTypes = ;` and `Foo.PropTypes ||=`, all of which came back with a
@@ -351,7 +351,7 @@ func (s *noTyposState) checkMemberAssignment(node *ast.Node) {
 // namesAComponent reports whether an identifier names something this rule treats as a component.
 //
 // Upstream calls `utils.getRelatedComponent`, which resolves the name through its registry, and then
-// accepts it when it is an ES6 component class OR a non-class whose body returns JSX. Resolution is
+// accepts it when it is an ES6 component class or a non-class whose body returns JSX. Resolution is
 // done here by searching the file for a declaration of that name, which is what the registry is
 // doing for this shape: the assignment and the declaration are both in the file by construction,
 // since a name declared elsewhere has no `Foo.propTypes = ...` here to check.
@@ -432,7 +432,7 @@ func noTyposFindDeclaration(from *ast.Node, name string) *ast.Node {
 	return found
 }
 
-// noTyposReturnsJsx reports whether a function's OWN body returns JSX.
+// noTyposReturnsJsx reports whether a function's own body returns JSX.
 //
 // A concise arrow body counts when it is JSX directly. Otherwise every `return` in the body counts,
 // except those inside a nested function, which belong to that function instead. Reproduces
@@ -523,10 +523,10 @@ func (s *noTyposState) checkEs5Specification(node *ast.Node) {
 		return
 	}
 	for _, property := range properties.Nodes {
-		// Upstream filters spreads out here. The skip is SUBSUMED by `noTyposKeyName`, which
+		// Upstream filters spreads out here. The skip is subsumed by `noTyposKeyName`, which
 		// declines any key that is not an identifier, a string or a number, and a spread has no key
 		// node at all: a mutant removing this line survived the whole suite, and so did one removing
-		// it while ALSO teaching the key reader to answer for a spread, because the name it answers
+		// it while also teaching the key reader to answer for a spread, because the name it answers
 		// matches no canonical name either way. Kept because upstream writes it and because it says
 		// what the loop is doing; the equivalence rests on a second function's behavior rather than
 		// on anything visible here.
@@ -542,7 +542,7 @@ func (s *noTyposState) checkEs5Specification(node *ast.Node) {
 //
 // Written inline rather than through the shelf's `react.IsEs5ComponentCall`, which accepts
 // `createClass` in both spellings. Upstream's `isES5Component` compares the callee against the
-// createClass PRAGMA, which is `createReactClass` with no React settings read here to change it, so
+// createClass pragma, which is `createReactClass` with no React settings read here to change it, so
 // `createClass` fails in either spelling. Measured on the installed build, all five:
 //
 //	createReactClass({...})          counts
@@ -594,7 +594,7 @@ func noTyposPropertyValue(property *ast.Node) *ast.Node {
 
 // reportCasingTypo answers upstream's `reportErrorIfPropertyCasingTypo`.
 //
-// Two things happen here and they are independent. A property NAMED exactly `propTypes`,
+// Two things happen here and they are independent. A property named exactly `propTypes`,
 // `contextTypes` or `childContextTypes` has its object value walked for prop-type typos. And any
 // property whose lowercased name matches one of the four static names while differing in case is
 // itself a casing typo.
@@ -632,7 +632,7 @@ func (s *noTyposState) reportCasingTypo(value *ast.Node, key *ast.Node, isClassP
 
 // reportLifecycleCasingTypo answers upstream's `reportErrorIfLifecycleMethodCasingTypo`.
 //
-// Two independent judgments again. A name matching the ONE static lifecycle method case-insensitively
+// Two independent judgments again. A name matching the one static lifecycle method case-insensitively
 // and written without `static` reports `staticLifecycleMethod`. And a name matching any lifecycle
 // method case-insensitively while differing in case reports `typoLifecycleMethod`. A name can trip
 // both, which upstream reports as two findings in that order.
@@ -682,7 +682,7 @@ func (s *noTyposState) checkPropObject(node *ast.Node) {
 
 // checkProp answers upstream's `checkValidProp`, including its recursion through shape and oneOfType.
 //
-// The leading guard is upstream's and it is load-bearing: with NEITHER package name known, every
+// The leading guard is upstream's and it is load-bearing: with neither package name known, every
 // prop-type arm is silent, so a file that imports nothing produces no typo findings however
 // misspelled it is.
 func (s *noTyposState) checkProp(node *ast.Node) {
@@ -712,7 +712,7 @@ func (s *noTyposState) checkProp(node *ast.Node) {
 		}
 
 		if s.isPropTypesPackage(object) {
-			// `PropTypes.myProp`, unless the property IS the qualifier.
+			// `PropTypes.myProp`, unless the property is itself the qualifier.
 			if property.Kind == ast.KindIdentifier && property.Text() == "isRequired" {
 				return
 			}

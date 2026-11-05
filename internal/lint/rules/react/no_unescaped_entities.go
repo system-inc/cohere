@@ -48,7 +48,7 @@ type NoUnescapedEntitiesOptions struct {
 // **Order within this list is not observable and that is measured, not assumed.** A mutant swapping
 // the first two entries survived the whole fixture set. The loops below are source-major, so the
 // entity list is only consulted per byte, and no byte can equal two different single characters, so
-// at most one entry ever matches a given position. A mutant DUPLICATING an entry is caught in 10
+// at most one entry ever matches a given position. A mutant duplicating an entry is caught in 10
 // lines, which is what proves the inner loop is live rather than the order argument being a cover
 // for a dead branch. The order is upstream's anyway, because matching the source costs nothing.
 //
@@ -158,7 +158,7 @@ var messageReplaceWithAlt = rule.Message{
 // text changes the rendered output when the surrounding text was meant literally, and picking which
 // of four quote entities the author wanted is a choice rather than a mechanical equivalence.
 //
-// Upstream's fixer replaces the ENTIRE JsxText node with the node's raw text carrying one character
+// Upstream's fixer replaces the entire JsxText node with the node's raw text carrying one character
 // substituted. Replacing just the character produces byte-identical output and would be the obvious
 // simplification. It is not taken, because it is not the same edit: the fix engine reasons about
 // overlaps between proposed ranges, and two findings in one JsxText that upstream would have made
@@ -172,7 +172,7 @@ var messageReplaceWithAlt = rule.Message{
 // "Cannot read properties of undefined (reading 'map')". Measured, with the stack landing at
 // `no-unescaped-entities.js:121`. That is a defect rather than a judgment, so it is not reproduced.
 // An object entry with no `alternatives` key is dropped here, which makes it silent rather than
-// fatal. `{char: "&", alternatives: []}` is a different configuration and DOES report, with an
+// fatal. `{char: "&", alternatives: []}` is a different configuration and does report, with an
 // empty alternatives list, and that one is reproduced exactly.
 var NoUnescapedEntities = rule.Rule{
 	Name: "react/no-unescaped-entities",
@@ -203,9 +203,9 @@ var NoUnescapedEntities = rule.Rule{
 
 // reportEntities scans one JsxText node and reports every forbidden character it holds.
 //
-// # The loop nesting is deliberately NOT upstream's, and this is the one place that matters
+// # The loop nesting is deliberately not upstream's, and this is the one place that matters
 //
-// Upstream puts the entity list outside and the text positions inside, so it EMITS a line holding
+// Upstream puts the entity list outside and the text positions inside, so it emits a line holding
 // `'` before `>` as `>` first. That order is invisible in ESLint, which sorts diagnostics by
 // position before anyone sees them: measured by reversing the `forbid` array on the same input and
 // watching the reported order not move, twice.
@@ -228,7 +228,7 @@ func reportEntities(ruleContext rule.Context, sourceText string, node *ast.Node,
 		for _, entity := range entities {
 			// A multi-character entry can never match, because upstream compares one character
 			// against the whole string. Skipping is what makes that explicit; without it the byte
-			// comparison below would silently match the first byte and report, which is MORE than
+			// comparison below would silently match the first byte and report, which is more than
 			// upstream does.
 			if len(entity.character) != 1 || raw[index] != entity.character[0] {
 				continue
@@ -332,7 +332,7 @@ type noUnescapedEntitiesWireOptions struct {
 // DecodeNoUnescapedEntitiesOptions maps the wire options onto the struct the rule reads.
 //
 // Hand-written rather than `rule.DecodeOptionsInto` for two reasons that both come from the
-// heterogeneous array. A `forbid` element is a string OR an object, which no single Go type
+// heterogeneous array. A `forbid` element is a string or an object, which no single Go type
 // unmarshals, and `forbid` itself has to be distinguishable as absent, because absent means the
 // four defaults while `[]` means silence.
 //
@@ -340,7 +340,7 @@ type noUnescapedEntitiesWireOptions struct {
 // `c === entities[j].char` against undefined and never matches. Measured clean on
 // `{forbid: [{alternatives: ["x"]}]}`.
 //
-// An object entry with no `alternatives` is ALSO dropped, and that one is a deliberate divergence:
+// An object entry with no `alternatives` is also dropped, and that one is a deliberate divergence:
 // upstream crashes on it. See the rule doc.
 func DecodeNoUnescapedEntitiesOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
