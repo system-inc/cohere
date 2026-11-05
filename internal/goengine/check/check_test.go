@@ -403,8 +403,27 @@ func TestAPanickingRuleIsACrashAndTheOthersStillReport(test *testing.T) {
 			test.Errorf("want the frames to stop at the wrapper, got %q", crash.Error)
 		}
 	}
-	if result.FindingsByRule[rule.Namespace+"test-panicking"] != 0 {
-		test.Errorf("want no findings counted for the rule that crashed, got %v", result.FindingsByRule)
+}
+
+// A rule that crashed is listed as crashed and never counts as quiet, though it has 0 findings like a rule that
+// ran and found nothing: quiet, as the lint record's rulesWatchedAndQuiet reads it, is 0 findings and no crash.
+func TestACrashedRuleIsListedCrashedAndNeverQuiet(test *testing.T) {
+	test.Parallel()
+
+	result := runRules(test, Options{}, houseRule(targetAnalyzer), houseRule(panickingAnalyzer),
+		houseRule(quietAnalyzer))
+	wantCrashed := []string{rule.Namespace + "test-panicking"}
+	if !slices.Equal(result.CrashedRules, wantCrashed) {
+		test.Fatalf("want the crashed rules %q, got %q", wantCrashed, result.CrashedRules)
+	}
+	var quiet []string
+	for name, count := range result.FindingsByRule {
+		if count == 0 && !slices.Contains(result.CrashedRules, name) {
+			quiet = append(quiet, name)
+		}
+	}
+	if wantQuiet := []string{rule.Namespace + "test-quiet"}; !slices.Equal(quiet, wantQuiet) {
+		test.Fatalf("want the quiet rules %q, got %q", wantQuiet, quiet)
 	}
 }
 

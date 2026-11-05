@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"go/build"
+	"go/parser"
+	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"golang.org/x/tools/go/packages"
@@ -87,7 +90,17 @@ func excludedAndUnseen(
 		return nil, nil, matchError
 	}
 	for _, file := range ignored {
-		excluded = append(excluded, Excluded{File: file, Reason: reasonFor(buildContext)})
+		// Each ignored file is read again so its reason is the one ExcludedByConstraints gives it, cgo's for a
+		// file that imports "C". go list already left it out, so when the context would build it (a tool tag the
+		// context reads from the host, say), it was still the constraints.
+		reason, reasonError := exclusionReason(buildContext, file)
+		if reasonError != nil {
+			return nil, nil, reasonError
+		}
+		if reason == "" {
+			reason = reasonFor(buildContext)
+		}
+		excluded = append(excluded, Excluded{File: file, Reason: reason})
 	}
 	slices.SortFunc(excluded, func(left, right Excluded) int { return strings.Compare(left.File, right.File) })
 	return excluded, unseen, nil
@@ -99,20 +112,49 @@ func matchConstraints(buildContext *build.Context, files []string) ([]Excluded, 
 	var excluded []Excluded
 	var built []string
 	for _, file := range files {
-		directory, name := filepath.Split(file)
-		matched, matchError := buildContext.MatchFile(directory, name)
-		if matchError != nil {
-			return nil, nil, fmt.Errorf("reading the build constraints of %s: %w", file, matchError)
+		reason, reasonError := exclusionReason(buildContext, file)
+		if reasonError != nil {
+			return nil, nil, reasonError
 		}
-		if matched {
+		if reason == "" {
 			built = append(built, file)
 		} else {
-			excluded = append(excluded, Excluded{File: file, Reason: reasonFor(buildContext)})
+			excluded = append(excluded, Excluded{File: file, Reason: reason})
 		}
 	}
 	slices.SortFunc(excluded, func(left, right Excluded) int { return strings.Compare(left.File, right.File) })
 	slices.Sort(built)
 	return excluded, built, nil
+}
+
+// exclusionReason is why the context leaves file out, or empty when it builds it. MatchFile reads the file's
+// name and build lines and keeps a file that imports "C" though cgo is off; only go/build's Import drops that
+// one, so it is read here too, its imports alone.
+func exclusionReason(buildContext *build.Context, file string) (string, error) {
+	directory, name := filepath.Split(file)
+	matched, matchError := buildContext.MatchFile(directory, name)
+	if matchError != nil {
+		return "", fmt.Errorf("reading the build constraints of %s: %w", file, matchError)
+	}
+	if !matched {
+		return reasonFor(buildContext), nil
+	}
+	if buildContext.CgoEnabled || filepath.Ext(name) != ".go" {
+		return "", nil
+	}
+	// Ignored: a header that does not parse still yields the imports read before the error, and the load
+	// reports the error itself, so only what was read decides.
+	header, _ := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly)
+	if header == nil {
+		return "", nil
+	}
+	for _, imported := range header.Imports {
+		// An import path can be written as a raw string, so it is compared unquoted.
+		if importPath, unquoteError := strconv.Unquote(imported.Path.Value); unquoteError == nil && importPath == "C" {
+			return `imports "C", and cgo is off for ` + buildContext.GOOS + "/" + buildContext.GOARCH, nil
+		}
+	}
+	return "", nil
 }
 
 // reasonFor is why a file the context's constraints leave out was left out.

@@ -75,8 +75,10 @@ type Crash struct {
 // Result is one run.
 //
 // The lint record's counts come from here. RulesRun is rulesRun, FilesWalked is filesWalked, NodesVisited is
-// nodesVisited, and len(Findings) is findings before suppression. FindingsByRule is what rulesWatchedAndQuiet
-// counts: a rule with 0 here ran on every package it was given and reported nothing. rulesSilent, the rules
+// nodesVisited, and len(Findings) is findings before suppression. rulesWatchedAndQuiet counts the rules with 0 in
+// FindingsByRule that are not in CrashedRules: only such a rule ran on every package it was given and reported
+// nothing. A crashed rule also has 0, from the packages it never finished, and counting it quiet would read a
+// rule that saw nothing as a rule that found nothing. rulesSilent, the rules
 // that listened to no file at all, is the engine's to name, since only it knows which rules the config kept from
 // every file before they reached this run; a run over no files leaves every rule it was given silent.
 type Result struct {
@@ -99,6 +101,10 @@ type Result struct {
 
 	// FindingsByRule is each rule's number of findings kept, 0 included, by rule name.
 	FindingsByRule map[string]int
+
+	// CrashedRules names, once each and sorted, every rule with a crash on at least one package. Whatever its count
+	// in FindingsByRule, such a rule is never quiet.
+	CrashedRules []string
 
 	// WithheldAsGenerated is, by rule name, how many findings of a house rule were dropped because their file is
 	// generated, only for rules that had any. A house rule is about how we write code, which a generator's output
@@ -168,6 +174,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 				seenCrashes[crash] = true
 				result.Crashes = append(result.Crashes, crash)
 			}
+			if !slices.Contains(result.CrashedRules, actionRule.Name) {
+				result.CrashedRules = append(result.CrashedRules, actionRule.Name)
+			}
 			continue
 		}
 		for _, diagnostic := range action.Diagnostics {
@@ -198,6 +207,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	slices.SortFunc(result.Crashes, func(left, right Crash) int {
 		return cmp.Or(cmp.Compare(left.File, right.File), cmp.Compare(left.Error, right.Error))
 	})
+	slices.Sort(result.CrashedRules)
 	result.FilesWalked, result.NodesVisited = walk(analyzed)
 	result.Elapsed = time.Since(started)
 	return result, nil
