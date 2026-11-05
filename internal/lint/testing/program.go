@@ -115,7 +115,7 @@ func RunTypedFiles(test *testing.T, subject rule.Rule, files map[string]string, 
 // contents cannot express: something on disk that is not a file with text in it.
 //
 // The case that motivated it is a symlink. A rule reading a Tailwind design system finds the
-// installed package by walking UP from the stylesheet looking for `node_modules/tailwindcss`, and a
+// installed package by walking up from the stylesheet looking for `node_modules/tailwindcss`, and a
 // fixture in `test.TempDir()` has nothing above it, so the rule declines before it reads a line of the
 // fixture's CSS. Writing an absolute import into the stylesheet does not help, because the rule never
 // resolves the import itself. Linking a real package into the fixture does, and it makes the rule
@@ -136,7 +136,7 @@ func RunTypedFilesWithSetup(
 //
 // Both axes at once, because a rule can need both and the two existing entry points each drop one.
 // `no-unknown-classes` is the case: it needs the symlinked package RunTypedFilesWithSetup exists for
-// AND its `ignore` option, and without this its ignore-list fixtures would have to run through a
+// and its `ignore` option, and without this its ignore-list fixtures would have to run through a
 // harness that leaves the Program nil, where the rule declines and every assertion passes vacuously.
 func RunTypedFilesWithSetupAndOptions(
 	test *testing.T,

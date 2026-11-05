@@ -922,7 +922,7 @@ func (finder *duplicateSuperFinder) walkStatement(node *ast.Node, insideLoop boo
 		statement := node.AsIfStatement()
 		finder.walkStatement(statement.Expression, insideLoop)
 		// Each arm reads the entry state and neither sees the other's result, which is what keeps
-		// `if (a) super(); else super();` clean. The merge is an OR because either arm having
+		// `if (a) super(); else super();` clean. The merge is a logical or because either arm having
 		// called means a call may have happened.
 		entry := finder.mayHaveCalled
 

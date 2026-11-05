@@ -142,11 +142,11 @@ var messageIdLengthTooLongPrivate = rule.Message{
 //	invalid: obj.a = 1;                        (a WRITE creates a property with that name)
 //	invalid: class C { #a = 1; }               (reported as #a)
 //
-// # The rule is a dispatch table on the parent, and what it does NOT check is the interesting half
+// # The rule is a dispatch table on the parent, and what it does not check is the interesting half
 //
 // Upstream's `SUPPORTED_EXPRESSIONS` maps a parent's ESTree type to either `true` or a predicate.
 // A name whose parent is absent from that table is never reported at all, which is how the rule
-// avoids flagging every reference to a short name -- only the DECLARATION of `a` is reported, and
+// avoids flagging every reference to a short name -- only the declaration of `a` is reported, and
 // the twenty uses of it are not. That inversion is the rule's whole shape: the table is a list of
 // naming sites rather than a list of exclusions.
 //
@@ -154,7 +154,7 @@ var messageIdLengthTooLongPrivate = rule.Message{
 // we do not own, while `foo.a = 1` names a property we are creating. Same split as `id-denylist`,
 // and upstream's predicate also reaches the destructuring-into-a-member form `({p: o.q} = {})`.
 //
-// # Grapheme counting, and why a rune count is wrong in BOTH directions
+// # Grapheme counting, and why a rune count is wrong in both directions
 //
 // Upstream measures with `getGraphemeCount`, which uses `Intl.Segmenter`. Go has no grapheme
 // segmenter in its standard library and this module has no dependency that provides one, so the
@@ -249,7 +249,7 @@ func checkIdLengthName(ruleContext rule.Context, node *ast.Node, settings IdLeng
 	}
 	if node.Kind == ast.KindPrivateIdentifier {
 		if tooLong {
-			// Upstream's `tooLongPrivate` message spells the hash OUTSIDE the quotes --
+			// Upstream's `tooLongPrivate` message spells the hash outside the quotes --
 			// `Identifier name #'{{name}}' is too long` -- while every other message puts it
 			// inside. That is upstream's own inconsistency and it is reproduced rather than
 			// tidied, because the message text is a verdict a fixture asserts.
@@ -264,7 +264,7 @@ func checkIdLengthName(ruleContext rule.Context, node *ast.Node, settings IdLeng
 	ruleContext.ReportNode(node, rule.Message{Id: message.Id, Description: rendered})
 }
 
-// idLengthIsNamingSite is upstream's `SUPPORTED_EXPRESSIONS` lookup: does this identifier NAME
+// idLengthIsNamingSite is upstream's `SUPPORTED_EXPRESSIONS` lookup: does this identifier name
 // something, as opposed to referring to something already named.
 //
 // A parent kind absent from this switch means the name is never reported, which is what keeps the
@@ -284,7 +284,7 @@ func idLengthIsNamingSite(node *ast.Node, parent *ast.Node, settings IdLengthSet
 
 	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
 		ast.KindClassDeclaration, ast.KindClassExpression:
-		// The function's or class's own NAME, not its parameters.
+		// The function's or class's own name, not its parameters.
 		return idLengthNodeNameOf(parent) == node
 
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor,
@@ -293,7 +293,7 @@ func idLengthIsNamingSite(node *ast.Node, parent *ast.Node, settings IdLengthSet
 		return idLengthNodeNameOf(parent) == node
 
 	// Upstream's RestElement and ArrayPattern, and its parameter naming generally. A parameter's
-	// name and a binding-pattern element are both naming sites; a binding element's PROPERTY name
+	// name and a binding-pattern element are both naming sites; a binding element's property name
 	// is the source object's key and is handled below.
 	case ast.KindParameter:
 		declaration := parent.AsParameterDeclaration()
@@ -317,14 +317,14 @@ func idLengthIsNamingSite(node *ast.Node, parent *ast.Node, settings IdLengthSet
 		}
 		return idLengthMemberIsWritten(parent)
 
-	// Upstream's three import entries. Only the LOCAL name is ours, and a named import is ours only
-	// when it RENAMES: `import { x } from 'y'` binds the exporting module's own name, which we did
+	// Upstream's three import entries. Only the local name is ours, and a named import is ours only
+	// when it renames: `import { x } from 'y'` binds the exporting module's own name, which we did
 	// not choose, so upstream exempts it.
 	//
 	// Upstream spells that as `getModuleExportName(parent.imported) !== getModuleExportName(...)`,
 	// and the test is easy to get backwards because ESTree fills `imported` even when no `as` is
 	// written -- with the same name -- so the inequality is false and the specifier is exempt. Our
-	// parser leaves PropertyName NIL in that case, so a nil PropertyName means "no rename" and must
+	// parser leaves PropertyName `nil` in that case, so a nil PropertyName means "no rename" and must
 	// return false rather than true. An earlier draft returned true and reported every short named
 	// import, which two corpus cases caught.
 	//
@@ -360,7 +360,7 @@ func idLengthNodeNameOf(node *ast.Node) *ast.Node {
 	return node.Name()
 }
 
-// idLengthBindingElementIsNamingSite handles a DECLARATION destructuring.
+// idLengthBindingElementIsNamingSite handles a declaration destructuring.
 //
 // One `KindBindingElement` carries what ESTree splits over a Property's key and value:
 //
@@ -368,9 +368,9 @@ func idLengthNodeNameOf(node *ast.Node) *ast.Node {
 //	var { p: q }     PropertyName = p,  Name() = q     key and value
 //	var [ a ]        PropertyName nil,  Name() = a     an array pattern element
 //
-// Upstream's Property predicate for an ObjectPattern reports the VALUE when the two differ, and
+// Upstream's Property predicate for an ObjectPattern reports the value when the two differ, and
 // reports the shared name only when `properties` is on. The binding form draws the same line: the
-// new binding is always ours, and the key is only ours when it IS the binding.
+// new binding is always ours, and the key is only ours when it is the binding.
 func idLengthBindingElementIsNamingSite(node *ast.Node, parent *ast.Node,
 	settings IdLengthSettings) bool {
 
@@ -378,7 +378,7 @@ func idLengthBindingElementIsNamingSite(node *ast.Node, parent *ast.Node,
 	if element == nil {
 		return false
 	}
-	// Only the BINDING is ours. In `var { a: b } = x` the key `a` is the source object's own
+	// Only the binding is ours. In `var { a: b } = x` the key `a` is the source object's own
 	// property name, so it is never reported even when it is too short -- measured against the
 	// installed rule, `var { a: longEnough } = x` at min 2 is clean while `var { a: b } = x`
 	// reports on `b` alone.
@@ -408,7 +408,7 @@ func idLengthBindingElementIsNamingSite(node *ast.Node, parent *ast.Node,
 	return settings.CheckProperties
 }
 
-// idLengthPropertyIsNamingSite handles an object literal key and an ASSIGNMENT destructuring, which
+// idLengthPropertyIsNamingSite handles an object literal key and an assignment destructuring, which
 // our parser spells with the same nodes.
 func idLengthPropertyIsNamingSite(node *ast.Node, parent *ast.Node, settings IdLengthSettings) bool {
 	objectLiteral := parent.Parent

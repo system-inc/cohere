@@ -30,7 +30,7 @@ func noInnerDeclarationsMessage(declarationType string, bodyDescription string) 
 
 // NoInnerDeclarationsOptions carries upstream's two positional options.
 //
-// The first says WHAT to check and the second says whether block scoped functions are allowed. Both
+// The first says what to check and the second says whether block scoped functions are allowed. Both
 // are pointers so an absent key stays distinguishable from an explicitly configured one, which
 // matters because one of the two defaults is not the zero value of its type.
 type NoInnerDeclarationsOptions struct {
@@ -40,7 +40,7 @@ type NoInnerDeclarationsOptions struct {
 
 	// BlockScopedFunctions allows a function declaration inside a block when the surrounding code
 	// is strict and the language edition gives such a declaration block scope. Upstream's default
-	// is "allow", so this defaults to TRUE and a zero-value struct would invert it.
+	// is "allow", so this defaults to `true` and a zero-value struct would invert it.
 	BlockScopedFunctions *bool
 }
 
@@ -60,7 +60,7 @@ type noInnerDeclarationsSecondOption struct {
 // DecodeNoInnerDeclarationsOptions turns upstream's option list into options.
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto` for the reason the brief names: one default is
-// TRUE, so a zero-value struct silently inverts the rule and every fixture built from a struct
+// `true`, so a zero-value struct silently inverts the rule and every fixture built from a struct
 // rather than routed through here would pass anyway.
 //
 // The wire shape is upstream's own positional list minus the severity: the rule registers with
@@ -146,7 +146,7 @@ func noInnerDeclarationsApplyFirst(
 // with no statement attached to it.
 //
 // The parent test is deliberately two-step. A block is a legal home only when the block itself is a
-// FUNCTION BODY, so `function f() { function g() {} }` is clean while `{ function g() {} }` is not,
+// function body, so `function f() { function g() {} }` is clean while `{ function g() {} }` is not,
 // and both spell the parent `Block`. A single-step check on the parent kind would accept every bare
 // block in the tree.
 //
@@ -185,7 +185,7 @@ var NoInnerDeclarations = rule.Rule{
 			settings = DefaultNoInnerDeclarationsSettings()
 		}
 		checkVariables := settings.Both != nil && *settings.Both
-		// Defaults to TRUE, which is why a nil here has to mean allow rather than disallow.
+		// Defaults to `true`, which is why a nil here has to mean allow rather than disallow.
 		allowBlockScopedFunctions := settings.BlockScopedFunctions == nil ||
 			*settings.BlockScopedFunctions
 
@@ -229,7 +229,7 @@ var NoInnerDeclarations = rule.Rule{
 
 // noInnerDeclarationsIsAtARoot answers upstream's two acceptance sets.
 //
-// The block arm is the load-bearing one: a block is a legal home only when it IS a function body,
+// The block arm is the load-bearing one: a block is a legal home only when it is a function body,
 // which is why the grandparent is consulted rather than only the parent.
 func noInnerDeclarationsIsAtARoot(node *ast.Node) bool {
 	parent := node.Parent
@@ -254,7 +254,7 @@ func noInnerDeclarationsIsAtARoot(node *ast.Node) bool {
 			// A parser difference rather than a rule one. Upstream's static block holds its
 			// statements directly, so a declaration at its root has the static block as its parent
 			// and is accepted by the parent set below. Ours wraps them in a Block, so the same
-			// declaration arrives here with the static block as its GRANDPARENT and the parent set
+			// declaration arrives here with the static block as its grandparent and the parent set
 			// never sees it.
 			//
 			// Without this arm `class C { static { var x; } }` reports, which is one of upstream's
