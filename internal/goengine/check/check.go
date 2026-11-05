@@ -80,9 +80,10 @@ type Crash struct {
 // that listened to no file at all, is the engine's to name, since only it knows which rules the config kept from
 // every file before they reached this run; a run over no files leaves every rule it was given silent.
 type Result struct {
-	// Findings are every diagnostic of every rule that finished, each once by rule, position and message, sorted
-	// by file, line, column and rule. A rule that crashed on a package contributes no findings for it, since what
-	// it reported before it stopped is not what it would have reported.
+	// Findings are every diagnostic of every rule that finished, but a house rule's in a generated file (see
+	// WithheldAsGenerated), each once by rule, position and message, sorted by file, line, column and rule. A rule
+	// that crashed on a package contributes no findings for it, since what it reported before it stopped is not
+	// what it would have reported.
 	Findings []Finding
 
 	// Crashes are each rule that did not finish on a package, once each, sorted by file.
@@ -96,8 +97,15 @@ type Result struct {
 	// NodesVisited is the nodes of one ast.Inspect over those files.
 	NodesVisited int
 
-	// FindingsByRule is each rule's number of findings, 0 included, by rule name.
+	// FindingsByRule is each rule's number of findings kept, 0 included, by rule name.
 	FindingsByRule map[string]int
+
+	// WithheldAsGenerated is, by rule name, how many findings of a house rule were dropped because their file is
+	// generated, only for rules that had any. A house rule is about how we write code, which a generator's output
+	// does not answer to, while a vet or tools finding there is still a bug in what we ship, so those stay. The
+	// engine writes these counts into the lint record, so a run over generated files never reads as clean when it
+	// withheld what it found there.
+	WithheldAsGenerated map[string]int
 
 	Elapsed time.Duration
 }
@@ -137,10 +145,15 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return nil, fmt.Errorf("analyzing %d packages: %w", len(analyzed), analyzeError)
 	}
 
-	result := &Result{RulesRun: len(rules), FindingsByRule: make(map[string]int, len(rules))}
+	result := &Result{
+		RulesRun:            len(rules),
+		FindingsByRule:      make(map[string]int, len(rules)),
+		WithheldAsGenerated: map[string]int{},
+	}
 	for _, enabled := range rules {
 		result.FindingsByRule[enabled.Name] = 0
 	}
+	generated := generatedFiles(analyzed)
 	seenFindings := map[findingKey]bool{}
 	seenCrashes := map[Crash]bool{}
 	for _, action := range graph.Roots {
@@ -164,6 +177,10 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 				continue
 			}
 			seenFindings[key] = true
+			if actionRule.Origin == rule.OriginHouse && generated[found.File] {
+				result.WithheldAsGenerated[found.Rule]++
+				continue
+			}
 			result.Findings = append(result.Findings, found)
 			result.FindingsByRule[found.Rule]++
 		}
@@ -270,6 +287,21 @@ func firstFile(analyzedPackage *packages.Package) string {
 		return analyzedPackage.CompiledGoFiles[0]
 	}
 	return analyzedPackage.ID
+}
+
+// generatedFiles is every file of the analyzed packages that go/ast.IsGenerated reads as generated, a comment line
+// `// Code generated ... DO NOT EDIT.` before the package clause, judged on the syntax the rules were given rather
+// than on a second read of the disk, which could disagree with it.
+func generatedFiles(analyzed []*packages.Package) map[string]bool {
+	generated := map[string]bool{}
+	for _, analyzedPackage := range analyzed {
+		for _, file := range analyzedPackage.Syntax {
+			if ast.IsGenerated(file) {
+				generated[analyzedPackage.Fset.PositionFor(file.FileStart, false).Filename] = true
+			}
+		}
+	}
+	return generated
 }
 
 // walk counts the distinct files the rules were given, the syntax trees go/packages parsed from each package's
