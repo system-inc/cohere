@@ -17,7 +17,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
-	"github.com/system-inc/cohere/internal/lint/optionschema"
+	"github.com/system-inc/cohere/internal/json_value"
 )
 
 // valuesParseScript is the oracle: postcss-values-parser 2.0.1 from the fork's node_modules, loaded
@@ -418,7 +418,7 @@ func TestParseAgreesWithPostcssValuesParser(test *testing.T) {
 			case dumpValuesError != nil:
 				fail("%s %s: the library parses it and Go refused: %v", label, mode.name, dumpValuesError)
 			default:
-				want, wantError := optionschema.ParseJsonValue(mode.want.Tree)
+				want, wantError := json_value.Parse(mode.want.Tree)
 				if wantError != nil {
 					fail("%s %s: the library's tree does not read as JSON: %v", label, mode.name, wantError)
 					continue
@@ -487,7 +487,7 @@ func asError(dumpValuesError error) (*Error, bool) {
 
 // dumpValues parses one value and renders it the way the oracle script does, as the JSON value the
 // script prints, with sourceIndex converted back to UTF-16.
-func dumpValues(text string, options Options) (optionschema.JsonValue, error) {
+func dumpValues(text string, options Options) (json_value.Value, error) {
 	tree, parseError := Parse(text, options)
 	if parseError != nil {
 		return nil, parseError
@@ -499,25 +499,25 @@ func dumpValues(text string, options Options) (optionschema.JsonValue, error) {
 // Every string the parser builds is decoded from UTF-16, so it is valid UTF-8 and reads in JSON as
 // it is. A float64 JSON cannot carry, which json.Marshal would refuse, becomes a description no
 // oracle prints, so the comparison still fails on it.
-func dumpValuesValue(value any, toUTF16 func(int) int) optionschema.JsonValue {
+func dumpValuesValue(value any, toUTF16 func(int) int) json_value.Value {
 	switch typed := value.(type) {
 	case nil:
-		return optionschema.JsonString("<undefined>")
+		return json_value.String("<undefined>")
 	case *estree.Node:
 		if typed.Range != [2]int{0, 0} {
-			return optionschema.JsonString(
+			return json_value.String(
 				fmt.Sprintf("a node with range %v, which the port leaves at [0, 0]", typed.Range),
 			)
 		}
-		result := optionschema.JsonObject{"type": optionschema.JsonString(typed.Type())}
+		result := json_value.Object{"type": json_value.String(typed.Type())}
 		for _, key := range typed.Keys() {
 			if key == "sourceIndex" {
 				index, isInt := typed.Get(key).(int)
 				if !isInt {
-					result[key] = optionschema.JsonString(fmt.Sprintf("a sourceIndex of type %T", typed.Get(key)))
+					result[key] = json_value.String(fmt.Sprintf("a sourceIndex of type %T", typed.Get(key)))
 					continue
 				}
-				result[key] = optionschema.JsonNumber(strconv.Itoa(toUTF16(index)))
+				result[key] = json_value.Number(strconv.Itoa(toUTF16(index)))
 				continue
 			}
 			result[key] = dumpValuesValue(typed.Get(key), toUTF16)
@@ -525,35 +525,35 @@ func dumpValuesValue(value any, toUTF16 func(int) int) optionschema.JsonValue {
 		return result
 	case []*estree.Node:
 		if typed == nil {
-			return optionschema.JsonString("a nil list, which no field of the library holds")
+			return json_value.String("a nil list, which no field of the library holds")
 		}
-		result := make(optionschema.JsonArray, len(typed))
+		result := make(json_value.Array, len(typed))
 		for index, child := range typed {
 			result[index] = dumpValuesValue(child, toUTF16)
 		}
 		return result
 	case map[string]any:
-		result := optionschema.JsonObject{}
+		result := json_value.Object{}
 		for key, each := range typed {
 			result[key] = dumpValuesValue(each, toUTF16)
 		}
 		return result
 	case float64:
 		if math.IsNaN(typed) {
-			return optionschema.JsonString("NaN")
+			return json_value.String("NaN")
 		}
 		if math.IsInf(typed, 0) {
-			return optionschema.JsonString(fmt.Sprintf("a float64 of %v, which JSON cannot carry", typed))
+			return json_value.String(fmt.Sprintf("a float64 of %v, which JSON cannot carry", typed))
 		}
-		return optionschema.JsonNumber(strconv.FormatFloat(typed, 'g', -1, 64))
+		return json_value.Number(strconv.FormatFloat(typed, 'g', -1, 64))
 	case string:
-		return optionschema.JsonString(typed)
+		return json_value.String(typed)
 	case bool:
-		return optionschema.JsonBoolean(typed)
+		return json_value.Boolean(typed)
 	case int:
-		return optionschema.JsonNumber(strconv.Itoa(typed))
+		return json_value.Number(strconv.Itoa(typed))
 	default:
-		return optionschema.JsonString(fmt.Sprintf("an unexpected %T", typed))
+		return json_value.String(fmt.Sprintf("an unexpected %T", typed))
 	}
 }
 
@@ -579,10 +579,10 @@ func utf16IndexOf(text string) func(int) int {
 }
 
 // firstValuesDifference names the first path where two JSON values differ, or "".
-func firstValuesDifference(want optionschema.JsonValue, got optionschema.JsonValue, path string) string {
+func firstValuesDifference(want json_value.Value, got json_value.Value, path string) string {
 	switch typed := want.(type) {
-	case optionschema.JsonObject:
-		other, isMap := got.(optionschema.JsonObject)
+	case json_value.Object:
+		other, isMap := got.(json_value.Object)
 		if !isMap {
 			return fmt.Sprintf("%s: want an object, got %v", path, got)
 		}
@@ -616,8 +616,8 @@ func firstValuesDifference(want optionschema.JsonValue, got optionschema.JsonVal
 			}
 		}
 		return ""
-	case optionschema.JsonArray:
-		other, isList := got.(optionschema.JsonArray)
+	case json_value.Array:
+		other, isList := got.(json_value.Array)
 		if !isList || len(other) != len(typed) {
 			return fmt.Sprintf("%s: want %d elements, got %v", path, len(typed), got)
 		}
@@ -641,19 +641,19 @@ func firstValuesDifference(want optionschema.JsonValue, got optionschema.JsonVal
 // jsonLeafText is a JSON value as Go's untyped decode would hold it, its type and its value, so two
 // leaves are equal exactly when they decode to the same thing: a number is read as a float64, so 1
 // and 1.0 are one number, as they are in JavaScript.
-func jsonLeafText(value optionschema.JsonValue) string {
+func jsonLeafText(value json_value.Value) string {
 	switch typed := value.(type) {
-	case optionschema.JsonNumber:
+	case json_value.Number:
 		number, parseError := json.Number(typed).Float64()
 		if parseError != nil {
 			return fmt.Sprintf("a number that does not read as a float64, %q", string(typed))
 		}
 		return fmt.Sprintf("float64 %v", number)
-	case optionschema.JsonString:
+	case json_value.String:
 		return fmt.Sprintf("string %q", string(typed))
-	case optionschema.JsonBoolean:
+	case json_value.Boolean:
 		return fmt.Sprintf("bool %v", bool(typed))
-	case optionschema.JsonNull:
+	case json_value.Null:
 		return "null"
 	}
 	return fmt.Sprintf("%T %v", value, value)
