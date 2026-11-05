@@ -148,6 +148,8 @@ func Register(registrations ...Registration) {
 	for _, registration := range registrations {
 		name := registration.Rule.Name
 		if name == "" {
+			// Invariant: every rule names itself, and Register runs from package init, so a nameless rule
+			// stops the program the moment it starts, as the comment above explains.
 			panic("rule.Register: a rule was registered with an empty name, so the config could never address it")
 		}
 		decoders := 0
@@ -157,6 +159,8 @@ func Register(registrations ...Registration) {
 			}
 		}
 		if decoders > 1 {
+			// Invariant: a registration sets at most one decoder, and Register runs from package init, so a
+			// contradiction stops the program the moment it starts.
 			panic(fmt.Sprintf(
 				"rule.Register: %q sets more than one of Decode, DecodeOptionList and DecodeAt; the "+
 					"config layer reads which one is set as the rule's option arity, so two is a contradiction",
@@ -164,6 +168,8 @@ func Register(registrations ...Registration) {
 			))
 		}
 		if existing, taken := registered[name]; taken {
+			// Invariant: rule names are unique, and Register runs from package init, so a duplicate stops the
+			// program the moment it starts, as the comment above explains.
 			panic(fmt.Sprintf(
 				"rule.Register: two rules answer to %q (%T and %T); the config addresses rules by "+
 					"name, so one of them would be permanently unreachable while its tests passed",

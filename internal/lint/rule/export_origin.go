@@ -69,6 +69,9 @@ func (r *exportOriginResolver) requireShape(node *ast.Node) {
 			if sourceFile != nil {
 				fileName = sourceFile.FileName().AsString()
 			}
+			// Invariant: the shape fingerprint covers the home file and every declaration outside a function
+			// body, so a read inside another file's body would serve a stale cached finding; the walk turns this
+			// panic into a crashed file that is never cached.
 			panic(fmt.Sprintf("rule.ExportNameIn read a %s at %s:%d, inside a function body in another file, which the shape fingerprint does not cover",
 				node.Kind, fileName, node.Pos()))
 		}

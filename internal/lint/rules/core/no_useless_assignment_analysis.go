@@ -96,6 +96,8 @@ func analyzeDeadStoresByLiveness(ruleContext rule.Context, sourceFile *ast.Node)
 func deadStoreCheckSkipped(ruleContext rule.Context, root *ast.Node, symbols map[*ast.Symbol]*symbolFacts) {
 	for _, block := range deadStoreGraph(ruleContext, root, symbols).Blocks {
 		if len(block.Events) > 0 {
+			// Invariant: the gate skips a root only when it holds no occurrence of a tracked binding, the only
+			// thing that emits an event, and the tests turn CheckCodePathGates on to hold the two to agreeing.
 			panic("no-useless-assignment skipped a root whose graph holds an event")
 		}
 	}

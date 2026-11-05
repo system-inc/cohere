@@ -170,6 +170,8 @@ func noUselessReturnCheckSkipped(root *ast.Node) {
 	control_flow_graph.Build(root, control_flow_graph.Hooks[struct{}]{
 		Statement: func(builder *control_flow_graph.Builder[struct{}], node *ast.Node) {
 			if node.Kind == ast.KindReturnStatement && node.AsReturnStatement().Expression == nil {
+				// Invariant: the root index records every bare return in a root's own code, the code this graph
+				// lays out, and the tests turn CheckCodePathGates on to hold the two to agreeing.
 				panic("no-useless-return skipped a root whose graph holds a bare return")
 			}
 		},

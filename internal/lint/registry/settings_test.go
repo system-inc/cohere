@@ -92,7 +92,11 @@ func TestSettingsReachARuleThroughTheRunsOptions(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	if encoded, _ := json.Marshal(bare); !strings.Contains(string(encoded), `"order":"desc"`) ||
+	encoded, encodeError := json.Marshal(bare)
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	if !strings.Contains(string(encoded), `"order":"desc"`) ||
 		!strings.Contains(string(encoded), `"callees":["mergeClassNames"]`) {
 		test.Fatalf("a bare severity decoded %s, want settings' order and callees", encoded)
 	}
@@ -102,7 +106,11 @@ func TestSettingsReachARuleThroughTheRunsOptions(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	if encoded, _ := json.Marshal(overridden); !strings.Contains(string(encoded), `"order":"asc"`) ||
+	encoded, encodeError = json.Marshal(overridden)
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	if !strings.Contains(string(encoded), `"order":"asc"`) ||
 		!strings.Contains(string(encoded), `"callees":["mergeClassNames"]`) {
 		test.Fatalf("an options element decoded %s, want its own order over settings' and settings' callees kept", encoded)
 	}

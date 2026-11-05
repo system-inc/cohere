@@ -172,6 +172,8 @@ func TestAbbreviationVocabularyRefusesAMalformedFile(test *testing.T) {
 		{"an uppercase abbreviation", `{"abbreviations": [{"abbreviation": "Val", "expansion": "value", "segment": {}}]}`},
 		{"a duplicate entry", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "segment": {}}, {"abbreviation": "val", "expansion": "value", "segment": {}}]}`},
 		{"an unknown matcher", `{"abbreviations": [{"abbreviation": "ms", "expansion": "m", "suffix": {"matcher": "seconds"}}]}`},
+		{"a broken prefix", `{"abbreviations":[{"abbreviation":"v(","expansion":"v","prefix":{"phase":"late"}}]}`},
+		{"a broken segment", `{"abbreviations":[{"abbreviation":"v(","expansion":"v","segment":{}}]}`},
 		{"a retired per-word messageId", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"messageId": "noVal", "style": "plain"}}]}`},
 	}
 	for _, testCase := range cases {

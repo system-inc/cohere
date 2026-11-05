@@ -125,6 +125,8 @@ func init() { rule.Register(rule.Registration{Rule: NoCrossEnumNarrowing}) }
 	if writeError := os.WriteFile(overlayPath, overlay, 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
+	// Uncached: the child run measures a rule's CPU time, so it has to run again each time rather than replay a
+	// cached result from a run that happened to land under the budget.
 	command := exec.Command("go", "test", "-overlay="+overlayPath, "./internal/lint/registry", "-count=1", "-timeout=30s", "-run=^TestRegisteredRuleCPUBudget$", "-v")
 	command.Dir = root
 	output, err := command.CombinedOutput()
