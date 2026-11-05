@@ -15,8 +15,25 @@ import (
 	"honnef.co/go/tools/unused"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
+	"github.com/system-inc/cohere/internal/goengine/rules/concurrency_no_buffered_wait_delay"
+	"github.com/system-inc/cohere/internal/goengine/rules/concurrency_no_kill_by_name"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_abbreviated_identifier"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_ambiguous_identifier"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_long_line"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_screaming_snake_case"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_shouting"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_uppercase_initialism"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_require_error_clause"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_require_one_type_per_file"
 	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_checked_assertion"
+	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_declared_walk"
+	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_handled_error"
+	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_invariant_reason"
+	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_wrapped_error"
 	"github.com/system-inc/cohere/internal/goengine/rules/testing_no_machine_path"
+	"github.com/system-inc/cohere/internal/goengine/rules/testing_no_timing_assertion"
+	"github.com/system-inc/cohere/internal/goengine/rules/testing_no_uncached_run"
+	"github.com/system-inc/cohere/internal/goengine/rules/testing_require_failure_path"
 	"github.com/system-inc/cohere/internal/goengine/rules/testing_require_parallel"
 )
 
@@ -126,8 +143,25 @@ func All() []rule.Rule {
 // House is every house rule, in the order the registry lists them after the ported ones.
 func House() []rule.Rule {
 	return []rule.Rule{
+		concurrency_no_buffered_wait_delay.Rule,
+		concurrency_no_kill_by_name.Rule,
+		consistency_no_abbreviated_identifier.Rule,
+		consistency_no_ambiguous_identifier.Rule,
+		consistency_no_long_line.Rule,
+		consistency_no_screaming_snake_case.Rule,
+		consistency_no_shouting.Rule,
+		consistency_no_uppercase_initialism.Rule,
+		consistency_require_error_clause.Rule,
+		consistency_require_one_type_per_file.Rule,
 		correctness_require_checked_assertion.Rule,
+		correctness_require_declared_walk.Rule,
+		correctness_require_handled_error.Rule,
+		correctness_require_invariant_reason.Rule,
+		correctness_require_wrapped_error.Rule,
 		testing_no_machine_path.Rule,
+		testing_no_timing_assertion.Rule,
+		testing_no_uncached_run.Rule,
+		testing_require_failure_path.Rule,
 		testing_require_parallel.Rule,
 	}
 }

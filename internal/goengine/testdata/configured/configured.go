@@ -7,8 +7,8 @@ import "fmt"
 // nor unused.
 func Report() {
 	//cohere:ignore printf the wrong verb is the fixture's point
-	fmt.Printf("%d\n", "one")
-	fmt.Printf("%d\n", "two")
+	_ = fmt.Sprintf("%d\n", "one")
+	_ = fmt.Sprintf("%d\n", "two")
 }
 
 // Dereference reads through a pointer that is always nil, which nilness reports as a warning here.

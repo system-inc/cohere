@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"slices"
 	"strings"
@@ -297,5 +298,34 @@ func TestNoCheckDuplicatesAVetPass(test *testing.T) {
 		if _, found := registeredRuleNamed(rule.Namespace + code); found {
 			test.Errorf("%s is registered beside %s, so one mistake would be two findings", code, vetPass)
 		}
+	}
+}
+
+// TestEveryRulePackageIsInHouse holds the registry to the rule packages on disk: each directory under rules/, but
+// testdata, is one house rule named for it, and House lists it. A rule package nobody registered would build, pass
+// its own fixtures and run on nothing.
+func TestEveryRulePackageIsInHouse(test *testing.T) {
+	test.Parallel()
+	entries, readError := os.ReadDir(".")
+	if readError != nil {
+		test.Fatalf("reading the rules directory: %v", readError)
+	}
+	registeredHouse := map[string]bool{}
+	for _, houseRule := range House() {
+		registeredHouse[houseRule.Name] = true
+	}
+	packages := 0
+	for _, entry := range entries {
+		if !entry.IsDir() || entry.Name() == "testdata" {
+			continue
+		}
+		packages++
+		name := rule.Namespace + strings.ReplaceAll(entry.Name(), "_", "-")
+		if !registeredHouse[name] {
+			test.Errorf("rules/%s holds a rule, and House does not list %s", entry.Name(), name)
+		}
+	}
+	if packages != len(House()) {
+		test.Errorf("rules/ holds %d rule packages, and House lists %d rules", packages, len(House()))
 	}
 }

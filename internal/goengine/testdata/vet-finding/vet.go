@@ -3,7 +3,7 @@ package vet
 
 import "fmt"
 
-// Report prints a count with a verb that does not fit it.
+// Report formats a count with a verb that does not fit it.
 func Report() {
-	fmt.Printf("%d\n", "three")
+	_ = fmt.Sprintf("%d\n", "three")
 }
