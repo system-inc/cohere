@@ -610,8 +610,8 @@ func TestJsxNoUselessFragmentAllowExpressionsSilencesOneArmOnly(test *testing.T)
 
 // TestJsxNoUselessFragmentHandlesNilOptions covers the path the fixtures cannot reach.
 //
-// The config layer turns a decoder error into nil for a non-required rule, and `options.(T)` on nil
-// yields the zero value, which here is the default. Asserted rather than assumed.
+// The config layer binds a non-required rule whose decoder errors to the zero `rule.Given`, whose `Read`
+// returns false, so it reads the zero value, which here is the default. Asserted rather than assumed.
 func TestJsxNoUselessFragmentHandlesNilOptions(test *testing.T) {
 	test.Parallel()
 

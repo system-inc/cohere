@@ -36,7 +36,7 @@ const jsxNoScriptUrlFile = "/repository/source/JsxNoScriptUrl.tsx"
 // jsxNoScriptUrlOptions decodes a raw option body the way the config layer does.
 //
 // Fixtures route through the exported decoder rather than building the struct, which is what puts
-// the positional union and the built-in default under test. An empty body is the nil-options case:
+// the positional union and the built-in default under test. An empty body is the bare-severity case:
 // upstream still checks `a` and `href`, so the answer is the built-in pair rather than an error.
 func jsxNoScriptUrlOptions(test *testing.T, raw string) JsxNoScriptUrlOptions {
 	test.Helper()
@@ -303,7 +303,7 @@ func TestJsxNoScriptUrlHasNoFileSuffixGate(test *testing.T) {
 //
 // The two slots have different shapes and Go has no single type for that, so the decoder tries the
 // array arm first, matching upstream's own test on whether the first option is an array. An empty
-// body must yield the built-in pair rather than an error, which is the nil-options path a rule
+// body must yield the built-in pair rather than an error, which is the empty-input path a rule
 // configured as a bare severity takes.
 func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 	test.Parallel()

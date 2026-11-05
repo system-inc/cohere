@@ -579,7 +579,7 @@ func TestPreferStatelessFunctionReturnBoundary(test *testing.T) {
 // TestPreferStatelessFunctionDecodesOptions exercises the decoder directly, including the
 // unconfigured path.
 //
-// A rule configured as a bare severity is handed nil rather than a struct, and the port brief
+// A rule configured as a bare severity hands its decoder empty input rather than an object, and the port brief
 // records a rule that registered on 3,407 files and was completely inert because nothing in its
 // suite reached that path. Every fixture above goes through the decoder, so this covers the nil
 // input and the wire name.

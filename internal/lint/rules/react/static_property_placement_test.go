@@ -918,8 +918,8 @@ func TestDecodeStaticPropertyPlacementOptionsRefusesWhatUpstreamRefuses(test *te
 // TestStaticPropertyPlacementNilOptionsUsesTheDefault bypasses the decoder entirely.
 //
 // Every other fixture here reaches the rule through the decoder, so nothing else can see the
-// rule's own nil fallback. A rule handed nil options would otherwise read a nil map, find no
-// position for any property, and go silent on everything.
+// rule's own unconfigured fallback. A rule handed the zero `rule.Given` would otherwise read a nil map,
+// find no position for any property, and go silent on everything.
 func TestStaticPropertyPlacementNilOptionsUsesTheDefault(test *testing.T) {
 	test.Parallel()
 

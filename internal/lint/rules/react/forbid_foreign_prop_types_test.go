@@ -476,10 +476,10 @@ func TestForbidForeignPropTypesDoesNotApplyTheOptionToPatterns(test *testing.T) 
 	rule_testing.ExpectFindings(test, result, "forbiddenPropType")
 }
 
-// TestForbidForeignPropTypesDefaultsWithoutADecoder pins the nil-options path.
+// TestForbidForeignPropTypesDefaultsWithoutADecoder pins the unconfigured path.
 //
-// A rule configured as a bare severity is handed nil rather than a decoded struct, so the rule's
-// type assertion yields the zero value. For this option surface the zero value is upstream's
+// A rule configured as a bare severity is handed the zero `rule.Given` rather than a decoded struct, so
+// its `Read` returns false and the zero value. For this option surface the zero value is upstream's
 // default of false, and this asserts that directly rather than through the decoder, which is the
 // one path a fixture routed through the decoder cannot reach.
 func TestForbidForeignPropTypesDefaultsWithoutADecoder(test *testing.T) {

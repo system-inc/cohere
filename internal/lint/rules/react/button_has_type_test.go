@@ -58,7 +58,7 @@ const buttonHasTypeFile = "/repository/source/ButtonHasType.tsx"
 // All three options default to `true`, which is not Go's zero value, so a fixture handed a struct
 // built by hand would leave the decoder's default restoration entirely untested and would pass
 // either way. Every case routes through `DecodeButtonHasTypeOptions`, the same function the config
-// calls. An empty string means a bare severity, which is what hands a real rule nil options.
+// calls. An empty string means a bare severity, which is what hands a real rule's decoder empty input.
 
 // TestButtonHasTypeFires asserts ids, count, order, and rendered text.
 func TestButtonHasTypeFires(test *testing.T) {
@@ -781,8 +781,8 @@ func TestButtonHasTypeRejectsMalformedOptions(test *testing.T) {
 
 // TestButtonHasTypeHandlesNilOptions covers the path the fixtures cannot reach.
 //
-// The config layer turns a decoder error into nil for a non-required rule, and `options.(T)` on nil
-// yields the zero value, which for this rule forbids all three types and would report
+// The config layer binds a non-required rule whose decoder errors to the zero `rule.Given`, whose `Read`
+// returns false, so it reads the zero value, which for this rule forbids all three types and would report
 // `forbiddenValue` on `<button type="button"/>`. The rule restores the defaults explicitly on that
 // path and this asserts it, because no fixture routed through the decoder can ever see it.
 func TestButtonHasTypeHandlesNilOptions(test *testing.T) {

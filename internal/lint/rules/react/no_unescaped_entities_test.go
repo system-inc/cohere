@@ -377,11 +377,12 @@ func TestNoUnescapedEntitiesReportsInSourceOrder(test *testing.T) {
 // TestNoUnescapedEntitiesUsesTheDefaultsWhenHandedNilOptions is the fixture that bypasses the
 // decoder.
 //
-// A rule configured as a bare "error" is handed nil, because `configuration.OptionsRegistry.Decode` turns
-// a decode of empty input into nil for a rule whose options are not required. That is the path the
-// entire real tree takes, and a rule reaching the scan with an empty entity list there registers on
-// every file and finds nothing, which looks exactly like a clean tree. Every other fixture in this
-// file reaches the rule through options, so nothing else can see it.
+// A rule configured as a bare "error" is handed the zero `rule.Given`, whose `Read` returns false, because
+// `configuration.OptionsRegistry.Decode` runs a rule unconfigured when a decode of empty input fails and
+// its options are not required. That is the path the entire real tree takes, and a rule reaching the
+// scan with an empty entity list there registers on every file and finds nothing, which looks exactly
+// like a clean tree. Every other fixture in this file reaches the rule through options, so nothing else
+// can see it.
 func TestNoUnescapedEntitiesUsesTheDefaultsWhenHandedNilOptions(test *testing.T) {
 	test.Parallel()
 

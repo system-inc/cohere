@@ -508,8 +508,9 @@ func TestGatingOptionDecodesAndDefaultsToChecking(test *testing.T) {
 
 	decode := rule.DecodeOptionsInto[GatingOptions]()
 
-	// A bare severity hands the rule nil options, which is how it is configured in practice. The
-	// zero value must be the checking one, or the rule is inert everywhere it is actually used.
+	// A bare severity hands the rule the zero `rule.Given`, which is how it is configured in practice,
+	// so `Read` returns false and the zero value. That must be the checking one, or the rule is inert
+	// everywhere it is actually used.
 	rule_testing.ExpectFindings(test,
 		rule_testing.Run(test, Gating, gatingFile, gatingUpstreamInvalidIdentifier),
 		"invalidGatingDirective")

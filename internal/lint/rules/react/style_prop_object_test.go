@@ -30,7 +30,7 @@ const stylePropObjectFile = "/repository/source/StylePropObject.tsx"
 
 // stylePropObjectOptions decodes a raw option body the way the config layer does.
 //
-// An empty body is the nil-options case, which here means an empty allow list and therefore full
+// An empty body is the bare-severity case, which here means an empty allow list and therefore full
 // enforcement. That is the opposite direction from the sibling forbid rules, where an empty list
 // means the rule declines everything.
 func stylePropObjectOptions(test *testing.T, raw string) StylePropObjectOptions {
@@ -487,7 +487,7 @@ func TestStylePropObjectIsNonNullLiteral(test *testing.T) {
 	}
 }
 
-// TestDecodeStylePropObjectOptions covers the allow list and the nil-options path.
+// TestDecodeStylePropObjectOptions covers the allow list and the empty-body path.
 func TestDecodeStylePropObjectOptions(test *testing.T) {
 	test.Parallel()
 
