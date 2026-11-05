@@ -166,6 +166,8 @@ func typeScriptFiles(roots []string) []string {
 	}
 	var files []string
 	for _, root := range roots {
+		// Ignored: the walk function returns nil for a path it cannot read, skipping it, so WalkDir has no
+		// error to return.
 		filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
 			if pathError != nil {
 				return nil

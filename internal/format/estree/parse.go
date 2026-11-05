@@ -39,10 +39,11 @@ func ParseTypeScriptFrom(
 	parsed *ast.SourceFile,
 	nodes *Arena,
 ) (*Node, []*Node, *StrippedText, error) {
+	sourceFile := parsed
 	if !treeIsFor(fileName, text, parsed) {
-		parsed = ParseSourceFile(fileName, ReplaceHashbang(text))
+		sourceFile = ParseSourceFile(fileName, ReplaceHashbang(text))
 	}
-	return convertTypeScript(parsed, text, nodes)
+	return convertTypeScript(sourceFile, text, nodes)
 }
 
 // treeIsFor reports whether parsed is the tree ParseTypeScript would build for text: see ParseTypeScriptFrom.
