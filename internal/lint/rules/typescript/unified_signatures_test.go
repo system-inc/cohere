@@ -379,6 +379,19 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			wantStarts: []string{"These overloads can be combined into one signature taking `number | string`."},
 		},
 		{
+			// The control for the decoder test's same-line rows: a block comment after the last
+			// overload's semicolon precedes the implementation, not either overload, so both read as
+			// undocumented and the pair still reports. A lookup that reached past a signature's own
+			// end for its comment would go quiet here. The installed build reports this row.
+			sourceText: "function f(a: string): void;\nfunction f(a: number): void; /** documents the implementation */\n" +
+				"function f(a: unknown): void {}\n",
+			options:    &UnifiedSignaturesOptions{IgnoreOverloadsWithDifferentJsDoc: true},
+			isJsx:      false,
+			wantIds:    []string{"singleParameterDifference"},
+			wantSpans:  []string{"a: number"},
+			wantStarts: []string{"These overloads can be combined into one signature taking `string | number`."},
+		},
+		{
 			sourceText: "declare function f(a: number): void;\ndeclare function f(a: number): void;\n",
 			options:    nil,
 			isJsx:      false,
@@ -947,6 +960,24 @@ func TestUnifiedSignaturesOptionsArriveThroughTheDecoder(test *testing.T) {
 			name: "ignoreOverloadsWithDifferentJSDoc past a line comment",
 			sourceText: "/** @deprecated */ // kept for old callers\ndeclare function f(x: number): unknown;\n" +
 				"declare function f(x: boolean): unknown;\n",
+			option: "ignoreOverloadsWithDifferentJSDoc",
+		},
+		{
+			// A JSDoc block on the first overload's line, after its semicolon, documents the second:
+			// upstream's `getCommentsBefore` is every comment after the previous token, the `;`. The
+			// scanner's leading ranges at that position start after the first newline, so they alone
+			// miss it and the second overload read as undocumented. The installed build is clean here.
+			name: "ignoreOverloadsWithDifferentJSDoc on the previous overload's line",
+			sourceText: "function f(a: string): void; /** doc for the next */\nfunction f(a: number): void;\n" +
+				"function f(a: unknown): void {}\n",
+			option: "ignoreOverloadsWithDifferentJSDoc",
+		},
+		{
+			// Upstream finds any block comment, not only a JSDoc one (`comment.type === Block`), so a plain
+			// block in the same place documents the second overload too.
+			name: "ignoreOverloadsWithDifferentJSDoc plain block on the previous overload's line",
+			sourceText: "function f(a: string): void; /* plain */\nfunction f(a: number): void;\n" +
+				"function f(a: unknown): void {}\n",
 			option: "ignoreOverloadsWithDifferentJSDoc",
 		},
 	}
