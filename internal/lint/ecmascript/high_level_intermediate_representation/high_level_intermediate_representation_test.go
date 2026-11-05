@@ -6,7 +6,9 @@ import (
 	goparser "go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -257,15 +259,21 @@ func forEachPackageFile(test *testing.T, visit func(*ast.File)) {
 		test.Fatalf("cannot locate the package source: %v", err)
 	}
 
-	fileSet := token.NewFileSet()
-	packages, err := goparser.ParseDir(fileSet, directory, nil, 0)
-	if err != nil {
-		test.Fatalf("parsing the package source: %v", err)
+	// Every `.go` file in the directory, test files among them, as go/parser's deprecated ParseDir read it.
+	entries, readError := os.ReadDir(directory)
+	if readError != nil {
+		test.Fatalf("reading the package source: %v", readError)
 	}
-	for _, pkg := range packages {
-		for _, file := range pkg.Files {
-			visit(file)
+	fileSet := token.NewFileSet()
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+			continue
 		}
+		file, parseError := goparser.ParseFile(fileSet, filepath.Join(directory, entry.Name()), nil, 0)
+		if parseError != nil {
+			test.Fatalf("parsing the package source: %v", parseError)
+		}
+		visit(file)
 	}
 }
 

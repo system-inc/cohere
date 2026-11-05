@@ -292,7 +292,8 @@ func sortedBlockIds(set map[static_single_assignment.BlockId]bool) []static_sing
 // loweredParentAndNested lowers source and returns the first function holding a nested one.
 func loweredParentAndNested(test *testing.T, source string) (*Function, *Function, []Place) {
 	test.Helper()
-	var parent, nested *Function
+	var parent *Function
+	var nested *Function
 	var captures []Place
 	probe := rule.Rule{
 		Name:             "inline-remap-fixture",
