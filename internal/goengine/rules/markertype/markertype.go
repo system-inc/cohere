@@ -27,20 +27,22 @@ func IsMarkerOnly(methods []*ast.FuncDecl) bool {
 		return false
 	}
 	for _, method := range methods {
-		if !isMarkerMethod(method) {
+		if !IsMarkerMethod(method) {
 			return false
 		}
 	}
 	return true
 }
 
-// isMarkerMethod is whether method declares membership and nothing else. NumFields is zero for a nil field list, so it
-// reads a missing parameter or result list as an empty one, and an empty result list, `func (A) kind() ()`, declares
-// no result either. A parameter, even a blank `_ int`, is a field, so a method taking one is an operation and no
-// marker. In code that compiles a method with a result always ends in a return, so its body is never empty, but the
-// results are still read: a caller working from syntax alone can be handed `func (A) kind() int {}`, which parses,
-// and it is no marker.
-func isMarkerMethod(method *ast.FuncDecl) bool {
+// IsMarkerMethod is whether method has the shape of one that declares membership and nothing else: a receiver, no
+// parameters, no results and an empty body. It lives here, beside IsMarkerOnly, because consistency-no-empty-function
+// asks it too, before it reads the type information that tells a sealed union's marker from any other empty method, and
+// the two rules must agree on what a marker looks like. NumFields is zero for a nil field list, so it reads a missing
+// parameter or result list as an empty one, and an empty result list, `func (A) kind() ()`, declares no result either.
+// A parameter, even a blank `_ int`, is a field, so a method taking one is an operation and no marker. In code that
+// compiles a method with a result always ends in a return, so its body is never empty, but the results are still
+// read: a caller working from syntax alone can be handed `func (A) kind() int {}`, which parses, and it is no marker.
+func IsMarkerMethod(method *ast.FuncDecl) bool {
 	return method.Recv != nil && method.Body != nil && len(method.Body.List) == 0 &&
 		method.Type.Params.NumFields() == 0 && method.Type.Results.NumFields() == 0
 }
