@@ -24,6 +24,7 @@ func TestValidateAcceptsAWellFormedRule(t *testing.T) {
 		{Name: "cohere-go/performance-require-parallel-test", Origin: OriginHouse, TypeAware: true, Analyzer: plantedAnalyzer},
 		{Name: "cohere-go/printf", Origin: OriginVet, UpstreamName: "printf", TypeAware: true, Analyzer: plantedAnalyzer},
 		{Name: "cohere-go/SA4006", Origin: OriginStaticcheck, UpstreamName: "SA4006", Analyzer: plantedAnalyzer},
+		{Name: "cohere-go/nilness", Origin: OriginTools, UpstreamName: "nilness", TypeAware: true, Analyzer: plantedAnalyzer},
 	}
 	for _, testCase := range cases {
 		if validateError := testCase.Validate(); validateError != nil {
@@ -50,6 +51,7 @@ func TestValidateRefusesEachMalformedRule(t *testing.T) {
 		{"an upstream name on a house rule", Rule{Name: "cohere-go/consistency-no-long-line", Origin: OriginHouse, UpstreamName: "lll", Analyzer: plantedAnalyzer}, "a house rule has no upstream"},
 		{"a vet rule with no upstream name", Rule{Name: "cohere-go/printf", Origin: OriginVet, Analyzer: plantedAnalyzer}, "names no upstream rule"},
 		{"a staticcheck rule with no upstream name", Rule{Name: "cohere-go/SA4006", Origin: OriginStaticcheck, Analyzer: plantedAnalyzer}, "names no upstream rule"},
+		{"a tools rule with no upstream name", Rule{Name: "cohere-go/nilness", Origin: OriginTools, Analyzer: plantedAnalyzer}, "names no upstream rule"},
 	}
 	for _, testCase := range cases {
 		validateError := testCase.rule.Validate()
