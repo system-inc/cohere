@@ -200,7 +200,7 @@ func thisMachine() (benchresults.Machine, error) {
 	if readError != nil {
 		return machine, readError
 	}
-	machine.OS = "macOS " + version
+	machine.Os = "macOS " + version
 	return machine, nil
 }
 

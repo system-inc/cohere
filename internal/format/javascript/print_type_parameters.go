@@ -173,22 +173,22 @@ func printTypeParameter(path *Path, options *Options, print PrintFunc) Doc {
 	// print, "bound")) is dropped: `bound` is set only on Flow's TypeParameter.
 
 	if current.Truthy("constraint") {
-		groupID := newGroupID("constraint")
+		groupId := newGroupId("constraint")
 		parts = append(parts,
 			" extends",
-			groupWithIn(path, indentIn(path, line), doc.GroupOptions{ID: groupID}),
+			groupWithIn(path, indentIn(path, line), doc.GroupOptions{Id: groupId}),
 			lineSuffixBoundary,
-			indentIfBreak(print("constraint", nil), groupID, false),
+			indentIfBreak(print("constraint", nil), groupId, false),
 		)
 	}
 
 	if current.Truthy("default") {
-		groupID := newGroupID("default")
+		groupId := newGroupId("default")
 		parts = append(parts,
 			" =",
-			groupWithIn(path, indentIn(path, line), doc.GroupOptions{ID: groupID}),
+			groupWithIn(path, indentIn(path, line), doc.GroupOptions{Id: groupId}),
 			lineSuffixBoundary,
-			indentIfBreak(print("default", nil), groupID, false),
+			indentIfBreak(print("default", nil), groupId, false),
 		)
 	}
 

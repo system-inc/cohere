@@ -250,7 +250,7 @@ func run() error {
 	case *verbose:
 		activeOutput.Mode = outputVerbose
 	case *jsonOutput:
-		activeOutput = outputSettings{Mode: outputJSON}
+		activeOutput = outputSettings{Mode: outputJson}
 	}
 	if *profilePath != "" {
 		if startProfileError := startProfile(*profilePath); startProfileError != nil {

@@ -9,10 +9,10 @@ import (
 	"testing"
 )
 
-func unusedDisableRecords(test *testing.T, output string) ([]findingJSON, summaryJSON) {
+func unusedDisableRecords(test *testing.T, output string) ([]findingJson, summaryJson) {
 	test.Helper()
-	var findings []findingJSON
-	var summary summaryJSON
+	var findings []findingJson
+	var summary summaryJson
 	for _, line := range strings.Split(output, "\n") {
 		var kind struct {
 			Kind string `json:"kind"`
@@ -22,7 +22,7 @@ func unusedDisableRecords(test *testing.T, output string) ([]findingJSON, summar
 		}
 		switch kind.Kind {
 		case "finding":
-			var finding findingJSON
+			var finding findingJson
 			if decodeError := json.Unmarshal([]byte(line), &finding); decodeError != nil {
 				test.Fatal(decodeError)
 			}

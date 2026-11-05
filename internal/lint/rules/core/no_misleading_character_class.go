@@ -450,7 +450,7 @@ func checkRegexPatternWithReporter(
 	// flag entirely, and rejects `/[👍-￿]/` which upstream reports on. Trading two false
 	// positives for four false negatives is not a trade, so the one construct that matters is
 	// tested directly.
-	if flags.UV() && patternHasLoneQuantifierBrace(pattern, flags) {
+	if flags.UnicodeMode() && patternHasLoneQuantifierBrace(pattern, flags) {
 		return
 	}
 
@@ -551,7 +551,7 @@ func characterSequences(
 		// starts and the low half is the whole character. So a pair of halves points at the whole
 		// character, and a join ending at a high half, as in `👨‍👩` read without the flag, stops
 		// where 👩 starts, which is where ESLint's span stops too.
-		if !flags.UV() && value > 0xFFFF && !isCodePointEscape {
+		if !flags.UnicodeMode() && value > 0xFFFF && !isCodePointEscape {
 			high := 0xD800 + ((value - 0x10000) >> 10)
 			low := 0xDC00 + ((value - 0x10000) & 0x3FF)
 			current = append(current,
@@ -602,7 +602,7 @@ func rangeEndpointBounds(
 	switch {
 	case pattern[start] != '\\':
 		_, width = utf8.DecodeRuneInString(pattern[start:])
-	case flags.UV() && element.Value > 0xFFFF && start+2 < len(pattern) && pattern[start+1] == 'u' &&
+	case flags.UnicodeMode() && element.Value > 0xFFFF && start+2 < len(pattern) && pattern[start+1] == 'u' &&
 		pattern[start+2] != '{':
 		// `👍` under a unicode flag is two escapes the parser folded into one member.
 		width = 12

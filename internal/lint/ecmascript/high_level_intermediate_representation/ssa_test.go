@@ -25,8 +25,8 @@ import (
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
-// lowerTypedForSSA lowers the first function in code with a real type checker attached.
-func lowerTypedForSSA(test *testing.T, code string) *Function {
+// lowerTypedForSsa lowers the first function in code with a real type checker attached.
+func lowerTypedForSsa(test *testing.T, code string) *Function {
 	test.Helper()
 	var lowered *Function
 	probe := rule.Rule[rule.NoOptions]{
@@ -59,7 +59,7 @@ func cohereEverywhere(test *testing.T, function *Function) {
 	test.Helper()
 	var each func(*Function)
 	each = func(function *Function) {
-		for _, violation := range VerifySSA(function) {
+		for _, violation := range VerifySsa(function) {
 			test.Errorf("SSA violation: %s", violation.Detail)
 		}
 		for _, nested := range function.Functions {
@@ -69,7 +69,7 @@ func cohereEverywhere(test *testing.T, function *Function) {
 	each(function)
 }
 
-func TestSSAMatchesReactSpecFixtures(test *testing.T) {
+func TestSsaMatchesReactSpecFixtures(test *testing.T) {
 	test.Parallel()
 
 	for _, source := range []string{
@@ -77,31 +77,31 @@ func TestSSAMatchesReactSpecFixtures(test *testing.T) {
 		"export function f(){ let x = 1; while (x < 10) { x = x + 1; } return x; }\n",
 		"export function f(){ let x = 1; try { x = 2; } finally { x = 3; } return x; }\n",
 	} {
-		fn := lowerTypedForSSA(test, source)
+		fn := lowerTypedForSsa(test, source)
 		Construct(fn)
 		test.Logf("SRC %s\n%s", source, Print(fn))
-		if violations := VerifySSA(fn); len(violations) > 0 {
+		if violations := VerifySsa(fn); len(violations) > 0 {
 			for _, one := range violations {
 				test.Errorf("VIOLATION: %s", one)
 			}
 		}
-		test.Logf("stats %+v", CollectSSAStats(fn))
+		test.Logf("stats %+v", CollectSsaStats(fn))
 	}
 }
 
 // Deliberately corrupt a correct SSA function four different ways and confirm
 // VerifySSA reports each one. A checker that has never been shown to fail is
 // not evidence that the property holds.
-func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
+func TestSsaVerifierDetectsEachViolationClass(test *testing.T) {
 	test.Parallel()
 
 	build := func() *Function {
-		fn := lowerTypedForSSA(
+		fn := lowerTypedForSsa(
 			test,
 			"export function f(){ let y = 2; if (y > 1) { y = 1; } else { y = 2; } let x = y; return x; }\n",
 		)
 		Construct(fn)
-		if violations := VerifySSA(fn); len(violations) != 0 {
+		if violations := VerifySsa(fn); len(violations) != 0 {
 			test.Fatalf("baseline should be clean, got %v", violations)
 		}
 		return fn
@@ -131,7 +131,7 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 		}
 		from.Phis = nil
 		to.Phis = append(to.Phis, moved)
-		violations := VerifySSA(fn)
+		violations := VerifySsa(fn)
 		if len(violations) == 0 {
 			test.Fatal("moving a phi off its join was NOT detected")
 		}
@@ -166,7 +166,7 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 				break
 			}
 		}
-		violations := VerifySSA(fn)
+		violations := VerifySsa(fn)
 		if len(violations) == 0 {
 			test.Fatal("a use reading a non-dominating sibling definition was NOT detected")
 		}
@@ -193,7 +193,7 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 			test.Skip("too few instructions")
 		}
 		second.LValue.Identifier = first.LValue.Identifier
-		violations := VerifySSA(fn)
+		violations := VerifySsa(fn)
 		if len(violations) == 0 {
 			test.Fatal("a doubly-defined value was NOT detected")
 		}
@@ -213,7 +213,7 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 		last := fn.Instructions[entry.Instructions[len(entry.Instructions)-1]]
 		first := fn.Instructions[entry.Instructions[0]]
 		first.Value = &LoadLocal{Place: Place{Identifier: last.LValue.Identifier}}
-		violations := VerifySSA(fn)
+		violations := VerifySsa(fn)
 		if len(violations) == 0 {
 			test.Fatal("a use before its definition was NOT detected")
 		}
@@ -223,7 +223,7 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 
 // Constructs the corpus sample did not contain, plus the loop shapes most likely
 // to break a construction that only looks right on straight-line code.
-func TestSSAAcrossEveryControlFlowConstruct(test *testing.T) {
+func TestSsaAcrossEveryControlFlowConstruct(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct{ name, code string }{
@@ -272,14 +272,14 @@ func TestSSAAcrossEveryControlFlowConstruct(test *testing.T) {
 	for _, one := range cases {
 		test.Run(one.name, func(test *testing.T) {
 			test.Parallel()
-			fn := lowerTypedForSSA(test, one.code)
+			fn := lowerTypedForSsa(test, one.code)
 			if fn == nil {
 				test.Fatal("did not lower")
 			}
 			Construct(fn)
 			var each func(*Function)
 			each = func(f *Function) {
-				for _, violation := range VerifySSA(f) {
+				for _, violation := range VerifySsa(f) {
 					test.Errorf("violation: %s", violation.Detail)
 				}
 				for _, n := range f.Functions {
@@ -287,7 +287,7 @@ func TestSSAAcrossEveryControlFlowConstruct(test *testing.T) {
 				}
 			}
 			each(fn)
-			st := CollectSSAStats(fn)
+			st := CollectSsaStats(fn)
 			test.Logf("phis=%d named=%d uses=%d", st.Phis, st.NamedValues, st.Uses)
 		})
 	}

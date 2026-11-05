@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-// YAMLError is a YAMLParseError or a YAMLWarning.
-type YAMLError struct {
+// YamlError is a YAMLParseError or a YAMLWarning.
+type YamlError struct {
 	// Name is "YAMLParseError" or "YAMLWarning".
 	Name string
 	// Code is upstream's ErrorCode, such as "BAD_INDENT" or "MISSING_CHAR".
@@ -20,14 +20,14 @@ type YAMLError struct {
 	Pos [2]int
 }
 
-func (yamlError *YAMLError) Error() string { return yamlError.Message }
+func (yamlError *YamlError) Error() string { return yamlError.Message }
 
-func newYAMLParseError(position [2]int, code string, message string) *YAMLError {
-	return &YAMLError{Name: "YAMLParseError", Code: code, Message: message, Pos: position}
+func newYamlParseError(position [2]int, code string, message string) *YamlError {
+	return &YamlError{Name: "YAMLParseError", Code: code, Message: message, Pos: position}
 }
 
-func newYAMLWarning(position [2]int, code string, message string) *YAMLError {
-	return &YAMLError{Name: "YAMLWarning", Code: code, Message: message, Pos: position}
+func newYamlWarning(position [2]int, code string, message string) *YamlError {
+	return &YamlError{Name: "YAMLWarning", Code: code, Message: message, Pos: position}
 }
 
 // errorString is an Error upstream throws, whose message a caller catches and reports.

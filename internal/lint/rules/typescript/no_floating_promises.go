@@ -17,7 +17,7 @@ type NoFloatingPromisesOptions struct {
 	AllowForKnownSafePromises       []type_checking.TypeOrValueSpecifier
 	AllowForKnownSafePromisesInline []string
 	CheckThenables                  *bool
-	IgnoreIIFE                      *bool
+	IgnoreIife                      *bool `json:"IgnoreIIFE"`
 	IgnoreVoid                      *bool
 }
 
@@ -293,8 +293,8 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 		if settings.CheckThenables == nil {
 			settings.CheckThenables = type_checking.Ref(false)
 		}
-		if settings.IgnoreIIFE == nil {
-			settings.IgnoreIIFE = type_checking.Ref(false)
+		if settings.IgnoreIife == nil {
+			settings.IgnoreIife = type_checking.Ref(false)
 		}
 		if settings.IgnoreVoid == nil {
 			settings.IgnoreVoid = type_checking.Ref(true)
@@ -594,7 +594,7 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 
 				exprStatement := node.AsExpressionStatement()
 
-				if *settings.IgnoreIIFE && isAsyncIife(exprStatement) {
+				if *settings.IgnoreIife && isAsyncIife(exprStatement) {
 					return
 				}
 
@@ -668,7 +668,7 @@ type noFloatingPromisesRawOptions struct {
 	AllowForKnownSafeCalls    []noFloatingPromisesRawSpecifier `json:"allowForKnownSafeCalls"`
 	AllowForKnownSafePromises []noFloatingPromisesRawSpecifier `json:"allowForKnownSafePromises"`
 	CheckThenables            *bool                            `json:"checkThenables"`
-	IgnoreIIFE                *bool                            `json:"ignoreIIFE"`
+	IgnoreIife                *bool                            `json:"ignoreIIFE"`
 	IgnoreVoid                *bool                            `json:"ignoreVoid"`
 }
 
@@ -765,7 +765,7 @@ func DecodeNoFloatingPromisesOptions(raw []byte) (NoFloatingPromisesOptions, err
 
 	options := NoFloatingPromisesOptions{
 		CheckThenables: decoded.CheckThenables,
-		IgnoreIIFE:     decoded.IgnoreIIFE,
+		IgnoreIife:     decoded.IgnoreIife,
 		IgnoreVoid:     decoded.IgnoreVoid,
 	}
 	options.AllowForKnownSafeCalls, options.AllowForKnownSafeCallsInline = specifiersFrom(

@@ -472,7 +472,7 @@ func timestampResolve(value []uint16) (any, error) {
 	if match[7] != "" {
 		millisec = number(substr(asciiUnits(match[7]+"00"), 1, 3))
 	}
-	date := dateUTC(year, month-1, day, hour, minute, second, millisec)
+	date := dateUtc(year, month-1, day, hour, minute, second, millisec)
 	tz := match[8]
 	if tz != "" && tz != "Z" {
 		d := parseSexagesimal(asciiUnits(tz))
@@ -492,9 +492,9 @@ func orZero(number float64) float64 {
 	return number
 }
 
-// dateUTC is `Date.UTC(year, month, day, hour, minute, second, millisecond)`: a year from 0 to 99 means
+// dateUtc is `Date.UTC(year, month, day, hour, minute, second, millisecond)`: a year from 0 to 99 means
 // 1900 plus it, each field is truncated to an integer, and months and days overflow into the next.
-func dateUTC(year, month, day, hour, minute, second, millisecond float64) float64 {
+func dateUtc(year, month, day, hour, minute, second, millisecond float64) float64 {
 	for _, field := range []float64{year, month, day, hour, minute, second, millisecond} {
 		if math.IsNaN(field) || math.IsInf(field, 0) {
 			return nan()

@@ -259,7 +259,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	// failures is where this run's own failure lines go: with the report in the human views, and on stderr
 	// under `--json`, whose stdout is records only.
 	failures := out
-	if activeOutput.Mode == outputJSON {
+	if activeOutput.Mode == outputJson {
 		failures = streams.Errors
 	}
 	executable, executableError := os.Executable()
@@ -316,7 +316,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 			running <- struct{}{}
 			defer func() { <-running }()
 			runs[index] = runProject(executable, found.Root, project, projectArguments, yieldFile, openPath, children,
-				activeOutput.Mode == outputJSON)
+				activeOutput.Mode == outputJson)
 		}()
 	}
 	group.Wait()
@@ -384,7 +384,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	facts := overallFactsOf(runs, time.Since(processStart))
 	facts.CoverageUnknown = len(found.SwiftCoverage.FailedQueries)
 	facts.UnclaimedSwift = found.UnclaimedSwift
-	if activeOutput.Mode != outputJSON {
+	if activeOutput.Mode != outputJson {
 		fmt.Fprintln(out, overallFooter(facts, activeOutput.Style))
 	}
 	// A run stopped by a signal ends the way the signal would have ended it, after every child has, so the

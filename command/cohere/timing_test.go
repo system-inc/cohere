@@ -145,7 +145,7 @@ func TestTheHeaderNamesItsUnit(test *testing.T) {
 	timings := program.NewTimings([]string{"a-rule"})
 	setCost(timings, "a-rule", 120*time.Millisecond, 100)
 	timings.Account.Calls = 1000
-	timings.Account.InstrumentCPU = 150 * time.Microsecond
+	timings.Account.InstrumentCpu = 150 * time.Microsecond
 
 	rendered := renderTimings(timings, time.Second)
 	header := strings.SplitN(strings.TrimLeft(rendered, "\n"), "\n", 2)[0]
@@ -177,20 +177,20 @@ func TestNoClockIsSaidRatherThanPrintedAsZero(test *testing.T) {
 	}
 }
 
-// TestCoverageStatesEveryPartOfTheWalksCPU guards the line that keeps the table honest.
+// TestCoverageStatesEveryPartOfTheWalksCpu guards the line that keeps the table honest.
 //
 // The rows are rule listeners and per-file setup. A reader who sums the share column gets 100 percent and
 // concludes the phase is explained, when the walk that offers nodes to those listeners costs CPU too. The
 // wall-clock table could only guess at that from wall clock, which absorbed every wait, and in a parallel
 // run it vanished entirely. The threads' clocks account for it, so the line states each part.
-func TestCoverageStatesEveryPartOfTheWalksCPU(test *testing.T) {
+func TestCoverageStatesEveryPartOfTheWalksCpu(test *testing.T) {
 	test.Parallel()
 	timings := program.NewTimings([]string{"a-rule"})
 	setCost(timings, "a-rule", 300*time.Millisecond, 100)
 	timings.SetSharedForTest("hir.Function", 100*time.Millisecond)
-	timings.Account.InstrumentCPU = 100 * time.Millisecond
-	timings.Account.WalkCPU = 500 * time.Millisecond
-	timings.Account.OtherCPU = 250 * time.Millisecond
+	timings.Account.InstrumentCpu = 100 * time.Millisecond
+	timings.Account.WalkCpu = 500 * time.Millisecond
+	timings.Account.OtherCpu = 250 * time.Millisecond
 
 	var out strings.Builder
 	stream := bufio.NewWriter(&out)
@@ -235,7 +235,7 @@ func TestTheTableItselfCarriesTheCoverageLine(test *testing.T) {
 	test.Parallel()
 	timings := program.NewTimings([]string{"a-rule"})
 	setCost(timings, "a-rule", 285*time.Millisecond, 100)
-	timings.Account.WalkCPU = 700 * time.Millisecond
+	timings.Account.WalkCpu = 700 * time.Millisecond
 
 	rendered := renderTimings(timings, 1024*time.Millisecond)
 	if !strings.Contains(rendered, "coverage:") || !strings.Contains(rendered, "the walk itself") {

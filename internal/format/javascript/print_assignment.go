@@ -41,12 +41,12 @@ func printAssignment(
 
 	// First break right-hand side, then after operator
 	case "fluid":
-		groupID := newGroupID("assignment")
+		groupId := newGroupId("assignment")
 		return groupIn(path, concatIn(path, groupIn(path, leftDoc),
 			operator,
-			groupWithIn(path, indentIn(path, line), doc.GroupOptions{ID: groupID}),
+			groupWithIn(path, indentIn(path, line), doc.GroupOptions{Id: groupId}),
 			lineSuffixBoundary,
-			indentIfBreak(rightDoc, groupID, false),
+			indentIfBreak(rightDoc, groupId, false),
 		))
 
 	case "break-lhs":

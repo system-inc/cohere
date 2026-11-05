@@ -30,8 +30,8 @@ func TestReversePostorderKeepsLoopBodyBeforeContinuation(test *testing.T) {
 	}
 	locations := map[string]location{}
 	for blockIndex, block := range function.Blocks {
-		for _, instructionID := range block.Instructions {
-			instruction := function.Instructions[instructionID]
+		for _, instructionId := range block.Instructions {
+			instruction := function.Instructions[instructionId]
 			load, ok := instruction.Value.(*LoadGlobal)
 			if !ok || (load.Name != "sink" && load.Name != "done") {
 				continue

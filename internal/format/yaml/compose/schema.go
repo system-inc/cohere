@@ -237,7 +237,7 @@ var coreIntHexTag = &Tag{
 // floatNaNResolve is floatNaN's resolve, the same in both schemas.
 func floatNaNResolve(value []uint16, _ func(string), _ *Options) (any, error) {
 	last := slice(value, -3, len(value))
-	if len(last) == 3 && toLowerASCII(last) == "nan" {
+	if len(last) == 3 && toLowerAscii(last) == "nan" {
 		return nan(), nil
 	}
 	if characterAt(value, 0) == '-' {
@@ -246,9 +246,9 @@ func floatNaNResolve(value []uint16, _ func(string), _ *Options) (any, error) {
 	return positiveInfinity(), nil
 }
 
-// toLowerASCII is `text.toLowerCase()` for text whose comparison is against an ASCII literal: any
+// toLowerAscii is `text.toLowerCase()` for text whose comparison is against an ASCII literal: any
 // non-ASCII unit stays non-ASCII, so it can never compare equal.
-func toLowerASCII(text []uint16) string {
+func toLowerAscii(text []uint16) string {
 	lowered := []byte(asciiView(text))
 	for index, character := range lowered {
 		if character >= 'A' && character <= 'Z' {

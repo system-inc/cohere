@@ -324,19 +324,19 @@ func patternIsWellFormed(pattern string, structure regexStructure, groupCount in
 					break
 				}
 			}
-			if !named && (hasNamedGroup || flags.UV()) {
+			if !named && (hasNamedGroup || flags.UnicodeMode()) {
 				return false
 			}
 			continue
 		}
 		// Under `u` or `v` a numeric escape with no such group is not a legacy octal, it is an
 		// error. Without the flag it is an octal and the rule is right to ignore it.
-		if flags.UV() && reference.index > groupCount {
+		if flags.UnicodeMode() && reference.index > groupCount {
 			return false
 		}
 	}
 
-	if flags.UV() && hasUnmatchedQuantifierBrace(pattern, flags) {
+	if flags.UnicodeMode() && hasUnmatchedQuantifierBrace(pattern, flags) {
 		return false
 	}
 	return true

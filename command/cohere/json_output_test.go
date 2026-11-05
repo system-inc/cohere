@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func TestJSONLines(test *testing.T) {
+func TestJsonLines(test *testing.T) {
 	test.Parallel()
 	var out bytes.Buffer
 	stream := bufio.NewWriter(&out)
@@ -23,14 +23,14 @@ func TestJSONLines(test *testing.T) {
 		Column:    7,
 		Severity:  "error",
 		Rule:      "prefer-const",
-		MessageID: "useConst",
+		MessageId: "useConst",
 		Message:   "Use const.",
 	}
-	writeJSONLine(stream, findingAsJSON(finding))
-	for _, line := range changedFilesAsJSON([]changedFile{
+	writeJsonLine(stream, findingAsJson(finding))
+	for _, line := range changedFilesAsJson([]changedFile{
 		{Path: "b.ts", Fixed: true, Formatted: true, FixedBy: map[string]int{"prefer-const": 2, "object-shorthand": 1}},
 	}) {
-		writeJSONLine(stream, line)
+		writeJsonLine(stream, line)
 	}
 	flushStream(test, stream)
 	want := `{"kind":"finding","path":"/repo/a.ts","line":3,"column":7,"severity":"error","rule":"prefer-const","messageId":"useConst","message":"Use const."}
@@ -42,7 +42,7 @@ func TestJSONLines(test *testing.T) {
 	}
 }
 
-func TestJSONSummary(test *testing.T) {
+func TestJsonSummary(test *testing.T) {
 	test.Parallel()
 	summary := cleanSummary()
 	warmSummary(&summary)
@@ -50,7 +50,7 @@ func TestJSONSummary(test *testing.T) {
 	summary.Changed = []changedFile{{Path: "b.ts", Fixed: true, Formatted: true}, {Path: "c.ts", Formatted: true}}
 	summary.Gaps.CrashedFiles = 1
 
-	encoded, encodeError := json.Marshal(summaryAsJSON(summary))
+	encoded, encodeError := json.Marshal(summaryAsJson(summary))
 	if encodeError != nil {
 		test.Fatal(encodeError)
 	}
@@ -94,7 +94,7 @@ func TestJSONSummary(test *testing.T) {
 	if !reflect.DeepEqual(decoded, want) {
 		test.Errorf("the summary line:\n got %+v\nwant %+v", decoded, want)
 	}
-	if replay := summaryAsJSON(
+	if replay := summaryAsJson(
 		runSummary{Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}},
 	); !replay.Cache.Replayed || replay.Verdict != "pass" {
 		test.Errorf("a replay's summary: %+v", replay)
@@ -122,10 +122,10 @@ func TestOutputSchemaMatchesTheTypes(test *testing.T) {
 		object schemaObject
 		value  any
 	}{
-		"finding":       {schema.Defs["finding"], findingJSON{}},
-		"changedFile":   {schema.Defs["changedFile"], changedFileJSON{}},
-		"summary":       {summary, summaryJSON{}},
-		"summary.phase": {*summary.Properties["phases"].Items, phaseJSON{}},
+		"finding":       {schema.Defs["finding"], findingJson{}},
+		"changedFile":   {schema.Defs["changedFile"], changedFileJson{}},
+		"summary":       {summary, summaryJson{}},
+		"summary.phase": {*summary.Properties["phases"].Items, phaseJson{}},
 		"summary.cache": {summary.Properties["cache"], cacheUse{}},
 		"summary.gaps":  {summary.Properties["gaps"], runGaps{}},
 		"summary.gaps.uncheckedSwift": {

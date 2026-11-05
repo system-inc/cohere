@@ -195,7 +195,7 @@ func groupWithIn(path *Path, contents any, options doc.GroupOptions) Doc {
 		return groupWith(contents, options)
 	}
 	return memory.groups.New(doc.Group{
-		ID:             options.ID,
+		Id:             options.Id,
 		Contents:       toDoc(contents),
 		Break:          options.ShouldBreak,
 		ExpandedStates: options.ExpandedStates,
@@ -245,13 +245,13 @@ func ifBreak(breakContents any, flatContents any) Doc {
 }
 
 // ifBreakWithGroup is upstream's ifBreak(breakContents, flatContents, { groupId }).
-func ifBreakWithGroup(breakContents any, flatContents any, groupID *doc.GroupID) Doc {
-	return doc.NewIfBreak(toDoc(breakContents), toDoc(flatContents), groupID)
+func ifBreakWithGroup(breakContents any, flatContents any, groupId *doc.GroupId) Doc {
+	return doc.NewIfBreak(toDoc(breakContents), toDoc(flatContents), groupId)
 }
 
 // indentIfBreak is upstream's indentIfBreak(contents, { groupId, negate }).
-func indentIfBreak(contents any, groupID *doc.GroupID, negate bool) Doc {
-	return doc.NewIndentIfBreak(toDoc(contents), groupID, negate)
+func indentIfBreak(contents any, groupId *doc.GroupId, negate bool) Doc {
+	return doc.NewIndentIfBreak(toDoc(contents), groupId, negate)
 }
 
 // label is upstream's label(name, contents).
@@ -260,8 +260,8 @@ func label(name string, contents any) Doc { return doc.NewLabel(name, toDoc(cont
 // join is upstream's join(separator, parts).
 func join(separator any, parts []Doc) Doc { return doc.Join(toDoc(separator), parts) }
 
-// newGroupID is upstream's Symbol(name) used as a group id.
-func newGroupID(name string) *doc.GroupID { return doc.NewGroupID(name) }
+// newGroupId is upstream's Symbol(name) used as a group id.
+func newGroupId(name string) *doc.GroupId { return doc.NewGroupId(name) }
 
 // labelOf is upstream's `doc.label`, the label of a labelled doc, or "".
 func labelOf(document Doc) string {

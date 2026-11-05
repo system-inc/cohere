@@ -210,8 +210,8 @@ type SyntaxError struct {
 
 func (syntaxError *SyntaxError) Error() string { return syntaxError.Message }
 
-// newYAMLSyntaxError is `new YAMLSyntaxError(context, error)`.
-func (context *context) newYAMLSyntaxError(yamlError *compose.YAMLError, offsets unitOffsets) *SyntaxError {
+// newYamlSyntaxError is `new YAMLSyntaxError(context, error)`.
+func (context *context) newYamlSyntaxError(yamlError *compose.YamlError, offsets unitOffsets) *SyntaxError {
 	return &SyntaxError{
 		Message:  yamlError.Message,
 		Code:     yamlError.Code,

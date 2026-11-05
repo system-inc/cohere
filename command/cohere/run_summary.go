@@ -14,8 +14,8 @@ type runFinding struct {
 	Column   int    `json:"column"`
 	Severity string `json:"severity"`
 	Rule     string `json:"rule"`
-	// MessageID names which of a rule's messages this is. Empty for a type error.
-	MessageID string `json:"messageId,omitempty"`
+	// MessageId names which of a rule's messages this is. Empty for a type error.
+	MessageId string `json:"messageId,omitempty"`
 	Message   string `json:"message"`
 }
 

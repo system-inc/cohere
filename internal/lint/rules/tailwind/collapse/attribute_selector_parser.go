@@ -75,7 +75,7 @@ const (
 	attributeSelectorLineBreak      = '\n'
 	attributeSelectorLowerI         = 'i'
 	attributeSelectorLowerS         = 's'
-	attributeSelectorNonASCII       = 0x80
+	attributeSelectorNonAscii       = 0x80
 	attributeSelectorOpen           = '['
 	attributeSelectorPipe           = '|'
 	attributeSelectorSingleQuote    = '\''
@@ -149,7 +149,7 @@ func ParseAttributeSelector(input string) (AttributeSelector, bool) {
 			continue
 		}
 		// Non-ASCII code points are valid in a CSS ident, e.g.: `[data-état]`.
-		if character >= attributeSelectorNonASCII {
+		if character >= attributeSelectorNonAscii {
 			continue
 		}
 		break

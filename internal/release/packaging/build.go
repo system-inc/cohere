@@ -297,7 +297,7 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 	// Signed before the manifest is written, so a signing failure leaves an obviously incomplete
 	// package rather than one that looks finished. Only macOS is signed: Linux and Windows have no
 	// equivalent gate on an npm-installed binary.
-	if target.IsMacOS() && options.Signing.IsConfigured() {
+	if target.IsMacOs() && options.Signing.IsConfigured() {
 		for _, executable := range executables {
 			if signError := Sign(executable, options.Signing); signError != nil {
 				return StagedPackage{}, signError
@@ -307,7 +307,7 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 
 	// Each signed executable goes to Apple and must come back Accepted, before anything checks or packs
 	// it, so a binary the notary service refused never reaches a package.
-	if target.IsMacOS() && options.Signing.CanNotarize() {
+	if target.IsMacOs() && options.Signing.CanNotarize() {
 		for _, executable := range executables {
 			if notarizeError := Notarize(executable, options.Signing, options.Progress); notarizeError != nil {
 				return StagedPackage{}, notarizeError

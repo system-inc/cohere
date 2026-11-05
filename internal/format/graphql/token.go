@@ -6,8 +6,8 @@ package graphql
 type tokenKind string
 
 const (
-	tokenKindSOF         tokenKind = "<SOF>"
-	tokenKindEOF         tokenKind = "<EOF>"
+	tokenKindSof         tokenKind = "<SOF>"
+	tokenKindEof         tokenKind = "<EOF>"
 	tokenKindBang        tokenKind = "!"
 	tokenKindDollar      tokenKind = "$"
 	tokenKindAmp         tokenKind = "&"

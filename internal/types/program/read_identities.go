@@ -17,14 +17,14 @@ type readIdentities struct {
 	byPath map[string]fileIdentity
 }
 
-// identityFS stats each file before reading it, as the content pack does, so the identity it records can only
+// identityFileSystem stats each file before reading it, as the content pack does, so the identity it records can only
 // be older than the bytes read after it, and records it when both succeed. Everything else passes through.
-type identityFS struct {
+type identityFileSystem struct {
 	vfs.FS
 	identities *readIdentities
 }
 
-func (fileSystem *identityFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+func (fileSystem *identityFileSystem) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	identity, statted := statIdentity(path.AsString())
 	contents, ok := fileSystem.FS.ReadFile(path)
 	if statted && ok {

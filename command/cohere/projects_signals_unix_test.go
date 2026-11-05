@@ -22,12 +22,12 @@ func TestATerminatedMixedRunLeavesNoChildBehind(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	marks := test.TempDir()
-	enginePID := filepath.Join(marks, "engine.pid")
-	compilerPID := filepath.Join(marks, "compiler.pid")
+	enginePid := filepath.Join(marks, "engine.pid")
+	compilerPid := filepath.Join(marks, "compiler.pid")
 	// An engine that starts a long compile of its own and waits on it, as the engine's types phase waits on
 	// swift build.
-	engine := fakeSwiftEngine(test, "echo $$ > '"+enginePID+".partial' && mv '"+enginePID+".partial' '"+enginePID+"'\n"+
-		"sleep 300 &\necho $! > '"+compilerPID+".partial' && mv '"+compilerPID+".partial' '"+compilerPID+"'\nwait")
+	engine := fakeSwiftEngine(test, "echo $$ > '"+enginePid+".partial' && mv '"+enginePid+".partial' '"+enginePid+"'\n"+
+		"sleep 300 &\necho $! > '"+compilerPid+".partial' && mv '"+compilerPid+".partial' '"+compilerPid+"'\nwait")
 	root := newRepository(test, nil)
 	writeTree(
 		test,
@@ -44,7 +44,7 @@ func TestATerminatedMixedRunLeavesNoChildBehind(test *testing.T) {
 	// Ignored: a run already ended, as the test means it to, is what the kill asks for.
 	defer run.Process.Kill()
 
-	readPID := func(path string) int {
+	readPid := func(path string) int {
 		deadline := time.Now().Add(2 * time.Minute)
 		for time.Now().Before(deadline) {
 			if contents, readError := os.ReadFile(path); readError == nil {
@@ -57,7 +57,7 @@ func TestATerminatedMixedRunLeavesNoChildBehind(test *testing.T) {
 		test.Fatalf("%s was never written: the engine did not start", filepath.Base(path))
 		return 0
 	}
-	engineProcess, compilerProcess := readPID(enginePID), readPID(compilerPID)
+	engineProcess, compilerProcess := readPid(enginePid), readPid(compilerPid)
 
 	if signalError := run.Process.Signal(syscall.SIGTERM); signalError != nil {
 		test.Fatal(signalError)

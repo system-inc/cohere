@@ -461,8 +461,8 @@ func dumpValues(text string, options Options) (any, error) {
 	if parseError != nil {
 		return nil, parseError
 	}
-	toUTF16 := utf16IndexOf(text)
-	encoded, encodeError := json.Marshal(dumpValuesValue(tree, toUTF16))
+	toUtf16 := utf16IndexOf(text)
+	encoded, encodeError := json.Marshal(dumpValuesValue(tree, toUtf16))
 	if encodeError != nil {
 		return nil, encodeError
 	}
@@ -471,7 +471,7 @@ func dumpValues(text string, options Options) (any, error) {
 	return result, decodeError
 }
 
-func dumpValuesValue(value any, toUTF16 func(int) int) any {
+func dumpValuesValue(value any, toUtf16 func(int) int) any {
 	switch typed := value.(type) {
 	case nil:
 		return "<undefined>"
@@ -487,10 +487,10 @@ func dumpValuesValue(value any, toUTF16 func(int) int) any {
 					result[key] = fmt.Sprintf("a sourceIndex of type %T", typed.Get(key))
 					continue
 				}
-				result[key] = toUTF16(index)
+				result[key] = toUtf16(index)
 				continue
 			}
-			result[key] = dumpValuesValue(typed.Get(key), toUTF16)
+			result[key] = dumpValuesValue(typed.Get(key), toUtf16)
 		}
 		return result
 	case []*estree.Node:
@@ -499,13 +499,13 @@ func dumpValuesValue(value any, toUTF16 func(int) int) any {
 		}
 		result := make([]any, len(typed))
 		for index, child := range typed {
-			result[index] = dumpValuesValue(child, toUTF16)
+			result[index] = dumpValuesValue(child, toUtf16)
 		}
 		return result
 	case map[string]any:
 		result := map[string]any{}
 		for key, each := range typed {
-			result[key] = dumpValuesValue(each, toUTF16)
+			result[key] = dumpValuesValue(each, toUtf16)
 		}
 		return result
 	case float64:

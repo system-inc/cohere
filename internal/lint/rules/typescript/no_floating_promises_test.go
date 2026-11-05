@@ -212,32 +212,32 @@ func TestNoFloatingPromisesStaysSilent(test *testing.T) {
 		{
 			"upstream valid case 22",
 			"\n        (async () => {\n          await something();\n        })();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIIFE: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
 		},
 		{
 			"upstream valid case 23",
 			"\n        (async () => {\n          something();\n        })();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIIFE: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
 		},
 		{
 			"upstream valid case 24",
 			"(async function foo() {})();",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIIFE: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
 		},
 		{
 			"upstream valid case 25",
 			"\n        function foo() {\n          (async function bar() {})();\n        }\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIIFE: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
 		},
 		{
 			"upstream valid case 26",
 			"\n        const foo = () =>\n          new Promise(res => {\n            (async function () {\n              await res(1);\n            })();\n          });\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIIFE: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
 		},
 		{
 			"upstream valid case 27",
 			"\n        (async function () {\n          await res(1);\n        })();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIIFE: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
 		},
 		{
 			"upstream valid case 28",
@@ -733,13 +733,13 @@ func TestNoFloatingPromisesFires(test *testing.T) {
 		{
 			"upstream invalid case 31",
 			"\n        (async function () {\n          Promise.resolve();\n        })();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIIFE: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
 			[]string{"floatingVoid"},
 		},
 		{
 			"upstream invalid case 32",
 			"\ndeclare const promiseIntersection: Promise<number> & number;\n(async function () {\n  promiseIntersection;\n  promiseIntersection.then(() => {});\n  promiseIntersection.catch();\n  promiseIntersection.finally();\n})();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIIFE: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
 			[]string{"floatingVoid", "floatingVoid", "floatingVoid", "floatingVoid"},
 		},
 		{
@@ -1821,7 +1821,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 31",
 			"\n        (async function () {\n          Promise.resolve();\n        })();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIIFE: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
 			[][]noFloatingPromisesSuggestion{{
 				{
 					"floatingFixVoid",
@@ -1836,7 +1836,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 32",
 			"\ndeclare const promiseIntersection: Promise<number> & number;\n(async function () {\n  promiseIntersection;\n  promiseIntersection.then(() => {});\n  promiseIntersection.catch();\n  promiseIntersection.finally();\n})();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIIFE: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
 			[][]noFloatingPromisesSuggestion{
 				{{
 					"floatingFixVoid",
@@ -2876,9 +2876,9 @@ func TestDecodeNoFloatingPromisesOptions(test *testing.T) {
 	test.Run("an empty object leaves every pointer nil so the rule's own defaults apply", func(test *testing.T) {
 		test.Parallel()
 		options := decode(test, `{}`)
-		if options.IgnoreVoid != nil || options.IgnoreIIFE != nil || options.CheckThenables != nil {
+		if options.IgnoreVoid != nil || options.IgnoreIife != nil || options.CheckThenables != nil {
 			test.Errorf("an empty object should leave the three booleans nil, got %v %v %v",
-				options.IgnoreVoid, options.IgnoreIIFE, options.CheckThenables)
+				options.IgnoreVoid, options.IgnoreIife, options.CheckThenables)
 		}
 	})
 

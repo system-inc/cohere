@@ -180,7 +180,7 @@ func TestFirstMatchWinsIsTheCallersOrder(test *testing.T) {
 		{"12", DataTypeNumber, DataTypeInteger},
 		{"cover", DataTypeBackgroundSize, DataTypeFamilyName},
 		{"calc(1px + 2px)", DataTypeLength, DataTypeNumber},
-		{"url(a.png)", DataTypeURL, DataTypeImage},
+		{"url(a.png)", DataTypeUrl, DataTypeImage},
 	}
 
 	for _, testCase := range cases {

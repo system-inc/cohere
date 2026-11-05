@@ -138,7 +138,7 @@ func (loader *themeLoader) loadFile(path string) error {
 		return fmt.Errorf("read %s: %w", absolutePath, readError)
 	}
 
-	nodes, parseCssError := ParseCSS(string(content))
+	nodes, parseCssError := ParseCss(string(content))
 	if parseCssError != nil {
 		return fmt.Errorf("parse %s: %w", absolutePath, parseCssError)
 	}
@@ -262,7 +262,7 @@ func (loader *themeLoader) ingestThemeBlock(node *Node, path string) error {
 			// The property is unescaped on the way in, so `--color-a\/b` is stored as
 			// `--color-a/b`. GetOptions and MarkUsedVariable unescape their arguments to match.
 			if addError := loader.theme.Add(
-				unescapeCSSIdentifier(child.Property),
+				unescapeCssIdentifier(child.Property),
 				child.Value,
 				options,
 			); addError != nil {

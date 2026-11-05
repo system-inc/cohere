@@ -17,8 +17,8 @@ type RegexFlags struct {
 	UnicodeSets bool // v flag
 }
 
-// UV reports whether unicode/unicodeSets mode is active (either u or v).
-func (flags RegexFlags) UV() bool { return flags.Unicode || flags.UnicodeSets }
+// UnicodeMode reports whether unicode/unicodeSets mode is active (either u or v).
+func (flags RegexFlags) UnicodeMode() bool { return flags.Unicode || flags.UnicodeSets }
 
 // ParseRegexFlags returns a RegexFlags from a flag string (e.g. "gui").
 func ParseRegexFlags(flags string) RegexFlags {
@@ -228,7 +228,7 @@ func SkipPatternEscape(pattern string, index int, flags RegexFlags) (int, bool) 
 		return 2, true
 	case 'u':
 		if index+2 < len(pattern) && pattern[index+2] == '{' {
-			if !flags.UV() {
+			if !flags.UnicodeMode() {
 				return 2, true
 			}
 			closeRel := strings.IndexByte(pattern[index+3:], '}')
@@ -247,7 +247,7 @@ func SkipPatternEscape(pattern string, index int, flags RegexFlags) (int, bool) 
 		}
 		return 2, true
 	case 'p', 'P':
-		if flags.UV() && index+2 < len(pattern) && pattern[index+2] == '{' {
+		if flags.UnicodeMode() && index+2 < len(pattern) && pattern[index+2] == '{' {
 			closeRel := strings.IndexByte(pattern[index+3:], '}')
 			if closeRel >= 0 {
 				return 3 + closeRel + 1, true
@@ -255,7 +255,7 @@ func SkipPatternEscape(pattern string, index int, flags RegexFlags) (int, bool) 
 		}
 		return 2, true
 	case 'q':
-		if flags.UV() && index+2 < len(pattern) && pattern[index+2] == '{' {
+		if flags.UnicodeMode() && index+2 < len(pattern) && pattern[index+2] == '{' {
 			closeRel := strings.IndexByte(pattern[index+3:], '}')
 			if closeRel >= 0 {
 				return 3 + closeRel + 1, true
@@ -474,7 +474,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 			}, 2, true
 		}
 		if next == 'B' {
-			if flags.UV() {
+			if flags.UnicodeMode() {
 				return RegexCharElement{}, 0, false // u mode syntax error
 			}
 			// Under non-u, identity escape.
@@ -484,7 +484,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 		}
 		return RegexCharElement{Kind: RegexCharBreaker, Start: index, End: index + 2}, 2, true
 	case 'p', 'P':
-		if flags.UV() && index+2 < len(pattern) && pattern[index+2] == '{' {
+		if flags.UnicodeMode() && index+2 < len(pattern) && pattern[index+2] == '{' {
 			closeRel := strings.IndexByte(pattern[index+3:], '}')
 			if closeRel < 0 {
 				return RegexCharElement{}, 0, false
@@ -497,7 +497,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 			Kind: RegexCharSingle, Value: uint32(next), Start: index, End: index + 2,
 		}, 2, true
 	case 'q':
-		if flags.UV() && index+2 < len(pattern) && pattern[index+2] == '{' {
+		if flags.UnicodeMode() && index+2 < len(pattern) && pattern[index+2] == '{' {
 			closeRel := strings.IndexByte(pattern[index+3:], '}')
 			if closeRel < 0 {
 				return RegexCharElement{}, 0, false
@@ -520,7 +520,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 		}, 2, true
 	case 'u':
 		if index+2 < len(pattern) && pattern[index+2] == '{' {
-			if !flags.UV() {
+			if !flags.UnicodeMode() {
 				// Non-u mode: treat `\u` as identity `u`.
 				return RegexCharElement{
 					Kind: RegexCharSingle, Value: 'u', Start: index, End: index + 2,
@@ -544,7 +544,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 			hi := ParseHexUint(pattern[index+2 : index+6])
 			// Surrogate pair `\uHHHH\uHHHH` under u/v collapses to one element
 			// with an astral value.
-			if flags.UV() && hi >= 0xD800 && hi <= 0xDBFF && index+11 < len(pattern) &&
+			if flags.UnicodeMode() && hi >= 0xD800 && hi <= 0xDBFF && index+11 < len(pattern) &&
 				pattern[index+6] == '\\' && pattern[index+7] == 'u' && AllHexDigits(pattern[index+8:index+12]) {
 				lo := ParseHexUint(pattern[index+8 : index+12])
 				if lo >= 0xDC00 && lo <= 0xDFFF {

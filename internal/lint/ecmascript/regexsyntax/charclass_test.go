@@ -588,14 +588,14 @@ func FuzzParseRegexCharacterClassWithEndParity(fuzz *testing.F) {
 func assertKnownEndParserParity(test *testing.T, pattern string, flags RegexFlags) {
 	test.Helper()
 	IterateRegexCharacterClasses(pattern, flags, func(start, end int) {
-		got, gotEnd, gotOK := ParseRegexCharacterClassWithEnd(pattern, start, end, flags)
-		want, wantEnd, wantOK := ParseRegexCharacterClass(pattern, start, flags)
+		got, gotEnd, gotOk := ParseRegexCharacterClassWithEnd(pattern, start, end, flags)
+		want, wantEnd, wantOk := ParseRegexCharacterClass(pattern, start, flags)
 		// The old entry point can accept a prefix ending at an inner `]`
 		// even though the boundary scanner correctly found a later matching
 		// bracket (for example `[0-[]]` in v mode). The known-end entry point
 		// intentionally rejects that inconsistent parse.
-		if wantOK && wantEnd != end {
-			if gotOK {
+		if wantOk && wantEnd != end {
+			if gotOk {
 				test.Fatalf(
 					"known-end parse accepted mismatched end for pattern %q, flags %+v, range [%d,%d): got (%+v, %d)",
 					pattern, flags, start, end, got, gotEnd,
@@ -603,10 +603,10 @@ func assertKnownEndParserParity(test *testing.T, pattern string, flags RegexFlag
 			}
 			return
 		}
-		if gotOK != wantOK || gotEnd != wantEnd || !reflect.DeepEqual(got, want) {
+		if gotOk != wantOk || gotEnd != wantEnd || !reflect.DeepEqual(got, want) {
 			test.Fatalf(
 				"known-end parse mismatch for pattern %q, flags %+v, range [%d,%d): got (%+v, %d, %v), want (%+v, %d, %v)",
-				pattern, flags, start, end, got, gotEnd, gotOK, want, wantEnd, wantOK,
+				pattern, flags, start, end, got, gotEnd, gotOk, want, wantEnd, wantOk,
 			)
 		}
 	})

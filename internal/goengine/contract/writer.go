@@ -59,11 +59,11 @@ func (writer *Writer) Write(record Record) error {
 
 // encodeLine is a record as one line of JSON ending in a newline, with its kind as the first field.
 func encodeLine(record Record) ([]byte, error) {
-	fields, encodeError := encodeWithoutHTMLEscaping(record)
+	fields, encodeError := encodeWithoutHtmlEscaping(record)
 	if encodeError != nil {
 		return nil, encodeError
 	}
-	kind, encodeError := encodeWithoutHTMLEscaping(record.kind())
+	kind, encodeError := encodeWithoutHtmlEscaping(record.kind())
 	if encodeError != nil {
 		return nil, encodeError
 	}
@@ -81,10 +81,10 @@ func encodeLine(record Record) ([]byte, error) {
 	return line, nil
 }
 
-// encodeWithoutHTMLEscaping is json.Marshal without its escaping of <, > and &, which is for JSON
+// encodeWithoutHtmlEscaping is json.Marshal without its escaping of <, > and &, which is for JSON
 // embedded in HTML. A message that says `a <- b` should read that way in the stream too. It takes a value of
 // any type, as json.Marshal does.
-func encodeWithoutHTMLEscaping[Value any](value Value) ([]byte, error) {
+func encodeWithoutHtmlEscaping[Value any](value Value) ([]byte, error) {
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetEscapeHTML(false)

@@ -105,7 +105,7 @@ func (parser *parser) parseName() *estree.Node {
 func (parser *parser) parseDocument() *estree.Node {
 	start := parser.lexer.token
 	return parser.node(start, "Document",
-		"definitions", parser.many(tokenKindSOF, parser.parseDefinition, tokenKindEOF),
+		"definitions", parser.many(tokenKindSof, parser.parseDefinition, tokenKindEof),
 	)
 }
 

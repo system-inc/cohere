@@ -185,7 +185,7 @@ func mapOne(document Doc, rec func(Doc) Doc, fn func(Doc) Doc) Doc {
 		if sameDoc(breakContents, typed.BreakContents) && sameDoc(flatContents, typed.FlatContents) {
 			return fn(typed)
 		}
-		return fn(&IfBreak{BreakContents: breakContents, FlatContents: flatContents, GroupID: typed.GroupID})
+		return fn(&IfBreak{BreakContents: breakContents, FlatContents: flatContents, GroupId: typed.GroupId})
 	case *Group:
 		if typed.ExpandedStates == nil {
 			contents := rec(typed.Contents)
@@ -394,10 +394,10 @@ func cleanDocFn(document Doc) Doc {
 			return typed.Parts[0]
 		}
 	case *Group:
-		if isFalsy(typed.Contents) && typed.ID == nil && !typed.Break && typed.ExpandedStates == nil {
+		if isFalsy(typed.Contents) && typed.Id == nil && !typed.Break && typed.ExpandedStates == nil {
 			return Text("")
 		}
-		if inner, isGroup := typed.Contents.(*Group); isGroup && inner.ID == typed.ID && inner.Break == typed.Break &&
+		if inner, isGroup := typed.Contents.(*Group); isGroup && inner.Id == typed.Id && inner.Break == typed.Break &&
 			sameStates(inner.ExpandedStates, typed.ExpandedStates) {
 			return inner
 		}
@@ -614,7 +614,7 @@ func stripTrailingHardlineFromDoc(document Doc) Doc {
 		return &IfBreak{
 			BreakContents: stripTrailingHardlineFromDoc(typed.BreakContents),
 			FlatContents:  stripTrailingHardlineFromDoc(typed.FlatContents),
-			GroupID:       typed.GroupID,
+			GroupId:       typed.GroupId,
 		}
 	case *Fill:
 		return &Fill{Parts: stripTrailingHardlineFromParts(typed.Parts)}

@@ -95,7 +95,7 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 				(!shouldBreakChain && shouldAddParensIfNotBreak(functionBody)))
 
 	isCallee := keyOf(path) == "callee" && isCallLikeExpression(parentOf(path))
-	chainGroupID := newGroupID("arrow-chain")
+	chainGroupId := newGroupId("arrow-chain")
 
 	signaturesDoc := printArrowFunctionSignatures(path, resolvedArguments, signatureDocs, shouldBreakChain)
 	shouldBreakSignatures := false
@@ -142,17 +142,17 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 	}
 	var body Doc
 	if shouldPrintAsChain {
-		body = indentIfBreak(bodyDoc, chainGroupID, false)
+		body = indentIfBreak(bodyDoc, chainGroupId, false)
 	} else {
 		body = groupIn(path, bodyDoc)
 	}
 	var trailing Doc = emptyDoc
 	if shouldPrintAsChain && isCallee {
-		trailing = ifBreakWithGroup(softline, "", chainGroupID)
+		trailing = ifBreakWithGroup(softline, "", chainGroupId)
 	}
 	return groupIn(path, concatIn(
 		path,
-		groupWithIn(path, signatures, doc.GroupOptions{ShouldBreak: shouldBreakSignatures, ID: chainGroupID}),
+		groupWithIn(path, signatures, doc.GroupOptions{ShouldBreak: shouldBreakSignatures, Id: chainGroupId}),
 		" =>",
 		body,
 		trailing,

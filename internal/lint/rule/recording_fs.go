@@ -25,27 +25,27 @@ type FileRead struct {
 	ModifiedNanoseconds int64
 }
 
-// RecordingFS is a file system that notes every path it is asked about and refuses to write.
+// RecordingFileSystem is a file system that notes every path it is asked about and refuses to write.
 //
 // It is how a reader's inputs are observed rather than listed, the discipline the run cache's input
 // recorder holds the compiler to, applied to one reader: whatever the design system asked about is in
 // its read set, so a cache keyed on that set cannot miss a file it forgot (#pyhm2t2). Writes panic,
 // because a reader that writes is not a reader, and a cached verdict cannot replay a side effect.
-type RecordingFS struct {
+type RecordingFileSystem struct {
 	underlying vfs.FS
 	mutex      sync.Mutex
 	reads      map[string]FileRead
 }
 
-var _ vfs.FS = (*RecordingFS)(nil)
+var _ vfs.FS = (*RecordingFileSystem)(nil)
 
-// NewRecordingFs wraps underlying.
-func NewRecordingFs(underlying vfs.FS) *RecordingFS {
-	return &RecordingFS{underlying: underlying, reads: map[string]FileRead{}}
+// NewRecordingFileSystem wraps underlying.
+func NewRecordingFileSystem(underlying vfs.FS) *RecordingFileSystem {
+	return &RecordingFileSystem{underlying: underlying, reads: map[string]FileRead{}}
 }
 
 // Reads is every path asked about, sorted. A path seen both present and absent keeps present.
-func (recording *RecordingFS) Reads() []FileRead {
+func (recording *RecordingFileSystem) Reads() []FileRead {
 	recording.mutex.Lock()
 	defer recording.mutex.Unlock()
 	reads := make([]FileRead, 0, len(recording.reads))
@@ -56,7 +56,7 @@ func (recording *RecordingFS) Reads() []FileRead {
 	return reads
 }
 
-func (recording *RecordingFS) note(path string, present bool) {
+func (recording *RecordingFileSystem) note(path string, present bool) {
 	recording.mutex.Lock()
 	defer recording.mutex.Unlock()
 	if earlier, seen := recording.reads[path]; seen && (earlier.Present || !present) {
@@ -72,55 +72,59 @@ func (recording *RecordingFS) note(path string, present bool) {
 	recording.reads[path] = read
 }
 
-func (recording *RecordingFS) refuse(method string, path string) {
+func (recording *RecordingFileSystem) refuse(method string, path string) {
 	// Invariant: a recording file system wraps only readers (module resolution and rule reads), which never
 	// write, so a write here is a reader bug, refused before it can change what the recording describes.
 	panic(fmt.Sprintf("a recording file system refuses %s(%s): its reader must not write", method, path))
 }
 
-func (recording *RecordingFS) CaseSensitivity() tspath.CaseSensitivity {
+func (recording *RecordingFileSystem) CaseSensitivity() tspath.CaseSensitivity {
 	return recording.underlying.CaseSensitivity()
 }
 
-func (recording *RecordingFS) FileExists(path tspath.RootedFilePath) bool {
+func (recording *RecordingFileSystem) FileExists(path tspath.RootedFilePath) bool {
 	exists := recording.underlying.FileExists(path)
 	recording.note(path.AsString(), exists)
 	return exists
 }
 
-func (recording *RecordingFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+func (recording *RecordingFileSystem) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	contents, ok := recording.underlying.ReadFile(path)
 	recording.note(path.AsString(), ok)
 	return contents, ok
 }
 
-func (recording *RecordingFS) WriteFile(path tspath.RootedFilePath, data string) error {
+func (recording *RecordingFileSystem) WriteFile(path tspath.RootedFilePath, data string) error {
 	recording.refuse("WriteFile", path.AsString())
 	return nil
 }
 
-func (recording *RecordingFS) AppendFile(path tspath.RootedFilePath, data string) error {
+func (recording *RecordingFileSystem) AppendFile(path tspath.RootedFilePath, data string) error {
 	recording.refuse("AppendFile", path.AsString())
 	return nil
 }
 
-func (recording *RecordingFS) Remove(path tspath.RootedPath) error {
+func (recording *RecordingFileSystem) Remove(path tspath.RootedPath) error {
 	recording.refuse("Remove", path.AsString())
 	return nil
 }
 
-func (recording *RecordingFS) Chtimes(path tspath.RootedPath, accessTime time.Time, modificationTime time.Time) error {
+func (recording *RecordingFileSystem) Chtimes(
+	path tspath.RootedPath,
+	accessTime time.Time,
+	modificationTime time.Time,
+) error {
 	recording.refuse("Chtimes", path.AsString())
 	return nil
 }
 
-func (recording *RecordingFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
+func (recording *RecordingFileSystem) DirectoryExists(path tspath.RootedDirectoryPath) bool {
 	exists := recording.underlying.DirectoryExists(path)
 	recording.note(path.AsString(), exists)
 	return exists
 }
 
-func (recording *RecordingFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
+func (recording *RecordingFileSystem) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
 	entries := recording.underlying.GetAccessibleEntries(path)
 	recording.note(
 		path.AsString(),
@@ -129,13 +133,13 @@ func (recording *RecordingFS) GetAccessibleEntries(path tspath.RootedDirectoryPa
 	return entries
 }
 
-func (recording *RecordingFS) Stat(path tspath.RootedPath) vfs.FileInfo {
+func (recording *RecordingFileSystem) Stat(path tspath.RootedPath) vfs.FileInfo {
 	info := recording.underlying.Stat(path)
 	recording.note(path.AsString(), info != nil)
 	return info
 }
 
-func (recording *RecordingFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+func (recording *RecordingFileSystem) Realpath(path tspath.RootedPath) tspath.RootedPath {
 	recording.note(path.AsString(), recording.underlying.FileExists(tspath.RootedFilePath(path)) ||
 		recording.underlying.DirectoryExists(tspath.RootedDirectoryPath(path)))
 	return tspath.RootedPath(recording.underlying.Realpath(path).AsString())

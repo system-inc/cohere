@@ -420,7 +420,7 @@ func TestScopeTerminalsPreserveSingleAssignmentForm(test *testing.T) {
 	if result.Built == 0 {
 		test.Skip("no terminals built for this source")
 	}
-	if violations := VerifySSA(function); len(violations) != 0 {
+	if violations := VerifySsa(function); len(violations) != 0 {
 		test.Errorf("the rewrite left %d single-assignment violations: %v", len(violations), violations)
 	}
 
@@ -686,7 +686,7 @@ func TestScopeTerminalsRecoverEveryScopeFromTheGraph(test *testing.T) {
 								}
 							}
 							recovered += len(seen)
-							ssaViolations += len(VerifySSA(function))
+							ssaViolations += len(VerifySsa(function))
 						})
 					},
 				}

@@ -125,7 +125,7 @@ func foldLines(source []uint16) []uint16 {
 		}
 		match := source[start:foldLinesEnd(source, start, newline)]
 		if len(match) == 0 {
-			if equalsASCII(sep, "\n") {
+			if equalsAscii(sep, "\n") {
 				result = append(result, sep...)
 			} else {
 				sep = []uint16{'\n'}
@@ -406,9 +406,9 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 			sep = []uint16{'\n'}
 		} else if len(indent) > trimIndent || characterAt(content, 0) == '\t' {
 			// more-indented content within a folded block
-			if equalsASCII(sep, " ") {
+			if equalsAscii(sep, " ") {
 				sep = []uint16{'\n'}
-			} else if !previousMoreIndented && equalsASCII(sep, "\n") {
+			} else if !previousMoreIndented && equalsAscii(sep, "\n") {
 				sep = []uint16{'\n', '\n'}
 			}
 			value = append(append(append(value, sep...), trimmedIndent...), content...)
@@ -416,7 +416,7 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 			previousMoreIndented = true
 		} else if len(content) == 0 {
 			// empty line
-			if equalsASCII(sep, "\n") {
+			if equalsAscii(sep, "\n") {
 				value = append(value, '\n')
 			} else {
 				sep = []uint16{'\n'}

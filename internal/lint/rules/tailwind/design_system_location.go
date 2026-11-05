@@ -295,7 +295,7 @@ func WritesSettings(settings map[string]json.RawMessage) bool {
 // loadConfiguredDesignSystem is upstream's resolution for a rule that named a location.
 func loadConfiguredDesignSystem(
 	projectRoot string,
-	fileSystem *rule.RecordingFS,
+	fileSystem *rule.RecordingFileSystem,
 	location DesignSystemLocation,
 ) DesignSystemResult {
 	entryPoint, packageRoot, configuredEntryPointError := ConfiguredEntryPoint(
@@ -351,7 +351,7 @@ func stylesheetResolverAt(
 	cwd string,
 	configured string,
 	packageRoot string,
-	fileSystem *rule.RecordingFS,
+	fileSystem *rule.RecordingFileSystem,
 ) (tailwindengine.StylesheetResolver, error) {
 	fileExists := func(path string) bool { return fileSystem.FileExists(tspath.RootedFilePath(path)) }
 	readFile := func(path string) (string, bool) { return fileSystem.ReadFile(tspath.RootedFilePath(path)) }

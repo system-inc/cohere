@@ -463,12 +463,12 @@ func dumpParseWith(parse func(string) (*estree.Node, error), text string) (any, 
 			dumped["endColumn"] = syntaxError.EndColumn
 			dumped["endOffset"] = offsets(syntaxError.EndOffset)
 		}
-		return nil, throughJSON(dumped)
+		return nil, throughJson(dumped)
 	}
-	return throughJSON(dumpParseValue(root, offsets)), nil
+	return throughJson(dumpParseValue(root, offsets)), nil
 }
 
-func throughJSON(value any) any {
+func throughJson(value any) any {
 	encoded, encodeError := json.Marshal(value)
 	if encodeError != nil {
 		return fmt.Sprintf("not JSON: %v", encodeError)

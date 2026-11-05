@@ -306,7 +306,7 @@ func (graph *Graph) Walk(callerContext context.Context, files []*ast.SourceFile,
 	var processStart time.Duration
 	var processKnown bool
 	if timings != nil {
-		processStart, processKnown = processCPU()
+		processStart, processKnown = processCpu()
 	}
 
 	var waitGroup sync.WaitGroup

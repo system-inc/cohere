@@ -201,7 +201,7 @@ func loadDesignSystemForProgram(program rule.Program, location DesignSystemLocat
 // loadDesignSystemThrough is the load itself, asking fileSystem every question about the disk.
 func loadDesignSystemThrough(
 	program rule.Program,
-	fileSystem *rule.RecordingFS,
+	fileSystem *rule.RecordingFileSystem,
 	location DesignSystemLocation,
 ) DesignSystemResult {
 	projectRoot := projectRootOf(program)

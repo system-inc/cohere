@@ -346,11 +346,11 @@ func TestPhiNonMutabilityControlsUnknownCallScopes(test *testing.T) {
 					if block == nil || block.Kind != BlockKindValue {
 						continue
 					}
-					for _, instructionID := range block.Instructions {
-						instruction := function.Instructions[instructionID]
+					for _, instructionId := range block.Instructions {
+						instruction := function.Instructions[instructionId]
 						if instruction != nil && callMembers[instruction.LValue.Identifier] {
 							test.Errorf("call scope contains value-block instruction %d (%T); upstream starts "+
-								"the scope after the join", instructionID, instruction.Value)
+								"the scope after the join", instructionId, instruction.Value)
 						}
 					}
 				}

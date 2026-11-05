@@ -1617,8 +1617,8 @@ func nestedOptionalInstructionsToDefer(function *Function,
 	if function == nil || optional == nil {
 		return result
 	}
-	for instructionID := range optional.ProcessedInstructions {
-		instruction := function.Instructions[instructionID]
+	for instructionId := range optional.ProcessedInstructions {
+		instruction := function.Instructions[instructionId]
 		if instruction == nil {
 			continue
 		}
@@ -1636,7 +1636,7 @@ func nestedOptionalInstructionsToDefer(function *Function,
 				!equalPaths(candidate.Path[:len(prefix.Path)], prefix.Path) {
 				continue
 			}
-			result[instructionID] = true
+			result[instructionId] = true
 			break
 		}
 	}

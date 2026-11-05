@@ -307,7 +307,7 @@ func (lexer *Lexer) parseStream() string {
 	if !ok {
 		return lexer.setNext("stream")
 	}
-	if characterAt(line, 0) == int(BOM) {
+	if characterAt(line, 0) == int(Bom) {
 		lexer.pushCount(1)
 		line = substring(line, 1, len(line))
 	}

@@ -291,7 +291,7 @@ func TestVerboseNamesEveryCrashOnceAndNoGroup(test *testing.T) {
 }
 
 // Not parallel: its subtests swap the package-level activeOutput and activeSummary
-func TestJSONListsEveryCrashBesideTheCounts(test *testing.T) {
+func TestJsonListsEveryCrashBesideTheCounts(test *testing.T) {
 	for _, engine := range crashEngines {
 		// Not parallel: it swaps the package-level activeOutput and activeSummary
 		test.Run(engine.name, func(test *testing.T) {
@@ -306,10 +306,10 @@ func TestJSONListsEveryCrashBesideTheCounts(test *testing.T) {
 					Cause: "nil pointer",
 				})
 			}
-			output, summary := renderCrashesIn(test, outputJSON, engine, crashes)
+			output, summary := renderCrashesIn(test, outputJson, engine, crashes)
 			forbidLines(test, output, "crashed: ")
 
-			encoded, encodeError := json.Marshal(summaryAsJSON(summary))
+			encoded, encodeError := json.Marshal(summaryAsJson(summary))
 			if encodeError != nil {
 				test.Fatal(encodeError)
 			}

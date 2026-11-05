@@ -279,7 +279,7 @@ func (writer *jsonWriter) key(first *bool, name string) {
 	writer.builder.WriteString(`"` + name + `":`)
 }
 
-func (writer *jsonWriter) text(text string) { writeJSONString(&writer.builder, stringToUnits(text)) }
+func (writer *jsonWriter) text(text string) { writeJsonString(&writer.builder, stringToUnits(text)) }
 
 func (writer *jsonWriter) ints(values []int) {
 	if values == nil {
@@ -431,7 +431,7 @@ func (writer *jsonWriter) nullableText(text string) {
 	writer.text(text)
 }
 
-func (writer *jsonWriter) errors(errors []*YAMLError) {
+func (writer *jsonWriter) errors(errors []*YamlError) {
 	writer.builder.WriteByte('[')
 	for index, yamlError := range errors {
 		if index > 0 {
@@ -476,8 +476,8 @@ func (writer *jsonWriter) document(document *Document) {
 	writer.key(&inner, "docEnd")
 	writer.raw(strconv.FormatBool(directives.DocEnd))
 	writer.key(&inner, "yaml")
-	writer.raw(`{"explicit":` + strconv.FormatBool(directives.YAML.Explicit) + `,"version":`)
-	writer.text(directives.YAML.Version)
+	writer.raw(`{"explicit":` + strconv.FormatBool(directives.Yaml.Explicit) + `,"version":`)
+	writer.text(directives.Yaml.Version)
 	writer.raw("}")
 	writer.key(&inner, "tags")
 	handles := make([]string, 0, len(directives.Tags))

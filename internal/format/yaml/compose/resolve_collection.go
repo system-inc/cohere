@@ -242,7 +242,7 @@ func isBlock(token *cst.Token) bool {
 type typeError string
 
 func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError onErrorFunc, tag *Tag) *Node {
-	isMap := equalsASCII(fc.FlowStart.Source, "{")
+	isMap := equalsAscii(fc.FlowStart.Source, "{")
 	fcName := "flow sequence"
 	fallback := "YAMLSeq"
 	if isMap {
@@ -468,7 +468,7 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 		ee = append(ee, fc.End[1:]...)
 	}
 	cePosition := offset
-	if ce != nil && equalsASCII(ce.Source, expectedEnd) {
+	if ce != nil && equalsAscii(ce.Source, expectedEnd) {
 		cePosition = ce.Offset + len(ce.Source)
 	} else {
 		name := strings.ToUpper(fcName[:1]) + fcName[1:]

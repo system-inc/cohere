@@ -60,7 +60,7 @@ func composeCollection(composition *composeContext, token *cst.Token, properties
 		}
 	}
 	expType := "seq"
-	if token.Type == "block-map" || token.Type == "flow-collection" && equalsASCII(token.FlowStart.Source, "{") {
+	if token.Type == "block-map" || token.Type == "flow-collection" && equalsAscii(token.FlowStart.Source, "{") {
 		expType = "map"
 	}
 	// shortcut: check if it's a generic YAMLMap or YAMLSeq

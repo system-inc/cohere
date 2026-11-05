@@ -396,19 +396,19 @@ func (parser *parser) splitWord(namespace any, firstCallback func(first string, 
 	// The indexes below are UTF-16, as the column and sourceIndex arithmetic needs.
 	units := wtf8ToUnits(word)
 	hasClass := indexesOf(units, ".")
-	hasID := indexesOf(units, "#")
+	hasId := indexesOf(units, "#")
 	// Eliminate Sass interpolations from the list of id indexes
 	interpolations := indexesOf(units, "#{")
 	if len(interpolations) > 0 {
 		filtered := []int{}
-		for _, hashIndex := range hasID {
+		for _, hashIndex := range hasId {
 			if !containsInt(interpolations, hashIndex) {
 				filtered = append(filtered, hashIndex)
 			}
 		}
-		hasID = filtered
+		hasId = filtered
 	}
-	indices := sortAscending(uniq(flatten([]int{0}, hasClass, hasID)))
+	indices := sortAscending(uniq(flatten([]int{0}, hasClass, hasId)))
 	for indexIndex, ind := range indices {
 		index := len(units)
 		if indexIndex+1 < len(indices) && indices[indexIndex+1] != 0 {
@@ -416,7 +416,7 @@ func (parser *parser) splitWord(namespace any, firstCallback func(first string, 
 		}
 		value := units[ind:index]
 		if indexIndex == 0 && firstCallback != nil {
-			firstCallback(unitsToWTF8(value), len(indices))
+			firstCallback(unitsToWtf8(value), len(indices))
 			continue
 		}
 		currToken := parser.currToken()
@@ -429,19 +429,19 @@ func (parser *parser) splitWord(namespace any, firstCallback func(first string, 
 		var node *estree.Node
 		if containsInt(hasClass, ind) {
 			node = newSelectorNode(typeClass,
-				"value", unitsToWTF8(value[1:]),
+				"value", unitsToWtf8(value[1:]),
 				"source", nodeSource,
 				"sourceIndex", jsAdd(currToken.loose(6), indices[indexIndex]),
 			)
-		} else if containsInt(hasID, ind) {
-			node = newSelectorNode(typeID,
-				"value", unitsToWTF8(value[1:]),
+		} else if containsInt(hasId, ind) {
+			node = newSelectorNode(typeId,
+				"value", unitsToWtf8(value[1:]),
 				"source", nodeSource,
 				"sourceIndex", jsAdd(currToken.loose(6), indices[indexIndex]),
 			)
 		} else {
 			node = newSelectorNode(typeTag,
-				"value", unitsToWTF8(value),
+				"value", unitsToWtf8(value),
 				"source", nodeSource,
 				"sourceIndex", jsAdd(currToken.loose(6), indices[indexIndex]),
 			)
@@ -640,7 +640,7 @@ func jsSliceOneFromEach(text string) string {
 	if len(units) < 2 {
 		return ""
 	}
-	return unitsToWTF8(units[1 : len(units)-1])
+	return unitsToWtf8(units[1 : len(units)-1])
 }
 
 // jsAdd is `left + right` where left is a token field that may be undefined: undefined plus a number

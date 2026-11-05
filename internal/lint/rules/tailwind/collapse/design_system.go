@@ -615,7 +615,7 @@ func (collector *stylesheetCollector) loadFile(path string) error {
 		return fmt.Errorf("read %s: %w", absolutePath, readError)
 	}
 
-	nodes, parseCssError := ParseCSS(string(content))
+	nodes, parseCssError := ParseCss(string(content))
 	if parseCssError != nil {
 		return fmt.Errorf("parse %s: %w", absolutePath, parseCssError)
 	}
@@ -748,7 +748,7 @@ func (collector *stylesheetCollector) ingestThemeBlock(node *Node, path string) 
 		}
 		if child.Kind == KindDeclaration && strings.HasPrefix(child.Property, "--") {
 			if addError := collector.theme.Add(
-				unescapeCSSIdentifier(child.Property),
+				unescapeCssIdentifier(child.Property),
 				child.Value,
 				options,
 			); addError != nil {

@@ -611,7 +611,7 @@ var NoMisusedPromises = rule.Rule[NoMisusedPromisesOptions]{
 			)
 		}
 
-		checkJSXAttribute := func(node *ast.JsxAttribute) {
+		checkJsxAttribute := func(node *ast.JsxAttribute) {
 			if node.Initializer == nil || node.Initializer.Kind != ast.KindJsxExpression {
 				return
 			}
@@ -1132,7 +1132,7 @@ var NoMisusedPromises = rule.Rule[NoMisusedPromisesOptions]{
 				listeners[ast.KindNewExpression] = checkArguments
 			}
 			if *settings.ChecksVoidReturnOpts.Attributes {
-				listeners[ast.KindJsxAttribute] = func(node *ast.Node) { checkJSXAttribute(node.AsJsxAttribute()) }
+				listeners[ast.KindJsxAttribute] = func(node *ast.Node) { checkJsxAttribute(node.AsJsxAttribute()) }
 			}
 			if *settings.ChecksVoidReturnOpts.InheritedMethods {
 				listeners[ast.KindClassDeclaration] = checkClassLikeOrInterfaceNode

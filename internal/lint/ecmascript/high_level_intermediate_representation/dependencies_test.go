@@ -156,10 +156,10 @@ func TestOptionalChainProcessedStoresAreDeferred(test *testing.T) {
 	}
 
 	processedStores := 0
-	for instructionID := range optional.ProcessedInstructions {
-		instruction := function.Instructions[instructionID]
+	for instructionId := range optional.ProcessedInstructions {
+		instruction := function.Instructions[instructionId]
 		if instruction == nil {
-			test.Fatalf("optional traversal recorded missing instruction %d", instructionID)
+			test.Fatalf("optional traversal recorded missing instruction %d", instructionId)
 		}
 		if _, ok := instruction.Value.(*StoreLocal); !ok {
 			continue
@@ -167,13 +167,13 @@ func TestOptionalChainProcessedStoresAreDeferred(test *testing.T) {
 		processedStores++
 		if !collector.isDeferredDependency(instruction) {
 			test.Errorf("optional StoreLocal %d was visited again; its operand would submit a chain prefix",
-				instructionID)
+				instructionId)
 		}
 
 		withoutOptionalSet := dependencyCollector{temporaries: temporaries{}}
 		if withoutOptionalSet.isDeferredDependency(instruction) {
 			test.Errorf("optional StoreLocal %d was also deferred without the processed set; the test is "+
-				"not exercising the optional-chain protocol", instructionID)
+				"not exercising the optional-chain protocol", instructionId)
 		}
 	}
 	if processedStores == 0 {

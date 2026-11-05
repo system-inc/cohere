@@ -148,11 +148,11 @@ func TestTextAgreesWithUpstream(test *testing.T) {
 		test.Fatal(decodeError)
 	}
 
-	mismatches, unmapped, nonASCII := 0, 0, 0
+	mismatches, unmapped, nonAscii := 0, 0, 0
 	for index, original := range originals {
 		text, start := original.text, original.byteStart
-		if !isASCIIOnly(text) {
-			nonASCII++
+		if !isAsciiOnly(text) {
+			nonAscii++
 		}
 		_, unitToByte := offsetMaps(text)
 		want := upstream[index]
@@ -212,20 +212,20 @@ func TestTextAgreesWithUpstream(test *testing.T) {
 	test.Logf(
 		"%d cases, %d with non-ASCII, %d answers upstream lands mid surrogate pair (held to the containing rune's start), %d mismatches",
 		len(cases),
-		nonASCII,
+		nonAscii,
 		unmapped,
 		mismatches,
 	)
-	if nonASCII < len(cases)/2 {
+	if nonAscii < len(cases)/2 {
 		test.Errorf(
 			"only %d of %d cases contain non-ASCII text, which is the population this test exists for",
-			nonASCII,
+			nonAscii,
 			len(cases),
 		)
 	}
 }
 
-func isASCIIOnly(text string) bool {
+func isAsciiOnly(text string) bool {
 	for index := 0; index < len(text); index++ {
 		if text[index] >= utf8.RuneSelf {
 			return false

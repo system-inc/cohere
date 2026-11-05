@@ -54,12 +54,12 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	says := func() string {
 		test.Helper()
 		binaryPath := filepath.Join(test.TempDir(), "cohere-swift")
-		if buildSwiftProductWithSwiftPMError := buildSwiftProductWithSwiftPM(
+		if buildSwiftProductWithSwiftPmError := buildSwiftProductWithSwiftPm(
 			packageDirectory,
 			scratch,
 			binaryPath,
-		); buildSwiftProductWithSwiftPMError != nil {
-			test.Fatal(buildSwiftProductWithSwiftPMError)
+		); buildSwiftProductWithSwiftPmError != nil {
+			test.Fatal(buildSwiftProductWithSwiftPmError)
 		}
 		output, outputError := exec.Command(binaryPath).Output()
 		if outputError != nil {

@@ -59,13 +59,13 @@ func (listings *DirectoryListings) Listing(directory string) ([]os.DirEntry, boo
 	return entries, listed
 }
 
-// listingFS serves GetAccessibleEntries from the listings and everything else from the disk beneath.
-type listingFS struct {
+// listingFileSystem serves GetAccessibleEntries from the listings and everything else from the disk beneath.
+type listingFileSystem struct {
 	vfs.FS
 	listings *DirectoryListings
 }
 
-func (fileSystem *listingFS) GetAccessibleEntries(directory tspath.RootedDirectoryPath) vfs.Entries {
+func (fileSystem *listingFileSystem) GetAccessibleEntries(directory tspath.RootedDirectoryPath) vfs.Entries {
 	entries, listed := fileSystem.listings.Listing(directory.AsString())
 	if !listed {
 		return fileSystem.FS.GetAccessibleEntries(directory)

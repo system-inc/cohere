@@ -72,16 +72,16 @@ func FormatJavaScript(
 	return format(fileName, text, nil, options, "babel", textToDoc)
 }
 
-// FormatJSON is Prettier's format for a JSON file, with the parser JSONParser picks. JSON embeds
+// FormatJson is Prettier's format for a JSON file, with the parser JSONParser picks. JSON embeds
 // nothing.
-func FormatJSON(fileName string, text string, options formatoptions.Options) (string, error) {
-	return format(fileName, text, nil, options, JSONParser(fileName), nil)
+func FormatJson(fileName string, text string, options formatoptions.Options) (string, error) {
+	return format(fileName, text, nil, options, JsonParser(fileName), nil)
 }
 
-// JSONParser is the parser language-json/languages gives a .json file: the files package managers
+// JsonParser is the parser language-json/languages gives a .json file: the files package managers
 // write (package.json, package-lock.json, composer.json) use json-stringify, which prints the way
 // JSON.stringify does, and every other .json file uses json, which prints with the JavaScript printer.
-func JSONParser(fileName string) string {
+func JsonParser(fileName string) string {
 	switch filepath.Base(fileName) {
 	case "package.json", "package-lock.json", "composer.json":
 		return "json-stringify"
@@ -164,12 +164,12 @@ func printToDoc(
 	case "babel":
 		root, comments, strippedText, printToDocError = estree.ParseJavaScript(fileName, text, nodes)
 	case "json":
-		root, comments, printToDocError = estree.ParseJSON(text, true)
+		root, comments, printToDocError = estree.ParseJson(text, true)
 		// main/normalize-format-options.js: the json parser never prints a trailing comma.
 		options.TrailingComma = "none"
 	case "json-stringify":
-		root, comments, printToDocError = estree.ParseJSON(text, false)
-		printer = estreeJSONPrinter
+		root, comments, printToDocError = estree.ParseJson(text, false)
+		printer = estreeJsonPrinter
 	default:
 		printToDocError = fmt.Errorf("no parser %q", parser)
 	}

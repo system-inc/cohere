@@ -36,7 +36,7 @@ import (
  * status` names every boundary in one line.
  */
 
-// bundleFS holds the vendored bundles.
+// bundleFileSystem holds the vendored bundles.
 //
 // The eight paths are named rather than globbed, and that is load-bearing. `go:embed bundles` would
 // take whatever happens to be in the directory, so a bundle deleted from the tree would produce a
@@ -57,7 +57,7 @@ import (
 //go:embed bundles/plugins/markdown.js
 //go:embed bundles/plugins/graphql.js
 //go:embed bundles/plugins/yaml.js
-var bundleFS embed.FS
+var bundleFileSystem embed.FS
 
 // BundleOrigin says which copy of the bundles a BundleSource carries.
 //
@@ -113,7 +113,7 @@ func Bundles() (BundleSource, error) {
 func embeddedBundles() (BundleSource, error) {
 	files := make(map[string][]byte, len(BundleFiles))
 	for _, name := range BundleFiles {
-		content, readFileError := fs.ReadFile(bundleFS, "bundles/"+name)
+		content, readFileError := fs.ReadFile(bundleFileSystem, "bundles/"+name)
 		if readFileError != nil {
 			return BundleSource{}, fmt.Errorf("the embedded prettier bundle %s is missing: %w", name, readFileError)
 		}
