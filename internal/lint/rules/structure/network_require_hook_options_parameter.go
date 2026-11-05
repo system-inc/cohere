@@ -84,10 +84,10 @@ var inferOptionsTypeNames = map[string]bool{
 // that a query with no variables may pass options second directly. The original decides by looking
 // at what the second argument actually is, and that is reproduced here rather than simplified: a
 // simplification would report "options must be third" at a call site where second is correct.
-var NetworkRequireHookOptionsParameter = rule.Rule{
+var NetworkRequireHookOptionsParameter = rule.Rule[rule.NoOptions]{
 	Name:       "structure/network-require-hook-options-parameter",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		analysis := NetworkFileAnalysisFor(ruleContext)
 		if len(analysis.HookDeclarations) == 0 {
 			return nil

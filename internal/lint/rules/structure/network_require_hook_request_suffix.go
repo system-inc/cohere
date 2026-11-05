@@ -57,10 +57,10 @@ func messageFileShouldEndWithRequest() rule.Message {
 // `useUserQuery` is suggested as `useUserRequest` rather than `useUserQueryRequest`. Only one suffix
 // is stripped, matching the original: chaining the strips would rewrite `useQueryHook` past what
 // anyone asked for.
-var NetworkRequireHookRequestSuffix = rule.Rule{
+var NetworkRequireHookRequestSuffix = rule.Rule[rule.NoOptions]{
 	Name:       "structure/network-require-hook-request-suffix",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		analysis := NetworkFileAnalysisFor(ruleContext)
 		if len(analysis.HookDeclarations) == 0 {
 			// Declining the file rather than registering a listener that would find nothing. A file

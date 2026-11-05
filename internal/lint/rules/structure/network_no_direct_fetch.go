@@ -34,9 +34,9 @@ func messageNoDirectFetch() rule.Message {
 //
 // No fix. Replacing a fetch with a NetworkService call means choosing a method, a response shape,
 // and an error path, which is the work the rule is asking for rather than something to generate.
-var NetworkNoDirectFetch = rule.Rule{
+var NetworkNoDirectFetch = rule.Rule[rule.NoOptions]{
 	Name: "structure/network-no-direct-fetch",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

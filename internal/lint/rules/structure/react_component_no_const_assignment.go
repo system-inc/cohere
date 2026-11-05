@@ -76,9 +76,9 @@ func messageNoConstAssignment(identifierName string, isExported bool) rule.Messa
 // two checks rather than by its own logic: widening the kind test to accept calls, which a later
 // rule about component factories might want, silently makes this exemption load-bearing at a line
 // that change does not touch. A reader who found it deleted would have no way to learn that.
-var ReactComponentNoConstAssignment = rule.Rule{
+var ReactComponentNoConstAssignment = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-component-no-const-assignment",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil || !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}

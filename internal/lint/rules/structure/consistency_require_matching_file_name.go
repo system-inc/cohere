@@ -186,10 +186,10 @@ var companionFileSuffixes = []string{".test", ".spec", ".stories", ".story"}
 // The repair is renaming a file, which changes every import of it across the tree. That is a rename
 // with its own tooling and its own review, not a lint edit applied unattended to one file, and an
 // edit to one file cannot express it anyway.
-var ConsistencyRequireMatchingFileName = rule.Rule{
+var ConsistencyRequireMatchingFileName = rule.Rule[rule.NoOptions]{
 	Name:       "structure/consistency-require-matching-file-name",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

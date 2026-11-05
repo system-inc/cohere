@@ -52,9 +52,9 @@ func messageNoStringLiteralGraphQlQuery() rule.Message {
 // for a variable declaration of that name, which is the same search rather than a type query: this
 // rule has to work on a file that does not type-check, since a wrong document is exactly the kind of
 // mistake that arrives with other errors.
-var NetworkNoStringLiteralQuery = rule.Rule{
+var NetworkNoStringLiteralQuery = rule.Rule[rule.NoOptions]{
 	Name: "structure/network-no-string-literal-query",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()

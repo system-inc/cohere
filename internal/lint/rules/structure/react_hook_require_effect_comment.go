@@ -50,9 +50,9 @@ const effectCommentPrefix = "Effect to"
 // The comment is looked up on the enclosing statement rather than the call. Comments attach to
 // statements, so asking at the call expression finds nothing for the ordinary
 // `React.useEffect(...)` written as its own statement.
-var ReactHookRequireEffectComment = rule.Rule{
+var ReactHookRequireEffectComment = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-hook-require-effect-comment",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			// An effect outside a React file is not a component's effect. Declining here also skips
 			// the comment scan entirely on the majority of files.

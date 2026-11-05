@@ -60,10 +60,10 @@ func messageComponentRequiresNamedExport() rule.Message {
 // would mean writing nesting detection the original does not have, which would make this rule
 // quieter than the gate on files the gate reports. So the flag is not ported, and the reason is
 // recorded here because a later reader comparing the two files will otherwise see a missing guard.
-var ReactComponentRequireNamedExport = rule.Rule{
+var ReactComponentRequireNamedExport = rule.Rule[rule.NoOptions]{
 	Name:       "structure/react-component-require-named-export",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

@@ -283,7 +283,7 @@ func themeFingerprintOf(test *testing.T, files map[string]string) [sha256.Size]b
 	test.Helper()
 	var fingerprint [sha256.Size]byte
 	probe := BoundaryNoProjectThemeValue
-	probe.Run = func(ruleContext rule.Context, options any) rule.Listeners {
+	probe.Run = func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		fingerprint = BoundaryNoProjectThemeValue.ProgramFingerprint(ruleContext.Program, options)
 		return nil
 	}
