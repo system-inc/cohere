@@ -168,7 +168,9 @@ func RunTypedFilesWithOptionsFor(
 	optionsFor func(directory string) any,
 ) Result {
 	test.Helper()
-	return runTypedFiles(test, subject, files, subjectFileName, optionsFor, func(string) {}, false)
+	return runTypedFiles(test, subject, files, subjectFileName, optionsFor, func(string) {
+		// It writes nothing: a setup at all is what builds the fixture uncached, keeping its own tsconfig.
+	}, false)
 }
 
 // fixedOptions is an options value that does not depend on where the fixture was written.

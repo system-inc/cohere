@@ -87,17 +87,18 @@ func RunWithOptions(test *testing.T, subject rule.Rule, fileName string, sourceT
 	// typescript-go panics on a relative filename: the parser stores it as an identity and expects
 	// it to be normalized and absolute. A fixture names a file for readability rather than for the
 	// disk, so it is rooted here instead of at every call site.
+	rootedFileName := fileName
 	if !tspath.IsRootedDiskPath(fileName) {
-		fileName = "/" + strings.TrimPrefix(fileName, "/")
+		rootedFileName = "/" + strings.TrimPrefix(fileName, "/")
 	}
-	fileName = tspath.NormalizePath(fileName)
+	rootedFileName = tspath.NormalizePath(rootedFileName)
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: tspath.RootedFilePath(fileName),
-		PathKey:  tspath.PathKey(fileName),
+		FileName: tspath.RootedFilePath(rootedFileName),
+		PathKey:  tspath.PathKey(rootedFileName),
 	}, sourceText, scriptKind)
 	if sourceFile == nil {
-		test.Fatalf("could not parse %s", fileName)
+		test.Fatalf("could not parse %s", rootedFileName)
 	}
 
 	var diagnostics []rule.Diagnostic

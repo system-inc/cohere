@@ -23,7 +23,7 @@ import (
 //
 // Id is stable and machine-facing: it survives rewording, so suppressions and metrics keep
 // resolving. Description is the sentence a person reads, and it carries the reasoning rather than
-// just the verdict — a rule that only says what is wrong gets disabled the first time it is
+// just the verdict. A rule that only says what is wrong gets disabled the first time it is
 // inconvenient, while one that says why gets fixed.
 type Message struct {
 	Id          string
@@ -46,7 +46,7 @@ type Fix struct {
 // Suggestion is a fix that must not be applied automatically.
 //
 // The distinction is intent, not confidence. A fix preserves what the code means; a suggestion
-// changes it, and a human has to agree. Awaiting a non-promise is a fix — removing the await cannot
+// changes it, and a human has to agree. Awaiting a non-promise is a fix: removing the await cannot
 // alter behavior. Adding a missing switch case is a suggestion, because only the author knows what
 // belongs in the body.
 type Suggestion struct {
@@ -246,7 +246,7 @@ const (
 //
 // Run is called once per file, so a rule may allocate per-file state in its closure and read
 // ctx.SourceFile while deciding whether to listen at all. Returning nil listeners is how a rule
-// declines a file cheaply — the discipline that matters most for speed, since the cheapest rule is
+// declines a file cheaply, the discipline that matters most for speed, since the cheapest rule is
 // one that looks at a filename and stops.
 type Rule struct {
 	Name string
@@ -485,7 +485,7 @@ func (c Context) ReportNodeWithSuggestions(node *ast.Node, message Message, sugg
 	})
 }
 
-// ReportRange reports a span that is not exactly one node — a portion of a string literal, or the
+// ReportRange reports a span that is not exactly one node: a portion of a string literal, or the
 // gap between two tokens.
 func (c Context) ReportRange(textRange core.TextRange, message Message) {
 	c.Report(Diagnostic{
@@ -545,7 +545,7 @@ func (c Context) ReportRangeWithFixes(textRange core.TextRange, message Message,
 // that no downstream check can catch.
 //
 // `node.Loc.Pos()` is the position *before* leading trivia, not the start of the node's own text.
-// For `import * as X from 'fs'`, the module specifier's Loc spans `" 'fs'"` — the space is inside
+// For `import * as X from 'fs'`, the module specifier's Loc spans `" 'fs'"`, so the space is inside
 // the range. A fix built from Loc therefore replaces the whitespace too:
 //
 //	import * as X from 'fs'   ->   import * as X from'node:fs'

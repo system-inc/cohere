@@ -25,7 +25,7 @@ var designSystemRecordings struct {
 	byProgram map[weak.Pointer[compiler.Program]][]*RecordingFS
 }
 
-func recordDesignSystemFS(program *compiler.Program, recorder *RecordingFS) {
+func recordDesignSystemFs(program *compiler.Program, recorder *RecordingFS) {
 	designSystemRecordings.Lock()
 	defer designSystemRecordings.Unlock()
 	if designSystemRecordings.byProgram == nil {

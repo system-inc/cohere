@@ -11,7 +11,7 @@
  * `--cache` (default: the system's temporary directory), and writes `<out>/<rule>.json` per rule.
  *
  * This is a regeneration tool, and nothing runs it. The rows it writes are committed, pinned to the
- * tag, and `TestCohereAgreesWithESLintsCoreCorpus` replays the committed rows: a measurement that had
+ * tag, and `TestCohereAgreesWithEsLintsCoreCorpus` replays the committed rows: a measurement that had
  * to be re-fetched to re-run would be one whose source can vanish. Re-extracting for a new ESLint is
  * a deliberate act, and the test's row count says whether anything was lost on the way.
  *

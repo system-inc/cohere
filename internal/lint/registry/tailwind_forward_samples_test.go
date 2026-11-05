@@ -63,7 +63,7 @@ func TestTailwindForwardSamplesLoadOncePorted(test *testing.T) {
 		if len(sample.Elements) != 1 || json.Unmarshal(sample.Elements[0], &element) != nil {
 			test.Fatalf("%s %s: each sample is one object element", sample.Rule, sample.Elements)
 		}
-		described := sample.Rule + " " + string(compactJSON(test, sample.Elements[0]))
+		described := sample.Rule + " " + string(compactJson(test, sample.Elements[0]))
 
 		ported := true
 		for key := range element {
@@ -97,8 +97,8 @@ func isTailwindPorted(ruleName string, key string) bool {
 	return false
 }
 
-// compactJSON is a sample's element without whitespace, so a refused value is named one way.
-func compactJSON(test *testing.T, raw json.RawMessage) []byte {
+// compactJson is a sample's element without whitespace, so a refused value is named one way.
+func compactJson(test *testing.T, raw json.RawMessage) []byte {
 	test.Helper()
 	var value any
 	if decodeError := json.Unmarshal(raw, &value); decodeError != nil {

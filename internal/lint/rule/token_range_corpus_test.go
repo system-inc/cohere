@@ -107,8 +107,8 @@ func corpusFiles(test *testing.T, roots []string) []*ast.SourceFile {
 			if !handled || entry.Type()&fs.ModeSymlink != 0 {
 				return nil
 			}
-			contents, err := os.ReadFile(path)
-			if err != nil {
+			contents, readError := os.ReadFile(path)
+			if readError != nil {
 				return nil
 			}
 			fileName := tspath.NormalizePath(path)

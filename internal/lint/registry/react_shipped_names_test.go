@@ -18,7 +18,7 @@ import (
 // a rename on either side would be "a visible edit rather than a silent unjoin".
 //
 // It was silent for a reason worth stating, because it generalises past this map. `Classify` reads
-// only the key — `_, found := ShippedRules[ruleName]` — so the value was never evaluated by
+// only the key (`_, found := ShippedRules[ruleName]`), so the value was never evaluated by
 // anything. A field that no code path reads cannot be wrong in a way any test can see, and its
 // presence makes the file look checked. That is worse than omitting it, and it is the mechanism
 // behind the open finding that the parity guard cannot tell a namespaced spelling from a bare one.

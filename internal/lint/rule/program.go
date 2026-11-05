@@ -270,8 +270,8 @@ func (view *programView) FS() vfs.FS {
 
 func (view *programView) DesignSystemFS() *RecordingFS {
 	view.require(ReadsDesignSystem, "DesignSystemFS")
-	recorder := NewRecordingFS(view.program.Host().FS())
-	recordDesignSystemFS(view.program, recorder)
+	recorder := NewRecordingFs(view.program.Host().FS())
+	recordDesignSystemFs(view.program, recorder)
 	return recorder
 }
 

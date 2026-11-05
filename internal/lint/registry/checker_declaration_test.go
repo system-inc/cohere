@@ -239,11 +239,9 @@ func TestCheckerDeclarationShareStillSupportsTheConclusion(test *testing.T) {
 	// Below the floor, the acquisition is skipped on nearly every file and the blanket claim these
 	// comments replaced would be honest again. Above the ceiling, it is skipped so seldom that the
 	// conditional is not buying what the comments say it buys.
-	const (
-		measuredShare = 44.0 / 216.0
-		floorShare    = 0.05
-		ceilingShare  = 0.50
-	)
+	const measuredShare = 44.0 / 216.0
+	const floorShare = 0.05
+	const ceilingShare = 0.50
 
 	rules := All()
 	needsChecker := 0
