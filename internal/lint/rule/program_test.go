@@ -144,8 +144,9 @@ func TestASlotViewKeptPastItsFileFailsOnEveryRead(test *testing.T) {
 	test.Parallel()
 	program := new(compiler.Program)
 	everything := Rule{
-		Name:         "keeps-its-program",
-		ProgramReads: ReadsCompilerOptions | ReadsDefaultLibrary | ReadsModuleResolution | ReadsOtherFiles | ReadsDesignSystem,
+		Name: "keeps-its-program",
+		ProgramReads: ReadsCompilerOptions | ReadsDefaultLibrary | ReadsModuleResolution | ReadsOtherFiles |
+			ReadsDesignSystem,
 	}
 	reads := map[string]func(Program){
 		"Options":                        func(view Program) { view.Options() },

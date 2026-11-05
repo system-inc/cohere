@@ -88,7 +88,8 @@ func (resolver *exportOriginResolver) expression(node *ast.Node) moduleExport {
 	}
 	resolver.requireShape(node)
 	switch node.Kind {
-	case ast.KindParenthesizedExpression, ast.KindAsExpression, ast.KindTypeAssertionExpression, ast.KindNonNullExpression, ast.KindSatisfiesExpression:
+	case ast.KindParenthesizedExpression, ast.KindAsExpression, ast.KindTypeAssertionExpression,
+		ast.KindNonNullExpression, ast.KindSatisfiesExpression:
 		return resolver.expression(node.Expression())
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
 		receiver := resolver.expression(node.Expression())
