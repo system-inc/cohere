@@ -65,7 +65,7 @@ type JsxNoUselessFragmentOptions struct {
 	// AllowExpressions keeps a fragment whose single child is an expression container.
 	//
 	// Upstream's reasoning is that `<Foo content={<>{value}</>} />` is a real use: the fragment
-	// gives the expression a React element wrapper the prop may require. It silences ONLY the
+	// gives the expression a React element wrapper the prop may require. It silences only the
 	// `NeedsMoreChildren` arm; a fragment inside an HTML element still reports the other one.
 	// Measured on the installed build.
 	AllowExpressions bool `json:"allowExpressions"`
@@ -73,7 +73,7 @@ type JsxNoUselessFragmentOptions struct {
 
 // DecodeJsxNoUselessFragmentOptions decodes the option object.
 //
-// Hand-written rather than `rule.DecodeOptionsInto` because the generic helper errors on EMPTY
+// Hand-written rather than `rule.DecodeOptionsInto` because the generic helper errors on empty
 // input, which is what a bare `"error"` configuration hands a rule. The one default is the zero
 // value, so nothing else needs translating.
 func DecodeJsxNoUselessFragmentOptions(raw []byte) (any, error) {
@@ -101,14 +101,14 @@ func DecodeJsxNoUselessFragmentOptions(raw []byte) (any, error) {
 // Ported from `react/jsx-no-useless-fragment` in `eslint-plugin-react`, the implementation that
 // defined it. Its 14 clean and 16 reporting cases were extracted mechanically from the clone by
 // stubbing its `RuleTester`, then all 30 were run against the installed build, 7.37.5, through the
-// ESLint Linter API with the TypeScript parser, driving the FIXER as well as the judgment.
+// ESLint Linter API with the TypeScript parser, driving the fixer as well as the judgment.
 //
 // # Two arms, and one input can trip both
 //
 // `NeedsMoreChildren` is about the fragment's own contents and `ChildOfHtmlElement` is about where
 // it sits, so `<div><>{child}</></div>` reports twice, contents first.
 //
-// # The fixer replaces the fragment with its children's TEXT, and that is safe for TypeScript
+// # The fixer replaces the fragment with its children's text, and that is safe for TypeScript
 //
 // Upstream slices the source between the opener's end and the closer's start and writes it back over
 // the whole node. That is the shape the port brief warns about, a fixer building a replacement span
@@ -117,7 +117,7 @@ func DecodeJsxNoUselessFragmentOptions(raw []byte) (any, error) {
 // why a type assertion, a non-null assertion, a `satisfies`, a generic call and a typed arrow all
 // survive intact. Each of the five was driven through the installed fixer and then through this one.
 //
-// # But the fixer DOES delete attributes, and this port declines that case
+// # But the fixer does delete attributes, and this port declines that case
 //
 // `isKeyedElement` skips a fragment carrying `key`, and nothing skips any other attribute. Measured
 // on the installed build:
@@ -127,7 +127,7 @@ func DecodeJsxNoUselessFragmentOptions(raw []byte) (any, error) {
 //	<div><Fragment key={1} id={2}>{x}</Fragment></div>  not reported at all, key exempts it
 //
 // A spread can carry `key`, so the second row can change behavior rather than spelling, and neither
-// row tells the reader anything was removed. This port REPORTS both and withholds the repair, which
+// row tells the reader anything was removed. This port reports both and withholds the repair, which
 // is the shape `no-arrow-function-lifecycle` already uses here for the same reason: a rule that
 // reports without fixing is useful, and a fixer that quietly deletes what somebody wrote is not.
 // `TestJsxNoUselessFragmentDeclinesToDropAttributes` pins it, and the guard is mutation-tested.
@@ -297,11 +297,11 @@ func jsxNoUselessFragmentChildren(node *ast.Node) []*ast.Node {
 
 // jsxNoUselessFragmentIsPaddingSpaces reports whether a child is whitespace React would strip.
 //
-// Upstream requires the text be whitespace AND contain a newline, which is exactly the text React's
+// Upstream requires the text be whitespace and contain a newline, which is exactly the text React's
 // runtime removes: a line break with indentation around it is layout, while a single space between
 // two elements is a rendered space and counts as a real child.
 //
-// `ast.Node.Text()` PANICS on a JsxText node, and the walk recovers per FILE rather than per rule,
+// `ast.Node.Text()` panics on a JsxText node, and the walk recovers per file rather than per rule,
 // so one such call costs every rule in this package every finding in that file while the run still
 // prints a plausible summary. The field is read directly instead, which is what `self_closing_comp`
 // already does for the same reason. This was written as `Text()` first and the corpus caught it as
@@ -327,11 +327,11 @@ func jsxNoUselessFragmentNonPaddingChildren(children []*ast.Node) []*ast.Node {
 
 // jsxNoUselessFragmentHasLessThanTwoChildren answers upstream's first arm.
 //
-// Fewer than two real children, EXCEPT when that one child is a call expression in braces. Upstream
+// Fewer than two real children, except when that one child is a call expression in braces. Upstream
 // spells the exception as `return !containsCallExpression(nonPaddingChildren[0])`, on the reasoning
 // that `<>{items.map(...)}</>` produces a list whose elements need the fragment's key context.
 //
-// Upstream's function has NO return at all when there are two or more children, so it answers
+// Upstream's function has no return at all when there are two or more children, so it answers
 // `undefined`, which is falsy and behaves as false. Reproduced as a plain false, and the two are the
 // same decision.
 func jsxNoUselessFragmentHasLessThanTwoChildren(children []*ast.Node) bool {
@@ -347,11 +347,11 @@ func jsxNoUselessFragmentHasLessThanTwoChildren(children []*ast.Node) bool {
 
 // jsxNoUselessFragmentContainsCallExpression reports whether a child is `{someCall()}`.
 //
-// # An OPTIONAL call is not one, and the difference is in the two parsers rather than in the rule
+// # An optional call is not one, and the difference is in the two parsers rather than in the rule
 //
 // Upstream's `containsCallExpression` is `node.expression.type === 'CallExpression'`, and estree
 // wraps a whole optional chain in a `ChainExpression`. So for `{items?.map(...)}` upstream sees a
-// ChainExpression, answers false, and REPORTS the fragment. Our parser has no wrapper: `?.` is a
+// ChainExpression, answers false, and reports the fragment. Our parser has no wrapper: `?.` is a
 // `QuestionDotToken` hanging off the call, and the kind is `KindCallExpression` either way, so a
 // bare kind test answers true and silently exempts the fragment.
 //
@@ -366,7 +366,7 @@ func jsxNoUselessFragmentHasLessThanTwoChildren(children []*ast.Node) bool {
 //
 // This is the same parser difference `logicalAssignmentIsOptionalChain` records in
 // `internal/rules/core/logical_assignment_operators.go`, reached from a different rule: any port
-// that compares an estree node TYPE against our node KIND has to ask about `QuestionDotToken`
+// that compares an estree node type against our node kind has to ask about `QuestionDotToken`
 // separately, because the wrapper upstream tests for does not exist here.
 func jsxNoUselessFragmentContainsCallExpression(child *ast.Node) bool {
 	if child.Kind != ast.KindJsxExpression {
@@ -377,7 +377,7 @@ func jsxNoUselessFragmentContainsCallExpression(child *ast.Node) bool {
 		return false
 	}
 	// An optional call is upstream's ChainExpression, which its type test rejects. Only the
-	// call's OWN `?.` matters: `a?.b.c()` is a ChainExpression upstream too, so the whole spine
+	// call's own `?.` matters: `a?.b.c()` is a ChainExpression upstream too, so the whole spine
 	// is walked rather than just the outermost node.
 	return !jsxNoUselessFragmentIsOptionalChain(expression)
 }
@@ -385,7 +385,7 @@ func jsxNoUselessFragmentContainsCallExpression(child *ast.Node) bool {
 // jsxNoUselessFragmentIsOptionalChain reports whether any link in an access spine carries `?.`.
 //
 // The spine is walked rather than the outermost node tested, because estree's ChainExpression wraps
-// the ENTIRE chain: `a?.b.c()` and `a.b?.c()` are both a ChainExpression to upstream, so both must
+// the entire chain: `a?.b.c()` and `a.b?.c()` are both a ChainExpression to upstream, so both must
 // answer true here for the two rules to agree.
 func jsxNoUselessFragmentIsOptionalChain(node *ast.Node) bool {
 	for current := node; current != nil; {
@@ -422,7 +422,7 @@ func jsxNoUselessFragmentIsOptionalChain(node *ast.Node) bool {
 // jsxNoUselessFragmentIsOnlyTextAndNotChild answers upstream's exemption for a text-only fragment.
 //
 // `<>foo</>` written outside any JSX is kept, because `content={<>ee eeee</>}` is a real use: the
-// prop wants an element and a bare string is not one. Upstream tests the RAW children list rather
+// prop wants an element and a bare string is not one. Upstream tests the raw children list rather
 // than the padding-filtered one, so a text-only fragment spanning lines does not qualify.
 func jsxNoUselessFragmentIsOnlyTextAndNotChild(node *ast.Node, children []*ast.Node) bool {
 	if len(children) != 1 || children[0].Kind != ast.KindJsxText {
@@ -441,7 +441,7 @@ func jsxNoUselessFragmentIsSingleExpression(children []*ast.Node) bool {
 // jsxNoUselessFragmentIsChildOfHtmlElement answers upstream's second arm.
 //
 // The parent must be a JSX element whose tag is a bare lowercase identifier, which is upstream's
-// `/^[a-z]+$/`. That pattern accepts letters only, so `<my-tag>` and `<h1>` are NOT html elements to
+// `/^[a-z]+$/`. That pattern accepts letters only, so `<my-tag>` and `<h1>` are not html elements to
 // this rule, and a fragment inside either reports only the first arm. Both measured.
 func jsxNoUselessFragmentIsChildOfHtmlElement(node *ast.Node) bool {
 	parent := node.Parent
@@ -452,7 +452,7 @@ func jsxNoUselessFragmentIsChildOfHtmlElement(node *ast.Node) bool {
 	if opening == nil {
 		return false
 	}
-	// Not `jsx.ElementParts`: the subject here is the PARENT, which the test above has already
+	// Not `jsx.ElementParts`: the subject here is the parent, which the test above has already
 	// narrowed to a JsxElement, and that helper answers nil for a JsxElement. The self-closing case
 	// it guards against cannot arise on this line either, measured rather than argued: a
 	// self-closing element has no children, so nothing nests inside one. Probed over five nesting
@@ -469,16 +469,16 @@ func jsxNoUselessFragmentIsChildOfHtmlElement(node *ast.Node) bool {
 // jsxNoUselessFragmentIsAllLowercaseLetters reproduces upstream's `/^[a-z]+$/`.
 //
 // Letters only, so a digit, a dash, an uppercase letter or any byte outside ASCII fails. `<h1>` is
-// therefore NOT an html element as far as this rule is concerned, which is upstream's behavior
+// therefore not an html element as far as this rule is concerned, which is upstream's behavior
 // rather than an oversight here, and a Cyrillic tag is not one either.
 //
 // Both ends of the byte comparison are load-bearing and they are killed by different inputs, which
 // is worth knowing because the obvious fixture kills only one. An uppercase letter is below `a`, so
-// the lower bound catches it and a mutant dropping the UPPER bound survives an uppercase fixture. A
+// the lower bound catches it and a mutant dropping the upper bound survives an uppercase fixture. A
 // tag outside ASCII is what separates them: every byte of it is above `z`.
 //
 // The `+` in upstream's pattern requires at least one character, and the empty-string guard that
-// would express it is DELETED as unreachable. Probed over six shapes including three the parser only
+// would express it is deleted as unreachable. Probed over six shapes including three the parser only
 // reaches through error recovery: `<>` and `<  >` both parse as fragments rather than as elements
 // with an empty name, and the only callers are this file's `IsChildOfHtmlElement`, which reads a
 // JsxOpeningElement's TagName. If a caller is ever added that can pass an empty string, this needs
@@ -527,7 +527,7 @@ func jsxNoUselessFragmentIsChildOfComponentElement(node *ast.Node) bool {
 // both, so there is nothing to reproduce and no fixture could reach it. That is a stated absence
 // rather than a silent omission.
 //
-// The FIFTH refusal is this port's own and is not upstream's: a fragment written as an element
+// The fifth refusal is this port's own and is not upstream's: a fragment written as an element
 // carrying any attribute other than `key`. See the rule's doc comment for the measurement.
 func jsxNoUselessFragmentCanFix(node *ast.Node) bool {
 	if jsxNoUselessFragmentHasNonKeyAttributes(node) {
@@ -588,7 +588,7 @@ func jsxNoUselessFragmentIsNonspaceTextOrCurly(child *ast.Node) bool {
 
 // jsxNoUselessFragmentFix builds the replacement, or reports that none is safe.
 //
-// The replacement is the source text BETWEEN the opener and the closer, trimmed the way React trims
+// The replacement is the source text between the opener and the closer, trimmed the way React trims
 // it, written over the whole node. Copying the text verbatim is what makes this safe for TypeScript:
 // a type assertion, a non-null assertion, a `satisfies`, a generic call and a typed arrow inside the
 // children all survive byte for byte, each driven through both implementations.

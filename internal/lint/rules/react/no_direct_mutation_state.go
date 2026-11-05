@@ -64,7 +64,7 @@ var messageNoDirectMutationState = rule.Message{
 //
 // # The root of the chain must be a dotted `this.state`
 //
-// oxc's `get_outer_member_expression` is named for the outer expression and walks to the INNERMOST
+// oxc's `get_outer_member_expression` is named for the outer expression and walks to the innermost
 // one, descending through `object()` while the object is itself a member expression, then requires
 // the result to be a `StaticMemberExpression`. So the chain is reduced to its root before anything
 // is compared, and the root has to be dot access rather than subscript.
@@ -95,7 +95,7 @@ var messageNoDirectMutationState = rule.Message{
 //
 // The split is not a decision upstream made, it is where the parentheses land in oxc's tree. A
 // parenthesized assignment target is stored unwrapped there, so the outermost parens vanish before
-// the rule sees anything; parentheses anywhere INSIDE the chain survive as a real node, and the
+// the rule sees anything; parentheses anywhere inside the chain survive as a real node, and the
 // `object()` walk does not skip them, so the descent stops at a `ParenthesizedExpression` that is
 // not a member expression and the root is never reached.
 //
@@ -120,7 +120,7 @@ var messageNoDirectMutationState = rule.Message{
 //
 // The third is upstream's own failing case and reads as "an async callback runs later, so the
 // exemption should not cover it". The fourth shows the implementation does not actually ask that.
-// The latch is set by any `CallExpression` ancestor at all, so a write in an ARGUMENT position is
+// The latch is set by any `CallExpression` ancestor at all, so a write in an argument position is
 // enough, and `foo(this.state.x = 1)` reports even though it runs synchronously during construction
 // exactly like the exempt form. That is upstream being crude rather than upstream being right, and
 // it is reproduced rather than improved on. Measured on the release binary; no fixture upstream
@@ -149,8 +149,8 @@ var messageNoDirectMutationState = rule.Message{
 // # This is not the question `reference.WritesToBinding` answers
 //
 // That helper is what eight rules in this tree ask, and it is the wrong shelf here rather than a
-// near miss. It asks whether an IDENTIFIER writes the BINDING it names, and its own test file pins
-// `this.a = 1` and `o.a = 1` as answering FALSE, deliberately, because a rule watching a binding
+// near miss. It asks whether an identifier writes the binding it names, and its own test file pins
+// `this.a = 1` and `o.a = 1` as answering `false`, deliberately, because a rule watching a binding
 // called `a` must not report a property write that merely shares the name. This rule asks the
 // opposite question: not which binding is written, but whether the member chain being written is
 // rooted at `this.state`. There is no binding involved at any point. Read the body, not the name.
@@ -244,7 +244,7 @@ func reportUpdate(ruleContext rule.Context, updateExpression *ast.Node, operand 
 //
 // This is oxc's `get_outer_member_expression` composed with `is_state_member_expression`. The walk
 // descends through the object of each member expression while that object is itself a member
-// expression, so any depth of chain reduces to its root, then the root must be a DOTTED access
+// expression, so any depth of chain reduces to its root, then the root must be a dotted access
 // whose object is the `this` keyword and whose name is `state`.
 //
 // Three properties of that, each of which a fixture pins:
@@ -304,7 +304,7 @@ func isStateRootedMemberChain(target *ast.Node) bool {
 
 // shouldIgnoreComponent is oxc's `should_ignore_component` at our AST's spelling.
 //
-// It answers true for a write that should NOT be reported, which is upstream's polarity and is kept
+// It answers true for a write that should not be reported, which is upstream's polarity and is kept
 // rather than inverted so the two read the same way side by side. The condition is
 // `(is_constructor && !is_call_expression) || !is_component`, and the three latches are gathered in
 // one climb that stops at the first class.
@@ -325,9 +325,9 @@ func isStateRootedMemberChain(target *ast.Node) bool {
 //
 // # Why the climb stops at a class and why the checks run before the break
 //
-// Upstream breaks on `AstKind::Class` at the END of the loop body, so the class that stops the walk
+// Upstream breaks on `AstKind::Class` at the end of the loop body, so the class that stops the walk
 // is itself tested first. That ordering is load-bearing rather than incidental: for a write inside
-// a component's own method, the component class IS the node the loop breaks on, and testing it
+// a component's own method, the component class is the node the loop breaks on, and testing it
 // before breaking is the only reason the whole ES6 half of this rule reports at all. Reversing the
 // two lines silences every class-component finding while leaving all eight passing cases green,
 // which is the shape of defect no imported fixture can catch.

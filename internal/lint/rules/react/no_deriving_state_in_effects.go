@@ -32,13 +32,13 @@ var messageNoDerivingStateInEffects = rule.Message{
 // `ValidateNoDerivedComputationsInEffects_exp.ts`, 842 lines against the base pass's 229, and
 // choosing between them is the first decision this port makes.
 //
-// The shipped ESLint plugin runs the BASE pass. Measured in
+// The shipped ESLint plugin runs the base pass. Measured in
 // `node_modules/eslint-plugin-react-hooks/cjs/eslint-plugin-react-hooks.development.js`: its
 // `COMPILER_OPTIONS.environment` sets `validateNoDerivedComputationsInEffects: true` and never sets
 // the `_exp` flag, whose schema default is false. The pipeline prefers `_exp` when both are on, so
 // the flag that is absent is the one that decides. This rule is the base pass.
 //
-// That matters more than it sounds, because the CORPUS is the other way round. All 21 fixtures in
+// That matters more than it sounds, because the corpus is the other way round. All 21 fixtures in
 // `__tests__/fixtures/compiler/effect-derived-computations/` carry
 // `@validateNoDerivedComputationsInEffects_exp`, so their names describe the experimental pass's
 // verdict and not the shipped one. Exactly one fixture in the whole 2,688-fixture tree carries the
@@ -57,7 +57,7 @@ var messageNoDerivingStateInEffects = rule.Message{
 //	ArrayExpression    value -> the literal, so a dependency array can be recovered from an identifier
 //	FunctionExpression value -> the function, so an effect callback can be recovered from an identifier
 //
-// A call is a candidate when its callee is an effect hook AND it has exactly two arguments AND both
+// A call is a candidate when its callee is an effect hook and it has exactly two arguments and both
 // are plain identifiers. Both halves are load-bearing: `useEffect(cb)` with no dependency array is
 // never a candidate, because this rule's whole judgment is "the callback computes nothing the deps
 // did not already supply", which has no meaning without deps.
@@ -76,7 +76,7 @@ var messageNoDerivingStateInEffects = rule.Message{
 //
 // Within that, a taint map carries dep-ness forward through loads, property reads, binary
 // expressions, template literals and calls. A setter call reports only when its argument's taint
-// set has exactly as many distinct deps as the effect declared, so setting from ONE of two deps is
+// set has exactly as many distinct deps as the effect declared, so setting from one of two deps is
 // silent and setting from both reports. A setter call whose argument carries no taint at all
 // abandons the whole effect rather than skipping that one call.
 //
@@ -85,9 +85,9 @@ var messageNoDerivingStateInEffects = rule.Message{
 // `isUseEffectHookType` and `isSetStateType` both read `Identifier.type.shapeId`, a builtin shape
 // the compiler seeds when it sees an import from the literal module `react`. This tree has no such
 // registry, and the sibling rule `set-state-in-effect` already established the replacement: ask the
-// checker. `effectHookKind` resolves a callee to the name it was DECLARED as, which is what makes a
+// checker. `effectHookKind` resolves a callee to the name it was declared as, which is what makes a
 // renamed import report and a same-named local stay silent, and `isSetterTyped` reads the `Dispatch`
-// type ALIAS that `@types/react` puts on a `useState` setter and on nothing else. Both helpers are
+// type alias that `@types/react` puts on a `useState` setter and on nothing else. Both helpers are
 // this package's and are reused rather than rewritten, which is the whole reason these two rules
 // were batched.
 //
@@ -223,7 +223,7 @@ func reportDerivedComputationsInEffects(ruleContext rule.Context, function *high
 // dependency array is what this rule reasons about. Both plain identifiers, because upstream reads
 // them out of the maps above rather than off the call, so an inline function or an inline array
 // literal is not a candidate at all. Verified against the shipped rule: `useEffect(() => setV(a),
-// [a])` written inline is REPORTED, because lowering assigns the inline callback and the inline
+// [a])` written inline is reported, because lowering assigns the inline callback and the inline
 // array to temporaries first, so both arguments are identifiers by the time the pass sees them.
 // That is why this is not a syntactic test.
 func derivedEffectCandidate(
@@ -247,7 +247,7 @@ func derivedEffectCandidate(
 		return
 	}
 	deps, hasDeps := candidateDependencies[args[1].Place.Identifier]
-	// The `len == 0` half is upstream's `deps.elements.length !== 0` and it is SUBSUMED here,
+	// The `len == 0` half is upstream's `deps.elements.length !== 0` and it is subsumed here,
 	// deliberately kept rather than deleted. Its mutant survives the whole suite and no fixture can
 	// catch it, so the equivalence is stated with the measurement rather than left as a blind spot.
 	//
@@ -269,7 +269,7 @@ func derivedEffectCandidate(
 	// in the dependency array abandons the effect rather than being skipped.
 	dependencies := make([]static_single_assignment.IdentifierId, 0, len(deps.Elements))
 	for _, element := range deps.Elements {
-		// The `Hole` half is SUBSUMED and kept for fidelity, with the measurement recorded rather
+		// The `Hole` half is subsumed and kept for fidelity, with the measurement recorded rather
 		// than the branch deleted. A hole lowers to a real `<hole>` element, so this is reachable,
 		// but dropping the test changes no verdict: the hole's Place carries no live identifier, so
 		// it enters `dependencies` as a value nothing in the callback can capture, and the "every
@@ -283,7 +283,7 @@ func derivedEffectCandidate(
 			return
 		}
 		// `locals.get(dep) ?? dep`: a dependency written as an identifier lowered to a LoadLocal, so
-		// the taint has to be keyed on the value it READ rather than on the temporary that read it.
+		// the taint has to be keyed on the value it read rather than on the temporary that read it.
 		identifier := element.Place.Identifier
 		if origin, ok := locals[identifier]; ok {
 			identifier = origin
@@ -318,7 +318,7 @@ func validateDerivedEffect(
 	effectValue *high_level_intermediate_representation.FunctionExpression,
 	effectDeps []static_single_assignment.IdentifierId,
 ) {
-	// The captures are places in the ENCLOSING function, which is what makes them comparable to the
+	// The captures are places in the enclosing function, which is what makes them comparable to the
 	// dependency identifiers gathered there. `effectFunction.Context` holds the same values renamed
 	// into the nested function's own identifier space, so comparing those to `effectDeps` would
 	// compare two different numbering schemes and never match.
@@ -351,7 +351,7 @@ func validateDerivedEffect(
 		}
 	}
 
-	// The taint map is keyed in the NESTED function's identifier space, seeded from the captures.
+	// The taint map is keyed in the nested function's identifier space, seeded from the captures.
 	// Upstream seeds `values` directly from `effectDeps` because its context operands carry the same
 	// identifier ids inside and out; ours are renamed by lowering, so the seed is translated through
 	// the context list, which is index-aligned with the captures.
@@ -365,7 +365,7 @@ func validateDerivedEffect(
 			values[inner] = []static_single_assignment.IdentifierId{capture.Identifier}
 		}
 	}
-	// This guard is UNREACHABLE today and is kept deliberately, because what makes it unreachable
+	// This guard is unreachable today and is kept deliberately, because what makes it unreachable
 	// lives in another package.
 	//
 	// The seed can only come up short if `Captures` and `Context` stop corresponding index for
@@ -449,15 +449,15 @@ func validateDerivedEffect(
 				}
 
 				call, isCall := instruction.Value.(*high_level_intermediate_representation.CallExpression)
-				// The `Spread` half is SUBSUMED, measured rather than assumed. `setV(...[x])`
+				// The `Spread` half is subsumed, measured rather than assumed. `setV(...[x])`
 				// does lower to a single spread argument, so the branch is reachable in the sense
 				// that matters, but the effect never gets this far: building the spread's operand
 				// requires an `ArrayExpression` instruction, which is not in the allowed set above
-				// and so hits `default: return` first. Spreading a NAMED array is the same story
+				// and so hits `default: return` first. Spreading a named array is the same story
 				// one step earlier, since the array is built in the enclosing function and the
 				// callback then captures a value that is neither a setter nor a dep.
 				//
-				// Measured both ways on the spread shape: pristine 0, mutant 0. The argument-COUNT
+				// Measured both ways on the spread shape: pristine 0, mutant 0. The argument-count
 				// half of this condition is load-bearing and its own mutant dies on
 				// `setterCalledWithTwoArguments`.
 				if !isCall || len(call.Args) != 1 || call.Args[0].Spread {
@@ -472,7 +472,7 @@ func validateDerivedEffect(
 					break
 				}
 				// A setter call whose argument carries no taint, or taint from only some of the
-				// deps, abandons the WHOLE effect rather than skipping this call. That is
+				// deps, abandons the whole effect rather than skipping this call. That is
 				// upstream's `return`, and it is why setting from one of two deps is silent even
 				// when a second call in the same effect sets from both.
 				return
@@ -507,7 +507,7 @@ func validateDerivedEffect(
 // reportDerivedSetter points the finding at the setter's reference inside the effect.
 //
 // Same mechanism and same reasoning as `reportSetter` in `set_state_in_effect.go`: a Place carries
-// the span of the REFERENCE while `Identifier.Node` carries the span of the binding, so reporting
+// the span of the reference while `Identifier.Node` carries the span of the binding, so reporting
 // through the node points every finding at the `useState` destructure. The range is trimmed of
 // leading trivia because a Place's range starts at the raw start of the reference, which includes
 // the newline and indentation before it.
@@ -537,7 +537,7 @@ func reportDerivedSetter(ruleContext rule.Context, function *high_level_intermed
 // is now a fixture.
 //
 // The resolution mechanism is the sibling's and is correct to share: read the type's symbol rather
-// than `GetSymbolAtLocation`, so a renamed import reports under its DECLARED name and a same-named
+// than `GetSymbolAtLocation`, so a renamed import reports under its declared name and a same-named
 // local does not. Only the accepted set differs.
 // Kept in this file rather than lifted out of `effectHookKind`, and that is a deliberate scar
 // rather than duplication left by accident. That function is `set_state_in_effect.go`'s and encodes
@@ -551,7 +551,7 @@ func isUseEffectExactly(ruleContext rule.Context, function *high_level_intermedi
 	if node == nil || ruleContext.TypeChecker == nil {
 		return false
 	}
-	// The TYPE's symbol, not `GetSymbolAtLocation`'s: for `import {useEffect as useFx}` the latter
+	// The type's symbol, not `GetSymbolAtLocation`'s: for `import {useEffect as useFx}` the latter
 	// returns the local name `useFx` while this returns the declared `useEffect`, which is the name
 	// React's `binding.imported` asks for. Reading the local spelling silently declines every
 	// renamed import, and a namespace member falls out of the same read with no extra case.
@@ -592,13 +592,13 @@ func isUseEffectExactly(ruleContext rule.Context, function *high_level_intermedi
 //	const lastName = 'Swift'   NOT listed as a dep REPORTS  (folded on both sides, so no mismatch)
 //
 // The last row is why this declines the whole effect rather than dropping the dep from the list: a
-// constant that is not named in the array changes nothing on either side, and a constant that IS
+// constant that is not named in the array changes nothing on either side, and a constant that is
 // named is precisely the mismatch that makes upstream give up.
 //
 // # What is deliberately not reproduced
 //
 // Only a directly-assigned literal is recognised, not the full fold. `const n = 40 + 2` is silent
-// upstream and REPORTS here, because our lowering leaves the addition as a `BinaryExpression` and
+// upstream and reports here, because our lowering leaves the addition as a `BinaryExpression` and
 // nothing folds it. That is a stated divergence in the reporting direction on a shape nobody writes
 // into a dependency array, and closing it means porting constant propagation, which is a pass for
 // the intermediate representation rather than a helper for this rule. Recorded here so the next
@@ -666,7 +666,7 @@ func identifiersOf(set map[static_single_assignment.IdentifierId]bool, order []s
 	return result
 }
 
-// distinctCount is upstream's `new Set(deps).size`, and here it is EQUIVALENT to `len`, which is
+// distinctCount is upstream's `new Set(deps).size`, and here it is equivalent to `len`, which is
 // stated rather than left as a surviving mutant.
 //
 // Replacing the body with `len(identifiers)` survives the whole suite. That is not a fixture gap:
@@ -686,7 +686,7 @@ func identifiersOf(set map[static_single_assignment.IdentifierId]bool, order []s
 // The reachability was probed rather than argued: six shapes that could plausibly produce a repeat
 // were run against both versions, including a ternary with identical arms, a logical operator over
 // one dep, and `a + a` in a single expression. Zero disagreements. The `a + a` case is the
-// interesting one, since it reports under both versions, proving the path IS reached and the count
+// interesting one, since it reports under both versions, proving the path is reached and the count
 // still agrees.
 //
 // Upstream's spelling is kept because it is upstream's, and because the property above is a

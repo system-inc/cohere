@@ -170,7 +170,7 @@ func didUpdateIsThisSetStateCallee(callee *ast.Node) bool {
 
 // didUpdateIsBareThisReceiver reports whether an expression is `this` written without parentheses.
 //
-// Parentheses are deliberately NOT skipped, which is the opposite of what the rest of this package
+// Parentheses are deliberately not skipped, which is the opposite of what the rest of this package
 // does and is measured rather than reasoned about: `(this).setState({})` inside a real
 // `componentDidUpdate` is silent on the release oxlint binary. oxc destructures
 // `Expression::ThisExpression` directly, so a parenthesized receiver is a different variant and
@@ -270,7 +270,7 @@ func didUpdateIsCountedFunction(node *ast.Node) bool {
 
 // didUpdateIsMethodLike reports whether a node carries its own function scope as one node.
 //
-// These are the kinds that latch the lifecycle name AND introduce a function, which in oxc are two
+// These are the kinds that latch the lifecycle name and introduce a function, which in oxc are two
 // nodes and here are one. A class property holding an arrow is absent on purpose: there the arrow is
 // a separate node passed by the walk before the property that names it, so counting the property
 // would double it. The corpus covers that shape directly, with `componentDidUpdate = () => {}` as a

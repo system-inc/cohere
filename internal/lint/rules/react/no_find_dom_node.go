@@ -15,6 +15,9 @@ var messageNoFindDOMNode = rule.Message{
 		"the component decides what it hands out.",
 }
 
+// findDOMNodeName is the one function this rule is about.
+const findDOMNodeName = "findDOMNode"
+
 // NoFindDOMNode flags a call to `findDOMNode`, bare or through a React namespace.
 //
 //	valid:   var Hello = function() {};
@@ -183,9 +186,6 @@ func findDOMNodeCalleeName(callee *ast.Node) *ast.Node {
 	}
 	return nil
 }
-
-// findDOMNodeName is the one function this rule is about.
-const findDOMNodeName = "findDOMNode"
 
 // isReactDOMReceiver reports whether an expression is one of the three accepted namespace objects.
 //

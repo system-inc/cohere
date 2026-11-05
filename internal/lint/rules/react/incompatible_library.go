@@ -101,7 +101,7 @@ var messageIncompatibleLibrary = rule.Message{
 // table. What is not handled is an arbitrary chain of re-assignments between the hook call and the
 // property access, which needs the binding-resolution pass this rule deliberately does not build.
 //
-// Deliberately NOT reproduced: with a JavaScript-only parser, ESLint reads `import type {x}` as a
+// Deliberately not reproduced: with a JavaScript-only parser, ESLint reads `import type {x}` as a
 // default import named `type` and reports at the specifier with an empty span. That is an artifact
 // of parsing TypeScript syntax without a TypeScript parser, not a judgment about the code, and our
 // parser gets the shape right. Measured and declined rather than ported.
@@ -155,8 +155,8 @@ type incompatibleLibraryEntry struct {
 // A variable rather than a direct call for the same reason `configuration.go` has one, though the reason
 // is weaker here and the difference is worth stating so a reader does not copy the wrong lesson.
 // There, the seam is the *only* way to make the rule report at all. Here the shipped table fires on
-// its own, and the seam exists so upstream's three fixtures — which import a module registered by a
-// test harness rather than a real package — can be run as written rather than rewritten against a
+// its own, and the seam exists so upstream's three fixtures (which import a module registered by a
+// test harness rather than a real package) can be run as written rather than rewritten against a
 // different library. Both proofs are then available: the shipped table reporting on real names, and
 // upstream's own corpus reporting on its synthetic one.
 var incompatibleLibraryTable = defaultIncompatibleLibraryTable
@@ -271,7 +271,7 @@ func incompatibleLibraryReport(ruleContext rule.Context, sourceFile *ast.Node, l
 	// Locals bound to an incompatible hook's whole result, keyed by the local name, carrying that
 	// hook's property table. This is the `const form = useForm()` half, and it is a different map
 	// from `destructured` because the finding lands at a different node: here the call is
-	// `form.watch()` and upstream's span is the OBJECT, while a destructured property is called
+	// `form.watch()` and upstream's span is the object, while a destructured property is called
 	// bare and the span is the property's own local.
 	results := map[string]map[string]string{}
 
@@ -305,6 +305,9 @@ func incompatibleLibraryReport(ruleContext rule.Context, sourceFile *ast.Node, l
 // property under a different local, so the *property* name decides the lookup and the *local* name
 // is what the call site will spell. Measured at React 7.1.1: the renamed form reports, with the span
 // on the renamed local.
+//
+// Mutates: destructured gains each destructured local, keyed to the message its property carries
+// Mutates: results gains each whole-result binding, keyed to its library's property table for a later member call
 func incompatibleLibraryCollectDestructure(declaration *ast.Node, locals incompatibleLibraryLocals, destructured map[string]string, results map[string]map[string]string) {
 	node := declaration.AsVariableDeclaration()
 	if node == nil || node.Initializer == nil || node.Name() == nil {
@@ -448,7 +451,7 @@ func incompatibleLibraryLocalName(specifier *ast.Node) string {
 
 // incompatibleLibraryModuleName reads the specifier text of an import declaration.
 //
-// The kind check is CRASH PROTECTION rather than a behavioral filter, and the distinction was
+// The kind check is crash protection rather than a behavioral filter, and the distinction was
 // established by a surviving mutant rather than by reading. Deleting it survives the whole suite,
 // because no fixture asserting findings can see a panic. Probed over the shapes our parser produces
 // for a malformed specifier, three of them take the linter down on `Text()`:

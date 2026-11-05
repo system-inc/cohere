@@ -23,7 +23,7 @@ import (
 // as if the wrapper were not there. That is the shape the review found at DialogRoot, DrawerRoot,
 // TableRoot and Field: wrapping the value, which is upstream's own remedy, would have done nothing.
 //
-// The judgment is one-sided on purpose. A dependency is reported only when the code PROVES it can be
+// The judgment is one-sided on purpose. A dependency is reported only when the code proves it can be
 // a new identity on a render: it is built by an object, array, function, class, `new`, JSX or
 // regular-expression expression evaluated during render, or it is the result of a call whose body
 // returns such a construction on some path (or of any async function or generator, which return a new
@@ -564,7 +564,8 @@ func (walk *jsxNoConstructedContextValuesStabilityWalk) functionEvaluation(
 	// Only the holders this function declared are judged here, against this function's body. A holder
 	// from an enclosing function (a render `const` a memo factory or a nested helper returns) travels
 	// on to the dependency, where it is judged against the body that declared it.
-	var own, enclosing []*ast.Node
+	var own []*ast.Node
+	var enclosing []*ast.Node
 	for _, holder := range result.holders {
 		if jsxNoConstructedContextValuesNearestFunction(holder) == function {
 			own = append(own, holder)

@@ -65,7 +65,7 @@ type JsxKeyOptions struct {
 
 	// CheckKeyMustBeforeSpread reports a `key` written after a `{...spread}`.
 	//
-	// False by default. Note that this is checked on elements that DO have a key, which is the
+	// False by default. Note that this is checked on elements that do have a key, which is the
 	// opposite population from the rest of the rule.
 	CheckKeyMustBeforeSpread bool `json:"checkKeyMustBeforeSpread"`
 
@@ -79,7 +79,7 @@ type JsxKeyOptions struct {
 // DecodeJsxKeyOptions turns the configured JSON into the struct the rule reads.
 //
 // Exported so fixtures can drive the same path the config drives. Every default is false, so this
-// is a thin wrapper over `rule.UnmarshalOptions` plus a nil path: `rule.DecodeOptionsInto` ERRORS on empty
+// is a thin wrapper over `rule.UnmarshalOptions` plus a nil path: `rule.DecodeOptionsInto` errors on empty
 // input, and a rule configured as a bare `"error"` is handed exactly that, so the generic decoder
 // would refuse a configuration upstream accepts.
 func DecodeJsxKeyOptions(raw []byte) (any, error) {
@@ -108,7 +108,7 @@ func DecodeJsxKeyOptions(raw []byte) (any, error) {
 // this rule. Its 37 clean and 30 reporting cases were extracted from the clone and byte-verified
 // through a second independent extraction.
 //
-// # THE CLONE AND THE INSTALLED BUILD DISAGREE, and this port follows the CLONE
+// # The clone and the installed build disagree, and this port follows the clone
 //
 // This is the one rule in its batch where the two authorities differ, and the difference is a whole
 // branch rather than a detail. The clone's `checkFunctionsBlockStatement` inspects the returned
@@ -120,7 +120,7 @@ func DecodeJsxKeyOptions(raw []byte) (any, error) {
 //
 // The installed build, 7.37.5, passes `returnStatement.argument` straight to
 // `checkIteratorElement`, which handles only a JSX element or fragment and silently ignores
-// anything else. So SIX of upstream's own reporting cases are silent on the installed build:
+// anything else. So six of upstream's own reporting cases are silent on the installed build:
 //
 //	[1,2,3].map((item) => { return c ? <div/> : <span/>; })     clone 2, installed 0
 //	[1,2,3].map(function(item) { return c ? <div/> : <span/>; }) clone 2, installed 0
@@ -138,9 +138,9 @@ func DecodeJsxKeyOptions(raw []byte) (any, error) {
 // installed ESLint sees exactly which six inputs are expected to differ and why, rather than
 // finding six unexplained extra findings.
 //
-// Note what does NOT differ: the ARROW-BODY forms, `map(x => x && <App/>)` and
+// Note what does not differ: the arrow-body forms, `map(x => x && <App/>)` and
 // `map(x => x ? <A/> : <B/>)`, report on both, because `checkArrowFunctionWithJSX` has always had
-// the conditional and logical arms. Only the BLOCK-bodied path was missing them. That pairing is
+// the conditional and logical arms. Only the block-bodied path was missing them. That pairing is
 // what makes the divergence easy to misread as a bug in the port.
 //
 // # Four listeners, and what each one is actually anchored on
@@ -153,14 +153,14 @@ func DecodeJsxKeyOptions(raw []byte) (any, error) {
 //	CallExpression[...from]                     the iterator arm again, second argument
 //	Children.toArray(...)                       a suppression scope, not a judgment
 //
-// The collection arm's two anchors do NOT report the same things. Its `missingArrayKey` finding is
+// The collection arm's two anchors do not report the same things. Its `missingArrayKey` finding is
 // guarded by `node.type === 'ArrayExpression'`, so a keyless element nested directly inside another
-// element is SILENT: `<div><App /></div>` reports nothing, measured. What the JSX anchor is for is
+// element is silent: `<div><App /></div>` reports nothing, measured. What the JSX anchor is for is
 // the other two findings, duplicates and key-before-spread, which apply to an element's children as
 // much as to an array. A port that reported `missingArrayKey` from both anchors would fire on every
 // nested element in the tree and pass the entire imported corpus, which writes no such case.
 //
-// # The two arms disagree about the CASE of the attribute name, and it is not a typo
+// # The two arms disagree about the case of the attribute name, and it is not a typo
 //
 // The iterator arm asks `hasProp(attributes, 'key')`, whose default options are
 // `{spreadStrict: true, ignoreCase: true}`, so it uppercases both sides before comparing. The
@@ -175,7 +175,7 @@ func DecodeJsxKeyOptions(raw []byte) (any, error) {
 // matcher named at each site.
 //
 // A spread also answers differently at the two sites. `hasProp` with `spreadStrict: true` returns
-// FALSE for a spread, so the iterator arm treats a spread as not supplying a key and reports:
+// `false` for a spread, so the iterator arm treats a spread as not supplying a key and reports:
 // `[1,2,3].map(x => <App {...p} />)` reports. The collection arm's filter finds no matching name in
 // a spread either, so it reports too. They agree here by two different routes.
 //
@@ -187,7 +187,7 @@ func DecodeJsxKeyOptions(raw []byte) (any, error) {
 // flag across a traversal whose order this rule does not control.
 //
 // The two accepted shapes are `<pragma>.Children.toArray(...)` and a bare `Children.toArray(...)`.
-// Measured: `Foo.Children.toArray(...)` does NOT suppress and a bare `toArray(...)` does not
+// Measured: `Foo.Children.toArray(...)` does not suppress and a bare `toArray(...)` does not
 // either, so the `Children` segment is required in both spellings. The pragma is read from the
 // file's `@jsx` comment, the same mechanism `no-deprecated` in this package documents at length.
 var JsxKey = rule.Rule{
@@ -200,14 +200,14 @@ var JsxKey = rule.Rule{
 		pragma := reactPragmaFor(ruleContext)
 
 		// Upstream keeps a WeakSet so a key attribute reported once as a duplicate is not reported
-		// again. THERE IS NO EQUIVALENT HERE, because in this anchoring nothing can be reported
+		// again. There is no equivalent here, because in this anchoring nothing can be reported
 		// twice, and carrying a guard that cannot fire would read as a discrimination this rule
 		// makes.
 		//
 		// The reason is the anchoring rather than an argument about the rule. Upstream's selector
-		// is `ArrayExpression, JSXElement > JSXElement`, so its JSX arm fires once per CHILD and
+		// is `ArrayExpression, JSXElement > JSXElement`, so its JSX arm fires once per child and
 		// hands the handler that child's parent's children, visiting one collection as many times
-		// as it has elements. This rule anchors the JSX arm on the PARENT instead, so every
+		// as it has elements. This rule anchors the JSX arm on the parent instead, so every
 		// collection is visited exactly once.
 		//
 		// After that, the two anchors are disjoint by construction: an element is reached by the
@@ -230,13 +230,13 @@ var JsxKey = rule.Rule{
 				return
 			}
 
-			// Keyed by the key attribute's SOURCE TEXT, which is what upstream compares:
+			// Keyed by the key attribute's source text, which is what upstream compares:
 			// `getText(context, attr.value)` is the value's own slice, so `key={x}` and `key={ x }`
 			// are different keys and `key="a"` and `key={'a'}` are too. Reproduced rather than
 			// evaluated, because evaluating would report on code whose real keys are unknown.
 			byKeyText := map[string][]*ast.Node{}
 			// Insertion order, because a map is unordered in Go and upstream emits duplicates in
-			// the order the keys were first seen. Without this the finding ORDER varies run to run
+			// the order the keys were first seen. Without this the finding order varies run to run
 			// while the count stays fixed, which is the shape a fixture asserting ids cannot see.
 			keyOrder := []string{}
 
@@ -260,8 +260,8 @@ var JsxKey = rule.Rule{
 					}
 					byKeyText[text] = append(byKeyText[text], keyAttribute)
 
-					// Reported once per KEY ATTRIBUTE rather than once per element, which is
-					// upstream's loop shape, and it reports on the CONTAINER rather than on the
+					// Reported once per key attribute rather than once per element, which is
+					// upstream's loop shape, and it reports on the container rather than on the
 					// element. Both measured: the span for an array literal covers the whole
 					// `[...]` and for a nested element covers the whole parent element.
 					if settings.CheckKeyMustBeforeSpread && isKeyAfterSpread(attributes) {
@@ -279,13 +279,13 @@ var JsxKey = rule.Rule{
 					continue
 				}
 				for _, keyAttribute := range group {
-					// The KEY ATTRIBUTE, not the element. Measured: the span covers `key="a"`.
+					// The key attribute, not the element. Measured: the span covers `key="a"`.
 					ruleContext.ReportNode(keyAttribute, messageJsxKeyNonUniqueKeys)
 				}
 			}
 		}
 
-		// checkIteratorElement is upstream's function of the same name, and it is the ONLY place
+		// checkIteratorElement is upstream's function of the same name, and it is the only place
 		// the two iterator messages are produced.
 		checkIteratorElement := func(node *ast.Node) {
 			// Skipped once, here, so the element reaches every check below and its finding sits on
@@ -299,13 +299,13 @@ var JsxKey = rule.Rule{
 			}
 			if isJsxElementNode(node) {
 				attributes := attributesOfJsxElement(node)
-				// Case-INSENSITIVE here, unlike the collection arm. See the rule's doc comment.
+				// Case-insensitive here, unlike the collection arm. See the rule's doc comment.
 				if !hasKeyAttributeIgnoringCase(attributes) {
 					ruleContext.ReportNode(node, messageJsxKeyMissingIterKey)
 					return
 				}
 				if settings.CheckKeyMustBeforeSpread && isKeyAfterSpread(attributes) {
-					// The ELEMENT here, where the collection arm reports the container. Measured.
+					// The element here, where the collection arm reports the container. Measured.
 					ruleContext.ReportNode(node, messageJsxKeyBeforeSpread)
 				}
 				return
@@ -342,7 +342,7 @@ var JsxKey = rule.Rule{
 
 			// The JSX anchor of the collection arm. Upstream's selector is `JSXElement >
 			// JSXElement`, a child element, and it hands the handler `node.parent.children`, so
-			// the collection is the PARENT's children and the parent is what gets reported for a
+			// the collection is the parent's children and the parent is what gets reported for a
 			// key-before-spread. Anchoring on the parent directly reaches the same collection once
 			// instead of once per child, which is what stops the duplicate findings from
 			// multiplying by the number of children.
@@ -354,7 +354,7 @@ var JsxKey = rule.Rule{
 				reportCollection(node, children.Nodes, false)
 			},
 
-			// The shorthand fragment sitting DIRECTLY in an array literal. Upstream checks
+			// The shorthand fragment sitting directly in an array literal. Upstream checks
 			// `node.parent.type === 'ArrayExpression'`, so a fragment inside a JSX element's
 			// children is silent even under the option. Measured: `<div><></></div>` reports
 			// nothing with `checkFragmentShorthand` on.
@@ -394,7 +394,7 @@ var JsxKey = rule.Rule{
 					}
 					checkIteratorCallback(arguments[0])
 				case "from":
-					// `node.arguments.length > 1 && node.arguments[1]`. Note upstream does NOT
+					// `node.arguments.length > 1 && node.arguments[1]`. Note upstream does not
 					// check that the callee's object is `Array`, so `whatever.from(a, x => <App/>)`
 					// is checked too. Reproduced.
 					if len(arguments) < 2 {
@@ -409,9 +409,9 @@ var JsxKey = rule.Rule{
 
 // checkArrowFunctionWithJsx is upstream's function of the same name.
 //
-// It handles an arrow with an EXPRESSION body, and its three arms are the ones the installed build
+// It handles an arrow with an expression body, and its three arms are the ones the installed build
 // already had. Note upstream's own guard shape: the first `if` requires an arrow, and the following
-// `if`/`else if` do NOT, so a function EXPRESSION with a conditional body would reach them. That is
+// `if`/`else if` do not, so a function expression with a conditional body would reach them. That is
 // unreachable in JavaScript, since a function expression's body is always a block, and it is left
 // structurally faithful here rather than collapsed, because collapsing it would be a claim about
 // the parser rather than about the rule.
@@ -424,7 +424,7 @@ func checkArrowFunctionWithJsx(node *ast.Node, checkIteratorElement func(*ast.No
 		return
 	}
 
-	// Upstream's first arm is `isArrFn && isJSX(node.body)`, and the arrow test is REDUNDANT here.
+	// Upstream's first arm is `isArrFn && isJSX(node.body)`, and the arrow test is redundant here.
 	// Measured by walking the parse of four callback shapes: a function expression's body is always
 	// a `KindBlock`, which none of the three arms below matches, so only an arrow can reach any of
 	// them. A mutant dropping the arrow test survives the whole fixture set for that reason.
@@ -458,7 +458,7 @@ func checkArrowFunctionWithJsx(node *ast.Node, checkIteratorElement func(*ast.No
 	}
 }
 
-// checkFunctionsBlockStatement is upstream's function of the same name, from THE CLONE.
+// checkFunctionsBlockStatement is upstream's function of the same name, from the clone.
 //
 // The three arms below are the divergence documented on the rule: the installed 7.37.5 has only the
 // `else` arm, so a returned conditional or logical is silent there and reports here.
@@ -488,15 +488,15 @@ func checkFunctionsBlockStatement(node *ast.Node, checkIteratorElement func(*ast
 			if isJsxElementOrFragment(right) {
 				checkIteratorElement(right)
 			}
-			// Upstream's `else if` means a logical whose right side is NOT JSX falls through to
+			// Upstream's `else if` means a logical whose right side is not JSX falls through to
 			// nothing rather than to the general arm, so `return x && foo()` is silent. That is a
 			// clean case in the corpus.
 			//
-			// This `continue` is INERT and is kept as structure rather than as a discrimination.
+			// This `continue` is inert and is kept as structure rather than as a discrimination.
 			// Measured: removing it survives the whole fixture set, because the value that would
 			// then reach `checkIteratorElement` is the whole logical expression, which is not a JSX
 			// element, so both paths arrive at the same silence. Two controls establish the arm is
-			// live and covered rather than dead: passing the LEFT operand instead of the right is
+			// live and covered rather than dead: passing the left operand instead of the right is
 			// caught by nine lines, and removing the arm entirely is caught by seven.
 			//
 			// It stays because it is upstream's control flow, and because it stops being inert the
@@ -510,7 +510,7 @@ func checkFunctionsBlockStatement(node *ast.Node, checkIteratorElement func(*ast
 
 // jsxKeyReturnStatements is upstream's `getReturnStatements`, which is deliberately shallow.
 //
-// It descends into an `IfStatement`'s branches recursively and otherwise reads only the DIRECT
+// It descends into an `IfStatement`'s branches recursively and otherwise reads only the direct
 // statements of a block. So a return inside a loop, a `try`, or a `switch` is invisible, and so is
 // one inside a nested function. Measured on the installed build, all silent:
 //
@@ -521,7 +521,7 @@ func checkFunctionsBlockStatement(node *ast.Node, checkIteratorElement func(*ast
 // The nested-function case is worth naming separately: upstream is silent because the inner
 // function's body is not in the outer block's statement list, not because it filters functions out.
 // A recursive walk that simply skipped functions would still report the loop and try cases, so
-// reproducing this means copying the SHALLOWNESS rather than adding an exclusion.
+// reproducing this means copying the shallowness rather than adding an exclusion.
 func jsxKeyReturnStatements(node *ast.Node) []*ast.Node {
 	collected := []*ast.Node{}
 
@@ -541,7 +541,7 @@ func jsxKeyReturnStatements(node *ast.Node) []*ast.Node {
 		case ast.KindReturnStatement:
 			collected = append(collected, current)
 		case ast.KindBlock:
-			// Upstream's `Array.isArray(node.body)` arm, which takes only the DIRECT statements and
+			// Upstream's `Array.isArray(node.body)` arm, which takes only the direct statements and
 			// recurses only for a nested `IfStatement`.
 			statements := current.AsBlock().Statements
 			if statements == nil {
@@ -570,7 +570,7 @@ func jsxKeyReturnStatements(node *ast.Node) []*ast.Node {
 // exit hook, so the same question is answered by looking at the ancestors of the node being judged,
 // which is order-independent and reaches the same set of nodes.
 //
-// The two accepted spellings, and what is NOT accepted, both measured on the installed build:
+// The two accepted spellings, and what is not accepted, both measured on the installed build:
 //
 //	React.Children.toArray(...)   suppresses (the pragma's Children)
 //	Children.toArray(...)         suppresses (a bare Children)
@@ -645,7 +645,7 @@ func calleePropertyName(callee *ast.Node) (string, bool) {
 
 // isFunctionLikeExpressionForJsxKey reproduces `astUtil.isFunctionLikeExpression`.
 //
-// A function EXPRESSION or an arrow, and nothing else. A function DECLARATION does not qualify,
+// A function expression or an arrow, and nothing else. A function declaration does not qualify,
 // which cannot be an argument anyway, and neither does an identifier: `[1,2,3].map(someFn)` is
 // clean, measured, and it is a corpus case.
 func isFunctionLikeExpressionForJsxKey(node *ast.Node) bool {
@@ -742,7 +742,7 @@ func attributesOfJsxElement(node *ast.Node) []*ast.Node {
 	return attributesOf(attributes)
 }
 
-// exactlyNamedAttributes is the COLLECTION arm's matcher, and it is case-sensitive.
+// exactlyNamedAttributes is the collection arm's matcher, and it is case-sensitive.
 //
 // `attrs.filter((x) => x.name && x.name.name === 'key')`, written inline upstream rather than
 // through `hasProp`. Measured: `[<App KEY={1} />]` reports, where the iterator arm's equivalent
@@ -761,10 +761,10 @@ func exactlyNamedAttributes(properties []*ast.Node, wanted string) []*ast.Node {
 	return matches
 }
 
-// hasKeyAttributeIgnoringCase is the ITERATOR arm's matcher, and it is case-insensitive.
+// hasKeyAttributeIgnoringCase is the iterator arm's matcher, and it is case-insensitive.
 //
 // `hasProp(attributes, 'key')` with its default `{spreadStrict: true, ignoreCase: true}`. The
-// spread strictness is why a spread does NOT satisfy the key here: `hasProp` returns
+// spread strictness is why a spread does not satisfy the key here: `hasProp` returns
 // `!options.spreadStrict` for a spread, which is false. `jsx.HasAttributeNamed` declines a spread
 // for the same reason, by requiring a named attribute, so the two agree.
 func hasKeyAttributeIgnoringCase(properties []*ast.Node) bool {
@@ -783,7 +783,7 @@ func hasKeyAttributeIgnoringCase(properties []*ast.Node) bool {
 // `key` that follows one. A non-attribute that is not a spread is skipped without clearing the
 // flag, which matters only for shapes our parser does not produce.
 //
-// The name comparison here is upstream's `propName(attribute) === 'key'`, which is EXACT and
+// The name comparison here is upstream's `propName(attribute) === 'key'`, which is exact and
 // therefore agrees with the collection arm rather than with the iterator arm's `hasProp`. So an
 // element written `<App {...p} KEY={x} />` is not a key-after-spread even though the iterator arm
 // considers it keyed. Both facts come from the same asymmetry and neither is in the corpus.
@@ -805,11 +805,11 @@ func isKeyAfterSpread(properties []*ast.Node) bool {
 	return false
 }
 
-// jsxElementsAmong filters a collection to the JSX ELEMENTS in it, excluding fragments.
+// jsxElementsAmong filters a collection to the JSX elements in it, excluding fragments.
 //
 // Upstream's filter is `x && x.type === 'JSXElement'`, so a fragment sitting in an array is not a
 // member of the collection for the duplicate and missing-key questions; the separate `JSXFragment`
-// listener is what handles it. The `x &&` guard is for an array HOLE, which our parser spells as an
+// listener is what handles it. The `x &&` guard is for an array hole, which our parser spells as an
 // omitted-expression node rather than as a null, so it is declined by kind here.
 func jsxElementsAmong(nodes []*ast.Node) []*ast.Node {
 	elements := []*ast.Node{}
@@ -821,7 +821,7 @@ func jsxElementsAmong(nodes []*ast.Node) []*ast.Node {
 	return elements
 }
 
-// keyAttributeValueText returns the key's value as SOURCE TEXT, which is what upstream compares.
+// keyAttributeValueText returns the key's value as source text, which is what upstream compares.
 //
 // `getText(context, attr.value)` is the value node's own slice, so two keys are the same key only
 // when they are written the same way. `key="a"` and `key={'a'}` are different, and so are `key={x}`
