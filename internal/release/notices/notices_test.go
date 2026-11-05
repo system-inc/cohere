@@ -117,6 +117,63 @@ func TestTheGeneratorRefusesAModuleWithNoRecordedLicense(t *testing.T) {
 	}
 }
 
+// TestAModulesOwnThirdPartyCreditFollowsItsLicense writes a fixture module that ships a credit for code it
+// includes, under each spelling the module cache holds, and requires the credit verbatim after the module's
+// license; and a module that ships none gets no credit line.
+func TestAModulesOwnThirdPartyCreditFollowsItsLicense(test *testing.T) {
+	test.Parallel()
+
+	cases := []struct {
+		directory string
+		fileName  string
+	}{
+		{directory: "longspelling", fileName: "LICENSE-THIRD-PARTY"},
+		{directory: "shortspelling", fileName: "THIRD-PARTY"},
+	}
+	for _, testCase := range cases {
+		directory := filepath.Join("testdata", testCase.directory)
+		license, licenseError := os.ReadFile(filepath.Join(directory, "LICENSE"))
+		if licenseError != nil {
+			test.Fatal(licenseError)
+		}
+		credit, creditError := os.ReadFile(filepath.Join(directory, testCase.fileName))
+		if creditError != nil {
+			test.Fatal(creditError)
+		}
+
+		// golang.org/x/sync, because writeModule writes only a module whose license is recorded.
+		var builder strings.Builder
+		module := Module{Path: "golang.org/x/sync", Version: "v0.0.0", Directory: directory}
+		if writeError := writeModule(&builder, module, "carries"); writeError != nil {
+			test.Fatalf("%s: %v", testCase.directory, writeError)
+		}
+		written := builder.String()
+		licenseBlock := "````text\n" + strings.TrimRight(string(license), "\n") + "\n````\n"
+		creditBlock := "The module's own credit for code it includes, from its " + testCase.fileName + ":\n\n" +
+			"````text\n" + strings.TrimRight(string(credit), "\n") + "\n````\n"
+		licenseIndex := strings.Index(written, licenseBlock)
+		creditIndex := strings.Index(written, creditBlock)
+		if licenseIndex < 0 || creditIndex < 0 || creditIndex < licenseIndex {
+			test.Errorf("%s: expected its license and then its %s verbatim, and it wrote:\n%s",
+				testCase.directory, testCase.fileName, written)
+		}
+	}
+
+	bare := test.TempDir()
+	writeError := os.WriteFile(filepath.Join(bare, "LICENSE"), []byte("A license and nothing more.\n"), 0o644)
+	if writeError != nil {
+		test.Fatal(writeError)
+	}
+	var builder strings.Builder
+	bareModule := Module{Path: "golang.org/x/sync", Version: "v0.0.0", Directory: bare}
+	if writeError := writeModule(&builder, bareModule, "carries"); writeError != nil {
+		test.Fatal(writeError)
+	}
+	if strings.Contains(builder.String(), "own credit for code it includes") {
+		test.Errorf("a module that ships no third-party credit was given one:\n%s", builder.String())
+	}
+}
+
 // TestEveryLicenseTextIsUsedAndEveryReferenceExists keeps licenses/ and the lists naming it in step: a
 // text nothing names is a credit nobody reads, and a name with no text stops the generator.
 func TestEveryLicenseTextIsUsedAndEveryReferenceExists(t *testing.T) {
