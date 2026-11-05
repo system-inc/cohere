@@ -77,6 +77,40 @@ func TestALoneRuleCarriesNoTerms(t *testing.T) {
 	}
 }
 
+// Go joins a file the way Swift did: a lone Go rule's file is named for its own idea, a file Go joins keeps
+// the TypeScript rule's name, and Go's text resolves Go's words for each term.
+func TestGoNamesALoneFileAndJoinsATwinWithItsOwnTerms(test *testing.T) {
+	test.Parallel()
+	lone := `{"rules": {"Go": "cohere-go/consistency-no-thing"}, "messages": {"thing": {"text": "This is a thing."}}}`
+	if _, loadError := loadMinimalMessages(lone); loadError != nil {
+		test.Fatalf("a lone Go rule's file, named for its idea, is refused: %v", loadError)
+	}
+	if _, loadError := LoadMessages(fstest.MapFS{"consistency-no-other.json": {Data: []byte(lone)}}); loadError == nil {
+		test.Error("a lone Go rule's file named for another idea loaded")
+	}
+
+	triplet := strings.NewReplacer(
+		`"Swift": "cohere-swift/consistency-no-thing" }`,
+		`"Swift": "cohere-swift/consistency-no-thing", "Go": "cohere-go/consistency-no-thing" }`,
+		`"Swift": "an enum" }`,
+		`"Swift": "an enum", "Go": "a constant set" }`,
+	).Replace(minimalMessages)
+	if triplet == minimalMessages {
+		test.Fatal("the replacement matched nothing, so the file under test is the twin, not the triplet")
+	}
+	catalog, loadError := loadMinimalMessages(triplet)
+	if loadError != nil {
+		test.Fatalf("a twin Go joined is refused: %v", loadError)
+	}
+	goHandle := MessageHandle{Rule: "cohere-go/consistency-no-thing", Id: "thing"}
+	if got, want := catalog.Render(goHandle, map[string]string{"count": "3"}), "This is a constant set, which names 3 things."; got != want {
+		test.Errorf("Go renders %q, want %q", got, want)
+	}
+	if len(catalog.MessagesFor(MessageLanguageGo)) != 1 {
+		test.Errorf("MessagesFor(Go) is %v, want the one Go message", catalog.MessagesFor(MessageLanguageGo))
+	}
+}
+
 // A rule named by two files is refused, wherever the second one is.
 func TestARuleNamedByTwoFilesIsRefused(t *testing.T) {
 	t.Parallel()
