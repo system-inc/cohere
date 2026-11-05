@@ -51,9 +51,9 @@ func TestASignalDuringABuildEndsTheToolAndWhatItStarted(test *testing.T) {
 
 	signals <- syscall.SIGTERM
 	select {
-	case err := <-result:
-		if err == nil || !strings.Contains(err.Error(), "stopped by terminated") {
-			test.Errorf("a stopped build reported %v", err)
+	case resultError := <-result:
+		if resultError == nil || !strings.Contains(resultError.Error(), "stopped by terminated") {
+			test.Errorf("a stopped build reported %v", resultError)
 		}
 	case <-time.After(buildToolGrace + 30*time.Second):
 		test.Fatal("the build did not end after the signal")

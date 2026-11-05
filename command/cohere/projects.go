@@ -75,9 +75,9 @@ func checkDiscoveredProjects(
 	lintConfigFileName string,
 ) (int, bool, error) {
 	root := discoveryRoot(location, locateError, workingDirectory)
-	patterns, err := rootIgnorePatterns(root)
-	if err != nil {
-		return 0, false, err
+	patterns, rootIgnorePatternsError := rootIgnorePatterns(root)
+	if rootIgnorePatternsError != nil {
+		return 0, false, rootIgnorePatternsError
 	}
 	// Asked here because a Swift-only run loads no lint configuration, so this is the one read of the root's
 	// file that every run makes. A file the command line named is the Swift engine's to read wherever it
@@ -92,12 +92,13 @@ func checkDiscoveredProjects(
 			return 0, false, checkSwiftBlockHasAReaderError
 		}
 	}
-	found, err := discoverProjects(root, patterns)
-	if err != nil {
-		return 0, false, err
+	found, discoverProjectsError := discoverProjects(root, patterns)
+	if discoverProjectsError != nil {
+		return 0, false, discoverProjectsError
 	}
-	if found.Ownership, err = resolveOwnership(&found); err != nil {
-		return 0, false, err
+	var resolveOwnershipError error
+	if found.Ownership, resolveOwnershipError = resolveOwnership(&found); resolveOwnershipError != nil {
+		return 0, false, resolveOwnershipError
 	}
 	// Before the one-project check, so a package and the dependency its run checks are the one project they
 	// are, and run here as `cohere --directory` on the package would.

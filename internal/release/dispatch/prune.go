@@ -96,9 +96,9 @@ func (plan PrunePlan) Bytes() int64 {
 // keep names binaries that must survive whatever their age, such as the one just built. currentCompiler
 // is the compiler extraction in use, or empty when it is not known.
 func PlanPrune(paths Paths, keep []string, currentCompiler string, now time.Time) (PrunePlan, error) {
-	entries, err := os.ReadDir(paths.BinaryDirectory())
-	if err != nil {
-		return PrunePlan{}, fmt.Errorf("reading the binary cache %s: %w", paths.BinaryDirectory(), err)
+	entries, readDirectoryError := os.ReadDir(paths.BinaryDirectory())
+	if readDirectoryError != nil {
+		return PrunePlan{}, fmt.Errorf("reading the binary cache %s: %w", paths.BinaryDirectory(), readDirectoryError)
 	}
 
 	plan := PrunePlan{Examined: len(entries)}
@@ -170,14 +170,20 @@ func PlanPrune(paths Paths, keep []string, currentCompiler string, now time.Time
 	// Without the current compiler named, nothing says which extraction a build is reading, so none is
 	// removed.
 	if currentCompiler != "" {
-		plan.StaleCompilers, err = planStaleDirectories(paths.CompilerDirectory(), filepath.Base(currentCompiler), now)
-		if err != nil {
-			return PrunePlan{}, fmt.Errorf("reading the compiler cache: %w", err)
+		var planStaleDirectoriesError error
+		plan.StaleCompilers, planStaleDirectoriesError = planStaleDirectories(
+			paths.CompilerDirectory(),
+			filepath.Base(currentCompiler),
+			now,
+		)
+		if planStaleDirectoriesError != nil {
+			return PrunePlan{}, fmt.Errorf("reading the compiler cache: %w", planStaleDirectoriesError)
 		}
 	}
-	plan.StaleSnapshots, err = planStaleDirectories(paths.SnapshotDirectory(), "", now)
-	if err != nil {
-		return PrunePlan{}, fmt.Errorf("reading the snapshot cache: %w", err)
+	var planStaleDirectoriesError error
+	plan.StaleSnapshots, planStaleDirectoriesError = planStaleDirectories(paths.SnapshotDirectory(), "", now)
+	if planStaleDirectoriesError != nil {
+		return PrunePlan{}, fmt.Errorf("reading the snapshot cache: %w", planStaleDirectoriesError)
 	}
 	return plan, nil
 }

@@ -174,30 +174,31 @@ func thisMachine() (benchresults.Machine, error) {
 		return strings.TrimSpace(string(output)), nil
 	}
 	machine := benchresults.Machine{}
-	var err error
-	if machine.Model, err = read("sysctl", "-n", "hw.model"); err != nil {
-		return machine, err
+	var readError error
+	if machine.Model, readError = read("sysctl", "-n", "hw.model"); readError != nil {
+		return machine, readError
 	}
-	if machine.Processor, err = read("sysctl", "-n", "machdep.cpu.brand_string"); err != nil {
-		return machine, err
+	if machine.Processor, readError = read("sysctl", "-n", "machdep.cpu.brand_string"); readError != nil {
+		return machine, readError
 	}
-	cores, err := read("sysctl", "-n", "hw.ncpu")
-	if err != nil {
-		return machine, err
+	cores, readError := read("sysctl", "-n", "hw.ncpu")
+	if readError != nil {
+		return machine, readError
 	}
-	if machine.Cores, err = strconv.Atoi(cores); err != nil {
-		return machine, err
+	var parseError error
+	if machine.Cores, parseError = strconv.Atoi(cores); parseError != nil {
+		return machine, parseError
 	}
-	memory, err := read("sysctl", "-n", "hw.memsize")
-	if err != nil {
-		return machine, err
+	memory, readError := read("sysctl", "-n", "hw.memsize")
+	if readError != nil {
+		return machine, readError
 	}
-	if machine.MemoryBytes, err = strconv.ParseInt(memory, 10, 64); err != nil {
-		return machine, err
+	if machine.MemoryBytes, parseError = strconv.ParseInt(memory, 10, 64); parseError != nil {
+		return machine, parseError
 	}
-	version, err := read("sw_vers", "-productVersion")
-	if err != nil {
-		return machine, err
+	version, readError := read("sw_vers", "-productVersion")
+	if readError != nil {
+		return machine, readError
 	}
 	machine.OS = "macOS " + version
 	return machine, nil
@@ -207,9 +208,9 @@ func thisMachine() (benchresults.Machine, error) {
 // cache, load_before, load_after, idle_before, idle_after, quiet, exit, primes, tab-separated, with a header
 // line the script prints apart.
 func readRuns(path string) ([]benchresults.Run, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
+	file, openError := os.Open(path)
+	if openError != nil {
+		return nil, openError
 	}
 	defer file.Close() // Ignored: the file was only read, so a failed close loses nothing.
 	modes := map[string]benchresults.Mode{
@@ -234,8 +235,9 @@ func readRuns(path string) ([]benchresults.Run, error) {
 		}
 		numbers := map[int]float64{}
 		for _, index := range []int{1, 2, 3, 4, 5, 7, 8, 9, 10, 12, 13} {
-			if numbers[index], err = strconv.ParseFloat(fields[index], 64); err != nil {
-				return nil, fmt.Errorf("%s:%d: field %d: %w", path, line, index+1, err)
+			var parseError error
+			if numbers[index], parseError = strconv.ParseFloat(fields[index], 64); parseError != nil {
+				return nil, fmt.Errorf("%s:%d: field %d: %w", path, line, index+1, parseError)
 			}
 		}
 		runs = append(runs, benchresults.Run{

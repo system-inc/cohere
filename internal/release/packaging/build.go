@@ -265,9 +265,9 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 		return StagedPackage{}, compileError
 	}
 
-	size, err := cohereBinary(binaryPath, target)
-	if err != nil {
-		return StagedPackage{}, err
+	size, cohereBinaryError := cohereBinary(binaryPath, target)
+	if cohereBinaryError != nil {
+		return StagedPackage{}, cohereBinaryError
 	}
 
 	// The Swift engine, beside cohere in the same bin/, on the platforms that ship it. A released cohere
@@ -277,9 +277,10 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 	enginePath := filepath.Join(directory, "bin", SwiftEngineFileName)
 	engineCommit := ""
 	if ShipsSwiftEngine(target.GoOperatingSystem) {
-		engineCommit, err = readReleaseCommit(options.ModuleDirectory)
-		if err != nil {
-			return StagedPackage{}, err
+		var readReleaseCommitError error
+		engineCommit, readReleaseCommitError = readReleaseCommit(options.ModuleDirectory)
+		if readReleaseCommitError != nil {
+			return StagedPackage{}, readReleaseCommitError
 		}
 		if buildSwiftEngineError := buildSwiftEngine(
 			options.ModuleDirectory,
@@ -325,9 +326,9 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 		}
 	}
 
-	manifest, err := PlatformManifest(target, options.Version)
-	if err != nil {
-		return StagedPackage{}, err
+	manifest, platformManifestError := PlatformManifest(target, options.Version)
+	if platformManifestError != nil {
+		return StagedPackage{}, platformManifestError
 	}
 	if writeError := os.WriteFile(filepath.Join(directory, "package.json"), manifest, 0o644); writeError != nil {
 		return StagedPackage{}, fmt.Errorf("writing the package manifest: %w", writeError)

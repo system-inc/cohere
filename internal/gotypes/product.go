@@ -517,17 +517,18 @@ func (product Product) compile(state *productState, directory string) error {
 		if exportFiles[path] == "" {
 			return fmt.Errorf("building the %s product, go list compiled no export data for %s", product.Name, path)
 		}
-		content, err := os.ReadFile(exportFiles[path])
-		if err != nil {
-			return err
+		content, readError := os.ReadFile(exportFiles[path])
+		if readError != nil {
+			return readError
 		}
-		if content, err = exportDataOnly(content); err != nil {
+		var exportDataOnlyError error
+		if content, exportDataOnlyError = exportDataOnly(content); exportDataOnlyError != nil {
 			return fmt.Errorf(
 				"building the %s product, %s's export file %s: %w",
 				product.Name,
 				path,
 				exportFiles[path],
-				err,
+				exportDataOnlyError,
 			)
 		}
 		name := fmt.Sprintf("exports/%04d.a", index)

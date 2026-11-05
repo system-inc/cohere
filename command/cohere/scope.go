@@ -450,9 +450,9 @@ func namedPathsScope(workingDirectory string, root string, names []string) (form
 			return wholeTreeScope(), nil
 		}
 
-		walkError := filepath.WalkDir(path, func(entry string, directoryEntry fs.DirEntry, walkError error) error {
-			if walkError != nil {
-				return walkError
+		walkError := filepath.WalkDir(path, func(entry string, directoryEntry fs.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if directoryEntry.IsDir() {
 				return nil

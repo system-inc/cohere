@@ -83,22 +83,25 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 					shape.directive +
 					" -- the reason\nconst a = 1;\n",
 			})
-			graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-			if err != nil {
-				test.Fatalf("building: %v", err)
+			graph, buildError := program.Build(
+				program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory},
+			)
+			if buildError != nil {
+				test.Fatalf("building: %v", buildError)
 			}
-			graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
-			if err != nil {
-				test.Fatalf("loading the config: %v", err)
+			var loadError error
+			graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+			if loadError != nil {
+				test.Fatalf("loading the config: %v", loadError)
 			}
 
-			result, err := graph.Walk(
+			result, walkError := graph.Walk(
 				context.Background(),
 				graph.ProjectFiles(),
 				rule_testing.EntriesOf(test, quiet, registeredOff, prefixed),
 			)
-			if err != nil {
-				test.Fatalf("walking: %v", err)
+			if walkError != nil {
+				test.Fatalf("walking: %v", walkError)
 			}
 			coverage := result.Coverage
 			if coverage.UnusedSuppressions != 1 {
@@ -151,21 +154,22 @@ func TestADeadDirectiveIsNamedWhereItIs(test *testing.T) {
 			"// eslint-disable-next-line test-quiet -- dead, the rule ran and found nothing\n" +
 			"const b = 2;\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
-	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
-	if err != nil {
-		test.Fatalf("loading the config: %v", err)
+	var loadError error
+	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError != nil {
+		test.Fatalf("loading the config: %v", loadError)
 	}
-	result, err := graph.Walk(
+	result, walkError := graph.Walk(
 		context.Background(),
 		graph.ProjectFiles(),
 		rule_testing.EntriesOf(test, reporting, quiet),
 	)
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 
 	// The live directive did withhold something, or this file cannot tell the two apart.

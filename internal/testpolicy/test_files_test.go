@@ -18,9 +18,9 @@ func eachTestFile(test *testing.T, visit func(path string, source []byte) error)
 		test.Fatal(absolutePathError)
 	}
 	files := 0
-	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
-		if walkError != nil {
-			return walkError
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() {
 			switch entry.Name() {
