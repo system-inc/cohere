@@ -27,23 +27,34 @@
 //
 // See the Example of how to build a complete analysis driver program.
 //
-// cohere: this is a copy of golang.org/x/tools@v0.50.0's
-// go/analysis/checker/checker.go (identical in v0.49.0), kept so that
-// it diffs against upstream: every change is marked "cohere:". Upstream
-// keeps every action's Result until the whole graph finishes, under its
-// own "TODO(adonovan): opt: clear them earlier, so we can release large
-// data structures like SSA sooner" in Analyze. On cohere's own tree
-// that held staticcheck's IR of all 820 packages at once, an 18 GB
-// peak. This copy releases a Result when the last action that reads it
-// has finished (Action.releaseInputs), and builds a package's Results
-// only once an action that reads them has its facts from the packages
-// below (Action.prepare), without which the release frees nothing in
-// time. Otherwise it runs as upstream, and the findings are the same.
-// Beyond the release, it drops what imports x/tools internals: the
-// init that gave analysistest access to Action.pass, and the
-// driverutil helpers, which are copied beside it in driverutil.go.
-// Graph and its All method are in graph.go, one type with methods to
-// a file, as the house keeps them.
+// cohere: this file is a copy of golang.org/x/tools@v0.50.0's
+// go/analysis/checker/checker.go, the version cohere links. go.mod pins
+// v0.49.0, but that is not what links: go.work's TypeScript/tsc
+// requires v0.50.0, and minimal version selection takes it. Diff this
+// file against that upstream path to bump it; every change is marked
+// "cohere:".
+//
+// The one change is the release. Upstream's Analyze keeps every
+// action's Result until the whole graph finishes, under its own
+// "TODO(adonovan): opt: clear them earlier, so we can release large data
+// structures like SSA sooner" (checker.go:210-219 at v0.50.0, :213 at
+// v0.49.0). On cohere's own tree that holds staticcheck's IR of every
+// package in the graph at once. Here an action's Result is released
+// when the last action that reads it has finished (releaseInputs). When
+// x/tools resolves that TODO, this copy goes away and check imports
+// golang.org/x/tools/go/analysis/checker again.
+//
+// What else differs, because this module cannot import x/tools'
+// internal packages:
+//   - The init that gave analysistest access to Action.pass, through
+//     go/analysis/internal, is dropped; nothing here uses analysistest.
+//   - The helpers from internal/analysis/driverutil that this file
+//     calls (ReadFileFunc, CheckedReadFile, ResolveURL, ValidateFixes)
+//     are copied unchanged into driverutil.go beside it.
+//   - codeFact's type assertion is the comma-ok form, as cohere's own
+//     rules require of the code they check.
+//   - Graph and its All method are in graph.go, unchanged, since the
+//     house keeps one type with methods to a file.
 package checker
 
 import (
@@ -105,9 +116,6 @@ type Action struct {
 	// this action's Result, its horizontal dependents. The last of them
 	// releases a non-root Result (see releaseInputs).
 	resultReaders atomic.Int32
-
-	// cohere: prepared guards prepare, which like exec runs once.
-	prepared sync.Once
 }
 
 func (act *Action) String() string {
@@ -241,53 +249,9 @@ func execAll(actions []*Action) {
 
 func (act *Action) exec() { act.once.Do(act.execOnce) }
 
-// cohere: prepare runs everything act and its horizontal dependencies
-// wait on across packages: each vertical dependency in full, and each
-// horizontal dependency's own prepare. Only then does execOnce run the
-// horizontal dependencies themselves.
-//
-// The release alone does not bound memory without this. An analyzer
-// with a large Result and no facts, such as staticcheck's buildir, has
-// no vertical dependencies, so upstream's execAll(act.Deps) starts it on
-// every package at once, while the actions that read it are still
-// waiting on facts from the packages below. Every package's IR is then
-// built before any reader can finish and release one. Preparing first
-// builds a package's IR only once a reader of it has its facts in hand.
-func (act *Action) prepare() {
-	act.prepared.Do(func() {
-		var wg sync.WaitGroup
-		for _, dep := range act.Deps {
-			step := dep.exec
-			if dep.Package == act.Package {
-				step = dep.prepare
-			}
-			wg.Add(1)
-			work := func() {
-				step()
-				wg.Done()
-			}
-			if act.opts.Sequential {
-				work()
-			} else {
-				go work()
-			}
-		}
-		wg.Wait()
-	})
-}
-
 func (act *Action) execOnce() {
 	// Analyze dependencies.
-	// cohere: in two steps, the vertical work first (see prepare), then
-	// the horizontal dependencies, all of whose vertical work is done.
-	act.prepare()
-	var horizontal []*Action
-	for _, dep := range act.Deps {
-		if dep.Package == act.Package {
-			horizontal = append(horizontal, dep)
-		}
-	}
-	execAll(horizontal)
+	execAll(act.Deps)
 
 	// cohere: however this action ends, a failed prerequisite or an
 	// error from Run included, it has read all it will of its inputs.
