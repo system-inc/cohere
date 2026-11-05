@@ -27,6 +27,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
@@ -855,7 +856,7 @@ func joinDiagnostics(diagnostics []*ast.Diagnostic) error {
 			messages = append(messages, fmt.Errorf("and %d more", len(diagnostics)-shown))
 			break
 		}
-		messages = append(messages, fmt.Errorf("TS%d: %s", diagnostic.Code(), diagnostic.MessageText()))
+		messages = append(messages, fmt.Errorf("TS%d: %s", diagnostic.Code(), diagnostic.Localize(locale.Locale{})))
 	}
 	return errors.Join(messages...)
 }
