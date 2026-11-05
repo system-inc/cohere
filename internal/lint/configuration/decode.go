@@ -161,12 +161,11 @@ func (registry OptionsRegistry) Decode(ruleName string, elements []json.RawMessa
 // that read their element with json.Unmarshal rather than rule.UnmarshalOptions.
 func refuseNulls(elements []json.RawMessage) error {
 	for index, element := range elements {
-		var value any
-		if decodeError := json.Unmarshal(element, &value); decodeError != nil {
-			// Malformed JSON is the decoder's to report, in its own words.
+		// Malformed JSON is the decoder's to report, in its own words.
+		if !json.Valid(element) {
 			continue
 		}
-		if path, found := nullPath(value, ""); found {
+		if path, found := nullPath(element, ""); found {
 			at := fmt.Sprintf("element %d", index+1)
 			if path != "" {
 				at += " at " + path
@@ -178,26 +177,33 @@ func refuseNulls(elements []json.RawMessage) error {
 	return nil
 }
 
-// nullPath finds the first null in a decoded JSON value, walking object keys in sorted order so the
+// nullPath finds the first null in a valid JSON value, walking object keys in sorted order so the
 // same config always names the same path, and returns its dotted path.
-func nullPath(value any, path string) (string, bool) {
-	switch typed := value.(type) {
-	case nil:
-		return path, true
-	case []any:
-		for index, member := range typed {
+func nullPath(value json.RawMessage, path string) (string, bool) {
+	// An array or object decodes into its members only when it is one, so a scalar fails both and
+	// holds no null below itself.
+	var members []json.RawMessage
+	if json.Unmarshal(value, &members) == nil {
+		// A null decodes into a slice too, as a nil one.
+		if members == nil {
+			return path, true
+		}
+		for index, member := range members {
 			if found, isNull := nullPath(member, joinPath(path, strconv.Itoa(index))); isNull {
 				return found, true
 			}
 		}
-	case map[string]any:
-		keys := make([]string, 0, len(typed))
-		for key := range typed {
+		return "", false
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(value, &fields) == nil {
+		keys := make([]string, 0, len(fields))
+		for key := range fields {
 			keys = append(keys, key)
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			if found, isNull := nullPath(typed[key], joinPath(path, key)); isNull {
+			if found, isNull := nullPath(fields[key], joinPath(path, key)); isNull {
 				return found, true
 			}
 		}

@@ -128,7 +128,11 @@ func TestASecondElementOnASingleElementRuleIsRefused(test *testing.T) {
 	if err != nil {
 		test.Fatalf("one element on a one-element rule was refused: %v", err)
 	}
-	if decoded.(tuningOptions).MaximumLineCount != 3 {
+	options, isTuning := decoded.(tuningOptions)
+	if !isTuning {
+		test.Fatalf("the single element decoded as %T, want tuningOptions", decoded)
+	}
+	if options.MaximumLineCount != 3 {
 		test.Fatalf("the single element did not reach the decoder: %+v", decoded)
 	}
 }

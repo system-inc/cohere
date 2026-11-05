@@ -617,7 +617,11 @@ func TestAnOverrideKeyTheLoaderDoesNotReadIsRefused(test *testing.T) {
 	if loaded.Overrides[0].Reason != "until the generator is fixed" {
 		test.Errorf("the reason was not carried, trimmed: %q", loaded.Overrides[0].Reason)
 	}
-	if want, _ := filepath.Abs(reasoned); loaded.Overrides[0].File != want {
+	want, absoluteError := filepath.Abs(reasoned)
+	if absoluteError != nil {
+		test.Fatal(absoluteError)
+	}
+	if loaded.Overrides[0].File != want {
 		test.Errorf("the override names %q as its file, want %q", loaded.Overrides[0].File, want)
 	}
 }
