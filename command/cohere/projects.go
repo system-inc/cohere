@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path"
@@ -166,6 +167,11 @@ func (found discovery) notes() []string {
 	}
 	for _, label := range found.Ownership.Yielding {
 		lines = append(lines, fmt.Sprintf("%s not run: every file it includes belongs to a nearer tsconfig", label))
+	}
+	for _, label := range slices.Sorted(maps.Keys(found.Ownership.Unloaded)) {
+		lines = append(lines, fmt.Sprintf("%s: its tsconfig did not load, so the %s under it that another tsconfig includes "+
+			"are judged by no run, and its own run fails naming why", label,
+			counted(found.Ownership.Unloaded[label], "file", "files")))
 	}
 	for _, covered := range found.SwiftCoverage.Covered {
 		if covered.Vendored {
