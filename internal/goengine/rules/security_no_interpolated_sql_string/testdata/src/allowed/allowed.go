@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -41,6 +42,25 @@ func numbersAndBooleans(database *sql.DB, limit int, identifier int64, ratio flo
 	_, _ = database.Query(fmt.Sprintf("SELECT name FROM users WHERE id = '%d'", identifier))
 	_, _ = database.Query(fmt.Sprintf("SELECT name FROM users WHERE ratio > %v AND active = %t", ratio, active))
 	_, _ = database.Exec(fmt.Sprintf("PRAGMA cache_size = -%d", limit))
+}
+
+func numbersFormattedByStrconv(database *sql.DB, identifier int, size uint64, ratio float64, active bool) {
+	// Go adds no number to a string, so strconv is how a number reaches a query, and its text is digits.
+	_, _ = database.Query("SELECT name FROM users WHERE id = " + strconv.Itoa(identifier))
+	_, _ = database.Query("SELECT name FROM users WHERE id = '" + strconv.Itoa(identifier) + "'")
+	_, _ = database.Query(fmt.Sprintf("SELECT name FROM users WHERE id = %s", strconv.Itoa(identifier)))
+	_, _ = database.Query("SELECT name FROM users WHERE id = " + strconv.FormatInt(int64(identifier), 10))
+	_, _ = database.Query("SELECT name FROM files WHERE size = " + strconv.FormatUint(size, 10))
+	_, _ = database.Query("SELECT name FROM users WHERE ratio > " + strconv.FormatFloat(ratio, 'f', -1, 64))
+	_, _ = database.Query("SELECT name FROM users WHERE active = '" + strconv.FormatBool(active) + "'")
+	text := strconv.Itoa(identifier)
+	_, _ = database.Query("SELECT name FROM users WHERE id = " + text)
+}
+
+func tableQualifyingAColumn(database *sql.DB, table string) {
+	// After a comparison, a hole the text continues with . is a table's name, not a value.
+	_, _ = database.Query(fmt.Sprintf("SELECT users.id FROM users JOIN %s ON users.id = %s.user_id", table, table))
+	_, _ = database.Query("SELECT users.id FROM users JOIN " + table + " ON users.id = " + table + ".user_id")
 }
 
 func numericTypeParameter[Number int | int64 | float64](database *sql.DB, value Number) {
