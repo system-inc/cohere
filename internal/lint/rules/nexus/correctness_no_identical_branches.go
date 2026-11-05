@@ -323,6 +323,25 @@ func correctnessNoIdenticalBranchesTokens(sourceFile *ast.SourceFile, start int,
 	return tokens
 }
 
+// correctnessNoIdenticalBranchesTypedOperators are the binary operators that can reject a union
+// whose members they each accept. Equality, the logical operators, `??`, `,` and plain assignment
+// accept any union of what they accept, so narrowing cannot change whether they compile.
+var correctnessNoIdenticalBranchesTypedOperators = map[ast.Kind]bool{
+	ast.KindPlusToken: true, ast.KindMinusToken: true, ast.KindAsteriskToken: true,
+	ast.KindAsteriskAsteriskToken: true, ast.KindSlashToken: true, ast.KindPercentToken: true,
+	ast.KindLessThanLessThanToken: true, ast.KindGreaterThanGreaterThanToken: true,
+	ast.KindGreaterThanGreaterThanGreaterThanToken: true, ast.KindAmpersandToken: true,
+	ast.KindBarToken: true, ast.KindCaretToken: true,
+	ast.KindLessThanToken: true, ast.KindGreaterThanToken: true,
+	ast.KindLessThanEqualsToken: true, ast.KindGreaterThanEqualsToken: true,
+	ast.KindInKeyword: true, ast.KindInstanceOfKeyword: true,
+	ast.KindPlusEqualsToken: true, ast.KindMinusEqualsToken: true, ast.KindAsteriskEqualsToken: true,
+	ast.KindAsteriskAsteriskEqualsToken: true, ast.KindSlashEqualsToken: true,
+	ast.KindPercentEqualsToken: true, ast.KindLessThanLessThanEqualsToken: true,
+	ast.KindGreaterThanGreaterThanEqualsToken: true, ast.KindGreaterThanGreaterThanGreaterThanEqualsToken: true,
+	ast.KindAmpersandEqualsToken: true, ast.KindBarEqualsToken: true, ast.KindCaretEqualsToken: true,
+}
+
 // correctnessNoIdenticalBranchesSameTypes walks two token-identical branches in parallel and says
 // whether merging them into one copy would type-check the same way. It does not ask whether every
 // expression has the same type on both sides, because the condition narrowing a reference is the
@@ -382,25 +401,6 @@ func correctnessNoIdenticalBranchesSameTypes(ruleContext rule.Context, left *ast
 		}
 	}
 	return true
-}
-
-// correctnessNoIdenticalBranchesTypedOperators are the binary operators that can reject a union
-// whose members they each accept. Equality, the logical operators, `??`, `,` and plain assignment
-// accept any union of what they accept, so narrowing cannot change whether they compile.
-var correctnessNoIdenticalBranchesTypedOperators = map[ast.Kind]bool{
-	ast.KindPlusToken: true, ast.KindMinusToken: true, ast.KindAsteriskToken: true,
-	ast.KindAsteriskAsteriskToken: true, ast.KindSlashToken: true, ast.KindPercentToken: true,
-	ast.KindLessThanLessThanToken: true, ast.KindGreaterThanGreaterThanToken: true,
-	ast.KindGreaterThanGreaterThanGreaterThanToken: true, ast.KindAmpersandToken: true,
-	ast.KindBarToken: true, ast.KindCaretToken: true,
-	ast.KindLessThanToken: true, ast.KindGreaterThanToken: true,
-	ast.KindLessThanEqualsToken: true, ast.KindGreaterThanEqualsToken: true,
-	ast.KindInKeyword: true, ast.KindInstanceOfKeyword: true,
-	ast.KindPlusEqualsToken: true, ast.KindMinusEqualsToken: true, ast.KindAsteriskEqualsToken: true,
-	ast.KindAsteriskAsteriskEqualsToken: true, ast.KindSlashEqualsToken: true,
-	ast.KindPercentEqualsToken: true, ast.KindLessThanLessThanEqualsToken: true,
-	ast.KindGreaterThanGreaterThanEqualsToken: true, ast.KindGreaterThanGreaterThanGreaterThanEqualsToken: true,
-	ast.KindAmpersandEqualsToken: true, ast.KindBarEqualsToken: true, ast.KindCaretEqualsToken: true,
 }
 
 // correctnessNoIdenticalBranchesSameTypeAt compares the checker's type for one pair of matching

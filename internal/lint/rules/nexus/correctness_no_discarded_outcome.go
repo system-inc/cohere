@@ -247,16 +247,18 @@ func correctnessNoDiscardedOutcomeAliasName(union *ast.Node) string {
 
 // correctnessNoDiscardedOutcomeSkipParenthesizedTypeUp walks up out of parenthesized type nodes.
 func correctnessNoDiscardedOutcomeSkipParenthesizedTypeUp(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedType {
-		node = node.Parent
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedType {
+		current = current.Parent
 	}
-	return node
+	return current
 }
 
 // correctnessNoDiscardedOutcomeSkipParenthesizedType walks down into parenthesized type nodes.
 func correctnessNoDiscardedOutcomeSkipParenthesizedType(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedType {
-		node = node.AsParenthesizedTypeNode().Type
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedType {
+		current = current.AsParenthesizedTypeNode().Type
 	}
-	return node
+	return current
 }

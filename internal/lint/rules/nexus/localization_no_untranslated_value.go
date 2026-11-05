@@ -215,6 +215,8 @@ func reportUntranslated(
 
 // collectStringValues flattens an object literal into dotted key paths, which is how the English
 // side is read.
+//
+// Mutates: into the walk records every key path it finds, so one map gathers a whole nested object
 func collectStringValues(objectLiteral *ast.Node, prefix string, into map[string]string) {
 	forEachStringProperty(objectLiteral, prefix, func(key string, value string, valueNode *ast.Node) {
 		into[key] = value

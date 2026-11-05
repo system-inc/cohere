@@ -61,6 +61,11 @@ func correctnessNoCollectionMisuseObjectMethodMessage() rule.Message {
 	}
 }
 
+// correctnessNoCollectionMisuseAnyCollection are the default library's keyed collections.
+var correctnessNoCollectionMisuseAnyCollection = map[string]bool{
+	"Map": true, "ReadonlyMap": true, "Set": true, "ReadonlySet": true, "WeakMap": true, "WeakSet": true,
+}
+
 // CorrectnessNoCollectionMisuse reports four ways of treating a built-in collection that cannot do
 // what they read as doing, each decided from the default library's declarations of the types
 // involved: `in` used for array membership, a length or size compared where the answer never
@@ -175,11 +180,6 @@ var CorrectnessNoCollectionMisuse = rule.Rule{
 			},
 		}
 	},
-}
-
-// correctnessNoCollectionMisuseAnyCollection are the default library's keyed collections.
-var correctnessNoCollectionMisuseAnyCollection = map[string]bool{
-	"Map": true, "ReadonlyMap": true, "Set": true, "ReadonlySet": true, "WeakMap": true, "WeakSet": true,
 }
 
 // correctnessNoCollectionMisuseSizedCollection are the collections with a `size`.
@@ -323,20 +323,21 @@ func correctnessNoCollectionMisuseIsDecided(operator ast.Kind, value float64) bo
 // correctnessNoCollectionMisuseNumericLiteral reads a numeric literal, or one under a unary minus,
 // through parentheses. A literal's text is the canonical spelling of its value.
 func correctnessNoCollectionMisuseNumericLiteral(node *ast.Node) (float64, bool) {
-	node = ast.SkipParentheses(node)
+	// The operand narrows from the whole expression to the literal under a unary minus, if there is one.
+	operand := ast.SkipParentheses(node)
 	sign := 1.0
-	if node.Kind == ast.KindPrefixUnaryExpression {
-		unary := node.AsPrefixUnaryExpression()
+	if operand.Kind == ast.KindPrefixUnaryExpression {
+		unary := operand.AsPrefixUnaryExpression()
 		if unary.Operator != ast.KindMinusToken {
 			return 0, false
 		}
 		sign = -1
-		node = ast.SkipParentheses(unary.Operand)
+		operand = ast.SkipParentheses(unary.Operand)
 	}
-	if node.Kind != ast.KindNumericLiteral {
+	if operand.Kind != ast.KindNumericLiteral {
 		return 0, false
 	}
-	value, parseError := strconv.ParseFloat(node.Text(), 64)
+	value, parseError := strconv.ParseFloat(operand.Text(), 64)
 	if parseError != nil {
 		return 0, false
 	}
@@ -347,11 +348,11 @@ func correctnessNoCollectionMisuseNumericLiteral(node *ast.Node) (float64, bool)
 // string or typed array, or `.size` of a Map or Set, with every member of the receiver's type one of
 // those, so a receiver that may be `undefined` (`items?.length`) is not.
 func correctnessNoCollectionMisuseIsSize(ruleContext rule.Context, expression *ast.Node) bool {
-	expression = ast.SkipParentheses(expression)
-	if expression.Kind != ast.KindPropertyAccessExpression {
+	unwrapped := ast.SkipParentheses(expression)
+	if unwrapped.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
-	access := expression.AsPropertyAccessExpression()
+	access := unwrapped.AsPropertyAccessExpression()
 	if access.Name().Kind != ast.KindIdentifier {
 		return false
 	}
