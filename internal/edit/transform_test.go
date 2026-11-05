@@ -106,7 +106,7 @@ func TestATransformProducingInvalidSyntaxIsRefused(test *testing.T) {
 }
 
 // A transform that errors is reported, and the fixes still land. The formatter being broken says
-// nothing about whether the fixes were correct — they already converged and already passed the guard.
+// nothing about whether the fixes were correct: they already converged and already passed the guard.
 func TestATransformThatErrorsDoesNotBlockFixes(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
@@ -335,7 +335,7 @@ func TestSummaryCountsReformattedFiles(test *testing.T) {
 // turning approximately-25K into strikethrough, so markdown is scoped out until that is fixed. The
 // engine does not care which files a transform handles, but the coverage line must not report a
 // skipped file the same way it reports a file that was already correctly formatted. Those mean
-// opposite things — one says the formatter never looked, the other says it looked and approved.
+// opposite things: one says the formatter never looked, the other says it looked and approved.
 func TestATransformCanSkipAFileAndTheSkipIsRecorded(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()

@@ -37,7 +37,7 @@ func expectSame(test *testing.T, label string, got []string, want []string) {
 }
 
 // Two fixes overlapping the same range must not both land. The earlier one wins by the stated
-// ordering, and the loser is reported with the winner named — a refusal nobody can attribute is
+// ordering, and the loser is reported with the winner named: a refusal nobody can attribute is
 // not actionable.
 func TestOverlappingFixesDoNotBothApply(test *testing.T) {
 	test.Parallel()
@@ -132,7 +132,7 @@ func TestTwoInsertionsAtOnePointDoNotBothApply(test *testing.T) {
 // adjacent, and two rules would both rewrite a region the overlap rule previously protected.
 //
 // Measured rather than assumed, and the answer is that sibling nodes were never overlapping to
-// begin with. A node's untrimmed Loc.Pos() is exactly the previous node's End — the trivia between
+// begin with. A node's untrimmed Loc.Pos() is exactly the previous node's End: the trivia between
 // two nodes belongs entirely to the second one's leading span, and is never shared. So for
 // `alpha + beta`, alpha is [13,19) and beta is [21,26) untrimmed, [14,19) and [22,26) trimmed:
 // adjacent in both forms, overlapping in neither. Narrowing moves a start forward into a region no
@@ -169,7 +169,7 @@ func TestTrimmingAStartCannotDissolveARealOverlap(test *testing.T) {
 
 // Three fixes to one file must all land at the right bytes. This is the offset test: applying front
 // to back would place the second and third edits wrong by the length delta of everything before
-// them, and the failure is silent — the file still parses, it just says something else.
+// them, and the failure is silent: the file still parses, it just says something else.
 func TestThreeFixesKeepTheirOffsets(test *testing.T) {
 	test.Parallel()
 	source := "const alpha = 1; const beta = 2; const gamma = 3;"

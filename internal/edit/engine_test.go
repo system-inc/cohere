@@ -79,7 +79,7 @@ func TestFixProducingInvalidSyntaxIsRefused(test *testing.T) {
 }
 
 // A pass is discarded whole. When one fix in a pass breaks the parse, the fixes that were
-// individually fine must not land either — writing a combination no rule proposed and nothing
+// individually fine must not land either: writing a combination no rule proposed and nothing
 // verified is a worse guarantee than leaving the file alone.
 func TestAParseFailureDiscardsTheWholePass(test *testing.T) {
 	test.Parallel()
@@ -190,7 +190,7 @@ func TestTwoRulesFightingTerminateOnTheBudget(test *testing.T) {
 
 // A file that is already broken must be refused up front. "The result parses" guarantees nothing if
 // the input did not, and pretending otherwise would let this package take the blame for damage it
-// did not do — or worse, hide damage it did.
+// did not do, or worse, hide damage it did.
 func TestAlreadyBrokenFileIsRefusedUpFront(test *testing.T) {
 	test.Parallel()
 	_, fixTextError := FixText("broken.ts", "function alpha() { return 1;\n", proposeOnce(), DefaultMaxPasses)
@@ -206,7 +206,7 @@ func TestAlreadyBrokenFileIsRefusedUpFront(test *testing.T) {
 // and renaming it over a source file would silently change permissions.
 //
 // The fixture mode is deliberately 0644 rather than 0600. An earlier version used 0600 and a mutant
-// that chmods unconditionally to 0600 passed it — the assertion was true for the wrong reason,
+// that chmods unconditionally to 0600 passed it: the assertion was true for the wrong reason,
 // which is the exact shape of a check that cannot fail. Picking a mode a temp file never has by
 // default is what makes the assertion mean something.
 func TestFixFileWritesAtomicallyAndKeepsMode(test *testing.T) {
@@ -388,7 +388,7 @@ func TestSummaryReportsPopulationAndReasons(test *testing.T) {
 // A file the engine could not process must be counted as failed, not as not-converged.
 //
 // The two send a reader somewhere different: not-converged points at two rules arguing, while a
-// failure means the file never entered the loop. This was a real defect in the CLI driver — a file
+// failure means the file never entered the loop. This was a real defect in the CLI driver: a file
 // that did not parse before any fix was applied reported as "1 files did not converge", a true
 // number under the wrong heading, which is the shape of an accurate answer to a question nobody
 // asked.
@@ -433,7 +433,7 @@ func TestSummaryDistinguishesAnEmptyRun(test *testing.T) {
 }
 
 // TSX must be parsed as TSX. A `<T>` is a type assertion in .ts and an element in .tsx, so parsing
-// one as the other invents syntax errors in a file that was fine — and the refusal guard would then
+// one as the other invents syntax errors in a file that was fine. And the refusal guard would then
 // refuse every correct fix in every .tsx file, silently, forever.
 func TestTsxIsParsedAsTsx(test *testing.T) {
 	test.Parallel()

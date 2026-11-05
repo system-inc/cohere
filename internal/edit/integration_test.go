@@ -161,12 +161,12 @@ func TestARealRuleConvergesInTwoPasses(test *testing.T) {
 // This fixture found a live defect rather than confirming a known-good behavior, and it is kept
 // because the defect is easy to reintroduce. `node.Loc.Pos()` in typescript-go is the position
 // before leading trivia, so the range for the specifier in `import * as X from 'fs'` spans
-// `" 'fs'"` — the space included. The original `rule.ReplaceNode` used `node.Loc` directly, so a
+// `" 'fs'"`, the space included. The original `rule.ReplaceNode` used `node.Loc` directly, so a
 // rule replacing that node also deleted the whitespace, producing `from'node:fs'`.
 //
 // The reason it matters more than its cosmetics, and the reason it belongs in this package's tests
 // rather than only in the rule package's: the corrupted output still parses. The refusal guard here
-// catches a rewrite that breaks syntax, and this one does not break syntax — it silently ate a
+// catches a rewrite that breaks syntax, and this one does not break syntax: it silently ate a
 // space, a newline, or an entire comment, and every downstream check stayed green. A helper handing
 // the engine a range wider than the rule meant is damage no validation downstream can detect. The
 // parse guard is necessary and not sufficient, and this fixture is the standing proof of that gap.
@@ -215,7 +215,7 @@ func TestReplaceNodeMustNotEatLeadingTrivia(test *testing.T) {
 }
 
 // A rule that reports without a fix must leave the file alone. Most rules are in this shape
-// deliberately — the namespace case in this very rule declines to fix because rewriting the import
+// deliberately: the namespace case in this very rule declines to fix because rewriting the import
 // without re-rooting its references through scope would leave the file uncompilable.
 func TestAFindingWithNoFixChangesNothing(test *testing.T) {
 	test.Parallel()
@@ -313,7 +313,7 @@ func TestARuleProposingBrokenSyntaxIsRefused(test *testing.T) {
 // This is the shape a real rule takes when its fix does not silence its own finding: the finding is
 // re-reported against the rewritten text every pass, so the fix lands again, and again, until the
 // budget runs out. It is written as a probe rather than found in the catalog because no shipped rule
-// does this today — every ReportNodeWithFixes site emits one fix that removes its own trigger. The
+// does this today: every ReportNodeWithFixes site emits one fix that removes its own trigger. The
 // guard is worth having precisely because it is unreachable now: it costs nothing today and the
 // first rule to get this wrong will be caught by the engine rather than by a developer reading a
 // file full of nested braces.
