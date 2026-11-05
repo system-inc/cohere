@@ -1,6 +1,7 @@
 package correctness_require_handled_error_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"golang.org/x/tools/go/analysis/analysistest"
@@ -36,6 +37,18 @@ func TestAnalyzer(test *testing.T) {
 		"allowed",
 		"lookalike",
 	)
+}
+
+// crypto/rand.Read is exempt only from Go 1.24, and the version is the package's, so each side is a module of its own
+// under testdata/src: analysistest loads a directory holding a go.mod in module mode, where go.mod's go line is the
+// package's version. olderversion, at go 1.23, flags Read; newerversion, at go 1.24, leaves it alone even in a file
+// whose //go:build line lowers the file's language to go1.23, since the toolchain is still 1.24 or later.
+func TestAnalyzerReadsThePackageGoVersion(test *testing.T) {
+	test.Parallel()
+	for _, module := range []string{"olderversion", "newerversion"} {
+		directory := filepath.Join(analysistest.TestData(), "src", module)
+		analysistest.Run(errorsOnly{test}, directory, correctness_require_handled_error.Analyzer, "./...")
+	}
 }
 
 // errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go

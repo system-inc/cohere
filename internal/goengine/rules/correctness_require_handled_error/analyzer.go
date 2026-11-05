@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
+	"go/version"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
@@ -77,14 +78,20 @@ var (
 	// write would. Println and Printf write to standard output, which can fail, so they are not here.
 	exemptPrintFunctions = map[string]bool{"Fprint": true, "Fprintf": true, "Fprintln": true}
 	// exemptCallees are single callees documented never to fail, by package path, receiver type name (empty for a
-	// package function) and name, as their documentation gives them:
+	// package function) and name, as their documentation gives them, and the Go version that promise starts at (empty
+	// for every version):
 	//
 	//	maphash.Hash.WriteString  "It always writes all of s and never fails; the count and error result are for
 	//	                          implementing io.StringWriter."
-	//	rand.Read                 "It never returns an error, and always fills b entirely." (crypto/rand)
-	exemptCallees = []struct{ packagePath, typeName, name string }{
-		{"hash/maphash", "Hash", "WriteString"},
-		{"crypto/rand", "", "Read"},
+	//	rand.Read                 "It never returns an error, and always fills b entirely." (crypto/rand, from Go
+	//	                          1.24, whose release notes say "The Read function is now guaranteed not to fail.")
+	//
+	// The promise is the toolchain's, so it is read from the package's version, the go line of its go.mod, which
+	// since Go 1.21 is the oldest toolchain that may build it. A file's //go:build version lowers only the language
+	// that file is checked against, never the toolchain, so it does not count here.
+	exemptCallees = []struct{ packagePath, typeName, name, sinceGoVersion string }{
+		{"hash/maphash", "Hash", "WriteString", ""},
+		{"crypto/rand", "", "Read", "go1.24"},
 	}
 )
 
@@ -250,7 +257,7 @@ func (checker checker) isExempt(call *ast.CallExpr) bool {
 	if !isFunc {
 		return false
 	}
-	if isExemptCallee(function) {
+	if checker.isExemptCallee(function) {
 		return true
 	}
 	if receiver := function.Signature().Recv(); receiver != nil {
@@ -321,8 +328,9 @@ func isExemptWriterType(candidate types.Type) bool {
 }
 
 // isExemptCallee is whether function is one of exemptCallees: a package function when the entry's type name is
-// empty, or else a method declared on that type, through a pointer or not.
-func isExemptCallee(function *types.Func) bool {
+// empty, or else a method declared on that type, through a pointer or not, in a package at the entry's Go version
+// or later.
+func (checker checker) isExemptCallee(function *types.Func) bool {
 	if function.Pkg() == nil {
 		return false
 	}
@@ -343,10 +351,20 @@ func isExemptCallee(function *types.Func) bool {
 			continue
 		}
 		if typeName == callee.typeName {
-			return true
+			return checker.isAtGoVersion(callee.sinceGoVersion)
 		}
 	}
 	return false
+}
+
+// isAtGoVersion is whether the analyzed package's Go version is since or later; an empty since is every version. A
+// package with no version, loaded outside a module, is read as the latest, as the type checker reads it.
+func (checker checker) isAtGoVersion(since string) bool {
+	packageVersion := checker.pass.Pkg.GoVersion()
+	if since == "" || packageVersion == "" {
+		return true
+	}
+	return version.Compare(packageVersion, since) >= 0
 }
 
 // findHashInterface is hash.Hash's interface from the import graph under analyzed, analyzed included, or nil when
