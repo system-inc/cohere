@@ -1,4 +1,4 @@
-package nexus
+package shouting
 
 import (
 	"os"
@@ -115,7 +115,7 @@ func TestShoutingUppercaseGatePreservesTokens(t *testing.T) {
 	comments := realCommentCorpus(t)
 
 	ungated := func(body string) []string {
-		masked := maskCodeAndCommands(body)
+		masked := MaskCodeAndCommands(body)
 		var tokens []string
 		seen := map[string]bool{}
 		for _, token := range uppercaseToken.FindAllString(masked, -1) {
@@ -129,7 +129,7 @@ func TestShoutingUppercaseGatePreservesTokens(t *testing.T) {
 	}
 
 	for _, comment := range comments {
-		gated := shoutedTokensIn(comment)
+		gated := TokensIn(comment)
 		reference := ungated(comment)
 		if len(gated) != len(reference) {
 			t.Fatalf("gate changed the token count for %q: %v against %v", comment, gated, reference)
@@ -156,7 +156,7 @@ func TestShoutingUppercaseGateAdmitsRealShouts(t *testing.T) {
 		"shouting at the very ENDOFLINE",
 	}
 	for _, body := range admitted {
-		if !hasAdjacentUppercaseLetters(body) {
+		if !HasAdjacentUppercaseLetters(body) {
 			t.Fatalf("gate rejects %q, which reaches the token scan", body)
 		}
 	}
@@ -169,13 +169,13 @@ func TestShoutingUppercaseGateAdmitsRealShouts(t *testing.T) {
 		"",
 	}
 	for _, body := range skipped {
-		if hasAdjacentUppercaseLetters(body) {
+		if HasAdjacentUppercaseLetters(body) {
 			t.Fatalf("gate admits %q, which holds no adjacent uppercase pair", body)
 		}
 	}
 
 	// The boundary: exactly two adjacent uppercase letters is the shortest reportable shape.
-	if !hasAdjacentUppercaseLetters("it IS wrong") {
+	if !HasAdjacentUppercaseLetters("it IS wrong") {
 		t.Fatalf("gate rejects a two-letter shout")
 	}
 }
