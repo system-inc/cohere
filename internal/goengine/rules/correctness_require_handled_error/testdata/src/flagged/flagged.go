@@ -90,9 +90,13 @@ func printing() {
 
 // A writer that can fail, or one whose static type promises nothing, keeps its error.
 func failingWriters(writer *bufio.Writer, reader io.Reader) {
-	writer.Write([]byte("data"))      // want `^.\(\*bufio\.Writer\)\.Write. returns an error`
-	writer.WriteString("data")        // want `^.\(\*bufio\.Writer\)\.WriteString. returns an error`
-	fmt.Fprintf(writer, "%s", "data") // want `^.fmt\.Fprintf. returns an error`
+	// A bufio.Writer's Flush is where its kept error comes back, and its ReadFrom writes through to what it wraps.
+	writer.Flush()          // want `^.\(\*bufio\.Writer\)\.Flush. returns an error`
+	defer writer.Flush()    // want `^.\(\*bufio\.Writer\)\.Flush. returns an error`
+	writer.ReadFrom(reader) // want `^.\(\*bufio\.Writer\)\.ReadFrom. returns an error`
+	// Standard error is an *os.File, which can fail, and the rule reads the writer's type, not its name.
+	fmt.Fprintf(os.Stderr, "%s", "data") // want `^.fmt\.Fprintf. returns an error`
+	os.Stderr.WriteString("data")        // want `^.\(\*os\.File\)\.WriteString. returns an error`
 	var builder strings.Builder
 	var held io.Writer = &builder
 	fmt.Fprint(held, "data")   // want `^.fmt\.Fprint. returns an error`

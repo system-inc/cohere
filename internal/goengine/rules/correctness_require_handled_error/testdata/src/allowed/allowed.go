@@ -1,8 +1,9 @@
 // Package allowed holds calls the rule must leave alone: each handles its error, says why it drops it, or is a write
-// documented never to fail.
+// exempt by its writer's type.
 package allowed
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/sha256"
 	"fmt"
@@ -87,6 +88,18 @@ func neverFailing(data []byte) string {
 	pointer.WriteString("f")
 	fmt.Fprint(pointer, "g")
 	return builder.String() + buffer.String()
+}
+
+// A bufio.Writer keeps a failed write's error and hands it back from every later write and from Flush, so its
+// writes need no reason as long as the Flush is checked.
+func buffered(writer *bufio.Writer) error {
+	writer.Write([]byte("data"))
+	writer.WriteString("data")
+	writer.WriteByte('a')
+	writer.WriteRune('b')
+	fmt.Fprintf(writer, "%s", "data")
+	_, _ = fmt.Fprintln(writer, "data")
+	return writer.Flush()
 }
 
 // An embedded Builder written through its embedder is still the Builder's own write.

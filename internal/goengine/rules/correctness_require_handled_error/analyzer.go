@@ -28,8 +28,8 @@ var Analyzer = &analysis.Analyzer{
 	Name: "correctness_require_handled_error",
 	Doc: "Flags a call that returns an error and drops it, as a statement of its own, as the operand of defer or " +
 		"go, or with the error assigned to _, unless a // Ignored: <reason> comment directly above the statement or " +
-		"at the end of its line says why. Writes documented never to return an error, such as those to a " +
-		"*strings.Builder, are exempt by type.",
+		"at the end of its line says why. Writes whose error is documented never to be non-nil, such as those to a " +
+		"*strings.Builder, or to be kept for a later checked call, a *bufio.Writer's Flush, are exempt by type.",
 	Run: run,
 }
 
@@ -43,11 +43,11 @@ var unhandledErrorWithoutReasonMessage = policy.MessageOf(Name, "unhandledErrorW
 // ignoredMarker opens the comment that excuses a dropped error.
 const ignoredMarker = "Ignored:"
 
-// The callees whose error is documented never to be non-nil, so handling it would be ceremony around a value that
-// cannot be anything but nil. Each is matched by its package, type and method, never by how the call is spelled.
+// The callees whose error need not be checked at the call: either it is documented never to be non-nil, so handling
+// it would be ceremony around a value that cannot be anything but nil, or it is kept and handed back at a later call
+// that is itself checked. Each is matched by its package, type and method, never by how the call is spelled.
 var (
-	// neverFailingWriteMethods are the write methods of *strings.Builder and *bytes.Buffer, as their documentation
-	// gives them:
+	// exemptWriteMethods are the write methods of the exemptWriters, as their documentation gives them:
 	//
 	//	strings.Builder.Write        "Write always returns len(p), nil."
 	//	strings.Builder.WriteByte    "The returned error is always nil."
@@ -58,17 +58,24 @@ var (
 	//	                             WriteByte."
 	//	bytes.Buffer.WriteRune       "The nil error is included to match bufio.Writer's WriteRune."
 	//	bytes.Buffer.WriteString     "The return value n is the length of s; err is always nil."
+	//	bufio.Writer, every write    "If an error occurs writing to a Writer, no more data will be accepted and all
+	//	                             subsequent writes, and Flush, will return the error."
 	//
-	// A bytes.Buffer's ReadFrom and WriteTo are absent on purpose: they read or write another io.Reader or io.Writer,
-	// and its error is theirs.
-	neverFailingWriteMethods = map[string]bool{"Write": true, "WriteByte": true, "WriteRune": true, "WriteString": true}
-	// neverFailingWriters are the types the write methods above belong to, by package path and type name, each
-	// through a pointer.
-	neverFailingWriters = []struct{ packagePath, typeName string }{{"strings", "Builder"}, {"bytes", "Buffer"}}
-	// neverFailingPrintFunctions are fmt's printers to a writer: "It returns the number of bytes written and any write
-	// error encountered." Formatting itself never fails, so with a writer above that never fails, neither do they.
-	// Println and Printf write to standard output, which can fail, so they are not here.
-	neverFailingPrintFunctions = map[string]bool{"Fprint": true, "Fprintf": true, "Fprintln": true}
+	// A bufio.Writer's error is sticky, so a dropped write loses nothing as long as its Flush is checked, which is
+	// why Flush is absent and stays judged: it is where the error comes back. ReadFrom and WriteTo are absent on
+	// purpose too: they read or write another io.Reader or io.Writer, and its error is theirs.
+	exemptWriteMethods = map[string]bool{"Write": true, "WriteByte": true, "WriteRune": true, "WriteString": true}
+	// exemptWriters are the types the write methods above belong to, by package path and type name, each through a
+	// pointer.
+	exemptWriters = []struct{ packagePath, typeName string }{
+		{"strings", "Builder"},
+		{"bytes", "Buffer"},
+		{"bufio", "Writer"},
+	}
+	// exemptPrintFunctions are fmt's printers to a writer: "It returns the number of bytes written and any write
+	// error encountered." Formatting itself never fails, so writing to one of the exemptWriters, they return what its
+	// write would. Println and Printf write to standard output, which can fail, so they are not here.
+	exemptPrintFunctions = map[string]bool{"Fprint": true, "Fprintf": true, "Fprintln": true}
 )
 
 // hashPackagePath holds hash.Hash, whose Write the interface itself documents: "Write (via the embedded io.Writer
@@ -156,8 +163,8 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-// returnsError is whether call has a result that is an error, in any position, and is not a call documented never
-// to return one.
+// returnsError is whether call has a result that is an error, in any position, and is not one of the exempt callees
+// whose error need not be checked at the call.
 func (checker checker) returnsError(call *ast.CallExpr) bool {
 	if !checker.isFunctionCall(call) {
 		return false
@@ -166,12 +173,12 @@ func (checker checker) returnsError(call *ast.CallExpr) bool {
 	case *types.Tuple:
 		for index := range result.Len() {
 			if checker.isError(result.At(index).Type()) {
-				return !checker.neverFails(call)
+				return !checker.isExempt(call)
 			}
 		}
 		return false
 	default:
-		return checker.isError(result) && !checker.neverFails(call)
+		return checker.isError(result) && !checker.isExempt(call)
 	}
 }
 
@@ -192,7 +199,7 @@ func (checker checker) callsDroppingError(left []ast.Expr, right []ast.Expr) []*
 		}
 		for index, name := range left {
 			if index < results.Len() && isBlank(name) && checker.isError(results.At(index).Type()) {
-				if !checker.neverFails(call) {
+				if !checker.isExempt(call) {
 					calls = append(calls, call)
 				}
 				return calls
@@ -208,7 +215,7 @@ func (checker checker) callsDroppingError(left []ast.Expr, right []ast.Expr) []*
 		if !isCall || !isBlank(name) || !checker.isFunctionCall(call) {
 			continue
 		}
-		if checker.isError(checker.pass.TypesInfo.TypeOf(call)) && !checker.neverFails(call) {
+		if checker.isError(checker.pass.TypesInfo.TypeOf(call)) && !checker.isExempt(call) {
 			calls = append(calls, call)
 		}
 	}
@@ -227,8 +234,8 @@ func (checker checker) isError(candidate types.Type) bool {
 	return candidate != nil && types.Implements(candidate, checker.errorInterface)
 }
 
-// neverFails is whether call is one of the callees documented above never to return a non-nil error.
-func (checker checker) neverFails(call *ast.CallExpr) bool {
+// isExempt is whether call is one of the callees above whose error need not be checked at the call.
+func (checker checker) isExempt(call *ast.CallExpr) bool {
 	function, isFunc := typeutil.Callee(checker.pass.TypesInfo, call).(*types.Func)
 	if !isFunc {
 		return false
@@ -236,12 +243,12 @@ func (checker checker) neverFails(call *ast.CallExpr) bool {
 	if receiver := function.Signature().Recv(); receiver != nil {
 		// The method's own receiver, so a Builder embedded in another struct and written through it is the same
 		// Builder.WriteString.
-		if neverFailingWriteMethods[function.Name()] && isNeverFailingWriterType(receiver.Type()) {
+		if exemptWriteMethods[function.Name()] && isExemptWriterType(receiver.Type()) {
 			return true
 		}
 		return function.Name() == "Write" && checker.isHashReceiver(call)
 	}
-	if function.Pkg() == nil || function.Pkg().Path() != "fmt" || !neverFailingPrintFunctions[function.Name()] {
+	if function.Pkg() == nil || function.Pkg().Path() != "fmt" || !exemptPrintFunctions[function.Name()] {
 		return false
 	}
 	if len(call.Args) == 0 {
@@ -249,7 +256,7 @@ func (checker checker) neverFails(call *ast.CallExpr) bool {
 	}
 	// The writer's static type: an io.Writer that happens to hold a Builder promises nothing at the call.
 	writer := checker.pass.TypesInfo.TypeOf(call.Args[0])
-	if isNeverFailingWriterType(writer) {
+	if isExemptWriterType(writer) {
 		return true
 	}
 	return checker.hashInterface != nil && types.Implements(writer, checker.hashInterface)
@@ -282,8 +289,8 @@ func (checker checker) isHashReceiver(call *ast.CallExpr) bool {
 	return types.Implements(types.NewPointer(receiver), checker.hashInterface)
 }
 
-// isNeverFailingWriterType is whether candidate is a pointer to one of neverFailingWriters.
-func isNeverFailingWriterType(candidate types.Type) bool {
+// isExemptWriterType is whether candidate is a pointer to one of exemptWriters.
+func isExemptWriterType(candidate types.Type) bool {
 	pointer, isPointer := types.Unalias(candidate).(*types.Pointer)
 	if !isPointer {
 		return false
@@ -292,7 +299,7 @@ func isNeverFailingWriterType(candidate types.Type) bool {
 	if !isNamed || named.Obj().Pkg() == nil {
 		return false
 	}
-	for _, writer := range neverFailingWriters {
+	for _, writer := range exemptWriters {
 		if named.Obj().Pkg().Path() == writer.packagePath && named.Obj().Name() == writer.typeName {
 			return true
 		}
@@ -300,11 +307,11 @@ func isNeverFailingWriterType(candidate types.Type) bool {
 	return false
 }
 
-// findHashInterface is hash.Hash's interface from the import graph under pkg, pkg included, or nil when hash is not
-// in it.
-func findHashInterface(pkg *types.Package) *types.Interface {
+// findHashInterface is hash.Hash's interface from the import graph under analyzed, analyzed included, or nil when
+// hash is not in it.
+func findHashInterface(analyzed *types.Package) *types.Interface {
 	seen := map[*types.Package]bool{}
-	pending := []*types.Package{pkg}
+	pending := []*types.Package{analyzed}
 	for len(pending) > 0 {
 		current := pending[len(pending)-1]
 		pending = pending[:len(pending)-1]
