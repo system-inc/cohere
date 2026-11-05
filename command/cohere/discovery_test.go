@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -49,6 +50,114 @@ func TestDiscoveryFindsEveryProjectTheRepositoryKeeps(t *testing.T) {
 	}
 	if !reflect.DeepEqual(found.Projects, want) {
 		t.Fatalf("found %+v, want %+v", found.Projects, want)
+	}
+}
+
+// A go.work and a go.mod in one directory are one Go project, the workspace, and the workspace claims the
+// modules its uses name: they leave Projects, since its run builds them. A module below it that it does not
+// use stays a project and a note names why, and a use that leads into a submodule or outside the root claims
+// nothing and breaks nothing.
+func TestDiscoveryLetsAGoWorkspaceClaimTheModulesItUses(test *testing.T) {
+	test.Parallel()
+	workspace := "go 1.24\n\nuse (\n\t.\n\t./services/api\n\t./tools/lint\n\t./vendored/module\n\t../outside\n)\n"
+	root := newRepository(test, map[string]string{
+		"go.work":                   workspace,
+		"go.mod":                    "module example.com/root\n",
+		"services/api/go.mod":       "module example.com/api\n",
+		"tools/lint/go.mod":         "module example.com/lint\n",
+		"tools/unused/go.mod":       "module example.com/unused\n",
+		"vendored/.git":             "gitdir: ../.git/modules/vendored\n",
+		"vendored/module/go.mod":    "module example.com/vendored\n",
+		"vendored/module/vendor.go": "package module\n",
+	})
+	found, err := discoverProjects(root, nil)
+	if err != nil {
+		test.Fatal(err)
+	}
+	want := []discoveredProject{
+		{Directory: ".", Engine: engineGo},
+		{Directory: "tools/unused", Engine: engineGo},
+	}
+	if !reflect.DeepEqual(found.Projects, want) {
+		test.Fatalf("found %+v, want %+v", found.Projects, want)
+	}
+	if found.Submodules != 1 {
+		test.Errorf("submodules %d, want 1: the use inside one should leave the walk as it was", found.Submodules)
+	}
+	wantNote := "tools/unused/go.mod runs as its own module: go.work does not use it"
+	if notes := found.notes(); !reflect.DeepEqual(notes, []string{wantNote}) {
+		test.Errorf("notes %q, want only %q", notes, wantNote)
+	}
+
+	// The control: with no go.work, every module is a project of its own and no note says otherwise.
+	if err := os.Remove(filepath.Join(root, "go.work")); err != nil {
+		test.Fatal(err)
+	}
+	unclaimed, err := discoverProjects(root, nil)
+	if err != nil {
+		test.Fatal(err)
+	}
+	if len(unclaimed.Projects) != 4 || len(unclaimed.notes()) != 0 {
+		test.Errorf("without the workspace found %+v and notes %q, want four modules and no note",
+			unclaimed.Projects, unclaimed.notes())
+	}
+}
+
+// A go.work discovery reads and cannot parse stops discovery naming it, rather than reading as a workspace
+// that uses nothing and running its modules apart.
+func TestDiscoveryRefusesAMalformedGoWork(test *testing.T) {
+	test.Parallel()
+	root := newRepository(test, map[string]string{
+		"workspace/go.work":        "go 1.24\n\nuse (\n\t./module\n",
+		"workspace/module/go.mod":  "module example.com/module\n",
+		"workspace/module/code.go": "package module\n",
+	})
+	_, err := discoverProjects(root, nil)
+	if err == nil {
+		test.Fatal("a go.work that does not parse was read as a workspace")
+	}
+	if want := filepath.Join(root, "workspace", "go.work"); !strings.Contains(err.Error(), want) {
+		test.Errorf("the error does not name %s: %v", want, err)
+	}
+}
+
+// Within one directory TypeScript comes first, then Swift, then Go, whatever order the reads finished in.
+func TestSortProjectsRanksTypeScriptThenSwiftThenGo(test *testing.T) {
+	test.Parallel()
+	found := discovery{Projects: []discoveredProject{
+		{Directory: "app", Engine: engineGo},
+		{Directory: ".", Engine: engineGo},
+		{Directory: "app", Engine: engineSwift},
+		{Directory: ".", Engine: engineSwift},
+		{Directory: "app", Engine: engineTypeScript},
+		{Directory: ".", Engine: engineTypeScript},
+	}}
+	found.sortProjects()
+	want := []discoveredProject{
+		{Directory: ".", Engine: engineTypeScript},
+		{Directory: ".", Engine: engineSwift},
+		{Directory: ".", Engine: engineGo},
+		{Directory: "app", Engine: engineTypeScript},
+		{Directory: "app", Engine: engineSwift},
+		{Directory: "app", Engine: engineGo},
+	}
+	if !reflect.DeepEqual(found.Projects, want) {
+		test.Errorf("sorted %+v, want %+v", found.Projects, want)
+	}
+}
+
+// The summary line counts Go projects after Swift's.
+func TestSummaryLineCountsGoProjects(test *testing.T) {
+	test.Parallel()
+	runs := []projectRun{
+		{project: discoveredProject{Directory: ".", Engine: engineTypeScript}},
+		{project: discoveredProject{Directory: ".", Engine: engineGo}},
+		{project: discoveredProject{Directory: "swift", Engine: engineSwift}},
+		{project: discoveredProject{Directory: "tools", Engine: engineGo}, exitCode: 1},
+	}
+	line := summaryLine(discovery{}, runs)
+	if want := "projects: 4 checked (1 TypeScript, 1 Swift, 2 Go), 1 failed"; !strings.HasPrefix(line, want) {
+		test.Errorf("summary %q, want it to start %q", line, want)
 	}
 }
 

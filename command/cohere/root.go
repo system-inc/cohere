@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"golang.org/x/mod/modfile"
 )
 
 // projectMarker is the file whose directory is a project's root.
@@ -35,6 +37,21 @@ const projectMarker = "tsconfig.json"
 // finds each marker as a project of its own, and each project's run names its engine (see discovery.go).
 const swiftProjectMarker = "Package.swift"
 
+// goWorkspaceMarker is the file whose directory is a Go workspace's root, and the run there belongs to the
+// Go engine, over every module the workspace uses.
+//
+// It shares the walk with the other markers and comes after them in one directory, so a tsconfig.json or a
+// Package.swift beside it keeps the run it had. Ahead of goModuleMarker, because a directory holding both is
+// one project, the workspace: go itself builds the workspace there, its own module among the uses.
+const goWorkspaceMarker = "go.work"
+
+// goModuleMarker is the file whose directory is a Go module's root, last of the four markers.
+//
+// A module is the nearest marker but not always the root: go builds a module inside the workspace whose
+// go.work is nearest above it, when that workspace uses it, so the walk up keeps looking for that go.work
+// and stands where go would (see goModuleRoot).
+const goModuleMarker = "go.mod"
+
 // projectEngine is which engine checks the project at a root.
 type projectEngine string
 
@@ -44,6 +61,9 @@ const (
 
 	// engineSwift is cohere-swift, which this binary runs and whose records it renders.
 	engineSwift projectEngine = "Swift"
+
+	// engineGo is the Go engine, over a workspace a go.work defines or a module a go.mod does.
+	engineGo projectEngine = "Go"
 )
 
 // projectLocation is where a run is anchored, and which directory each kind of path resolves against.
@@ -108,8 +128,9 @@ type locationRequest struct {
 //   - `--tsconfig` names the project, so the root is the directory that holds it. The name itself was
 //     typed, so it resolves against the working directory.
 //   - Otherwise the root is the nearest directory at or above the working directory that holds a
-//     tsconfig.json or a Package.swift. See projectMarker for why the tsconfig and not the lint
-//     config, and swiftProjectMarker for how the two markers share the walk.
+//     tsconfig.json, a Package.swift, a go.work or a go.mod, except that a Go module a workspace above
+//     it uses is that workspace's. See projectMarker for why the tsconfig and not the lint config,
+//     swiftProjectMarker for how the markers share the walk, and goModuleMarker for the workspace.
 //
 // The engine follows the marker. `--tsconfig` names a TypeScript program, so it is always TypeScript.
 // `--directory` is a `cd`, so the directory it names is read for markers the way discovery reads each
@@ -165,8 +186,9 @@ func locateProject(request locationRequest) (projectLocation, error) {
 	return location, nil
 }
 
-// findProjectRoot walks up from a directory to the nearest one holding a tsconfig.json or a
-// Package.swift, and says which engine that marker belongs to.
+// findProjectRoot walks up from a directory to the nearest one holding a tsconfig.json, a Package.swift,
+// a go.work or a go.mod, and says which engine that marker belongs to. A go.mod alone hands the walk on
+// to goModuleRoot, which finds the workspace go would build it in.
 //
 // Finding nothing is an error that names where the walk began, never a fallback to the starting
 // directory. A fallback would hand the graph builder a tsconfig path that does not exist, and the
@@ -176,22 +198,27 @@ func findProjectRoot(start string) (string, projectEngine, error) {
 	directory := filepath.Clean(start)
 	for {
 		if engine, found := engineAt(directory); found {
+			if engine == engineGo && !isRegularFile(filepath.Join(directory, goWorkspaceMarker)) {
+				root, err := goModuleRoot(directory)
+				return root, engineGo, err
+			}
 			return directory, engine, nil
 		}
 		parent := filepath.Dir(directory)
 		if parent == directory {
 			return "", "", fmt.Errorf(
-				"no %s or %s in %s or any directory above it, so there is no project here to check: "+
+				"no %s, %s, %s or %s in %s or any directory above it, so there is no project here to check: "+
 					"run from inside one, or name it with -tsconfig or -directory",
-				projectMarker, swiftProjectMarker, start,
+				projectMarker, swiftProjectMarker, goWorkspaceMarker, goModuleMarker, start,
 			)
 		}
 		directory = parent
 	}
 }
 
-// engineAt says which engine owns a directory by the marker it holds, TypeScript first. See
-// swiftProjectMarker for why a directory holding both is TypeScript's.
+// engineAt says which engine owns a directory by the marker it holds: TypeScript, then Swift, then Go by
+// either of its markers. See swiftProjectMarker for why a directory holding more than one is the first
+// one's, and goWorkspaceMarker for why the Go markers come last.
 func engineAt(directory string) (projectEngine, bool) {
 	if isRegularFile(filepath.Join(directory, projectMarker)) {
 		return engineTypeScript, true
@@ -199,7 +226,70 @@ func engineAt(directory string) (projectEngine, bool) {
 	if isRegularFile(filepath.Join(directory, swiftProjectMarker)) {
 		return engineSwift, true
 	}
+	if isRegularFile(filepath.Join(directory, goWorkspaceMarker)) ||
+		isRegularFile(filepath.Join(directory, goModuleMarker)) {
+		return engineGo, true
+	}
 	return "", false
+}
+
+// goModuleRoot is the root a Go module's run stands on: the directory of the nearest go.work above it, when
+// that workspace uses the module, since that is the build go itself runs there, and the module's own
+// directory otherwise. Only the nearest go.work counts, as with go, and the search stops at the enclosing
+// repository's root, since a go.work above it belongs to some other tree.
+func goModuleRoot(module string) (string, error) {
+	boundary := enclosingRepository(module)
+	for directory := module; directory != boundary; {
+		parent := filepath.Dir(directory)
+		if parent == directory {
+			break
+		}
+		directory = parent
+		if !isRegularFile(filepath.Join(directory, goWorkspaceMarker)) {
+			continue
+		}
+		uses, err := workspaceUses(directory)
+		if err != nil {
+			return "", err
+		}
+		for _, use := range uses {
+			if filepath.Join(directory, filepath.FromSlash(use)) == module {
+				return directory, nil
+			}
+		}
+		return module, nil
+	}
+	return module, nil
+}
+
+// workspaceUses reads the use directives of the go.work in a directory, as cleaned slash paths relative to
+// it, with the parser `go work edit` uses rather than by running go. A go.work that does not parse is an
+// error naming it, never read as absent, since a workspace read as empty would run its modules apart. A use
+// that cannot be put relative to the directory, an absolute path on another volume, is left out: nothing
+// under the directory is there.
+func workspaceUses(directory string) ([]string, error) {
+	workspaceFile := filepath.Join(directory, goWorkspaceMarker)
+	contents, err := os.ReadFile(workspaceFile)
+	if err != nil {
+		return nil, fmt.Errorf("reading the Go workspace %s: %w", workspaceFile, err)
+	}
+	work, err := modfile.ParseWork(goWorkspaceMarker, contents, nil)
+	if err != nil {
+		return nil, fmt.Errorf("the Go workspace %s does not parse: %w", workspaceFile, err)
+	}
+	uses := make([]string, 0, len(work.Use))
+	for _, use := range work.Use {
+		usePath := filepath.FromSlash(use.Path)
+		if filepath.IsAbs(usePath) {
+			relative, relativeError := filepath.Rel(directory, usePath)
+			if relativeError != nil {
+				continue
+			}
+			usePath = relative
+		}
+		uses = append(uses, filepath.ToSlash(filepath.Clean(usePath)))
+	}
+	return uses, nil
 }
 
 // isRegularFile reports whether a path names something that is not a directory. A directory named

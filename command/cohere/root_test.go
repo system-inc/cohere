@@ -276,8 +276,150 @@ func TestLocateProjectFailsLoudlyOutsideAnyProject(t *testing.T) {
 	if err == nil {
 		t.Fatal("no tsconfig anywhere above, and locateProject returned a location")
 	}
-	if !strings.Contains(err.Error(), outside) || !strings.Contains(err.Error(), projectMarker) || !strings.Contains(err.Error(), swiftProjectMarker) {
-		t.Errorf("the error does not say what it looked for and where: %v", err)
+	for _, want := range []string{outside, projectMarker, swiftProjectMarker, goWorkspaceMarker, goModuleMarker} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error does not say what it looked for and where, missing %s: %v", want, err)
+		}
+	}
+}
+
+// TestEngineAtRanksTheFourMarkers holds the order engineAt reads the markers in: TypeScript, then Swift, then
+// Go, and a directory holding a go.work and a go.mod is one Go project, the workspace, even when a go.work
+// above it would use its module.
+func TestEngineAtRanksTheFourMarkers(test *testing.T) {
+	test.Parallel()
+	root := newRepository(test, map[string]string{
+		"go.work":                      "go 1.24\n\nuse ./workspace-and-module\n",
+		"all/tsconfig.json":            "{}",
+		"all/Package.swift":            "",
+		"all/go.work":                  "go 1.24\n",
+		"all/go.mod":                   "module example.com/all\n",
+		"swift/Package.swift":          "",
+		"swift/go.work":                "go 1.24\n",
+		"swift/go.mod":                 "module example.com/swift\n",
+		"workspace-and-module/go.work": "go 1.24\n\nuse .\n",
+		"workspace-and-module/go.mod":  "module example.com/both\n",
+		"module/go.mod":                "module example.com/module\n",
+	})
+	cases := []struct {
+		directory  string
+		wantEngine projectEngine
+	}{
+		{"all", engineTypeScript},
+		{"swift", engineSwift},
+		{"workspace-and-module", engineGo},
+		{"module", engineGo},
+	}
+	for _, testCase := range cases {
+		engine, found := engineAt(filepath.Join(root, testCase.directory))
+		if !found || engine != testCase.wantEngine {
+			test.Errorf("%s: engine %q (found %v), want %s", testCase.directory, engine, found, testCase.wantEngine)
+		}
+	}
+
+	// The workspace in one directory with its module is the root there, and the walk stops at it rather than
+	// reading the go.work above, whose use names it.
+	workspaceAndModule := filepath.Join(root, "workspace-and-module")
+	location, err := locateProject(locationRequest{WorkingDirectory: workspaceAndModule, ConfigFileName: projectMarker})
+	if err != nil {
+		test.Fatal(err)
+	}
+	if location.Root != workspaceAndModule || location.Engine != engineGo || location.ConfigFileName != "" {
+		test.Errorf("root %s engine %s tsconfig %q, want the workspace %s, Go, and no tsconfig",
+			location.Root, location.Engine, location.ConfigFileName, workspaceAndModule)
+	}
+}
+
+// TestLocateProjectWalksAGoModuleUpToItsWorkspace holds goModuleRoot: a module the nearest go.work above it
+// uses is checked from the workspace, as go builds it, and a module that go.work does not use stays its own
+// root. Only the nearest go.work counts, and none above the enclosing repository does.
+func TestLocateProjectWalksAGoModuleUpToItsWorkspace(test *testing.T) {
+	test.Parallel()
+	outside := test.TempDir()
+	writeTree(test, outside, map[string]string{
+		"go.work":                                "go 1.24\n\nuse ./bare\n",
+		"repository/go.work":                     "go 1.24\n\nuse (\n\t./modules/used\n\t./modules/nearer/inner\n)\n",
+		"repository/modules/used/go.mod":         "module example.com/used\n",
+		"repository/modules/used/deep/a.go":      "package deep\n",
+		"repository/modules/unused/go.mod":       "module example.com/unused\n",
+		"repository/modules/nearer/go.work":      "go 1.24\n",
+		"repository/modules/nearer/inner/go.mod": "module example.com/inner\n",
+		"repository/modules/nearer/inner/b.go":   "package inner\n",
+		"bare/go.mod":                            "module example.com/bare\n",
+		"bare/c.go":                              "package bare\n",
+	})
+	repository := filepath.Join(outside, "repository")
+	if err := os.Mkdir(filepath.Join(repository, ".git"), 0o755); err != nil {
+		test.Fatal(err)
+	}
+	// The nearest go.work above inner does not use it, and the repository's, further up, does.
+	inner := filepath.Join(repository, "modules", "nearer", "inner")
+	// A repository of its own, so the go.work above it, which uses its module, is past the boundary.
+	bare := filepath.Join(outside, "bare")
+	if err := os.Mkdir(filepath.Join(bare, ".git"), 0o755); err != nil {
+		test.Fatal(err)
+	}
+
+	unused := filepath.Join(repository, "modules", "unused")
+
+	cases := []struct {
+		name       string
+		standingIn string
+		wantRoot   string
+	}{
+		{"a used module is the workspace's", filepath.Join(repository, "modules", "used", "deep"), repository},
+		{"an unused module is its own", unused, unused},
+		{"only the nearest go.work counts", inner, inner},
+		{"a module at its repository's root reads no go.work above it", bare, bare},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			location, err := locateProject(locationRequest{
+				WorkingDirectory: testCase.standingIn, ConfigFileName: projectMarker,
+			})
+			if err != nil {
+				test.Fatal(err)
+			}
+			if location.Root != testCase.wantRoot || location.Engine != engineGo {
+				test.Errorf("root %s engine %s, want root %s engine Go",
+					location.Root, location.Engine, testCase.wantRoot)
+			}
+		})
+	}
+
+	// `--directory` is a `cd`: a used module named by it is the root, with no walk to its workspace.
+	test.Run("--directory does not walk to the workspace", func(test *testing.T) {
+		test.Parallel()
+		used := filepath.Join(repository, "modules", "used")
+		location, err := locateProject(locationRequest{
+			WorkingDirectory: repository, Directory: "modules/used", ConfigFileName: projectMarker,
+		})
+		if err != nil {
+			test.Fatal(err)
+		}
+		if location.Root != used || location.Engine != engineGo {
+			test.Errorf("root %s engine %s, want root %s engine Go", location.Root, location.Engine, used)
+		}
+	})
+}
+
+// TestAMalformedGoWorkIsAnErrorNamingIt holds that a go.work the walk up reads and cannot parse stops the run
+// naming the file, rather than reading as no workspace and checking the module apart from it.
+func TestAMalformedGoWorkIsAnErrorNamingIt(test *testing.T) {
+	test.Parallel()
+	root := newRepository(test, map[string]string{
+		"go.work":          "go 1.24\n\nfrobnicate ./module\n",
+		"module/go.mod":    "module example.com/module\n",
+		"module/module.go": "package module\n",
+	})
+	module := filepath.Join(root, "module")
+	_, err := locateProject(locationRequest{WorkingDirectory: module, ConfigFileName: projectMarker})
+	if err == nil {
+		test.Fatal("a go.work that does not parse was read as no workspace")
+	}
+	if !strings.Contains(err.Error(), filepath.Join(root, "go.work")) {
+		test.Errorf("the error does not name the go.work: %v", err)
 	}
 }
 
