@@ -281,7 +281,7 @@ func (r *engineRun) accept(line []byte) error {
 		Kind string `json:"kind"`
 	}
 	if decodeError := json.Unmarshal(line, &envelope); decodeError != nil {
-		return fmt.Errorf("a line that is not a record: %q (%v)", truncateForError(line), decodeError)
+		return fmt.Errorf("a line that is not a record: %q (%w)", truncateForError(line), decodeError)
 	}
 
 	if r.summary != nil {
@@ -326,7 +326,7 @@ func (r *engineRun) accept(line []byte) error {
 // decodeRecord decodes a line into its record type and hands it on.
 func decodeRecord[Record any](line []byte, record *Record, accept func(*Record) error) error {
 	if decodeError := json.Unmarshal(line, record); decodeError != nil {
-		return fmt.Errorf("a record that does not decode: %q (%v)", truncateForError(line), decodeError)
+		return fmt.Errorf("a record that does not decode: %q (%w)", truncateForError(line), decodeError)
 	}
 	return accept(record)
 }
@@ -359,7 +359,7 @@ func (r *engineRun) acceptProject(record *engineProjectRecord) error {
 	r.project = record
 
 	elapsed := time.Duration(record.ElapsedMilliseconds) * time.Millisecond
-	line := fmt.Sprintf("%s described in %s — %d %s in the %s, %d of them ours",
+	line := fmt.Sprintf("%s described in %s: %d %s in the %s, %d of them ours",
 		r.language.Container, round(elapsed), record.FilesInPackage, r.language.FileNoun, r.language.Container,
 		record.FilesOurs)
 	if record.FilesInScope != record.FilesOurs || record.ScopeDescription != "" {
@@ -661,7 +661,9 @@ func (r *engineRun) acceptLint(record *engineLintRecord) error {
 	if record.ReusedFrom != "" {
 		walkCost = fmt.Sprintf("walked by the %s phase (nothing was rewritten, so its findings still hold)", record.ReusedFrom)
 	}
-	fmt.Fprintf(accountOutput(r.out), "lint: %d findings — %d rules over %d files, %d nodes visited, %s\n",
+	// The dash is escaped, not changed: it is the TypeScript run's lint line, which internal/differential finds
+	// by it. See writeLintReport.
+	fmt.Fprintf(accountOutput(r.out), "lint: %d findings \u2014 %d rules over %d files, %d nodes visited, %s\n",
 		record.Findings, record.RulesRun, record.FilesWalked, record.NodesVisited, walkCost)
 	activeSummary.Rules = record.RulesRun
 	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesWalked, record.FilesWalked

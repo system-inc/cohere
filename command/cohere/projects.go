@@ -29,6 +29,10 @@ const projectEngineVariable = "COHERE_PROJECT_ENGINE"
 // footer can say which project it is about (#ytqqv8v).
 const projectLabelVariable = "COHERE_PROJECT_LABEL"
 
+// discoveredListings are the directory listings discovery read, when the one project it found runs in this
+// process, for its build to serve the tsconfig's include enumeration from. Nil otherwise. See #bjv0tg4.
+var discoveredListings *program.DirectoryListings
+
 // discoveryApplies reports whether a run discovers its projects. Anything that names one project, a
 // directory, a tsconfig or a path, narrows the run to it as it always did, and so do the listings, the
 // explanations and the editor's save, which answer about one project.
@@ -97,10 +101,6 @@ func checkDiscoveredProjects(location projectLocation, locateError error, workin
 	}
 	return runProjects(found, childArguments(os.Args[1:], lintConfigFileName), os.Stdout), true, nil
 }
-
-// discoveredListings are the directory listings discovery read, when the one project it found runs in this
-// process, for its build to serve the tsconfig's include enumeration from. Nil otherwise. See #bjv0tg4.
-var discoveredListings *program.DirectoryListings
 
 // childArguments are the arguments every project's run gets: this run's, with a named lint config made
 // absolute. Discovery runs only when no path was named, so every argument is a flag, and a flag's value is
@@ -383,7 +383,8 @@ func runProject(
 	if openPath != "" {
 		child.Env = append(withoutVariable(child.Env, openReportVariable), openReportVariable+"="+openPath)
 	}
-	var output, standardError bytes.Buffer
+	var output bytes.Buffer
+	var standardError bytes.Buffer
 	child.Stdout = &output
 	child.Stderr = &output
 	if separateStandardError {

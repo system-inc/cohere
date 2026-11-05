@@ -191,7 +191,8 @@ func runFakeGoEngine(test *testing.T, body string) (string, int, error) {
 	if writeError := os.WriteFile(path, []byte("#!/bin/sh\n"+body+"\n"), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
-	var out, standardError bytes.Buffer
+	var out bytes.Buffer
+	var standardError bytes.Buffer
 	run := newEngineRun(&out, engineModeCheck, goLanguage("module"), "", time.Now())
 	exitCode, runError := runEngineBinary(path, []string{goEngineVerb, "--contract", "3"}, run, &standardError)
 	return out.String(), exitCode, runError

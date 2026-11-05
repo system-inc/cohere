@@ -55,6 +55,31 @@ import (
 // activeRunCache is the recording in progress, nil when this run is not being recorded.
 var activeRunCache *runCacheSession
 
+// runCacheClock is when the run began reading its inputs, the time a recording's inputs must not have changed
+// since. Set by startRunCacheClock.
+var runCacheClock time.Time
+
+// pendingTypes is the types section of a run the run cache does not record, nil for every other run.
+var pendingTypes *typesRecord
+
+// invocationTag marks a line that is true of this invocation and false of any replay of it.
+//
+// A recorded report says "graph built in 436ms" and "types ran in 409ms". Replayed, those lines claim
+// a graph was built that was not, and durations this run did not spend. So each line describing the
+// invocation rather than the tree is written through invocationOutput, which tags it; the tee strips
+// the tag before the terminal and keeps the line out of what is replayed. The tag is a record
+// separator, which no line of cohere's output contains.
+var invocationTag = []byte("\x1ecohere-invocation\x1e")
+
+// provenanceTag marks a line that is true of the tree but was produced by a phase, so a replay prints it
+// with where it came from.
+//
+// "fix: 0 of 5 files rewritten, 5 not formatted" is true of an unchanged tree and its not-formatted count
+// is actionable, so a replay keeps it. Printed bare it would claim the fix phase ran on a run where
+// nothing ran, so it is replayed as "fix (from the cached run at 03:41): ...". Unlike invocationTag the
+// line stays in the recording, tagged, so the replay can find it without matching on its text.
+var provenanceTag = []byte("\x1ecohere-provenance\x1e")
+
 type runCacheSession struct {
 	// directory is where this root's cache table lives, invocation the name this run's record goes under
 	// in it, and table what was read from it when the run began: this invocation's run and the sections a
@@ -339,10 +364,6 @@ func cacheDirectory(root string) string {
 // The warning is a warning rather than a refusal: the cache is still the project's to keep, and the line
 // to add is named so it is one edit away. What it must never be is a silent write into tracked space.
 var prepareCacheDirectoryOnce sync.Once
-
-// runCacheClock is when the run began reading its inputs, the time a recording's inputs must not have changed
-// since. Set by startRunCacheClock.
-var runCacheClock time.Time
 
 // startRunCacheClock starts the run cache's clock: after the cache directory exists, since creating it moves the
 // project root's time, and before discovery lists the tree. The clock was taken at the session's start, in
@@ -797,15 +818,6 @@ func firstLine(text string) string {
 	return text
 }
 
-// invocationTag marks a line that is true of this invocation and false of any replay of it.
-//
-// A recorded report says "graph built in 436ms" and "types ran in 409ms". Replayed, those lines claim
-// a graph was built that was not, and durations this run did not spend. So each line describing the
-// invocation rather than the tree is written through invocationOutput, which tags it; the tee strips
-// the tag before the terminal and keeps the line out of what is replayed. The tag is a record
-// separator, which no line of cohere's output contains.
-var invocationTag = []byte("\x1ecohere-invocation\x1e")
-
 // invocationOutput returns where to write a line that describes this invocation rather than the tree.
 // Without a recording it is out itself, so a run that is not recorded prints exactly what it always did.
 func invocationOutput(out io.Writer) io.Writer {
@@ -846,15 +858,6 @@ func (w *taggingWriter) Write(data []byte) (int, error) {
 	}
 	return written, nil
 }
-
-// provenanceTag marks a line that is true of the tree but was produced by a phase, so a replay prints it
-// with where it came from.
-//
-// "fix: 0 of 5 files rewritten, 5 not formatted" is true of an unchanged tree and its not-formatted count
-// is actionable, so a replay keeps it. Printed bare it would claim the fix phase ran on a run where
-// nothing ran, so it is replayed as "fix (from the cached run at 03:41): ...". Unlike invocationTag the
-// line stays in the recording, tagged, so the replay can find it without matching on its text.
-var provenanceTag = []byte("\x1ecohere-provenance\x1e")
 
 // provenanceOutput returns where to write such a line. Without a recording it is out itself.
 func provenanceOutput(out io.Writer) io.Writer {
@@ -1036,9 +1039,6 @@ func activeTypesReuse() *program.TypeDiagnosticsReuse {
 	}
 	return nil
 }
-
-// pendingTypes is the types section of a run the run cache does not record, nil for every other run.
-var pendingTypes *typesRecord
 
 // typesRecord is the types section's own reading and writing, for a run with no recording to carry it: any
 // flag, any named path, the editor's save of one file (#hfv0ae3). Those runs paid the full incremental

@@ -402,7 +402,7 @@ func run() error {
 	//
 	// Two separate things follow from that, and both are the point. It does not run unless named, so
 	// the gate people run constantly stays the correctness gate and nothing else. And naming it does
-	// not narrow the run the way `--lint` does — `cohere --unused` still fixes, type-checks, and
+	// not narrow the run the way `--lint` does: `cohere --unused` still fixes, type-checks, and
 	// lints, because unused leans on the type graph being sound and a narrowing flag would encourage
 	// running it against a tree whose symbols do not resolve.
 	//
@@ -561,7 +561,8 @@ func run() error {
 	// 250ms of every commit gate spent on a program nothing read. Without it graph stays nil and the
 	// project files empty, and every use below is on a path `--format-only` does not take.
 	var graph *program.Graph
-	var buildDuration, contentPackOpened time.Duration
+	var buildDuration time.Duration
+	var contentPackOpened time.Duration
 	// Read beside the build rather than after it, when the config needs nothing from the program. See
 	// lintConfigAhead.
 	var lintAhead *lintConfigAhead
@@ -661,7 +662,7 @@ func run() error {
 		fmt.Fprintln(accountOutput(invocationOutput(os.Stdout)), "graph not built: --format-only reads the disk, not the program")
 	case lintScope.Everything:
 		fmt.Fprintf(accountOutput(invocationOutput(os.Stdout)),
-			"graph built in %s — %d files in the program, %d of them ours\n",
+			"graph built in %s: %d files in the program, %d of them ours\n",
 			round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
 		)
 	default:
@@ -677,13 +678,13 @@ func run() error {
 		// binary walks imports at all.
 		if lintScope.DependentCount > 0 {
 			fmt.Fprintf(accountOutput(invocationOutput(os.Stdout)),
-				"graph built in %s — %d files in the program, %d of them ours, %d in scope (%s plus %d that import it)\n",
+				"graph built in %s: %d files in the program, %d of them ours, %d in scope (%s plus %d that import it)\n",
 				round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
 				len(projectFiles), lintScope.RequestDescription, lintScope.DependentCount,
 			)
 		} else {
 			fmt.Fprintf(accountOutput(invocationOutput(os.Stdout)),
-				"graph built in %s — %d files in the program, %d of them ours, %d in scope (%s)\n",
+				"graph built in %s: %d files in the program, %d of them ours, %d in scope (%s)\n",
 				round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
 				len(projectFiles), lintScope.RequestDescription,
 			)
@@ -1086,7 +1087,7 @@ func run() error {
 
 		// Files were rewritten, so the graph built from the old bytes no longer describes the tree.
 		// Every phase after this must read the new text or it reports findings against source that no
-		// longer exists — which is the same stale-read corruption the edit engine refuses internally,
+		// longer exists, which is the same stale-read corruption the edit engine refuses internally,
 		// one level up.
 		if mutate && fixSummary.FilesChanged > 0 && (runTypes || runLint) {
 			rebuiltGraph, rebuildDuration, rebuildGraphError := rebuildGraph(location.ConfigFileName, location.Root, *singleThreaded, lintConfig, yield.yieldedFiles())
@@ -1117,7 +1118,7 @@ func run() error {
 			}
 			projectFiles = rescoped
 			fmt.Fprintf(accountOutput(os.Stdout),
-				"graph rebuilt in %s — %d files changed, so every later phase reads the new text\n",
+				"graph rebuilt in %s: %d files changed, so every later phase reads the new text\n",
 				round(rebuildDuration), fixSummary.FilesChanged,
 			)
 		}
@@ -1214,7 +1215,7 @@ func run() error {
 		if sourceDiagnostics > 0 && runLint {
 			report.markRemainingNotReachedFor(
 				phaseTypes,
-				fmt.Sprintf("%d type diagnostics — lint findings against wrong semantics are noise", sourceDiagnostics),
+				fmt.Sprintf("%d type diagnostics; lint findings against wrong semantics are noise", sourceDiagnostics),
 				unusedRequest,
 			)
 			// Lint will not report, but the fix phase walked the same rules, and its skips are the ones lint
@@ -1355,7 +1356,8 @@ func run() error {
 
 	// Phase 5: unused. A report, run only when asked for, and never a reason to fail a build.
 	if !runUnused {
-		report.record(phaseUnused, outcomeSkipped, 0, "not requested — this is a report, ask for it with --unused")
+		// The dash is escaped, not changed: swift/Contract.md fixes this detail's spelling for both engines.
+		report.record(phaseUnused, outcomeSkipped, 0, "not requested \u2014 this is a report, ask for it with --unused")
 	} else {
 		unusedStart := time.Now()
 
@@ -1369,7 +1371,7 @@ func run() error {
 		// caveat that only applies to the other half.
 		if !runTypes {
 			fmt.Printf(
-				"\nunused: types did not run, so the reference half of this report is UNRELIABLE — " +
+				"\nunused: types did not run, so the reference half of this report is UNRELIABLE: " +
 					"unresolved symbols look exactly like unreferenced ones. The unreachable half " +
 					"below needs no types and is unaffected.\n",
 			)
@@ -1408,7 +1410,7 @@ func run() error {
 // rebuildGraph reconstructs the type graph after files on disk have changed.
 //
 // The graph is a snapshot of the bytes as they were when it was built. Once the fix phase rewrites
-// a file, every later phase reading that graph is reading source that no longer exists — the same
+// a file, every later phase reading that graph is reading source that no longer exists: the same
 // stale-read corruption the edit engine refuses internally, one level up and with a wider blast
 // radius, because a type diagnostic against deleted text points at a line nobody can find.
 //
@@ -1514,8 +1516,8 @@ func optionsBase(lintConfig *configuration.Config, projectRoot string) rule.Opti
 //
 // The program is checked as a whole and then filtered down, rather than asked file by file. That
 // ordering is load-bearing for speed and not at all for correctness: see Graph.AllDiagnostics. It
-// does mean the compiler also checks the 6,500 third-party declarations, which is unavoidable — they
-// have to be checked for our files to mean anything — and their findings are dropped here because
+// does mean the compiler also checks the 6,500 third-party declarations, which is unavoidable (they
+// have to be checked for our files to mean anything), and their findings are dropped here because
 // nobody working in this repo can act on them.
 //
 // When the tsconfig is incremental, the check runs warm: files whose contents have not changed
@@ -1559,6 +1561,12 @@ type typeCheck struct {
 	elapsed  time.Duration
 	finished time.Time
 }
+
+// earlyTypeCheckReleased is closed once the fix phase and any rebuild are over, for COHERE_TEST_HOLD_EARLY_CHECK.
+var (
+	earlyTypeCheckReleased    = make(chan struct{})
+	releaseEarlyTypeCheckOnce sync.Once
+)
 
 // startTypeCheck begins checking every file, and returns at once.
 //
@@ -1621,12 +1629,6 @@ func startTypeCheck(ctx context.Context, graph *program.Graph, incremental bool)
 	}()
 	return check
 }
-
-// earlyTypeCheckReleased is closed once the fix phase and any rebuild are over, for COHERE_TEST_HOLD_EARLY_CHECK.
-var (
-	earlyTypeCheckReleased    = make(chan struct{})
-	releaseEarlyTypeCheckOnce sync.Once
-)
 
 // releaseEarlyTypeCheck lets a held check start. Called when the fix phase is over, whether or not anything
 // was held.
@@ -1715,7 +1717,7 @@ func singleLineDescription(description string) string {
 }
 
 // printRuleDiagnostic prints one rule finding in the same shape, with the rule name where the error
-// code goes — a reader should not have to learn two formats. The settings give it its severity.
+// code goes, since a reader should not have to learn two formats. The settings give it its severity.
 func printRuleDiagnostic(out io.Writer, diagnostic rule.Diagnostic, lintConfig *configuration.Config) {
 	sourceFile := diagnostic.SourceFile
 	if sourceFile == nil {
@@ -1823,7 +1825,7 @@ func writeOrphanedConfigKeys(out io.Writer, rules []rule.Rule, config *configura
 	for _, key := range orphaned {
 		setting := config.Rules[key]
 		fmt.Fprintf(out,
-			"  config: key %q matches no registered rule, so its %s never applies — either the rule is not ported yet, or the key is spelled for an older name\n",
+			"  config: key %q matches no registered rule, so its %s never applies: either the rule is not ported yet, or the key is spelled for an older name\n",
 			key, setting.Severity,
 		)
 	}

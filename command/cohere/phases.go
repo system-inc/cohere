@@ -28,7 +28,7 @@ const (
 //
 // Mutation runs first so everything downstream sees the repaired tree: reporting a finding a fixer
 // would have silently repaired wastes the reader's attention. Types gate lint because findings
-// against wrong semantics are noise a reader has to re-read after fixing the real problem — one type
+// against wrong semantics are noise a reader has to re-read after fixing the real problem. One type
 // error alone at the top beats one type error buried under a hundred style findings in a file that
 // does not compile.
 //  5. unused           a report, opt-in, and never part of the gate
@@ -241,7 +241,8 @@ func (r *pipelineReport) markRemainingNotReachedFor(bailedAt phaseName, reason s
 		}
 		// An opt-in phase nobody named was not deprived of anything by the bail.
 		if optInPhases[name] && !requested[name] {
-			r.record(name, outcomeSkipped, 0, "not requested — this is a report, ask for it with --unused")
+			// The dash is escaped, not changed: swift/Contract.md fixes this detail's spelling for both engines.
+			r.record(name, outcomeSkipped, 0, "not requested \u2014 this is a report, ask for it with --unused")
 			continue
 		}
 		r.record(name, outcomeNotReached, 0, fmt.Sprintf("%s bailed: %s", bailedAt, reason))
@@ -264,7 +265,7 @@ func (r *pipelineReport) has(name phaseName) bool {
 // phases run", and the difference is the fix phase: a run that checked types and lint completely is
 // not a partial check merely because it was told not to fix (`--lint`, `--types`). A warning that
 // fired there would appear on every narrowed run, and a warning that fires when nothing is wrong is
-// one people learn to stop reading — which would cost exactly the case it exists for. Under
+// one people learn to stop reading, which would cost exactly the case it exists for. Under
 // `--no-fix` the fix phase is not skipped at all: it is checked, and its count is in the verdict.
 //
 // A phase that was cut off is always a gap, including the fix phase, because a bail means the run
@@ -280,7 +281,7 @@ func (r *pipelineReport) checkedEverything() bool {
 		// Unused is exempt for a different reason, and it is worth stating rather than folding into
 		// the same clause. Fix is exempt because skipping it withholds no finding; unused withholds
 		// findings by definition when it is skipped. It is exempt because being absent is its normal
-		// state — it is opt-in, so a bare `cohere` skips it every time, and a coverage warning that
+		// state: it is opt-in, so a bare `cohere` skips it every time, and a coverage warning that
 		// fires on every ordinary run is one people learn to stop reading. That would cost exactly
 		// the case the warning exists for.
 		//
@@ -301,7 +302,7 @@ const detailNotRequested = "not requested"
 // skippedAsNotRequested reports whether a phase was skipped because nobody asked for it.
 func skippedAsNotRequested(record phaseRecord) bool {
 	return record.Outcome == outcomeSkipped &&
-		(record.Detail == detailNotRequested || strings.HasPrefix(record.Detail, detailNotRequested+" — "))
+		(record.Detail == detailNotRequested || strings.HasPrefix(record.Detail, detailNotRequested+" \u2014 "))
 }
 
 // checkedEveryRequestedPhase reports whether every phase the caller asked for ran, which is what an
@@ -418,22 +419,22 @@ func (r *pipelineReport) Write(out io.Writer) {
 	// Said first, and with both numbers, because it is the larger gap: skipping a phase withholds one
 	// kind of finding, and checking 1 file of 3,542 withholds every kind on 3,541 files.
 	if r.filesInScope > 0 && r.filesInScope < r.filesInProgram {
-		fmt.Fprintf(out, "  this run checked %d of %d files — the rest were not looked at\n",
+		fmt.Fprintf(out, "  this run checked %d of %d files: the rest were not looked at\n",
 			r.filesInScope, r.filesInProgram)
 	}
 
 	if !r.checkedEverything() {
-		fmt.Fprintf(out, "  this run did not check everything — the phases above say what was not checked\n")
+		fmt.Fprintf(out, "  this run did not check everything: the phases above say what was not checked\n")
 	} else if r.incompleteBeyondPhases != "" {
-		fmt.Fprintf(out, "  this run did not check everything — %s\n", r.incompleteBeyondPhases)
+		fmt.Fprintf(out, "  this run did not check everything: %s\n", r.incompleteBeyondPhases)
 	}
 }
 
 // writeAccounting states how much of the run the phases above actually explain.
 //
 // A timing line that reports only its own phases invites the reader to add them up and treat the
-// total as the run, which is wrong here by roughly a third. The gap is real work — process start,
-// configuration, walking the file scope, printing findings, exit — and none of it is attributable
+// total as the run, which is wrong here by roughly a third. The gap is real work (process start,
+// configuration, walking the file scope, printing findings, exit), and none of it is attributable
 // to a phase, so leaving it unnamed makes it unownable. Naming it is the same discipline as the
 // coverage line: report what was not measured, rather than let a partial account read as a full one.
 //
@@ -450,7 +451,7 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 		graphLabel, graphNotBuiltSentence = r.graphLabel, r.graphNotBuiltSentence
 	}
 	if r.graphNotBuilt {
-		fmt.Fprintf(invocationOutput(out), "  total %s — %s\n", round(total), graphNotBuiltSentence)
+		fmt.Fprintf(invocationOutput(out), "  total %s: %s\n", round(total), graphNotBuiltSentence)
 		return
 	}
 	if r.graphSkipped {
@@ -460,7 +461,7 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 				phases += record.Elapsed
 			}
 		}
-		fmt.Fprintf(invocationOutput(out), "  total %s — no graph built (formatting reads none), phases %s, %s outside any phase\n",
+		fmt.Fprintf(invocationOutput(out), "  total %s: no graph built (formatting reads none), phases %s, %s outside any phase\n",
 			round(total), round(phases), round(max(total-phases, 0)))
 		return
 	}
@@ -479,12 +480,12 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 		// The phases run concurrently with each other in places, so a sum can exceed the wall
 		// clock. Reporting a negative remainder would be nonsense; reporting the overlap honestly
 		// is the useful reading.
-		fmt.Fprintf(invocationOutput(out), "  total %s — %s %s plus phases, overlapping by %s\n",
+		fmt.Fprintf(invocationOutput(out), "  total %s: %s %s plus phases, overlapping by %s\n",
 			round(total), graphLabel, round(r.graph), round(-unaccounted))
 		return
 	}
 
-	fmt.Fprintf(invocationOutput(out), "  total %s — %s %s, phases %s, %s outside any phase\n",
+	fmt.Fprintf(invocationOutput(out), "  total %s: %s %s, phases %s, %s outside any phase\n",
 		round(total), graphLabel, round(r.graph), round(accounted-r.graph), round(unaccounted))
 }
 

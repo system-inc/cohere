@@ -18,11 +18,11 @@ import (
 func holdTableLock(directory string) func() {
 	file, openError := os.OpenFile(tableLockPath(directory), os.O_CREATE|os.O_RDWR, 0o644)
 	if openError != nil {
-		return func() {}
+		return func() { /* No lock was taken, so there is nothing to release. */ }
 	}
 	if flockError := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); flockError != nil {
 		file.Close()
-		return func() {}
+		return func() { /* No lock was taken, so there is nothing to release. */ }
 	}
 	return func() {
 		syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
@@ -40,7 +40,7 @@ func holdTableLock(directory string) func() {
 func holdTableReadLock(directory string, bound time.Duration) (func(), bool) {
 	file, openError := os.OpenFile(tableLockPath(directory), os.O_CREATE|os.O_RDONLY, 0o644)
 	if openError != nil {
-		return func() {}, true
+		return func() { /* No lock was taken, so there is nothing to release. */ }, true
 	}
 	deadline := time.Now().Add(bound)
 	for {
@@ -53,7 +53,7 @@ func holdTableReadLock(directory string, bound time.Duration) (func(), bool) {
 		}
 		if !errors.Is(flockError, syscall.EWOULDBLOCK) || time.Now().After(deadline) {
 			file.Close()
-			return func() {}, false
+			return func() { /* No lock was taken, so there is nothing to release. */ }, false
 		}
 		time.Sleep(2 * time.Millisecond)
 	}

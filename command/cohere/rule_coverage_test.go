@@ -465,7 +465,7 @@ func TestACleanRunPrintsTwoCoverageLines(test *testing.T) {
 		Suppressed:        4,
 	}
 	output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, WalkCost: "in 1s"})
-	want := "lint: 0 findings — 0 rules over 0 files, 0 nodes visited, in 1s\n" +
+	want := "lint: 0 findings \u2014 0 rules over 0 files, 0 nodes visited, in 1s\n" +
 		"coverage: 4 rules = 1 ran and found nothing + 1 registered no listener + 1 off by the config + 1 nobody has configured\n" +
 		"  0 files crashed · 4 findings suppressed, 0 without a reason · details: cohere --coverage\n"
 	if output != want {

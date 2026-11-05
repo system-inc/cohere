@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -99,12 +100,9 @@ func TestRunCacheEndToEnd(test *testing.T) {
 	}
 	keepLines := func(output string, drop ...string) string {
 		kept := []string{}
-	line:
 		for _, line := range strings.Split(output, "\n") {
-			for _, prefix := range drop {
-				if strings.HasPrefix(line, prefix) {
-					continue line
-				}
+			if slices.ContainsFunc(drop, func(prefix string) bool { return strings.HasPrefix(line, prefix) }) {
+				continue
 			}
 			kept = append(kept, line)
 		}

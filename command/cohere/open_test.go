@@ -41,7 +41,7 @@ func TestOpenFlag(test *testing.T) {
 			}
 			editor := test.TempDir()
 			log := filepath.Join(editor, "opened")
-			if writeError := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nprintf 'invocation\\n' >> \"$OPEN_LOG\"\nprintf '%s\\n' \"$@\" >> \"$OPEN_LOG\"\n"), 0755); writeError != nil {
+			if writeError := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nprintf 'invocation\\n' >> \"$OPEN_LOG\"\nprintf '%s\\n' \"$@\" >> \"$OPEN_LOG\"\n"), 0o755); writeError != nil {
 				test.Fatal(writeError)
 			}
 			if testCase.name == "missing editor" {
@@ -50,7 +50,7 @@ func TestOpenFlag(test *testing.T) {
 				}
 			}
 			if testCase.name == "failed editor" {
-				if writeError := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nexit 42\n"), 0755); writeError != nil {
+				if writeError := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nexit 42\n"), 0o755); writeError != nil {
 					test.Fatal(writeError)
 				}
 			}
@@ -195,7 +195,7 @@ func TestOpenDiscoveredProjects(test *testing.T) {
 	})
 	editor := test.TempDir()
 	log := filepath.Join(editor, "opened")
-	if writeError := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nprintf 'invocation\\n' >> \"$OPEN_LOG\"\nprintf '%s\\n' \"$@\" >> \"$OPEN_LOG\"\n"), 0755); writeError != nil {
+	if writeError := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nprintf 'invocation\\n' >> \"$OPEN_LOG\"\nprintf '%s\\n' \"$@\" >> \"$OPEN_LOG\"\n"), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	cmd := exec.Command(binary, "--no-fix", "--no-format", "--no-cache", "--json", "--open")

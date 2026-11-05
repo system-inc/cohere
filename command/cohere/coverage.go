@@ -616,8 +616,8 @@ func writeDeadSuppressions(out io.Writer, sites []program.DeadSuppression) {
 
 // writeCrashedNote names one file a rule could not finish. Printed in full in both modes and before the
 // details, because a file nothing checked needs action.
-func writeCrashedNote(out io.Writer, fileName string, cause any) {
-	fmt.Fprintf(out, "  crashed: %s: %s\n", fileName, runCrash{Path: fileName, Cause: fmt.Sprint(cause)}.message())
+func writeCrashedNote(out io.Writer, fileName string, cause string) {
+	fmt.Fprintf(out, "  crashed: %s: %s\n", fileName, runCrash{Path: fileName, Cause: cause}.message())
 }
 
 // namedGapsSentence is what "this run did not check everything" says when every phase ran and a file
@@ -723,8 +723,10 @@ func writeLintReport(out io.Writer, report lintReport) {
 	}
 	// The account below is `--verbose`'s; the footer carries what a reader needs of it in every view.
 	account := accountOutput(out)
+	// The dash is escaped, not changed: internal/differential finds this line by it, and swift/Contract.md
+	// names it as the line both engines print.
 	fmt.Fprintf(accountOutput(invocationOutput(out)),
-		"lint: %d findings — %d rules over %d files, %d nodes visited%s, %s%s\n",
+		"lint: %d findings \u2014 %d rules over %d files, %d nodes visited%s, %s%s\n",
 		len(report.Result.Diagnostics), coverage.RulesRun, coverage.FilesWalked, coverage.NodesVisited, nodesReplayedClause(coverage),
 		report.WalkCost,
 		replayedFromCache(report.Result),

@@ -29,7 +29,8 @@ func fakeSwiftEngine(test *testing.T, body string) string {
 
 func runFakeSwiftEngine(test *testing.T, body string, mode engineMode) (string, string, int, error) {
 	test.Helper()
-	var out, standardError bytes.Buffer
+	var out bytes.Buffer
+	var standardError bytes.Buffer
 	run := newEngineRun(&out, mode, swiftLanguage, "", time.Now())
 	exitCode, runEngineBinaryError := runEngineBinary(fakeSwiftEngine(test, body), []string{"--contract", "1"}, run, &standardError)
 	return out.String(), standardError.String(), exitCode, runEngineBinaryError
@@ -126,7 +127,8 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 	test.Run("a signal cohere receives is passed to the engine and everything it started", func(test *testing.T) {
 		childFile := filepath.Join(test.TempDir(), "child")
 		interrupts := make(chan os.Signal, 1)
-		var out, standardError bytes.Buffer
+		var out bytes.Buffer
+		var standardError bytes.Buffer
 		run := newEngineRun(&out, engineModeCheck, swiftLanguage, "", time.Now())
 		go func() {
 			waitForFile(test, childFile)
