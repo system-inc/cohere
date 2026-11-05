@@ -35,16 +35,28 @@ func joinQueue(slotsDirectory string) (*queueTicket, error) {
 	if openError != nil {
 		return nil, openError
 	}
-	if taken, tryLockFileError := tryLockFile(file); tryLockFileError != nil || !taken {
-		file.Close()
-		os.Remove(pending)
+	// A lock that fails and a lock not taken are two answers: only the first has an error to wrap, and a fresh
+	// O_EXCL file that someone else already holds is a different fault worth its own words.
+	taken, tryLockFileError := tryLockFile(file)
+	if tryLockFileError != nil || !taken {
+		// Ignored: the ticket was never written, joining fails with the lock's error either way, and a pending
+		// ticket left behind is named with a dot, which no look at the line counts.
+		_ = file.Close()
+		_ = os.Remove(pending) // Ignored: as the close above.
+	}
+	if tryLockFileError != nil {
 		return nil, fmt.Errorf("locking a new queue ticket: %w", tryLockFileError)
+	}
+	if !taken {
+		return nil, fmt.Errorf("locking a new queue ticket: %s was made by this run and is locked by another", pending)
 	}
 	path := filepath.Join(queue, name)
 	if renameError := os.Rename(pending, path); renameError != nil {
 		unlockFile(file)
-		file.Close()
-		os.Remove(pending)
+		// Ignored: the ticket was never written, joining fails with the rename's error either way, and a pending
+		// ticket left behind is named with a dot, which no look at the line counts.
+		_ = file.Close()
+		_ = os.Remove(pending) // Ignored: as the close above.
 		return nil, renameError
 	}
 	return &queueTicket{file: file, path: path}, nil
@@ -80,14 +92,18 @@ func (ticket *queueTicket) place() (ahead int, waiting int, err error) {
 			// Removed since the listing, by its waiter taking a slot or by another waiter's cleanup.
 			continue
 		}
+		// Ignored: a ticket whose lock can't be tested counts as a live waiter, the side on which no one in line
+		// is passed over or removed.
 		taken, _ := tryLockFile(other)
 		if taken {
-			os.Remove(path)
+			// Ignored: a dead waiter's ticket that stays is passed over by every look, as here, and the next
+			// look removes it.
+			_ = os.Remove(path)
 			unlockFile(other)
-			other.Close()
+			_ = other.Close() // Ignored: opened only to test its lock, and never written.
 			continue
 		}
-		other.Close()
+		_ = other.Close() // Ignored: opened only to test its lock, and never written.
 		waiting++
 		if name < mine {
 			ahead++
@@ -98,9 +114,11 @@ func (ticket *queueTicket) place() (ahead int, waiting int, err error) {
 
 // leave takes the ticket out of line, once its run holds a slot or gives up waiting.
 func (ticket *queueTicket) leave() {
-	os.Remove(ticket.path)
+	// Ignored: a ticket left in line once its lock is dropped below is a dead waiter's, which the next look at
+	// the line passes over and removes.
+	_ = os.Remove(ticket.path)
 	unlockFile(ticket.file)
-	ticket.file.Close()
+	_ = ticket.file.Close() // Ignored: never written, and its lock goes with the descriptor.
 }
 
 // ordinal is a place in line as a person says it: 1st, 2nd, 3rd, 4th, 11th, 12th, 13th, 21st.
