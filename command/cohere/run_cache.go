@@ -512,7 +512,10 @@ func replayRunCache(stored *program.RunCache, anchor program.PathAnchor) {
 		"cached: no input has changed since the run at %s, so graph, types and lint did not run; its verdict follows\n",
 		recorded)
 	streams.Output.Write(replayLines(spelledOutput(stored.Output, anchor), recorded))
+	// The recording's stdout before its stderr, the order a replay always printed them in.
+	streams.Show(streams.Output)
 	streams.Errors.Write(spelledOutput(stored.Errors, anchor))
+	streams.Show(streams.Errors)
 	fmt.Fprintf(account, "phases: replayed the run at %s · fix, types and lint did not run\n", recorded)
 	fmt.Fprintf(account, "  this run: %s, after checking %d inputs\n", round(time.Since(processStart)), len(stored.Inputs))
 	fmt.Fprintf(account, "  %s\n", activeMemoryPolicy.line())
