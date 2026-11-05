@@ -239,10 +239,11 @@ func NewFill(parts []Doc) Doc { return &Fill{Parts: parts} }
 
 // NewIfBreak is upstream's ifBreak(). Upstream defaults flatContents to "", and so does a nil here.
 func NewIfBreak(breakContents Doc, flatContents Doc, groupID *GroupID) Doc {
+	flatOrEmpty := flatContents
 	if flatContents == nil {
-		flatContents = Text("")
+		flatOrEmpty = Text("")
 	}
-	return &IfBreak{BreakContents: breakContents, FlatContents: flatContents, GroupID: groupID}
+	return &IfBreak{BreakContents: breakContents, FlatContents: flatOrEmpty, GroupID: groupID}
 }
 
 // NewIndentIfBreak is upstream's indentIfBreak().

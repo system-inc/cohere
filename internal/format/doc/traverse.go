@@ -72,6 +72,8 @@ func TraverseDoc(root Doc, onEnter func(Doc) bool, onExit func(Doc), shouldTrave
 		default:
 			parts, isArray := Parts(current)
 			if !isArray {
+				// Invariant: the cases above, nil among them, and Parts cover every Doc this package defines
+				// but fillProgress, which lives only on the printer's stack and never in a doc handed here.
 				panic(fmt.Sprintf("invalid doc %T", current))
 			}
 			for index := len(parts) - 1; index >= 0; index-- {
@@ -241,6 +243,8 @@ func mapOne(document Doc, rec func(Doc) Doc, fn func(Doc) Doc) Doc {
 	case Text, trimDoc, lineSuffixBoundaryDoc, *Line, breakParentDoc, nil:
 		return fn(document)
 	}
+	// Invariant: Parts and the cases above cover every Doc this package defines but fillProgress and
+	// traverseExit, which live only on the printer's and the traversal's stacks and never in a doc mapped here.
 	panic(fmt.Sprintf("invalid doc %T", document))
 }
 
@@ -508,8 +512,9 @@ func sameStates(left []Doc, right []Doc) bool {
 // ReplaceEndOfLine is upstream's replaceEndOfLine: every newline in every string becomes replacement,
 // literalline by default.
 func ReplaceEndOfLine(document Doc, replacement Doc) Doc {
+	separator := replacement
 	if replacement == nil {
-		replacement = Literalline
+		separator = Literalline
 	}
 	return MapDoc(document, func(current Doc) Doc {
 		text, isText := current.(Text)
@@ -521,7 +526,7 @@ func ReplaceEndOfLine(document Doc, replacement Doc) Doc {
 		for index, line := range lines {
 			parts[index] = Text(line)
 		}
-		return Join(replacement, parts)
+		return Join(separator, parts)
 	})
 }
 
@@ -576,19 +581,19 @@ func StripTrailingHardlineWith(document Doc, slab *arena.Slab[Doc]) Doc {
 }
 
 func stripTrailingHardlineFromParts(parts []Doc) []Doc {
-	parts = append([]Doc(nil), parts...)
-	for len(parts) >= 2 {
-		_, isLine := parts[len(parts)-2].(*Line)
-		_, isBreakParent := parts[len(parts)-1].(breakParentDoc)
+	stripped := append([]Doc(nil), parts...)
+	for len(stripped) >= 2 {
+		_, isLine := stripped[len(stripped)-2].(*Line)
+		_, isBreakParent := stripped[len(stripped)-1].(breakParentDoc)
 		if !isLine || !isBreakParent {
 			break
 		}
-		parts = parts[:len(parts)-2]
+		stripped = stripped[:len(stripped)-2]
 	}
-	if len(parts) > 0 {
-		parts[len(parts)-1] = stripTrailingHardlineFromDoc(parts[len(parts)-1])
+	if len(stripped) > 0 {
+		stripped[len(stripped)-1] = stripTrailingHardlineFromDoc(stripped[len(stripped)-1])
 	}
-	return parts
+	return stripped
 }
 
 func stripTrailingHardlineFromDoc(document Doc) Doc {

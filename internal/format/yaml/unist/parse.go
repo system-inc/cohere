@@ -42,7 +42,11 @@ func Parse(text string, nodes *arena.Arena[Node]) (root *Node, parseError error)
 		}
 	}()
 
-	memory := parseMemories.Get().(*parseMemory)
+	memory, isParseMemory := parseMemories.Get().(*parseMemory)
+	if !isParseMemory {
+		// Invariant: the pool holds only what its New makes and Parse puts back, both *parseMemory.
+		panic("unist: parseMemories held a value that is not a parse memory")
+	}
 	defer func() {
 		memory.reset()
 		parseMemories.Put(memory)
@@ -98,26 +102,26 @@ type unitOffsets []int
 
 // newUnitOffsets appends text's offsets to offsets, which may be a table kept from an earlier parse.
 func newUnitOffsets(text string, offsets unitOffsets) unitOffsets {
-	offsets = slices.Grow(offsets, len(text)+1)
+	table := slices.Grow(offsets, len(text)+1)
 	for index, character := range text {
-		offsets = append(offsets, index)
+		table = append(table, index)
 		if character > 0xFFFF {
 			// The low surrogate of a pair sits at the pair's start too; no position upstream records
 			// falls between the two units of one character.
-			offsets = append(offsets, index)
+			table = append(table, index)
 		}
 	}
-	return append(offsets, len(text))
+	return append(table, len(text))
 }
 
 // appendUnits appends text as UTF-16 units to units: utf16.Encode([]rune(text)), into a table kept from an
 // earlier parse. Ranging a string decodes an invalid byte to U+FFFD, as the conversion to runes does.
 func appendUnits(units []uint16, text string) []uint16 {
-	units = slices.Grow(units, len(text))
+	appended := slices.Grow(units, len(text))
 	for _, character := range text {
-		units = utf16.AppendRune(units, character)
+		appended = utf16.AppendRune(appended, character)
 	}
-	return units
+	return appended
 }
 
 // byteOffset is the unit's byte offset. Past the end of the text, each unit is one byte further.

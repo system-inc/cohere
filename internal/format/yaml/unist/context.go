@@ -48,6 +48,10 @@ type context struct {
 	memory *parseMemory
 }
 
+// newContext is the context of one parse of text.
+//
+// Mutates: memory gets its positionsByNode map the first time it serves a parse, so every later parse
+// that takes this memory from parseMemories reuses the room the map grew to.
 func newContext(text []uint16, lineCounter *cst.LineCounter, nodes *arena.Arena[Node], memory *parseMemory) *context {
 	if memory.positionsByNode == nil {
 		// Sized for about a node per eight units of text, so the map is not rebuilt as it grows. Later
@@ -187,12 +191,16 @@ func (thrown *ThrownError) Error() string { return thrown.Name + ": " + thrown.M
 
 // throwError is `throw new Error(message)`.
 func throwError(format string, arguments ...any) {
+	// Invariant: Parse recovers every *ThrownError into the error it returns, as upstream's caller catches
+	// the throw, so this panic never leaves the package.
 	panic(&ThrownError{Name: "Error", Message: fmt.Sprintf(format, arguments...)})
 }
 
 // throwTypeError is the TypeError V8 raises reading property of undefined or null (missing names
 // which).
 func throwTypeError(missing string, property string) {
+	// Invariant: Parse recovers every *ThrownError into the error it returns, as upstream's caller catches
+	// the throw, so this panic never leaves the package.
 	panic(&ThrownError{
 		Name:    "TypeError",
 		Message: fmt.Sprintf("Cannot read properties of %s (reading '%s')", missing, property),

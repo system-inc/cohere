@@ -105,7 +105,10 @@ func factoryLabel(
 	size := 0
 	seen := false
 
-	var start, atBreak, labelInside, labelEscape State
+	var start State
+	var atBreak State
+	var labelInside State
+	var labelEscape State
 
 	start = func(code Code) State {
 		effects.Enter(tokenType, nil)
@@ -190,7 +193,11 @@ func factoryLabel(
 func factoryTitle(effects *Effects, ok State, nok State, tokenType string, markerType string, stringType string) State {
 	var marker Code
 
-	var start, begin, atBreak, inside, escape State
+	var start State
+	var begin State
+	var atBreak State
+	var inside State
+	var escape State
 
 	start = func(code Code) State {
 		if code == CodeQuotationMark || code == CodeApostrophe || code == CodeLeftParenthesis {
@@ -284,7 +291,12 @@ func factoryDestination(
 	unlimited := maximum == 0
 	balance := 0
 
-	var start, enclosedBefore, enclosed, enclosedEscape, raw, rawEscape State
+	var start State
+	var enclosedBefore State
+	var enclosed State
+	var enclosedEscape State
+	var raw State
+	var rawEscape State
 
 	start = func(code Code) State {
 		if code == CodeLessThan {

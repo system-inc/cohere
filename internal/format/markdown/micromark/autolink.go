@@ -7,8 +7,15 @@ var autolink = &Construct{Name: "autolink", Tokenize: tokenizeAutolink}
 func tokenizeAutolink(self *Self, effects *Effects, ok State, nok State) State {
 	size := 0
 
-	var start, open, schemeOrEmailAtext, schemeInsideOrEmailAtext, urlInside, emailAtext, emailAtSignOrDot,
-		emailLabel, emailValue State
+	var start State
+	var open State
+	var schemeOrEmailAtext State
+	var schemeInsideOrEmailAtext State
+	var urlInside State
+	var emailAtext State
+	var emailAtSignOrDot State
+	var emailLabel State
+	var emailValue State
 
 	// Start of an autolink.
 	//

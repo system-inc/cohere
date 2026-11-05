@@ -2,6 +2,11 @@ package micromark
 
 import "slices"
 
+// labelEndResolveAll is the one resolver labelStartLink, labelStartImage and labelEnd share. Upstream's
+// label starts say `resolveAll: labelEnd.resolveAll`; resolveAll calls a function once by identity, so
+// the three must hold the same pointer.
+var labelEndResolveAll = &Resolver{Resolve: resolveAllLabelEnd}
+
 // labelEnd is micromark-core-commonmark/lib/label-end.js.
 var labelEnd = &Construct{
 	Name:       "labelEnd",
@@ -9,11 +14,6 @@ var labelEnd = &Construct{
 	ResolveTo:  &Resolver{Resolve: resolveToLabelEnd},
 	Tokenize:   tokenizeLabelEnd,
 }
-
-// labelEndResolveAll is the one resolver labelStartLink, labelStartImage and labelEnd share. Upstream's
-// label starts say `resolveAll: labelEnd.resolveAll`; resolveAll calls a function once by identity, so
-// the three must hold the same pointer.
-var labelEndResolveAll = &Resolver{Resolve: resolveAllLabelEnd}
 
 func init() {
 	labelStartLink.ResolveAll = labelEndResolveAll
@@ -53,7 +53,7 @@ func resolveAllLabelEnd(events []Event, context *TokenizeContext) []Event {
 
 	// If the events are equal, we don't have to copy newEvents to events
 	if len(events) != len(newEvents) {
-		events = splice(events, 0, len(events), newEvents)
+		return splice(events, 0, len(events), newEvents)
 	}
 
 	return events
@@ -170,13 +170,11 @@ func resolveToLabelEnd(events []Event, context *TokenizeContext) []Event {
 // jsSlice is Array#slice for non-negative bounds: an end before the start yields an empty list rather
 // than a panic.
 func jsSlice(events []Event, start int, end int) []Event {
-	if end > len(events) {
-		end = len(events)
-	}
-	if start > end {
+	clampedEnd := min(end, len(events))
+	if start > clampedEnd {
 		return nil
 	}
-	return events[start:end]
+	return events[start:clampedEnd]
 }
 
 func tokenizeLabelEnd(self *Self, effects *Effects, ok State, nok State) State {
@@ -184,7 +182,11 @@ func tokenizeLabelEnd(self *Self, effects *Effects, ok State, nok State) State {
 	var labelStart *Token
 	var defined bool
 
-	var start, after, referenceNotFull, labelEndOk, labelEndNok State
+	var start State
+	var after State
+	var referenceNotFull State
+	var labelEndOk State
+	var labelEndNok State
 
 	// Find an opening.
 	for {
@@ -336,8 +338,14 @@ func tokenizeLabelEnd(self *Self, effects *Effects, ok State, nok State) State {
 }
 
 func tokenizeResource(self *Self, effects *Effects, ok State, nok State) State {
-	var resourceStart, resourceBefore, resourceOpen, resourceDestinationAfter, resourceDestinationMissing,
-		resourceBetween, resourceTitleAfter, resourceEnd State
+	var resourceStart State
+	var resourceBefore State
+	var resourceOpen State
+	var resourceDestinationAfter State
+	var resourceDestinationMissing State
+	var resourceBetween State
+	var resourceTitleAfter State
+	var resourceEnd State
 
 	// At a resource.
 	//
@@ -469,7 +477,9 @@ func tokenizeResource(self *Self, effects *Effects, ok State, nok State) State {
 }
 
 func tokenizeReferenceFull(self *Self, effects *Effects, ok State, nok State) State {
-	var referenceFull, referenceFullAfter, referenceFullMissing State
+	var referenceFull State
+	var referenceFullAfter State
+	var referenceFullMissing State
 
 	// In a reference (full), at the `[`.
 	//
@@ -518,7 +528,8 @@ func tokenizeReferenceFull(self *Self, effects *Effects, ok State, nok State) St
 }
 
 func tokenizeReferenceCollapsed(self *Self, effects *Effects, ok State, nok State) State {
-	var referenceCollapsedStart, referenceCollapsedOpen State
+	var referenceCollapsedStart State
+	var referenceCollapsedOpen State
 
 	// In reference (collapsed), at `[`.
 	//

@@ -44,7 +44,14 @@ type settings struct {
 	isNextEmptyLinePrinted map[int]bool
 }
 
-func settingsOf(options *options) *settings { return options.Settings.(*settings) }
+func settingsOf(options *options) *settings {
+	yamlSettings, isYamlSettings := options.Settings.(*settings)
+	if !isYamlSettings {
+		// Invariant: printDocFile builds the only options this printer is handed, with a *settings.
+		panic("yaml: the print options carry no YAML settings")
+	}
+	return yamlSettings
+}
 
 func currentNode(path *astPath) *unist.Node {
 	node, _ := path.Node()
@@ -498,6 +505,8 @@ func printNode(path *astPath, options *options, print printing.PrintFunc) doc.Do
 	case "flowSequenceItem":
 		return print("content", nil)
 	default:
+		// Invariant: unist's transform builds only the node types above, and getVisitorKeys has already
+		// stopped any other on the walk here. printDocFile recovers this into an error, as upstream throws.
 		panic(fmt.Sprintf("Unexpected node type %q in YAML", node.NodeType))
 	}
 }

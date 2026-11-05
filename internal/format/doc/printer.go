@@ -133,6 +133,8 @@ func generateIndent(base *indentation, command indentCommand, options Options) *
 			lastTabs++
 			lastSpaces += queued.width
 		default:
+			// Invariant: the queue holds only indent, string and width commands, since a dedent pops the
+			// base's last command above rather than being queued itself.
 			panic(fmt.Sprintf("unexpected indent command %d", queued.kind))
 		}
 	}
@@ -249,6 +251,8 @@ func (result *printResult) finish() string {
 	if len(result.buffer) == 0 {
 		return ""
 	}
+	// Unsafe: the buffer is never written again once finished, as above, and is not empty, so the string
+	// points at bytes that stay put for as long as it lives.
 	return unsafe.String(&result.buffer[0], len(result.buffer))
 }
 
@@ -283,7 +287,11 @@ func fits(
 ) bool {
 	restIndex := len(rest)
 	hasPendingSpace := false
-	pooled := fitsCommands.Get().(*[]command)
+	pooled, isCommands := fitsCommands.Get().(*[]command)
+	if !isCommands {
+		// Invariant: fitsCommands makes only *[]command, and fits is the only code that puts one back.
+		panic("fitsCommands held something other than a command stack")
+	}
 	commands := append((*pooled)[:0], next)
 	defer func() {
 		*pooled = commands[:0]
@@ -292,8 +300,12 @@ func fits(
 	// trailing is how many spaces and tabs the text measured so far ends in, which is what upstream's trimIndentation
 	// would remove from it.
 	trailing := 0
+	// widthLeft is the room remaining on the line as the text measured so far uses it up.
+	widthLeft := remainingWidth
+	// sawLineSuffix is whether a line suffix is pending: one the caller had, or one met while measuring.
+	sawLineSuffix := hasLineSuffix
 
-	for remainingWidth >= 0 {
+	for widthLeft >= 0 {
 		if len(commands) == 0 {
 			if restIndex == 0 {
 				return true
@@ -311,11 +323,11 @@ func fits(
 			if document != "" {
 				if hasPendingSpace {
 					trailing++
-					remainingWidth--
+					widthLeft--
 					hasPendingSpace = false
 				}
 				trailing = trailingIndentation(string(document), trailing)
-				remainingWidth -= StringWidth(string(document))
+				widthLeft -= StringWidth(string(document))
 			}
 
 		case *Fill:
@@ -338,7 +350,7 @@ func fits(
 			commands = append(commands, command{mode: current.mode, doc: document.Contents})
 
 		case trimDoc:
-			remainingWidth += trailing
+			widthLeft += trailing
 			trailing = 0
 
 		case *Group:
@@ -380,10 +392,10 @@ func fits(
 			}
 
 		case *LineSuffix:
-			hasLineSuffix = true
+			sawLineSuffix = true
 
 		case lineSuffixBoundaryDoc:
-			if hasLineSuffix {
+			if sawLineSuffix {
 				return false
 			}
 
@@ -576,6 +588,9 @@ func Print(document Doc, options Options) string {
 		default:
 			parts, isArray := Parts(document)
 			if !isArray {
+				// Invariant: the cases above and Parts cover every Doc this package defines, so only a nil doc
+				// lands here, which is a bug in the printer that built it and which upstream's
+				// printDocToString throws InvalidDocError for.
 				panic(fmt.Sprintf("invalid doc %T", current.doc))
 			}
 			for index := len(parts) - 1; index >= 0; index-- {
@@ -596,6 +611,9 @@ func Print(document Doc, options Options) string {
 }
 
 // printGroup is the immediately-invoked printGroup in upstream's DOC_TYPE_GROUP case.
+//
+// Mutates: shouldRemeasure is Print's own flag, which upstream's printGroup clears in its enclosing scope
+// once a group has been measured.
 func printGroup(
 	group *Group,
 	current command,
@@ -682,13 +700,13 @@ func printFill(
 	firstAndSecond := command{indent: current.indent, mode: modeFlat, doc: Concat{content, whitespace, secondContent}}
 	firstAndSecondFit := fits(firstAndSecond, nil, remainingWidth, hasLineSuffix, groupModes, true)
 
-	commands = append(commands, remaining)
+	withRemaining := append(commands, remaining)
 	switch {
 	case firstAndSecondFit:
-		return append(commands, whitespaceFlat, contentFlat)
+		return append(withRemaining, whitespaceFlat, contentFlat)
 	case contentFits:
-		return append(commands, whitespaceBreak, contentFlat)
+		return append(withRemaining, whitespaceBreak, contentFlat)
 	default:
-		return append(commands, whitespaceBreak, contentBreak)
+		return append(withRemaining, whitespaceBreak, contentBreak)
 	}
 }

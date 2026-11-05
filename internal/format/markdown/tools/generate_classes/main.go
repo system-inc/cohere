@@ -42,6 +42,7 @@ func main() {
 
 	generated, generateError := generate()
 	if generateError != nil {
+		// Ignored: the process exits on the next line, so a failed write to stderr has nowhere left to go.
 		fmt.Fprintln(os.Stderr, generateError)
 		os.Exit(1)
 	}
@@ -49,10 +50,12 @@ func main() {
 	if *check {
 		committed, readError := os.ReadFile(*output)
 		if readError != nil {
+			// Ignored: the process exits on the next line, so a failed write to stderr has nowhere left to go.
 			fmt.Fprintln(os.Stderr, readError)
 			os.Exit(1)
 		}
 		if !bytes.Equal(committed, generated) {
+			// Ignored: the process exits on the next line, so a failed write to stderr has nowhere left to go.
 			fmt.Fprintf(os.Stderr, "%s is stale: regenerate it\n", *output)
 			os.Exit(1)
 		}
@@ -60,6 +63,7 @@ func main() {
 	}
 
 	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		// Ignored: the process exits on the next line, so a failed write to stderr has nowhere left to go.
 		fmt.Fprintln(os.Stderr, writeError)
 		os.Exit(1)
 	}
@@ -77,6 +81,9 @@ var (
 	spaceUse = regexp.MustCompile(`/(\[\\u\{20\}\\u\{A0\}[^/]*\\t\\n\\f\\r\])\$/u\.test`)
 )
 
+// cjkShape is CJK_REGEXP's literal, `(?:[cjk])(?:[variation selectors])?`, with the two classes captured.
+var cjkShape = regexp.MustCompile(`^\(\?:(\[.*\])\)\(\?:(\[.*\])\)\?$`)
+
 func generate() ([]byte, error) {
 	bundles, bundlesError := prettier.Bundles()
 	if bundlesError != nil {
@@ -86,14 +93,14 @@ func generate() ([]byte, error) {
 
 	splitStart := strings.Index(markdown, `.split(/([\t\n ]+)/)`)
 	if splitStart < 0 || strings.Count(markdown, `.split(/([\t\n ]+)/)`) != 1 {
-		return nil, fmt.Errorf("could not find splitText's split exactly once")
+		return nil, fmt.Errorf("splitText's split is not in the bundle exactly once")
 	}
 	splitText := markdown[splitStart : splitStart+1500]
 
 	name := func(pattern *regexp.Regexp, what string) (string, error) {
 		match := pattern.FindStringSubmatch(splitText)
 		if match == nil {
-			return "", fmt.Errorf("could not find how splitText uses %s", what)
+			return "", fmt.Errorf("splitText has no use of %s", what)
 		}
 		return match[1], nil
 	}
@@ -124,14 +131,14 @@ func generate() ([]byte, error) {
 	}
 
 	// CJK_REGEXP is `(?:[cjk])(?:[variation selectors])?`: the two classes are asked about separately.
-	cjkParts := regexp.MustCompile(`^\(\?:(\[.*\])\)\(\?:(\[.*\])\)\?$`).FindStringSubmatch(cjkLiteral)
+	cjkParts := cjkShape.FindStringSubmatch(cjkLiteral)
 	if cjkParts == nil {
 		return nil, fmt.Errorf("CJK_REGEXP does not have the shape (?:[...])(?:[...])?: %.80s", cjkLiteral)
 	}
 
 	spaces := spaceUse.FindAllStringSubmatch(markdown, -1)
 	if len(spaces) == 0 {
-		return nil, fmt.Errorf("could not find the space-separator class")
+		return nil, fmt.Errorf("the bundle has no space-separator class")
 	}
 	for _, space := range spaces[1:] {
 		if space[1] != spaces[0][1] {
@@ -214,7 +221,10 @@ func generate() ([]byte, error) {
 
 // literal cuts the regex literal assigned to name out of the bundle, without its slashes or flags.
 func literal(markdown string, name string) (string, error) {
-	pattern := regexp.MustCompile(`[,; ]` + regexp.QuoteMeta(name) + `=/`)
+	pattern, compileError := regexp.Compile(`[,; ]` + regexp.QuoteMeta(name) + `=/`)
+	if compileError != nil {
+		return "", fmt.Errorf("compiling the assignment pattern for %s: %w", name, compileError)
+	}
 	matches := pattern.FindAllStringIndex(markdown, -1)
 	if len(matches) != 1 {
 		return "", fmt.Errorf("found %d assignments of %s to a regex literal, want exactly 1", len(matches), name)
@@ -243,7 +253,9 @@ func literal(markdown string, name string) (string, error) {
 
 // codePointRanges asks a u-flag regex, anchored, about every code point, lone surrogates included.
 func codePointRanges(runtime *goja.Runtime, pattern string) ([][2]int, error) {
-	runtime.Set("__pattern", pattern)
+	if setError := runtime.Set("__pattern", pattern); setError != nil {
+		return nil, fmt.Errorf("setting the pattern: %w", setError)
+	}
 	value, runStringError := runtime.RunString(`
 		(function () {
 			const regex = new RegExp("^(?:" + __pattern + ")$", "u");

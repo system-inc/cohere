@@ -27,7 +27,10 @@ func gfmTaskListItemExtension() *Extension {
 }
 
 func tokenizeTasklistCheck(self *Self, effects *Effects, ok State, nok State) State {
-	var open, inside, close, after State
+	var open State
+	var inside State
+	var close State
+	var after State
 
 	// At start of task list item check.
 	//
@@ -110,13 +113,11 @@ func tokenizeTasklistCheck(self *Self, effects *Effects, ok State, nok State) St
 }
 
 func tokenizeSpaceThenNonSpace(self *Self, effects *Effects, ok State, nok State) State {
-	var after State
-
 	// After whitespace, after task list item check.
 	//
 	// > | * [x] y.
 	//           ^
-	after = func(code Code) State {
+	after := func(code Code) State {
 		// EOF means there was nothing, so bad.
 		// EOL means there’s content after it, so good.
 		// Impossible to have more spaces.

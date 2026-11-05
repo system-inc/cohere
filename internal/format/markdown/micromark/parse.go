@@ -24,10 +24,11 @@ func SourceUnits(text string) []uint16 {
 
 // AppendSourceUnits is SourceUnits appended to units, so a caller can reuse one buffer for every text.
 func AppendSourceUnits(units []uint16, text string) []uint16 {
+	appendedUnits := units
 	for _, character := range text {
-		units = utf16.AppendRune(units, character)
+		appendedUnits = utf16.AppendRune(appendedUnits, character)
 	}
-	return units
+	return appendedUnits
 }
 
 // Combine is the constructs of upstream's parse(), micromark/lib/parse.js: the defaults combined with the
@@ -55,6 +56,8 @@ func (parser *ParseContext) create(contentType string, from *Point) *TokenizeCon
 	case ContentTypeText:
 		initial = textInitial
 	default:
+		// Invariant: every content type comes from this package's ContentType constants, set by Parse and by
+		// the constructs on the chunk tokens subtokenize hands back here, all of them handled above.
 		panic("micromark: unknown content type " + contentType)
 	}
 	return createTokenizer(parser, initial, from)
@@ -98,6 +101,9 @@ func combineExtensions(extensions []*Extension) *Extension {
 	return all
 }
 
+// mergeRecord is upstream's syntaxExtension for one record: right's constructs merged into left.
+//
+// Mutates: left it is the combined record being built, as upstream's syntaxExtension fills `all` in place
 func mergeRecord(left *ConstructRecord, right *ConstructRecord) {
 	if right == nil {
 		return
@@ -207,11 +213,12 @@ func preprocess(value []uint16) []Chunk {
 
 // postprocess is upstream's postprocess(): subtokenize until nothing is left.
 func postprocess(events []Event) []Event {
+	subtokenizedEvents := events
 	for {
 		var done bool
-		events, done = subtokenize(events)
+		subtokenizedEvents, done = subtokenize(subtokenizedEvents)
 		if done {
-			return events
+			return subtokenizedEvents
 		}
 	}
 }

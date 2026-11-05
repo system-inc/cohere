@@ -11,14 +11,15 @@ import (
 type processor func(path *astPath) (doc.Doc, bool)
 
 func printChildren(path *astPath, options *options, print printing.PrintFunc, process processor) doc.Doc {
-	if process == nil {
-		process = func(*astPath) (doc.Doc, bool) { return print(nil, nil), true }
+	childProcessor := process
+	if childProcessor == nil {
+		childProcessor = func(*astPath) (doc.Doc, bool) { return print(nil, nil), true }
 	}
 
 	parts := doc.Concat{}
 
 	path.Each(func(path *astPath, _ int, _ any) {
-		result, keep := process(path)
+		result, keep := childProcessor(path)
 		if keep {
 			if len(parts) > 0 && shouldPrePrintHardline(path) {
 				parts = append(parts, doc.Hardline)

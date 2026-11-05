@@ -23,7 +23,9 @@ func tokenizeLiquid(self *Self, effects *Effects, ok State, nok State) State {
 	// closingCode is `}` after `{{` and `%` after `{%`. Upstream's starts undefined; it is always set
 	// before inside reads it.
 	var closingCode Code
-	var start, inside, mayClose State
+	var start State
+	var inside State
+	var mayClose State
 
 	start = func(code Code) State {
 		effects.Enter(typeLiquidNode, nil)

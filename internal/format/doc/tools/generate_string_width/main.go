@@ -3,7 +3,8 @@
 //
 // Usage:
 //
-//	go run ./internal/format/doc/tools/generate_string_width -prettier-root ~/Projects/system/prettier [-output <file.go>] [-check]
+//	go run ./internal/format/doc/tools/generate_string_width -prettier-root ~/Projects/system/prettier \
+//		[-output <file.go>] [-check]
 //
 // Width decides where every line containing a wide character or an emoji breaks, so a table that is
 // one Unicode version off produces a different line break and a different file, with nothing wrong
@@ -104,7 +105,8 @@ func main() {
 
 	command := exec.Command("node", "--input-type=module", "-e", captureScript)
 	command.Dir = *prettierRoot
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	if runError := command.Run(); runError != nil {
@@ -170,12 +172,14 @@ func main() {
 		if !bytes.Equal(committed, generated) {
 			fail("%s is stale: the width packages changed, regenerate it", *output)
 		}
+		// Ignored: the check has already passed, and a stdout that cannot take the note changes nothing about it.
 		fmt.Printf("%s matches the packages\n", *output)
 		return
 	}
 	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
 		fail("writing %s: %v", *output, writeError)
 	}
+	// Ignored: the file is already written, and a stdout that cannot take the note changes nothing about it.
 	fmt.Printf("wrote %s: %d wide ranges\n", *output, len(captured.WideRanges))
 }
 
@@ -271,6 +275,7 @@ func translate(name string, source string) string {
 }
 
 func fail(format string, arguments ...any) {
+	// Ignored: if stderr cannot take the message, the exit status below still reports the failure.
 	fmt.Fprintf(os.Stderr, "generate_string_width: "+format+"\n", arguments...)
 	os.Exit(1)
 }

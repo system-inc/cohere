@@ -31,12 +31,12 @@ var mdastPrinter = &printing.Printer[*Node]{
 	VisitorKeys: func(node *Node) []string { return visitorKeys[node.NodeType] },
 	Embed:       embed,
 	Preprocess: func(ast *Node, options *options) *Node {
-		ast = preprocess(ast, options.OriginalText, settingsOf(options).tabWidth, settingsOf(options).nodes)
+		preprocessed := preprocess(ast, options.OriginalText, settingsOf(options).tabWidth, settingsOf(options).nodes)
 		// The print cache is made once preprocess returns, and most of the nodes it prints, the sentences,
 		// words and whitespace, are only made here. The arena holds every node of the tree from both,
 		// so its count, read now, presizes the cache without a walk (#4bq8vyn).
 		options.NodeCount = settingsOf(options).nodes.Len()
-		return ast
+		return preprocessed
 	},
 	HasPrettierIgnore:    hasPrettierIgnore,
 	PrintPrettierIgnored: printPrettierIgnored,
@@ -77,7 +77,11 @@ func formatWithProseWrap(
 	// native.Formatter, once for every printer.
 	// The tree, and the words and whitespace preprocess splits its text into, come from an arena released
 	// once the file is printed: doc.Print below has read the last of them before the deferred release runs.
-	nodes := nodeArenas.Get().(*arena.Arena[Node])
+	nodes, isNodeArena := nodeArenas.Get().(*arena.Arena[Node])
+	if !isNodeArena {
+		// Invariant: the pool's New makes only node arenas, and the release below puts back only the one taken here.
+		panic("markdown: the node arena pool held something other than a node arena")
+	}
 	defer func() {
 		nodes.Reset()
 		nodeArenas.Put(nodes)

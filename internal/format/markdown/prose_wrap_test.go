@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -66,12 +67,17 @@ func (oracle *proseWrapOracle) formatLive(
 	options formatoptions.Options,
 	proseWrap string,
 ) (string, error) {
-	oracle.runtime.Set("__source", text)
-	oracle.runtime.Set("__proseWrap", proseWrap)
-	oracle.runtime.Set("__printWidth", options.PrintWidth)
-	oracle.runtime.Set("__tabWidth", options.TabWidth)
-	oracle.runtime.Set("__useTabs", options.UseTabs)
-	oracle.runtime.Set("__singleQuote", options.SingleQuote)
+	setError := errors.Join(
+		oracle.runtime.Set("__source", text),
+		oracle.runtime.Set("__proseWrap", proseWrap),
+		oracle.runtime.Set("__printWidth", options.PrintWidth),
+		oracle.runtime.Set("__tabWidth", options.TabWidth),
+		oracle.runtime.Set("__useTabs", options.UseTabs),
+		oracle.runtime.Set("__singleQuote", options.SingleQuote),
+	)
+	if setError != nil {
+		return "", fmt.Errorf("setting the oracle's inputs: %w", setError)
+	}
 	value, runStringError := oracle.runtime.RunString(`prettier.format(__source, {
 		filepath: "fixture.md", parser: "markdown", plugins: prettierPlugins, proseWrap: __proseWrap,
 		printWidth: __printWidth, tabWidth: __tabWidth, useTabs: __useTabs, singleQuote: __singleQuote,

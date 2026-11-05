@@ -4,7 +4,8 @@ package micromark
 var characterEscape = &Construct{Name: "characterEscape", Tokenize: tokenizeCharacterEscape}
 
 func tokenizeCharacterEscape(self *Self, effects *Effects, ok State, nok State) State {
-	var start, inside State
+	var start State
+	var inside State
 
 	start = func(code Code) State {
 		effects.Enter(TypeCharacterEscape, nil)

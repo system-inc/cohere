@@ -309,8 +309,15 @@ process.stdin.on("end", () => {
 `
 
 type printCase struct {
-	Spec    *spec          `json:"spec"`
-	Options map[string]any `json:"options"`
+	Spec    *spec                 `json:"spec"`
+	Options *upstreamPrintOptions `json:"options"`
+}
+
+// upstreamPrintOptions are the options the script spreads into printDocToString's, spelled as upstream's are.
+type upstreamPrintOptions struct {
+	PrintWidth int  `json:"printWidth"`
+	TabWidth   int  `json:"tabWidth"`
+	UseTabs    bool `json:"useTabs"`
 }
 
 type printResultJSON struct {
@@ -371,10 +378,10 @@ func TestPrintAgreesWithUpstream(test *testing.T) {
 		}
 		cases[index] = printCase{
 			Spec: generator.node(),
-			Options: map[string]any{
-				"printWidth": options[index].PrintWidth,
-				"tabWidth":   options[index].TabWidth,
-				"useTabs":    options[index].UseTabs,
+			Options: &upstreamPrintOptions{
+				PrintWidth: options[index].PrintWidth,
+				TabWidth:   options[index].TabWidth,
+				UseTabs:    options[index].UseTabs,
 			},
 		}
 	}
@@ -384,7 +391,7 @@ func TestPrintAgreesWithUpstream(test *testing.T) {
 		options = append(options, boundaryOptions[index])
 		cases = append(cases, printCase{
 			Spec:    boundary,
-			Options: map[string]any{"printWidth": boundaryOptions[index].PrintWidth, "tabWidth": 2, "useTabs": false},
+			Options: &upstreamPrintOptions{PrintWidth: boundaryOptions[index].PrintWidth, TabWidth: 2, UseTabs: false},
 		})
 	}
 
@@ -395,7 +402,8 @@ func TestPrintAgreesWithUpstream(test *testing.T) {
 	command := exec.Command("node", "--input-type=module", "-e", upstreamScript)
 	command.Dir = root
 	command.Stdin = bytes.NewReader(encoded)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if runError := command.Run(); runError != nil {
 		test.Fatalf("node: %v\n%s", runError, stderr.String())
@@ -421,7 +429,10 @@ func TestPrintAgreesWithUpstream(test *testing.T) {
 		if got != upstream[index].Formatted {
 			mismatches++
 			if mismatches <= 5 {
-				specJSON, _ := json.Marshal(testCase.Spec)
+				specJSON, marshalError := json.Marshal(testCase.Spec)
+				if marshalError != nil {
+					test.Fatalf("encoding case %d's spec: %v", index, marshalError)
+				}
 				test.Errorf(
 					"case %d (%+v)\nspec %s\nwant %q\ngot  %q",
 					index,
