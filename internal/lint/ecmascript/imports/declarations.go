@@ -25,19 +25,21 @@ func appendDeclarations(declarations []*ast.Node, statements *ast.NodeList) []*a
 	if statements == nil {
 		return declarations
 	}
+	// The caller's list grows into this one and comes back, the way append does.
+	gathered := declarations
 	for _, statement := range statements.Nodes {
 		switch statement.Kind {
 		case ast.KindImportDeclaration:
-			declarations = append(declarations, statement)
+			gathered = append(gathered, statement)
 		case ast.KindModuleDeclaration:
 			body := statement.Body()
 			for body != nil && body.Kind == ast.KindModuleDeclaration {
 				body = body.Body()
 			}
 			if body != nil && body.Kind == ast.KindModuleBlock {
-				declarations = appendDeclarations(declarations, body.AsModuleBlock().Statements)
+				gathered = appendDeclarations(gathered, body.AsModuleBlock().Statements)
 			}
 		}
 	}
-	return declarations
+	return gathered
 }

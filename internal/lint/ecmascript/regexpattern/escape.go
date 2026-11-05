@@ -198,10 +198,11 @@ func braceQuantifierEnd(pattern string, start int) (int, bool) {
 
 // consumeDigits returns the index past a run of decimal digits, which may be empty.
 func consumeDigits(pattern string, index int) int {
-	for index < len(pattern) && pattern[index] >= '0' && pattern[index] <= '9' {
-		index++
+	end := index
+	for end < len(pattern) && pattern[end] >= '0' && pattern[end] <= '9' {
+		end++
 	}
-	return index
+	return end
 }
 
 // isAsciiLetter reports whether a byte is an unaccented letter, which is what a control escape

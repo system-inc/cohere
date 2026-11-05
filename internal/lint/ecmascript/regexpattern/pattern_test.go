@@ -194,7 +194,7 @@ func TestWalkBoundsAnOctalEscape(test *testing.T) {
 		{"two digits", `!`, 1, 33},
 		{"a value above 255 stops early", `\400`, 2, 32},
 		{"a fourth digit is literal", `A1`, 2, 65},
-		{"a non-octal digit ends it", `8`, 2, 1},
+		{"a non-octal digit ends it", "\x018", 2, 1},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
