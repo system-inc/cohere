@@ -301,9 +301,13 @@ func TestNoCheckDuplicatesAVetPass(test *testing.T) {
 	}
 }
 
+// sharedReaders is the packages under rules/ that several rules read through and that hold no rule of their own:
+// marker reads the reasoned marker comments, and inertvalue judges a value that cannot carry syntax.
+var sharedReaders = map[string]bool{"marker": true, "inertvalue": true}
+
 // TestEveryRulePackageIsInHouse holds the registry to the rule packages on disk: each directory under rules/, but
-// testdata and marker, is one house rule named for it, and House lists it. A rule package nobody registered would build, pass
-// its own fixtures and run on nothing.
+// testdata and the shared readers, is one house rule named for it, and House lists it. A rule package nobody
+// registered would build, pass its own fixtures and run on nothing.
 func TestEveryRulePackageIsInHouse(test *testing.T) {
 	test.Parallel()
 	entries, readError := os.ReadDir(".")
@@ -316,8 +320,7 @@ func TestEveryRulePackageIsInHouse(test *testing.T) {
 	}
 	packages := 0
 	for _, entry := range entries {
-		// marker is the reading of reasoned marker comments the rules share, a library and not a rule.
-		if !entry.IsDir() || entry.Name() == "testdata" || entry.Name() == "marker" {
+		if !entry.IsDir() || entry.Name() == "testdata" || sharedReaders[entry.Name()] {
 			continue
 		}
 		packages++
