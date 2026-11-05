@@ -748,3 +748,47 @@ func TestSwiftRunListsTheFilesItRewrote(t *testing.T) {
 	}
 	forbidLines(t, output, "cohered")
 }
+
+// TestASwiftRunUnderNoCacheSaysItsCacheWasOff: a Swift run under `--no-cache` says so in its summary's
+// `cache.off` and in the verbose account, as a TypeScript run does, and a run with its cache on says neither.
+// Every Swift summary once said the cache was on under `--no-cache`, because only the TypeScript pipeline set it.
+// Not parallel: it sets the package-level cacheOff and activeOutput, which every run reads.
+func TestASwiftRunUnderNoCacheSaysItsCacheWasOff(t *testing.T) {
+	savedCacheOff, savedOutput := cacheOff, activeOutput
+	defer func() { cacheOff, activeOutput = savedCacheOff, savedOutput }()
+	for _, off := range []bool{true, false} {
+		cacheOff = off
+		activeOutput = outputSettings{Mode: outputJSON}
+		output, _, err := renderRecords(t, swiftModeCheck, contractFixture(t, "Clean.jsonl"), 0)
+		if err != nil {
+			t.Fatalf("rendering under cacheOff %t: %v", off, err)
+		}
+		summaryLine := ""
+		for _, line := range strings.Split(output, "\n") {
+			if strings.Contains(line, `"kind":"summary"`) {
+				summaryLine = line
+			}
+		}
+		var summary struct {
+			Cache struct {
+				Off bool `json:"off"`
+			} `json:"cache"`
+		}
+		if err := json.Unmarshal([]byte(summaryLine), &summary); err != nil {
+			t.Fatalf("no summary record under cacheOff %t: %v\n%s", off, err, output)
+		}
+		if summary.Cache.Off != off {
+			t.Errorf("the summary's cache.off is %t under cacheOff %t", summary.Cache.Off, off)
+		}
+
+		activeOutput = outputSettings{Mode: outputVerbose}
+		output, _, err = renderRecords(t, swiftModeCheck, contractFixture(t, "Clean.jsonl"), 0)
+		if err != nil {
+			t.Fatalf("rendering verbose under cacheOff %t: %v", off, err)
+		}
+		said := strings.Contains(output, "  cache: off, by --no-cache: nothing was read from or written to this package's cache")
+		if said != off {
+			t.Errorf("the account said the cache was off %t under cacheOff %t:\n%s", said, off, output)
+		}
+	}
+}
