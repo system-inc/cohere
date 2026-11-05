@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -41,7 +42,7 @@ func TestOpenFlag(test *testing.T) {
 			}
 			editor := test.TempDir()
 			log := filepath.Join(editor, "opened")
-			if writeError := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nprintf 'invocation\\n' >> \"$OPEN_LOG\"\nprintf '%s\\n' \"$@\" >> \"$OPEN_LOG\"\n"), 0755); writeError != nil {
+			if writeError := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nprintf 'invocation\\n' >> \"$OPEN_LOG\"\nprintf '%s\\n' \"$@\" >> \"$OPEN_LOG\"\n"), 0o755); writeError != nil {
 				test.Fatal(writeError)
 			}
 			if testCase.name == "missing editor" {
@@ -50,7 +51,7 @@ func TestOpenFlag(test *testing.T) {
 				}
 			}
 			if testCase.name == "failed editor" {
-				if writeError := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nexit 42\n"), 0755); writeError != nil {
+				if writeError := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nexit 42\n"), 0o755); writeError != nil {
 					test.Fatal(writeError)
 				}
 			}
@@ -157,7 +158,9 @@ func TestOpenReport(test *testing.T) {
 			var output bytes.Buffer
 			var opened []string
 			calls := 0
-			report.open(&output, func(paths []string) error { calls++; opened = append(opened, paths...); return testCase.launchError })
+			stream := bufio.NewWriter(&output)
+			report.open(stream, func(paths []string) error { calls++; opened = append(opened, paths...); return testCase.launchError })
+			flushStream(test, stream)
 			var want []string
 			for _, path := range testCase.wantPaths {
 				absolute, absolutePathError := filepath.Abs(path)
@@ -195,7 +198,7 @@ func TestOpenDiscoveredProjects(test *testing.T) {
 	})
 	editor := test.TempDir()
 	log := filepath.Join(editor, "opened")
-	if writeError := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nprintf 'invocation\\n' >> \"$OPEN_LOG\"\nprintf '%s\\n' \"$@\" >> \"$OPEN_LOG\"\n"), 0755); writeError != nil {
+	if writeError := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nprintf 'invocation\\n' >> \"$OPEN_LOG\"\nprintf '%s\\n' \"$@\" >> \"$OPEN_LOG\"\n"), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	cmd := exec.Command(binary, "--no-fix", "--no-format", "--no-cache", "--json", "--open")

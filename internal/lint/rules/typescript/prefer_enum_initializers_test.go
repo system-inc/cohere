@@ -226,7 +226,7 @@ func TestPreferEnumInitializersFiresOnUpstreamFailCases(test *testing.T) {
 // TestPreferEnumInitializersStaysSilentOnShapesTheCorpusDoesNotWrite covers clean divergences.
 //
 // Upstream's corpus has four passing inputs and none of them carries a computed initializer, so
-// nothing in it establishes that the rule tests only whether an initializer is PRESENT rather than
+// nothing in it establishes that the rule tests only whether an initializer is present rather than
 // what it evaluates to. Both verdicts below were measured against the installed 8.x build.
 func TestPreferEnumInitializersStaysSilentOnShapesTheCorpusDoesNotWrite(test *testing.T) {
 	test.Parallel()
@@ -259,7 +259,7 @@ func TestPreferEnumInitializersStaysSilentOnShapesTheCorpusDoesNotWrite(test *te
 // TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite covers reporting divergences.
 //
 // The corpus writes only plain identifier members inside a plain enum, so it cannot see three
-// things this rule has to get right: that the suggested number is the member's POSITION rather than
+// things this rule has to get right: that the suggested number is the member's position rather than
 // the value TypeScript computes for it, that a quoted key renders its quotes twice, and that const,
 // ambient, exported and nested enums are all reached.
 //
@@ -336,7 +336,7 @@ func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(test *testing.
 			},
 		},
 		{
-			// The suggested numbers are POSITIONS, not computed values. C is offered 2 and 3.
+			// The suggested numbers are positions, not computed values. C is offered 2 and 3.
 			sourceText: "enum D {\n  A,\n  B = 1,\n  C,\n}",
 			wantFindings: []preferEnumInitializersFinding{
 				{

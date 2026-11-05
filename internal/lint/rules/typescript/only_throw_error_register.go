@@ -8,7 +8,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // concurrent port has to edit, so two ports landing at once conflict on a file neither is really
 // changing.
 //
-// The Decode entry is not optional here. This rule's three booleans all default to TRUE, and a
+// The Decode entry is not optional here. This rule's three booleans all default to true, and a
 // rule registered without a decoder is handed nil options, so the defaulting in Run is what keeps
 // an unconfigured rule permissive rather than reporting every `any` in the tree.
 func init() {

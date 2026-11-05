@@ -10,7 +10,7 @@ type PreferLiteralEnumMemberOptions struct {
 	// AllowBitwiseExpressions permits a bitwise operator in an initializer, and permits an
 	// initializer to name a sibling member of the same enum while inside one.
 	//
-	// It defaults to FALSE, so the generic decoder would happen to produce the right zero value.
+	// It defaults to false, so the generic decoder would happen to produce the right zero value.
 	// The decoder below is hand-rolled anyway, because relying on that coincidence leaves the next
 	// person to add a default-true key inheriting a decoder that silently inverts their rule.
 	AllowBitwiseExpressions bool
@@ -45,6 +45,17 @@ func DecodePreferLiteralEnumMemberOptions(raw []byte) (any, error) {
 	return options, nil
 }
 
+var preferLiteralEnumMemberNotLiteralMessage = rule.Message{
+	Id:          "notLiteral",
+	Description: "Explicit enum value must only be a literal value (string or number).",
+}
+
+var preferLiteralEnumMemberNotLiteralOrBitwiseMessage = rule.Message{
+	Id: "notLiteralOrBitwiseExpression",
+	Description: "Explicit enum value must only be a literal value (string or number) " +
+		"or a bitwise expression.",
+}
+
 // PreferLiteralEnumMember flags an enum member initialized to anything but a literal value.
 //
 //	valid:   enum Valid { A = 42, B = 'text', C = -1, D = null, E = /re/ }
@@ -59,7 +70,7 @@ func DecodePreferLiteralEnumMemberOptions(raw []byte) (any, error) {
 // literal is auditable at the line, survives a reorder, and means the same thing to the compiler as
 // it does to a reader of the diff.
 //
-// # The finding anchors on the member's NAME, not on the thing being judged
+// # The finding anchors on the member's name, not on the thing being judged
 //
 // Upstream reports `node: node.id`, so the span is the member key while the offending expression is
 // its initializer. That reads as backwards, and it is deliberate rather than accidental: every one of
@@ -81,12 +92,12 @@ func DecodePreferLiteralEnumMemberOptions(raw []byte) (any, error) {
 // Measured against the installed 8.x build rather than reasoned about: both are silent there, and a
 // control input in the same run reported, so the silence is a verdict rather than a rule that never
 // ran. The unwrap below is therefore fidelity, not a convenience. It is written as a loop rather than
-// a single step because `((2))` nests, and it is deliberately NOT `ast.SkipParentheses`: that helper
+// a single step because `((2))` nests, and it is deliberately not `ast.SkipParentheses`: that helper
 // dereferences its argument, and an initializer can be nil.
 //
 // # What `partOfBitwiseComputation` actually gates, and the arm that surprises
 //
-// A member may name a sibling member only INSIDE a bitwise computation, which is why `C = A | B`
+// A member may name a sibling member only inside a bitwise computation, which is why `C = A | B`
 // passes under the option while `B = A` does not. The flag threads down the recursion, and the two
 // unary arms treat it oppositely:
 //
@@ -98,7 +109,7 @@ func DecodePreferLiteralEnumMemberOptions(raw []byte) (any, error) {
 // that looks like a defect in this port and is not: upstream's `['-', '+']` arm recurses with
 // `partOfBitwiseComputation` rather than with `true`, and it is reproduced.
 //
-// # Key matching is on the COOKED text of the key
+// # Key matching is on the cooked text of the key
 //
 // `hasEnumMember` accepts a member whose key is an identifier of that name, or a string literal whose
 // static value is that name, so a quoted key is reachable by a bare identifier:
@@ -164,17 +175,6 @@ var PreferLiteralEnumMember = rule.Rule{
 	},
 }
 
-var preferLiteralEnumMemberNotLiteralMessage = rule.Message{
-	Id:          "notLiteral",
-	Description: "Explicit enum value must only be a literal value (string or number).",
-}
-
-var preferLiteralEnumMemberNotLiteralOrBitwiseMessage = rule.Message{
-	Id: "notLiteralOrBitwiseExpression",
-	Description: "Explicit enum value must only be a literal value (string or number) " +
-		"or a bitwise expression.",
-}
-
 // enclosingEnumDeclaration walks up from a member to the enum that holds it.
 //
 // Upstream reads `node.parent.parent`, because its enum has a body node between the declaration and
@@ -234,7 +234,7 @@ func isAllowedEnumInitializer(
 		ast.KindFalseKeyword,
 		// A backtick string with no interpolation. Upstream's TemplateLiteral arm accepts exactly
 		// the case where the expression list is empty, and our parser gives that shape its own kind,
-		// so the emptiness test is the kind test. A template WITH an interpolation parses as
+		// so the emptiness test is the kind test. A template with an interpolation parses as
 		// KindTemplateExpression, which falls to the default arm and reports, matching upstream.
 		ast.KindNoSubstitutionTemplateLiteral:
 		return true
@@ -242,7 +242,7 @@ func isAllowedEnumInitializer(
 	case ast.KindPrefixUnaryExpression:
 		unary := expression.AsPrefixUnaryExpression()
 
-		// `+123` and `-123`. The flag is passed THROUGH rather than set, so a sibling member under
+		// `+123` and `-123`. The flag is passed through rather than set, so a sibling member under
 		// a minus sign at the top level is still not allowed. Measured, not inferred.
 		if unary.Operator == ast.KindPlusToken || unary.Operator == ast.KindMinusToken {
 			return isAllowedEnumInitializer(declaration, unary.Operand,

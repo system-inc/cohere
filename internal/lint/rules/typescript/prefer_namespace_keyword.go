@@ -72,7 +72,7 @@ var messagePreferNamespaceKeyword = rule.Message{
 // ModuleBlock. Upstream reports it twice, which the snapshot also pins: six diagnostics across five
 // failing inputs, and this is the input supplying the sixth.
 //
-// So the exemption is keyed on the PARENT being a ModuleDeclaration, never on the node being
+// So the exemption is keyed on the parent being a ModuleDeclaration, never on the node being
 // nested. A guard reading "skip anything inside another module" would silence the second case and
 // still pass every fixture that only covers the first.
 //

@@ -33,9 +33,9 @@ func noUnsafeMemberAccessDecoded(test *testing.T, optionsJson string) any {
 // case that is silent under our compiler options.
 //
 // Upstream runs this corpus with `noImplicitThis` off and our harness pins `strict: true`, so every
-// case was measured against the installed 8.67.0 build under BOTH settings. Thirty-five of
+// case was measured against the installed 8.67.0 build under both settings. Thirty-five of
 // thirty-six are identical either way. The exception is upstream's object-literal `this` case,
-// which reports three findings under its configuration and is COMPLETELY silent under ours, because
+// which reports three findings under its configuration and is completely silent under ours, because
 // `this` in an object literal is typed as the literal rather than `any` once the option is on. It
 // is pinned here at the verdict this harness can observe rather than deleted, with the other column
 // recorded in the rule's doc comment.
@@ -139,7 +139,7 @@ type noUnsafeMemberAccessFinding struct {
 // TestNoUnsafeMemberAccessFires is upstream's reporting cases verbatim, at the verdicts this harness
 // can observe, with every id, rendered text, and span taken from the installed 8.67.0 build.
 //
-// The span assertions carry more weight here than on most rules. A chain reports ONCE and on the
+// The span assertions carry more weight here than on most rules. A chain reports once and on the
 // innermost property, so `x.a.b.c` underlines `a`; a port without the memoized recursion reports
 // three times, and one recursing the wrong way underlines `c`. Both satisfy every id assertion.
 func TestNoUnsafeMemberAccessFires(test *testing.T) {
@@ -294,7 +294,7 @@ func TestNoUnsafeMemberAccessFires(test *testing.T) {
 			},
 		},
 		{
-			// Upstream's corpus asserts TWO findings here and this harness produces a third, on
+			// Upstream's corpus asserts two findings here and this harness produces a third, on
 			// `console.log`. That is not a rule difference: probed with a control, `console` does
 			// not resolve in the program this harness builds, so its type is the checker's error
 			// type and `errorMemberExpression` is the correct verdict for it. Declaring `console`
@@ -327,8 +327,8 @@ func TestNoUnsafeMemberAccessFires(test *testing.T) {
 			// two findings, `pipe` before `subscribe`. Measured on the installed 8.67.0 build both
 			// ways, which reports the same two either way because its harness resolves `console`.
 			//
-			// This row is also what pins the ORDER through a call. The object of `.subscribe` is a
-			// CALL rather than a member access, so a recursion descending only through member
+			// This row is also what pins the order through a call. The object of `.subscribe` is a
+			// call rather than a member access, so a recursion descending only through member
 			// accesses never reaches `.pipe` and emits the two backwards. Every message id
 			// assertion passes over that.
 			sourceText:  "declare const console: { log(m: unknown): void };\nclass C {\n  getObs$: any;\n  getPopularDepartments(): void {\n    this.getObs$.pipe().subscribe(res => {\n      console.log(res);\n    });\n  }\n}\n",
@@ -365,7 +365,7 @@ func TestNoUnsafeMemberAccessFires(test *testing.T) {
 			},
 		},
 		{
-			// One link further, which pins that the call does NOT make the chain unsafe by
+			// One link further, which pins that the call does not make the chain unsafe by
 			// association: `.c` is suppressed by `.b` being unsafe, exactly as in a plain chain.
 			sourceText:  "declare const x: any;\nx.a().b.c;\n",
 			optionsJson: "{}",
@@ -480,9 +480,9 @@ func TestNoUnsafeMemberAccessFires(test *testing.T) {
 // TestNoUnsafeMemberAccessRequiresTheTypedHarness pins the nil-checker guard.
 //
 // It exists because a mutant removing that guard survives every other fixture, and the reason is
-// structural rather than a coverage gap: the guard prevents a PANIC, and no ExpectFindings assertion
+// structural rather than a coverage gap: the guard prevents a panic, and no ExpectFindings assertion
 // can see one. This is also not hypothetical for this rule. Its first version was tested through
-// `rule_testing.RunWithOptions`, the UNTYPED harness, which hands the rule a nil checker; every
+// `rule_testing.RunWithOptions`, the untyped harness, which hands the rule a nil checker; every
 // silent case passed vacuously and every reporting case failed, which reads like a broken rule
 // rather than a broken harness.
 //

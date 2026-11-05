@@ -39,7 +39,7 @@ func asTheTypedPreferForOfHarnessWroteIt(text string) string {
 // false-positive surface, and upstream has thought about far more of them than a port would invent:
 // a second declarator, a non-zero start, a decrementing update, a call rather than a property named
 // length, an optional chain in the test, an index used arithmetically, and thirteen separate shapes
-// where the indexed element is being ASSIGNED rather than read, each of which makes a for-of
+// where the indexed element is being assigned rather than read, each of which makes a for-of
 // rewrite wrong rather than merely different.
 func TestPreferForOfStaysSilentOnUpstreamPassCases(test *testing.T) {
 	test.Parallel()
@@ -110,11 +110,11 @@ func TestPreferForOfStaysSilentOnUpstreamPassCases(test *testing.T) {
 // TestPreferForOfFiresOnUpstreamFailCases is the imported failing corpus, verbatim, with the span of
 // every finding asserted.
 //
-// The span is the WHOLE for statement, which is unusual enough to be worth pinning: it runs from the
+// The span is the whole for statement, which is unusual enough to be worth pinning: it runs from the
 // `for` keyword to the closing brace of the body, so a port anchoring on the initializer or on the
 // index name satisfies every message id here while pointing at a fraction of what it means.
 //
-// One row reports twice, on a loop nested inside a loop where the inner index SHADOWS the outer. It
+// One row reports twice, on a loop nested inside a loop where the inner index shadows the outer. It
 // is the case that separates resolving an identifier to its declaration from matching it by name.
 func TestPreferForOfFiresOnUpstreamFailCases(test *testing.T) {
 	test.Parallel()
@@ -240,7 +240,7 @@ func TestPreferForOfFiresOnUpstreamFailCases(test *testing.T) {
 //
 // Upstream has fifty-two passing cases and they are unusually thorough, so it is worth being precise
 // about what is missing. Nothing here is a shape upstream forgot. Each is a shape upstream writes
-// while ALSO tripping a second test, so removing the guard under examination leaves every one of the
+// while also tripping a second test, so removing the guard under examination leaves every one of the
 // seventy imported cases green. Its four optional-chain rows each additionally use two receivers,
 // assign to the element, or use the index directly; its two-declarator rows compare against the
 // second declarator rather than against a length; and it writes no const index at all.
@@ -368,14 +368,14 @@ func TestPreferForOfOnShapesUpstreamsCorpusCannotSeparate(test *testing.T) {
 // TestPreferForOfDoesNotMistakeAReadForAWrite covers the false positives our flatter assignment
 // spelling makes available and upstream's does not.
 //
-// The rule reports a loop only when every use of the index is a plain READ of one array element, so
+// The rule reports a loop only when every use of the index is a plain read of one array element, so
 // every one of these nine rows must report. They exist because upstream reads distinct node types
 // where our parser uses one kind plus an operator: AssignmentExpression against every other binary
 // operator, and UpdateExpression against every other prefix operator. Upstream literally cannot
 // confuse `arr[i] < 1` with `arr[i] = 1`, so its corpus never separates them, and four mutations
 // weakening those tests survived all seventy imported rows.
 //
-// A port failing any of these does not over-report, it goes SILENT on ordinary reading loops, which
+// A port failing any of these does not over-report, it goes silent on ordinary reading loops, which
 // is the failure a rule about readability can afford least and which no amount of clean-case
 // coverage would reveal.
 //
@@ -552,9 +552,9 @@ func TestPreferForOfRequiresTheTypedHarness(test *testing.T) {
 // upstream and is reproduced rather than corrected.
 //
 // `isAssignee` requires the enclosing object be an `ObjectExpression`, and upstream's parser gives a
-// REAL destructuring target the distinct type `ObjectPattern`. So the arm fires on the spelling
+// real destructuring target the distinct type `ObjectPattern`. So the arm fires on the spelling
 // where the parentheses sit inside the assignment, which is not a destructuring at all, and does
-// NOT fire on the spelling that actually writes through the indexed element. Measured: with the
+// not fire on the spelling that actually writes through the indexed element. Measured: with the
 // parentheses around the whole assignment the loop reports, and with them around the object alone it
 // is silent, which is the opposite of what the two shapes do at runtime.
 //

@@ -70,6 +70,7 @@ func TestUnusedDisableSeverity(test *testing.T) {
 			if fixture.override != "" {
 				settings["overrides"] = []any{map[string]any{"files": []string{"source/a.ts"}, "rules": map[string]string{"unused-disable": fixture.override}}}
 			}
+			// Ignored: maps and lists of strings, which always encode.
 			encoded, _ := json.Marshal(settings)
 			project.write("CohereSettings.json", string(encoded))
 			source := "// cohere-disable-next-line no-debugger -- stale\nexport const a: number = 1;\n"
@@ -142,7 +143,10 @@ func TestUnusedDisableSeverity(test *testing.T) {
 			if exit != 0 {
 				test.Fatalf("--fix exit %d:\n%s", exit, output)
 			}
-			bytes, _ := os.ReadFile(filepath.Join(project.root, "source/a.ts"))
+			bytes, readError := os.ReadFile(filepath.Join(project.root, "source/a.ts"))
+			if readError != nil {
+				test.Fatal(readError)
+			}
 			want := strings.TrimPrefix(source, "// cohere-disable-next-line no-debugger -- stale")
 			if fixture.wantSeverity == "" {
 				want = source
@@ -153,7 +157,10 @@ func TestUnusedDisableSeverity(test *testing.T) {
 			if fixture.wantSeverity == "" {
 				project.write("source/a.ts", source+"debugger;\n")
 				_, exit = runCohere(test, binary, project.root, "--fix", "--no-format", "--no-cache", "--json")
-				bytes, _ = os.ReadFile(filepath.Join(project.root, "source/a.ts"))
+				bytes, readError = os.ReadFile(filepath.Join(project.root, "source/a.ts"))
+				if readError != nil {
+					test.Fatal(readError)
+				}
 				if exit != 0 || !strings.HasPrefix(string(bytes), source) || strings.Contains(string(bytes), "debugger;") {
 					test.Fatalf("off did not survive relint: exit=%d text=%q", exit, bytes)
 				}

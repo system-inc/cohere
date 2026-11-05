@@ -10,7 +10,7 @@ import (
 
 // DotNotationOptions is upstream's option surface: the core rule's two, and three that ask the checker.
 //
-// `AllowKeywords` is a pointer because its default is TRUE, as in the core rule: a plain bool would
+// `AllowKeywords` is a pointer because its default is true, as in the core rule: a plain bool would
 // decode an absent option to false and start reporting every `a.class` in the tree. The other three
 // default to false, which is their zero value.
 type DotNotationOptions struct {
@@ -45,8 +45,8 @@ type DotNotationOptions struct {
 // clearChangedFields and afterSave this way (#qv7evaa).
 //
 // Upstream's wrapper is `baseRule.create(context)` with one question asked first, and only when one
-// of the three options is on: does the accessed property's FIRST declaration carry `private` or
-// `protected` as its FIRST modifier, or, failing any property, does the object reach a string index
+// of the three options is on: does the accessed property's first declaration carry `private` or
+// `protected` as its first modifier, or, failing any property, does the object reach a string index
 // signature. Everything that reports comes from the core judgment in `ecmascript/dotnotation`, shared
 // with `dot-notation`, so this file carries the question and nothing else.
 //

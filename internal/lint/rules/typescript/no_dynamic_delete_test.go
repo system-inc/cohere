@@ -57,7 +57,7 @@ func TestNoDynamicDeleteStaysSilentOnUpstreamPassCases(test *testing.T) {
 //
 // The span on every row is measured rather than transcribed: each input was run through the
 // installed build and its reported line and column converted to an offset slice of that same input.
-// That matters more here than on most rules, because upstream reports on the KEY rather than on the
+// That matters more here than on most rules, because upstream reports on the key rather than on the
 // delete expression, and a message-id assertion cannot see the difference.
 func TestNoDynamicDeleteFiresOnUpstreamFailCases(test *testing.T) {
 	test.Parallel()
@@ -171,11 +171,11 @@ func TestNoDynamicDeleteStaysSilentOnShapesTheCorpusDoesNotWrite(test *testing.T
 			sourceText: "const c: { [i: string]: 0 } = {};\ndelete c?.[x];",
 		},
 		{
-			// The same input with an ACCEPTABLE key, which is what proves the exclusion is structural rather than a consequence of the index test.
+			// The same input with an acceptable key, which is what proves the exclusion is structural rather than a consequence of the index test.
 			sourceText: "const c: { [i: string]: 0 } = {};\ndelete c?.[7];",
 		},
 		{
-			// The OUTERMOST access is a property access, so the operand test declines. The computed access is not the thing being deleted.
+			// The outermost access is a property access, so the operand test declines. The computed access is not the thing being deleted.
 			sourceText: "const c: { [i: string]: 0 } = {};\ndelete c[x].a;",
 		},
 		{
@@ -204,7 +204,7 @@ func TestNoDynamicDeleteStaysSilentOnShapesTheCorpusDoesNotWrite(test *testing.T
 // about "is it a literal" rather than about which two values upstream accepts. None of them is in
 // the corpus; all four were measured against the installed build.
 //
-// The remaining rows pin where the finding LANDS on nested and parenthesized shapes, which is the
+// The remaining rows pin where the finding lands on nested and parenthesized shapes, which is the
 // half of this rule a message-id assertion cannot see.
 func TestNoDynamicDeleteFiresOnShapesTheCorpusDoesNotWrite(test *testing.T) {
 	test.Parallel()

@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -56,8 +57,11 @@ func TestGoEngineArgumentsForwardWhatTheGoEngineReads(test *testing.T) {
 	if mode != engineModeCheck {
 		test.Errorf("mode %s, expected %s", mode, engineModeCheck)
 	}
-	_, mode, _ = engineArguments(goLanguage("module"), goFlags, goTestLocation(root),
+	_, mode, listingError := engineArguments(goLanguage("module"), goFlags, goTestLocation(root),
 		map[string]bool{"rules-enabled": true, "version": true}, typedTrue, nil)
+	if listingError != nil {
+		test.Fatal(listingError)
+	}
 	if mode != engineModeRulesEnabled {
 		test.Errorf("--rules-enabled with --version asked mode %s, expected %s, as a TypeScript run reads it",
 			mode, engineModeRulesEnabled)
@@ -191,9 +195,12 @@ func runFakeGoEngine(test *testing.T, body string) (string, int, error) {
 	if writeError := os.WriteFile(path, []byte("#!/bin/sh\n"+body+"\n"), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
-	var out, standardError bytes.Buffer
-	run := newEngineRun(&out, engineModeCheck, goLanguage("module"), "", time.Now())
+	var out bytes.Buffer
+	var standardError bytes.Buffer
+	stream := bufio.NewWriter(&out)
+	run := newEngineRun(stream, engineModeCheck, goLanguage("module"), "", time.Now())
 	exitCode, runError := runEngineBinary(path, []string{goEngineVerb, "--contract", "3"}, run, &standardError)
+	flushStream(test, stream)
 	return out.String(), exitCode, runError
 }
 

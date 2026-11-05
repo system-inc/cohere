@@ -18,7 +18,7 @@ func noUnnecessaryQualifierCaseName(index int) string {
 //
 // Three of them are the ones that would be lost by a plausible simplification, and each was probed
 // against our checker rather than assumed. The nested-shadow case passes because the scope lookup
-// finds a DIFFERENT `T` and the export-symbol comparison answers false, not because nothing is in
+// finds a different `T` and the export-symbol comparison answers false, not because nothing is in
 // scope. `namespace X { const z = X.y }` passes because `y` does not exist, so the accessed symbol
 // is nil. The two `Foo` cases where an enum and a namespace merge pass because the scope lookup for
 // the accessed symbol's flags returns an empty scope.
@@ -59,7 +59,7 @@ func TestNoUnnecessaryQualifierStaysSilent(test *testing.T) {
 
 		// A namespace merged with a class and one merged with a function, both accessed from
 		// outside. Measured silent upstream and here. They are in this list because they were the
-		// obvious guesses for the mutant above and are NOT the answer, which is worth pinning so
+		// obvious guesses for the mutant above and are not the answer, which is worth pinning so
 		// the next reader does not re-derive them.
 		"class C {}\nnamespace C {\n  export const x = 3;\n}\nconst y = C.x;\n",
 		"function F() {}\nnamespace F {\n  export const x = 3;\n}\nconst y = F.x;\n",
@@ -76,14 +76,14 @@ func TestNoUnnecessaryQualifierStaysSilent(test *testing.T) {
 // noUnnecessaryQualifierFinding is one expected finding with the two layers it can be wrong at.
 //
 // The rule has a single message id, so asserting the id proves almost nothing: what varies between
-// a correct port and a broken one is WHERE the finding points and which name it says is in scope.
+// a correct port and a broken one is where the finding points and which name it says is in scope.
 // On a nested chain the span is the whole qualifier prefix rather than its first segment, and a
 // port reporting `A` where upstream reports `A.B.C` satisfies every id assertion.
 type noUnnecessaryQualifierFinding struct {
 	wantSpan string
 	wantName string
 
-	// wantNoFix marks the rows where this port reports WITHOUT the repair upstream ships, because
+	// wantNoFix marks the rows where this port reports without the repair upstream ships, because
 	// upstream's repair writes source that does not parse. Zero value is false, so every imported
 	// row keeps its fix and only the deliberate declines say so.
 	wantNoFix bool
@@ -98,12 +98,12 @@ type noUnnecessaryQualifierFinding struct {
 //
 // and it is silent in a single-file program. This was measured on the installed 8.67.0 build
 // rather than assumed to be a harness limit, and the measurement corrected the assumption: driven
-// through the real rule with a real program and no `./foo` on disk, UPSTREAM IS SILENT TOO. So the
+// through the real rule with a real program and no `./foo` on disk, upstream is silent too. So the
 // case is not something our harness cannot express, it is a case whose verdict depends on a module
 // that has to exist. The alias branch in the rule is ported and no fixture here reaches it; a
 // harness that can write two files should assert it.
 //
-// Every row asserts the span, the message text, and the repaired source. The span is the QUALIFIER
+// Every row asserts the span, the message text, and the repaired source. The span is the qualifier
 // rather than the whole access, which is upstream's `node: qualifier`, and on a nested chain like
 // `A.B.C.D` it is `A.B.C` rather than `A`. Asserting only the message id would leave both the span
 // and the nesting suppression free to be wrong.
@@ -173,8 +173,8 @@ func TestNoUnnecessaryQualifierFires(test *testing.T) {
 		},
 
 		{
-			// Measured, not imported. Two reportable qualifiers where the second is a TYPE
-			// ARGUMENT of the first, which is the shape that decides whether declining to recurse
+			// Measured, not imported. Two reportable qualifiers where the second is a type
+			// argument of the first, which is the shape that decides whether declining to recurse
 			// into a reported node is the same suppression upstream gets from its exit visitor.
 			// If the type argument were inside the reported node's subtree, upstream would suppress
 			// it and this port would too, and both would be wrong. Driven on the installed 8.67.0
@@ -188,7 +188,7 @@ func TestNoUnnecessaryQualifierFires(test *testing.T) {
 		},
 
 		{
-			// Measured, not imported: this is the ALIAS branch, which the doc comment previously
+			// Measured, not imported: this is the alias branch, which the doc comment previously
 			// called ported-and-untested. `import B = A` makes `B` an alias symbol whose own
 			// declaration is the import rather than the namespace, so the identity loop misses and
 			// the recursion through GetAliasedSymbol is the only thing that finds it. Without that
@@ -201,7 +201,7 @@ func TestNoUnnecessaryQualifierFires(test *testing.T) {
 			wantOutput: "namespace A {\n  export const x = 3;\n}\nimport B = A;\nnamespace A {\n  const y = x;\n}\n",
 		},
 		{
-			// Measured: the qualifier names an OUTER namespace from inside a nested one, so the
+			// Measured: the qualifier names an outer namespace from inside a nested one, so the
 			// stack has to hold every enclosing declaration rather than only the innermost.
 			sourceText: "namespace A {\n  export const x = 3;\n  export namespace B {\n    const y = A.x;\n  }\n}\n",
 			wantFindings: []noUnnecessaryQualifierFinding{
@@ -213,7 +213,7 @@ func TestNoUnnecessaryQualifierFires(test *testing.T) {
 			// Measured: two declarations of the same namespace merge, and the access is in the
 			// second while the declaration is in the first. The symbol carries both declarations,
 			// so a port indexing Declarations[0] instead of looping would still pass here by luck;
-			// what this pins is that the stack comparison is by NODE IDENTITY against whichever
+			// what this pins is that the stack comparison is by node identity against whichever
 			// declaration we are lexically inside.
 			sourceText: "namespace A {\n  export const x = 3;\n}\nnamespace A {\n  const y = A.x;\n}\n",
 			wantFindings: []noUnnecessaryQualifierFinding{
@@ -225,7 +225,7 @@ func TestNoUnnecessaryQualifierFires(test *testing.T) {
 		{
 			// Measured, not imported: the corpus writes no parenthesized form anywhere, so it has
 			// no opinion and guessing costs a divergence either way. Driven on the installed
-			// 8.67.0 build, all four parenthesized shapes REPORT there, and our parser declines
+			// 8.67.0 build, all four parenthesized shapes report there, and our parser declines
 			// two of them without the unwrap because estree has no parenthesized node for
 			// upstream's selector to trip over.
 			//
@@ -247,7 +247,7 @@ func TestNoUnnecessaryQualifierFires(test *testing.T) {
 			wantOutput: "namespace A {\n  export type T = number;\n  const x: (T) = 3;\n}\n",
 		},
 		{
-			// The two shapes where upstream's own fixer breaks the file. Both REPORT upstream and
+			// The two shapes where upstream's own fixer breaks the file. Both report upstream and
 			// report here; the repair is withheld. Measured outputs from the installed build:
 			//
 			//	(A).x     ->  `const y = (x;`     Parsing error: ')' expected

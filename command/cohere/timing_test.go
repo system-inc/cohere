@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"strings"
 	"testing"
 	"time"
@@ -80,7 +81,10 @@ func setCost(timings *program.Timings, name string, cost time.Duration, nodes in
 
 func renderTimings(timings *program.Timings, wall time.Duration) string {
 	builder := &strings.Builder{}
-	printTimings(builder, timings, wall)
+	stream := bufio.NewWriter(builder)
+	printTimings(stream, timings, wall)
+	// Ignored: a stream over a strings.Builder cannot fail to flush, since the builder's writes never do.
+	_ = stream.Flush()
 	return builder.String()
 }
 
@@ -189,7 +193,9 @@ func TestCoverageStatesEveryPartOfTheWalksCPU(test *testing.T) {
 	timings.Account.OtherCPU = 250 * time.Millisecond
 
 	var out strings.Builder
-	printCoverage(&out, timings)
+	stream := bufio.NewWriter(&out)
+	printCoverage(stream, timings)
+	flushStream(test, stream)
 	rendered := out.String()
 
 	for _, want := range []string{"1000ms", "rules 30%", "shared derivations 10%", "measuring 10%", "50% the walk itself", "250ms of process CPU"} {
@@ -205,7 +211,9 @@ func TestCoverageStatesEveryPartOfTheWalksCPU(test *testing.T) {
 func TestCoverageSaysNothingRatherThanComputingFromZero(test *testing.T) {
 	test.Parallel()
 	var out strings.Builder
-	printCoverage(&out, program.NewTimings([]string{"a-rule"}))
+	stream := bufio.NewWriter(&out)
+	printCoverage(stream, program.NewTimings([]string{"a-rule"}))
+	flushStream(test, stream)
 	if out.String() != "" {
 		test.Fatalf("coverage printed a claim computed from zero CPU: %q", out.String())
 	}

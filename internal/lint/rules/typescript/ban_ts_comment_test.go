@@ -118,7 +118,7 @@ func banTsCommentCaseName(index int) string {
 // is the rule's own fallback under test rather than DecodeBanTsCommentOptions.
 //
 // Each row is one of typescript-eslint's defaultOptions. The `@ts-check` row is the one a reader is
-// most likely to guess backwards: `@ts-check` turns checking ON, so it defaults to allowed.
+// most likely to guess backwards: `@ts-check` turns checking on, so it defaults to allowed.
 func TestBanTsCommentDefaultsBindWithNoConfiguration(test *testing.T) {
 	test.Parallel()
 
@@ -302,7 +302,7 @@ func TestBanTsCommentDeclinesJavaScriptFiles(test *testing.T) {
 // Three of the four messages interpolate, and ExpectFindings sees only the id, so a format string
 // that dropped the directive name or doubled a character would leave every fixture above green.
 //
-// Two things about how this is written. The comparison is EQUALITY on the whole description rather
+// Two things about how this is written. The comparison is equality on the whole description rather
 // than a Contains on a fragment, because a predicate weaker than the property it guards is not a
 // guard: a doubled character produces a string that still contains the needle. And every expected
 // string is a literal typed here rather than a call to the rule's own message constructor, because
@@ -376,11 +376,11 @@ func TestBanTsCommentMessageTextNamesTheDirective(test *testing.T) {
 //
 // Those guards are crash protection rather than behavioral filters, which is why the sweep reports
 // them as survivors under any assertion about findings: no ExpectFindings fixture can see a panic.
-// Ask what the line PREVENTS rather than what it decides, and this is what it prevents.
+// Ask what the line prevents rather than what it decides, and this is what it prevents.
 //
 // The reachable input is error recovery. A well-formed block comment is at least four bytes
 // (`/**/`), so a naive read says the four-byte guard is dead. Probed against the parser instead: an
-// unterminated `/*` at the end of a file comes back as a block comment of length TWO, and `/*/` and
+// unterminated `/*` at the end of a file comes back as a block comment of length two, and `/*/` and
 // `/**` come back as length three. Subtracting two from each end of a two-byte comment produces a
 // range whose start is past its end, and slicing the source with it panics. Measured by
 // neutralizing both guards, which turns every row below into a stack trace.

@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/system-inc/cohere/internal/goengine/project"
@@ -35,7 +35,7 @@ func readGatedWorkspace(root string) (project.Workspace, error) {
 }
 
 // reportWorkspace says what a run covers, so a module a gate missed shows as missing from its output.
-func reportWorkspace(covered project.Workspace, output io.Writer) {
+func reportWorkspace(covered project.Workspace, output *bufio.Writer) {
 	if !covered.FromWorkspace {
 		return
 	}

@@ -117,7 +117,7 @@ var messageNoRequireImports = rule.Message{
 // parenthesized form, so guessing either way would have cost nothing at fixture time and shipped a
 // divergence.
 //
-// # The `allow` option matches a template on RAW text and a string on COOKED text
+// # The `allow` option matches a template on raw text and a string on cooked text
 //
 // One option, two answers, split by literal kind, and this is invisible from the corpus because
 // every corpus path is escape-free. oxc reads `quasi.value.raw` for a template and
@@ -258,7 +258,7 @@ var NoRequireImports = rule.Rule{
 //
 // The first version of this asked `IsDeclarationFile` on the declaration's own source file, which
 // is what `resolvesToAGlobal` does. That is wrong in one measurable place and a mutation sweep
-// found it: `declare global { function require(...) }` puts a declaration in a SOURCE file without
+// found it: `declare global { function require(...) }` puts a declaration in a source file without
 // introducing a binding, and upstream reports the call beside it while staying silent beside a
 // plain `function require(...)`. Both were pinned on the release binary.
 //
@@ -283,7 +283,7 @@ func isLocallyBound(ruleContext rule.Context, identifier *ast.Node) bool {
 		// An ambient declaration declares a name that already exists rather than introducing a
 		// binding, so it is not a shadow however it is spelled. This matters because `declare
 		// global { function require(...) }` sits in a source file and would otherwise read as one:
-		// measured on the release binary, upstream REPORTS a `require('lib')` beside such a block
+		// measured on the release binary, upstream reports a `require('lib')` beside such a block
 		// and is silent beside a plain `function require(...)`, and the ambient flag is what
 		// separates them. Every genuine shadow probed here carries ambient=false and both halves of
 		// the declare-global pair carry ambient=true.
@@ -302,7 +302,7 @@ func isLocallyBound(ruleContext rule.Context, identifier *ast.Node) bool {
 // an oversight: a string is compared on its cooked value and a template on its raw source text,
 // which diverge the moment either carries an escape. See the rule doc for the pinned measurement.
 //
-// A template carrying a substitution compares only its FIRST QUASI, which is upstream's behavior
+// A template carrying a substitution compares only its first quasi, which is upstream's behavior
 // and reads as a defect until it is measured. oxc takes `template_literal.quasis.first()` with no
 // check that the template is static, so `require(`./a${b}c`)` under `allow: ["^\\./a"]` compares
 // `./a` and is permitted even though the assembled path is unknown. The intuitive reading is that a

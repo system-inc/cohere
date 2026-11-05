@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -94,18 +96,27 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(test *testing.T) {
 
 	began := time.Now()
 	outputs := make([]string, 2)
+	// firstEnded closes when the first run returns: a first run that ended without leaving its mark never will,
+	// so the second stops waiting on that signal rather than on a clock a loaded machine can outrun.
+	firstEnded := make(chan struct{})
 	var group sync.WaitGroup
 	for index := range outputs {
 		group.Add(1)
 		go func() {
 			defer group.Done()
+			if index == 0 {
+				defer close(firstEnded)
+			}
 			if index == 1 {
 				for _, err := os.Stat(started); err != nil; _, err = os.Stat(started) {
-					if time.Since(began) > time.Minute {
-						test.Errorf("the first run never started testing")
-						return
+					select {
+					case <-firstEnded:
+						if _, statError := os.Stat(started); statError != nil {
+							test.Errorf("the first run ended without starting to test")
+							return
+						}
+					case <-time.After(10 * time.Millisecond):
 					}
-					time.Sleep(10 * time.Millisecond)
 				}
 			}
 			output, err := run("./...")
@@ -155,7 +166,7 @@ func TestWaitersTakeTheSlotInArrivalOrder(test *testing.T) {
 	home := privatePool(test)
 	slots := filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots")
 	tickets := func() int {
-		entries, _ := os.ReadDir(queueDirectory(slots))
+		entries := listMaybeMissing(test, queueDirectory(slots))
 		count := 0
 		for _, entry := range entries {
 			if !strings.HasPrefix(entry.Name(), ".") {
@@ -189,7 +200,7 @@ func TestWaitersTakeTheSlotInArrivalOrder(test *testing.T) {
 		}
 		runs[name] = command
 		if index == 0 {
-			waitFor("the first run to reach go", func() bool { contents, _ := os.ReadFile(order); return string(contents) == "A\n" })
+			waitFor("the first run to reach go", func() bool { return string(readMaybeMissing(test, order)) == "A\n" })
 		} else {
 			waitFor(name+" to join the line", func() bool { return tickets() == index })
 		}
@@ -197,7 +208,8 @@ func TestWaitersTakeTheSlotInArrivalOrder(test *testing.T) {
 	if killError := runs["C"].Process.Kill(); killError != nil {
 		test.Fatal(killError)
 	}
-	runs["C"].Wait()
+	// Ignored: C was killed on purpose, so its wait's error is that kill.
+	_ = runs["C"].Wait()
 	if writeError := os.WriteFile(order+".release", nil, 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
@@ -206,7 +218,7 @@ func TestWaitersTakeTheSlotInArrivalOrder(test *testing.T) {
 			test.Errorf("run %s failed: %v", name, waitError)
 		}
 	}
-	if contents, _ := os.ReadFile(order); string(contents) != "A\nB\nD\nE\n" {
+	if contents := readMaybeMissing(test, order); string(contents) != "A\nB\nD\nE\n" {
 		test.Errorf("the runs reached go in the order %q, want A, B, D, E: arrival order, passing over C, which died waiting",
 			strings.ReplaceAll(strings.TrimSpace(string(contents)), "\n", ", "))
 	}
@@ -306,7 +318,7 @@ func outsideThePool(environment []string) []string {
 
 // A token's run starts its commands with Go held to the token's packages and threads, the token named, and
 // the cores it is worth for a runner that is not Go,
-// replacing any -p and GOMAXPROCS the caller had and keeping its other GOFLAGS, so every go command and test
+// replacing any -p and `GOMAXPROCS` the caller had and keeping its other `GOFLAGS`, so every go command and test
 // binary beneath it stays in its share (#qhg0ntb).
 func TestABudgetHoldsGoToTheTokensThreads(test *testing.T) {
 	test.Parallel()
@@ -316,7 +328,7 @@ func TestABudgetHoldsGoToTheTokensThreads(test *testing.T) {
 	if strings.Join(environment, "|") != strings.Join(want, "|") {
 		test.Errorf("the budget environment is %q, want %q", environment, want)
 	}
-	// A caller with no GOFLAGS, the usual shell, still gets -trimpath: setting GOFLAGS overrides the
+	// A caller with no `GOFLAGS`, the usual shell, still gets -trimpath: setting `GOFLAGS` overrides the
 	// machine's go env, which is how every run dropped it (#system_cohere_tools).
 	bare := budgetEnvironment([]string{"HOME=/home"}, 1, poolShape{tokens: 4, packages: 2, threads: 2})
 	if !slices.Contains(bare, "GOFLAGS=-trimpath -p=2") {
@@ -325,7 +337,7 @@ func TestABudgetHoldsGoToTheTokensThreads(test *testing.T) {
 }
 
 // A test or vet run turns VCS stamping off, which a worktree with TypeScript a symlink needs for any go build
-// a test runs, adding GOFLAGS if there was none, and a caller's own -buildvcs stands.
+// a test runs, adding `GOFLAGS` if there was none, and a caller's own -buildvcs stands.
 func TestATestRunStampsNoVCS(test *testing.T) {
 	test.Parallel()
 	for _, row := range []struct {
@@ -477,17 +489,6 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(test *testing.T) {
 		old = append(old, put(fmt.Sprintf("%02xaa-d", index), 3*time.Hour+time.Duration(index)*time.Minute))
 	}
 	fresh := put("a0aa-a", time.Minute)
-	size := func() int64 {
-		var total int64
-		filepath.WalkDir(cache, func(path string, entry os.DirEntry, err error) error {
-			if err == nil && !entry.IsDir() && entry.Name() != "README" {
-				information, _ := entry.Info()
-				total += information.Size()
-			}
-			return nil
-		})
-		return total
-	}
 	// A cap of 6 KB, so the trim brings 11 KB down to three quarters of it.
 	capGigabytes := strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64)
 	environment := append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratchHome(test),
@@ -504,7 +505,7 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(test *testing.T) {
 		test.Fatal(startError)
 	}
 	time.Sleep(2 * time.Second)
-	if remaining := size(); remaining != 11*1024 {
+	if remaining := cacheSize(test, cache); remaining != 11*1024 {
 		held.release()
 		test.Fatalf("the trim removed entries while a run held a token: %d bytes left", remaining)
 	}
@@ -512,7 +513,7 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(test *testing.T) {
 	if waitError := trim.Wait(); waitError != nil {
 		test.Fatalf("the trim failed: %v", waitError)
 	}
-	if remaining := size(); remaining > 6*1024/4*3 {
+	if remaining := cacheSize(test, cache); remaining > 6*1024/4*3 {
 		test.Errorf("the trim left %d bytes, over three quarters of the 6 KB cap", remaining)
 	}
 	if _, statError := os.Stat(fresh); statError != nil {
@@ -537,6 +538,50 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(test *testing.T) {
 	if claimCacheLook(rationed, time.Now().Add(time.Minute)) {
 		test.Error("a second look a minute later was due, inside the ten minutes")
 	}
+}
+
+// readMaybeMissing reads a file a run under test writes, as empty while it has not been written; any other
+// failure to read it fails the test.
+func readMaybeMissing(test testing.TB, path string) []byte {
+	test.Helper()
+	contents, readError := os.ReadFile(path)
+	if readError != nil && !errors.Is(readError, fs.ErrNotExist) {
+		test.Fatalf("reading %s: %v", path, readError)
+	}
+	return contents
+}
+
+// listMaybeMissing lists a directory a run under test makes, as empty while it has not been made; any other
+// failure to list it fails the test.
+func listMaybeMissing(test testing.TB, directory string) []os.DirEntry {
+	test.Helper()
+	entries, readDirectoryError := os.ReadDir(directory)
+	if readDirectoryError != nil && !errors.Is(readDirectoryError, fs.ErrNotExist) {
+		test.Fatalf("listing %s: %v", directory, readDirectoryError)
+	}
+	return entries
+}
+
+// cacheSize is the bytes of a test's Go build cache entries, its README left out; a cache that can't be walked
+// fails the test, since its size would be wrong.
+func cacheSize(test testing.TB, cache string) int64 {
+	test.Helper()
+	var total int64
+	walkError := filepath.WalkDir(cache, func(path string, entry os.DirEntry, entryError error) error {
+		if entryError != nil || entry.IsDir() || entry.Name() == "README" {
+			return entryError
+		}
+		information, informationError := entry.Info()
+		if informationError != nil {
+			return informationError
+		}
+		total += information.Size()
+		return nil
+	})
+	if walkError != nil {
+		test.Fatalf("measuring the cache %s: %v", cache, walkError)
+	}
+	return total
 }
 
 // privatePool is a home of its own for the wrappers a test starts, so they queue in a pool of their own, with
@@ -622,14 +667,17 @@ func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(test *testing.T) {
 		if openError != nil {
 			test.Fatal(openError)
 		}
-		taken, _ := tryLockFile(lock)
+		taken, tryLockFileError := tryLockFile(lock)
+		if tryLockFileError != nil {
+			test.Fatalf("testing token 1's lock: %v", tryLockFileError)
+		}
 		if taken {
 			unlockFile(lock)
 		} else if wasHeld {
 			idle += step
 		}
 		wasHeld = !taken
-		lock.Close()
+		_ = lock.Close() // Ignored: opened only to test its lock, and never written.
 	}
 	job.release()
 	if waitError := trim.Wait(); waitError != nil {
@@ -638,7 +686,7 @@ func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(test *testing.T) {
 	if idle > 0 {
 		test.Errorf("the trim held token 1 idle for about %s while the job held token 2", idle)
 	}
-	status, _ := os.ReadFile(filepath.Join(slots, "gocache.status"))
+	status := readMaybeMissing(test, filepath.Join(slots, "gocache.status"))
 	if !strings.Contains(string(status), "trimmed from") {
 		test.Errorf("the trim did not trim once the job ended: %q", status)
 	}

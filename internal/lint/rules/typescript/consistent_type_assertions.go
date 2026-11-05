@@ -39,7 +39,7 @@ type ConsistentTypeAssertionsOptions struct {
 
 // DefaultConsistentTypeAssertionsSettings is upstream's `defaultOptions`.
 //
-// Note that NONE of the three defaults is a zero value, which makes the decoder load bearing rather
+// Note that none of the three defaults is a zero value, which makes the decoder load bearing rather
 // than defensive: a decoder handing back a zero struct would give an empty assertion style that
 // matches no branch, and the rule would report nothing on every input.
 func DefaultConsistentTypeAssertionsSettings() ConsistentTypeAssertionsOptions {
@@ -134,10 +134,10 @@ func consistentTypeAssertionsLiteralSettingOf(
 // # `as const` is exempt everywhere, and the two exemptions are different
 //
 // The style check exempts it only under `never`, so `<const>x` still reports under `as`. The literal
-// checks exempt it through a type test that also lets a QUALIFIED name through, so `Foo.const` is not
+// checks exempt it through a type test that also lets a qualified name through, so `Foo.const` is not
 // treated as the const assertion it resembles. Both are upstream's and both are reproduced.
 //
-// # The fixer reasons about PRECEDENCE, which is where a naive text swap breaks
+// # The fixer reasons about precedence, which is where a naive text swap breaks
 //
 // Only one direction is fixable: angle bracket to `as`. The repair is not a text swap, because `as`
 // binds more loosely than the angle-bracket form, so both the asserted expression and the whole
@@ -150,7 +150,7 @@ func consistentTypeAssertionsLiteralSettingOf(
 // the parent, and skips the second when the assertion is already parenthesized. All three parts are
 // reproduced, and twenty-one of upstream's cases record the exact text the result must be.
 //
-// # The literal checks offer SUGGESTIONS rather than a fix, and that distinction is upstream's
+// # The literal checks offer suggestions rather than a fix, and that distinction is upstream's
 //
 // Turning `{} as T` into `const x: T = {}` moves the type to another node, and turning it into
 // `{} satisfies T` changes what is checked. Neither is a spelling change, so neither is applied
@@ -270,7 +270,7 @@ func (state *consistentTypeAssertionsState) buildAsExpressionText(
 
 // wrapWhenLooser is upstream's `getWrappedCode`.
 //
-// It parenthesizes when the inner form does NOT bind more tightly, which is the direction that
+// It parenthesizes when the inner form does not bind more tightly, which is the direction that
 // matters: equal precedence still needs the parentheses, because associativity decides the rest and
 // the fixer has no way to know it is safe.
 func wrapWhenLooser(text string, inner ast.OperatorPrecedence, outer ast.OperatorPrecedence) string {
@@ -307,14 +307,14 @@ func parentPrecedenceOf(node *ast.Node) ast.OperatorPrecedence {
 		return ast.OperatorPrecedenceLowest
 	}
 
-	// An arrow function's EXPRESSION body needs the assertion wrapped, and the two compilers'
+	// An arrow function's expression body needs the assertion wrapped, and the two compilers'
 	// tables disagree about why. Upstream's kind-based helper puts ArrowFunction in the primary
 	// group alongside the literals, so `as` never binds more tightly and the wrap always happens;
 	// ours answers the Yield precedence of 3, so `as` at 11 wins and no wrap is emitted. Answering
 	// Primary here reproduces upstream's table rather than our compiler's.
 	//
 	// Measured rather than reasoned: upstream fixes `() => <Foo>bar` to `() => (bar as Foo)` and
-	// `() => <Foo>{ bar: 5 }` to `() => ({ bar: 5 } as Foo)`, while a BLOCK body and a return
+	// `() => <Foo>{ bar: 5 }` to `() => ({ bar: 5 } as Foo)`, while a block body and a return
 	// statement are both left unwrapped. So the wrap belongs to the expression-body position rather
 	// than to arrow functions generally, and only that position is special-cased here.
 	if parent.Kind == ast.KindArrowFunction &&
@@ -493,7 +493,7 @@ func isAssertionInParameterPosition(node *ast.Node) bool {
 	case ast.KindBindingElement:
 		return parent.AsBindingElement().Initializer == node
 	case ast.KindTemplateSpan:
-		// Upstream requires the template be a TAGGED one, because an untagged template coerces its
+		// Upstream requires the template be a tagged one, because an untagged template coerces its
 		// interpolation and an annotation would still be checkable there.
 		if parent.Parent == nil || parent.Parent.Parent == nil {
 			return false
@@ -506,7 +506,7 @@ func isAssertionInParameterPosition(node *ast.Node) bool {
 // isCheckableAssertionType is upstream's `checkType`.
 //
 // `any` and `unknown` are exempt because asserting a literal into either says nothing an annotation
-// would say better. `as const` is exempt, unless the name is QUALIFIED, which is upstream's carve-out
+// would say better. `as const` is exempt, unless the name is qualified, which is upstream's carve-out
 // for a type that merely ends in the word.
 func isCheckableAssertionType(typeNode *ast.Node) bool {
 	switch typeNode.Kind {
@@ -516,7 +516,7 @@ func isCheckableAssertionType(typeNode *ast.Node) bool {
 		if !isConstTypeNode(typeNode) {
 			return true
 		}
-		// Upstream's carve-out for a QUALIFIED name that ends in the word `const`, and it appears to
+		// Upstream's carve-out for a qualified name that ends in the word `const`, and it appears to
 		// be unreachable. `isConstTypeNode` above already requires the whole type name be a bare
 		// identifier spelled `const`, so a qualified name never reaches here; and reaching it by
 		// widening that test is not possible either, because `const` is a reserved word that cannot

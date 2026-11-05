@@ -198,6 +198,8 @@ func requestedReadiness() *program.Readiness {
 	if !adamicReadinessRequested {
 		return nil
 	}
+	// Ignored: a set that cannot be read measures nothing here, and readinessOf says why, in the footer and in
+	// --json, from the same once-read answer.
 	readiness, _ := readinessSet()
 	return readiness
 }

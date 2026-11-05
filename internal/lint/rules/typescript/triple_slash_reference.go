@@ -144,6 +144,27 @@ var TripleSlashReference = rule.Rule{
 	},
 }
 
+// TripleSlashReferenceSetting is what to enforce for one kind of reference directive.
+//
+// Spelled as a string type rather than a bool pair because the surface has three values and only
+// one of the three keys accepts all of them, which a bool cannot express and which the decoder has
+// to be able to refuse.
+type TripleSlashReferenceSetting string
+
+const (
+	// TripleSlashReferenceAlways permits the directive.
+	TripleSlashReferenceAlways TripleSlashReferenceSetting = "always"
+
+	// TripleSlashReferenceNever reports the directive outright.
+	TripleSlashReferenceNever TripleSlashReferenceSetting = "never"
+
+	// TripleSlashReferencePreferImport reports a `types` directive only when the same module is
+	// also imported normally. It is accepted for `types` alone: the release binary refuses a
+	// configuration naming it for `path` or `lib`, which is what settles that this is one value of
+	// a three-valued key rather than a shared vocabulary.
+	TripleSlashReferencePreferImport TripleSlashReferenceSetting = "prefer-import"
+)
+
 // reportTripleSlashReferences is upstream's `run_once` body.
 //
 // It is a function rather than a closure so the two halves of the rule, the directive scan and the
@@ -314,27 +335,6 @@ func referenceAttribute(commentText string) (string, string, bool) {
 	}
 	return "", "", false
 }
-
-// TripleSlashReferenceSetting is what to enforce for one kind of reference directive.
-//
-// Spelled as a string type rather than a bool pair because the surface has three values and only
-// one of the three keys accepts all of them, which a bool cannot express and which the decoder has
-// to be able to refuse.
-type TripleSlashReferenceSetting string
-
-const (
-	// TripleSlashReferenceAlways permits the directive.
-	TripleSlashReferenceAlways TripleSlashReferenceSetting = "always"
-
-	// TripleSlashReferenceNever reports the directive outright.
-	TripleSlashReferenceNever TripleSlashReferenceSetting = "never"
-
-	// TripleSlashReferencePreferImport reports a `types` directive only when the same module is
-	// also imported normally. It is accepted for `types` alone: the release binary refuses a
-	// configuration naming it for `path` or `lib`, which is what settles that this is one value of
-	// a three-valued key rather than a shared vocabulary.
-	TripleSlashReferencePreferImport TripleSlashReferenceSetting = "prefer-import"
-)
 
 // TripleSlashReferenceOptions configures which directives report.
 //

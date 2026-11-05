@@ -46,7 +46,7 @@ var messageBannedFunctionType = rule.Message{
 //
 // The original guards the identifier with `isReferenceToGlobalFunction`, so a locally declared
 // `Function` is not flagged. That guard needs symbol resolution, which our checker shim does not
-// expose yet — see the note at the reference below. Rather than silently drop it, the syntactic
+// expose yet (see the note at the reference below). Rather than silently drop it, the syntactic
 // approximation here is narrowed in the one direction that matters: a file that declares its own
 // `Function` type or interface is skipped entirely, so a local declaration cannot be flagged. The
 // remaining divergence from the original is an import of a non-global `Function`, which shadows the

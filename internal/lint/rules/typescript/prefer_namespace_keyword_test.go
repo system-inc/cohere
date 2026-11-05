@@ -12,7 +12,7 @@ const preferNamespaceKeywordFile = "/repository/source/Namespaces.ts"
 // with the finding count recovered from the snapshot rather than assumed to be one per input.
 //
 // The snapshot carries six diagnostics across five inputs. The extra one is the brace-nested
-// case, which reports twice: nesting a module declaration inside another module BLOCK is not
+// case, which reports twice: nesting a module declaration inside another module block is not
 // exempt. Only the dotted form is, and the two look alike in source while parsing differently.
 func TestPreferNamespaceKeywordFires(test *testing.T) {
 	test.Parallel()
@@ -80,7 +80,7 @@ func TestPreferNamespaceKeywordStaysSilent(test *testing.T) {
 		// `declare` cannot tell which of the two did the work.
 		{"a module with a quoted name and no declare modifier", "module \"foo\" {}"},
 
-		// `global` is a keyword form here, not a name. `module global {}` REPORTS upstream, so
+		// `global` is a keyword form here, not a name. `module global {}` reports upstream, so
 		// the exemption cannot be keyed on the identifier text.
 		{"a global augmentation with statements inside", "declare global {\n  interface Window {\n    x: string;\n  }\n}"},
 	}

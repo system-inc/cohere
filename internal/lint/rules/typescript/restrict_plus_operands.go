@@ -12,12 +12,12 @@ import (
 // RestrictPlusOperandsOptions is the rule's option surface, matching upstream's schema exactly.
 //
 // Every `allow` field is a `*bool` rather than a `bool`, and that is load-bearing rather than
-// stylistic. All five DEFAULT TO TRUE upstream, so a zero-valued struct means "forbid everything"
+// stylistic. All five default to true upstream, so a zero-valued struct means "forbid everything"
 // and would invert the rule into reporting most of the tree. A pointer keeps an absent key
 // distinguishable from an explicit `false`, and the nil case falls back to the default in
 // DefaultRestrictPlusOperandsSettings.
 //
-// SkipCompoundAssignments is the one option that defaults to FALSE, so it binds through as a plain
+// SkipCompoundAssignments is the one option that defaults to false, so it binds through as a plain
 // bool: absent and explicitly false mean the same thing for it.
 type RestrictPlusOperandsOptions struct {
 	AllowAny                *bool `json:"allowAny"`
@@ -58,7 +58,7 @@ func restrictPlusOperandsSettingsFrom(options any) restrictPlusOperandsSettings 
 	decoded, ok := rule.OptionsAs[RestrictPlusOperandsOptions](options)
 	if !ok {
 		// A rule configured as a bare "error" is handed nil options, and `options.(T)` on nil yields
-		// the zero value rather than failing. Returning the DEFAULTS here rather than the zero
+		// the zero value rather than failing. Returning the defaults here rather than the zero
 		// struct is what keeps that path correct; reading the zero struct would turn every `allow`
 		// off and report most of the tree.
 		return settings
@@ -100,24 +100,24 @@ func restrictPlusOperandsSettingsFrom(options any) restrictPlusOperandsSettings 
 //
 // # The shape of the decision
 //
-// One early exit and then two passes, and the order between them is what the rule IS rather than an
+// One early exit and then two passes, and the order between them is what the rule is rather than an
 // implementation detail.
 //
-// The early exit is `leftType == rightType` on POINTER identity plus a flag test for bigint, number
+// The early exit is `leftType == rightType` on pointer identity plus a flag test for bigint, number
 // or string. Upstream writes `===` on the type objects, and that reproduces here because the checker
 // interns types: probed over eight shapes, two `string` annotations in different declarations, two
-// identical unions, two identical interfaces and two different string LITERALS after widening all
+// identical unions, two identical interfaces and two different string literals after widening all
 // answer identical pointers, while `number` against `string` does not. So this is a faithful port of
 // upstream's comparison rather than a lookalike that happens to agree.
 //
 // The first pass reports each operand that is individually impossible: a symbol, a `never`, an
 // `unknown`, an object, or one of the four kinds an `allow` option is switched off for. The second
-// pass runs ONLY if the first found nothing, and reports the pair: a string added to a number under
+// pass runs only if the first found nothing, and reports the pair: a string added to a number under
 // `allowNumberAndString: false`, or a number added to a bigint, which is a type error in any
 // configuration.
 //
 // That ordering is why `hadIndividualComplaint` exists and why it is not a micro-optimisation.
-// `symbol + 1` has an impossible operand AND a mismatched pair, and upstream reports only the
+// `symbol + 1` has an impossible operand and a mismatched pair, and upstream reports only the
 // operand. A port running both passes would report twice on a corpus that says once.
 //
 // # One flag test, not two, and the source reads as though there are two
@@ -126,7 +126,7 @@ func restrictPlusOperandsSettingsFrom(options any) restrictPlusOperandsSettings 
 // bottom of the rule file, and an `isTypeFlagSet` imported from `../util`. That reads as a deliberate
 // distinction between a union-aware test and a plain one, and porting it that way is wrong.
 //
-// The imported one is `packages/type-utils/src/typeFlagUtils.ts`, and it is ALSO union-aware: it ORs
+// The imported one is `packages/type-utils/src/typeFlagUtils.ts`, and it is also union-aware: it ORs
 // the flags of every union constituent before testing. Its own doc comment says so and points at
 // tsutils for the plain behaviour. So both spellings mean the same thing and every site here is
 // union-aware.
@@ -144,30 +144,30 @@ func restrictPlusOperandsSettingsFrom(options any) restrictPlusOperandsSettings 
 // # The RegExp arm, which is neither of the above
 //
 // A RegExp is an object and carries the object flag, so the generic object test below would report
-// it regardless of `allowRegExp`. Upstream therefore names it first, by TYPE NAME, and gives it a
-// second condition the other arms do not have: a RegExp is reported even when allowed if the OTHER
+// it regardless of `allowRegExp`. Upstream therefore names it first, by type name, and gives it a
+// second condition the other arms do not have: a RegExp is reported even when allowed if the other
 // operand is number-like, because `/x/ + 1` is a number-and-string mixture wearing an object.
 //
 // # Where each finding points
 //
 // The two passes report at different nodes and that is the whole difference between them. An
-// individual complaint points at the OPERAND, so a reader sees which side is wrong; a pair complaint
-// points at the WHOLE expression, because neither side is wrong alone. Upstream's corpus records
+// individual complaint points at the operand, so a reader sees which side is wrong; a pair complaint
+// points at the whole expression, because neither side is wrong alone. Upstream's corpus records
 // columns that pin both, and the fixtures assert the spans rather than only the ids.
 //
 // # Two different renderings of a type, and they are not interchangeable
 //
 // The RegExp arm identifies a type by `getTypeName`, the shelf helper that folds a string-like, an
 // all-string union, a string-bearing intersection and a string-constrained type parameter all down
-// to "string". Every MESSAGE, by contrast, renders with the checker's own `TypeToString`. Upstream
+// to "string". Every message, by contrast, renders with the checker's own `TypeToString`. Upstream
 // draws exactly the same line and this port keeps it.
 //
-// Swapping every message to `getTypeName` SURVIVES the whole suite, and that verdict is correct
+// Swapping every message to `getTypeName` survives the whole suite, and that verdict is correct
 // rather than a fixture gap. The check is mechanical rather than an argument: enumerate the type
 // names the corpus records across all 56 findings that carry data, and ask which of them the two
 // functions render differently. The answer is none. The list holds `string | boolean`,
 // `string | null`, `string | undefined` and `{ first: number; second: string; }`, none of which is a
-// shape `getTypeName` rewrites, because a union is only folded when EVERY member is string and these
+// shape `getTypeName` rewrites, because a union is only folded when every member is string and these
 // each have a non-string member. The one entry the two could disagree about is `string` itself,
 // where both return "string".
 //
@@ -177,7 +177,7 @@ func restrictPlusOperandsSettingsFrom(options any) restrictPlusOperandsSettings 
 // and all six were clean, because a type this rule complains about individually is by construction
 // not a plain string.
 //
-// So the two spellings are equivalent HERE and not in general, and upstream's is kept because the
+// So the two spellings are equivalent here and not in general, and upstream's is kept because the
 // equivalence rests on which types can reach these four sites, which is exactly the kind of fact
 // that stops being true when someone adds an arm.
 //
@@ -203,7 +203,7 @@ var RestrictPlusOperands = rule.Rule{
 		settings := restrictPlusOperandsSettingsFrom(options)
 		stringLike := restrictPlusOperandsStringLike(settings)
 
-		// Upstream applies `getBaseTypeOfLiteralType` over the CONSTRAINED type, so a `'a'` widens
+		// Upstream applies `getBaseTypeOfLiteralType` over the constrained type, so a `'a'` widens
 		// to `string` and a `T extends number` resolves to `number` before anything is judged.
 		typeOf := func(node *ast.Node) *checker.Type {
 			return checker.Checker_getBaseTypeOfLiteralType(
@@ -240,7 +240,7 @@ var RestrictPlusOperands = rule.Rule{
 				// whatever the options say. The three `allow` tests beside them are the options
 				// speaking.
 				//
-				// The nullish test is deliberately the NON-union form, matching upstream. Switching
+				// The nullish test is deliberately the non-union form, matching upstream. Switching
 				// it to the union-aware form reports `string | null`, which the corpus passes.
 				if restrictPlusOperandsIsTypeFlagSetInUnion(side.baseType,
 					checker.TypeFlagsESSymbolLike|checker.TypeFlagsNever|checker.TypeFlagsUnknown) ||
@@ -259,7 +259,7 @@ var RestrictPlusOperands = rule.Rule{
 				for subBaseType := range type_checking.UnionTypePartsSeq(side.baseType) {
 					var reportThisPart bool
 					if ruleContext.TypeChecker.TypeToString(subBaseType) == "RegExp" {
-						// Reported when RegExps are forbidden, and ALSO when they are allowed but
+						// Reported when RegExps are forbidden, and also when they are allowed but
 						// the other side is a number: `/x/ + 1` is a number-and-string mixture.
 						reportThisPart = !settings.allowRegExp ||
 							restrictPlusOperandsIsTypeFlagSetInUnion(side.otherType, checker.TypeFlagsNumberLike)
@@ -278,7 +278,7 @@ var RestrictPlusOperands = rule.Rule{
 			}
 
 			// The pair passes run only when neither operand was wrong on its own. Without this,
-			// `symbol + 1` would report an impossible operand AND a mismatched pair, where upstream
+			// `symbol + 1` would report an impossible operand and a mismatched pair, where upstream
 			// reports one.
 			if hadIndividualComplaint {
 				return
@@ -341,7 +341,7 @@ var RestrictPlusOperands = rule.Rule{
 // on, so the same finding reads differently under different configuration. Upstream builds it by
 // filtering a five-element list and then choosing between three spellings by length.
 //
-// The SINGULAR spelling is reachable but the corpus never renders it: all four renderings the corpus
+// The singular spelling is reachable but the corpus never renders it: all four renderings the corpus
 // records are the empty case or the plural one, because no corpus case leaves exactly one option on.
 // It is kept, and a fixture below constructs the one-option configuration to exercise it, because a
 // branch with no test is a branch that can be wrong for as long as nobody writes that configuration.
@@ -375,10 +375,10 @@ func restrictPlusOperandsStringLike(settings restrictPlusOperandsSettings) strin
 	}
 }
 
-// restrictPlusOperandsIsTypeFlagSetInUnion asks whether ANY member of a union carries a flag.
+// restrictPlusOperandsIsTypeFlagSetInUnion asks whether any member of a union carries a flag.
 //
 // Distinct from type_checking.IsTypeFlagSet, which asks the type itself. `string | null` is the input
-// that separates them: it has a `null` MEMBER while the union type itself carries neither the null
+// that separates them: it has a `null` member while the union type itself carries neither the null
 // flag nor the undefined one, so this answers true and the plain test answers false.
 //
 // Every flag test in the rule body except the early exit goes through here, including the ones
@@ -397,7 +397,7 @@ func restrictPlusOperandsIsTypeFlagSetInUnion(t *checker.Type, flags checker.Typ
 //
 // An intersection is walked as an intersection and everything else as a union, which is upstream's
 // own spelling. The distinction matters because `string & {}` is an intersection whose members are
-// NOT all objects, so it is not reported, while `{} & {}` is.
+// not all objects, so it is not reported, while `{} & {}` is.
 func restrictPlusOperandsIsDeeplyObjectType(t *checker.Type) bool {
 	parts := type_checking.UnionTypeParts(t)
 	if type_checking.IsIntersectionType(t) {

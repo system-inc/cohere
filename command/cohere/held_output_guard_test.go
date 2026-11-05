@@ -146,6 +146,7 @@ func pipeHolders() ([]string, error) {
 			continue
 		}
 		seen[open.pid] = true
+		// Ignored: ps exits nonzero for a pid it no longer finds, and its empty answer is read below.
 		started, _ := exec.Command("ps", "-o", "ppid=,lstart=,command=", "-p", open.pid).Output()
 		// A process ps no longer finds has exited and holds nothing now, the lsof that listed it included.
 		if fields := strings.Fields(string(started)); len(fields) == 0 || fields[0] == self {
@@ -165,7 +166,8 @@ type lsofFile struct {
 // file, and t, d and n describe it.
 func lsofFiles(output []byte) []lsofFile {
 	var files []lsofFile
-	var pid, command string
+	var pid string
+	var command string
 	for _, line := range bytes.Split(output, []byte("\n")) {
 		if len(line) == 0 {
 			continue
@@ -203,7 +205,9 @@ const heldOutputFiringBound = 2 * time.Minute
 // failHeldOutput ends the test binary with the report, since no test can recover from a goroutine that
 // never returns and waiting for -timeout only delays the same failure with less said.
 func failHeldOutput(report string) {
-	fmt.Fprintf(os.Stderr, "\nheld output: %s", report)
+	// Ignored: the exit below fails the helper either way, and the test that started it fails on the report
+	// it does not find.
+	_, _ = fmt.Fprintf(os.Stderr, "\nheld output: %s", report)
 	os.Exit(2)
 }
 
@@ -221,7 +225,9 @@ func TestAHeldOutputNamesItsHolder(test *testing.T) {
 	test.Parallel()
 	if os.Getenv("COHERE_HELD_OUTPUT_HELPER") == "1" {
 		watchForHeldOutput(2*time.Second, 200*time.Millisecond, failHeldOutput)
-		exec.Command("/bin/sh", "-c", "sleep 300 & echo started").CombinedOutput()
+		// Ignored: the command is here to hang on its output. The watch ends this binary first, or the Fatal
+		// below says it did not, so how the command ends is never read.
+		_, _ = exec.Command("/bin/sh", "-c", "sleep 300 & echo started").CombinedOutput()
 		test.Fatal("the command's output closed while its background sleep still held it")
 	}
 	if runtime.GOOS == "windows" {
@@ -234,17 +240,22 @@ func TestAHeldOutputNamesItsHolder(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
+	// Ignored: the helper writes it, through descriptors of its own, and this one is never written.
 	defer outputFile.Close()
 	// A file, not a buffer: the helper's sleep inherits whatever the helper writes to, and a buffer's pipe
 	// would hang this test on the same sleep.
 	helper.Stdout, helper.Stderr = outputFile, outputFile
 	started := time.Now()
 	err = helper.Run()
-	output, _ := os.ReadFile(outputFile.Name())
+	output, readError := os.ReadFile(outputFile.Name())
+	if readError != nil {
+		test.Fatal(readError)
+	}
 	if sleeper := regexp.MustCompile(`pid (\d+) sleep`).FindSubmatch(output); sleeper != nil {
 		if pid, convertError := strconv.Atoi(string(sleeper[1])); convertError == nil {
 			if process, findError := os.FindProcess(pid); findError == nil {
-				process.Kill()
+				// Ignored: a sleep already gone is the outcome the kill asks for.
+				_ = process.Kill()
 			}
 		}
 	}

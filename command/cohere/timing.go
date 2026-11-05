@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"runtime"
 	"sort"
 	"strings"
@@ -25,7 +25,7 @@ import (
 //
 // Every cost here is the walk threads' own CPU clock (see program.Timings), so a rule that waits costs
 // nothing and the first line says so.
-func printTimings(out io.Writer, timings *program.Timings, lintDuration time.Duration) {
+func printTimings(out *bufio.Writer, timings *program.Timings, lintDuration time.Duration) {
 	sorted := timings.Sorted()
 	if len(sorted) == 0 {
 		// A timing table with no rows is the instrument measuring nothing, which must not print as
@@ -98,12 +98,12 @@ func printTimings(out io.Writer, timings *program.Timings, lintDuration time.Dur
 // last. A reader would have concluded the 171ms rule was expensive and optimized the wrong thing.
 //
 // Reported by family, which is a cache key up to its first colon, because a key identifies a cache
-// entry and a cache entry is not a line worth reading. The HIR cache keys per function node, by kind
+// entry and a cache entry is not a line worth reading. The `HIR` cache keys per function node, by kind
 // and source offset, which is correct for a cache and once produced 11,150 rows here against three
 // real ones: `--timing` was 17,000 lines, two thirds of them a single derivation reported one
 // function at a time, each costing 0.00ms and none of them actionable. The family is the label the
 // fill's CPU carries, so the collapse happens where it is measured.
-func printSharedFills(out io.Writer, timings *program.Timings) {
+func printSharedFills(out *bufio.Writer, timings *program.Timings) {
 	shared := timings.SharedCPU()
 	if len(shared) == 0 {
 		return
@@ -125,7 +125,7 @@ func printSharedFills(out io.Writer, timings *program.Timings) {
 //
 // The coverage line already reports a rule that listened to nothing. These are the other two the
 // brief asked for: a rule that listens to everything, and work duplicated across rules.
-func printTimingNotes(out io.Writer, sorted []program.RuleTiming) {
+func printTimingNotes(out *bufio.Writer, sorted []program.RuleTiming) {
 	mostOffered := 0
 	for _, timing := range sorted {
 		if timing.NodesOffered > mostOffered {
@@ -154,7 +154,7 @@ func printTimingNotes(out io.Writer, sorted []program.RuleTiming) {
 			perNode = fmt.Sprintf(", %.0fns per node", float64(timing.TotalCPU().Nanoseconds())/float64(timing.NodesOffered))
 		}
 		fmt.Fprintf(out,
-			"  note: %s saw the most nodes of any rule (%d%s) — compare a rule's cost against this one, not against its own node count\n",
+			"  note: %s saw the most nodes of any rule (%d%s), so compare a rule's cost against this one, not against its own node count\n",
 			timing.Name, timing.NodesOffered, perNode)
 	}
 
@@ -192,7 +192,7 @@ func printTimingNotes(out io.Writer, sorted []program.RuleTiming) {
 		}
 
 		fmt.Fprintf(out,
-			"  note: %s and %s were each offered %d nodes but differ %.0fx in cost (%s against %s) — if they share work, this table may be billing it to whichever ran first\n",
+			"  note: %s and %s were each offered %d nodes but differ %.0fx in cost (%s against %s), and if they share work, this table may be billing it to whichever ran first\n",
 			extremes.dearestName, extremes.cheapestName, offered,
 			float64(extremes.dearestCost)/float64(extremes.cheapestCost),
 			formatMilliseconds(extremes.dearestCost), formatMilliseconds(extremes.cheapestCost))
@@ -269,7 +269,7 @@ func formatMilliseconds(duration time.Duration) string {
 // derivations and the measurement itself are read inside it, and the walk is what of the worker's CPU
 // lay outside every call: a difference between readings of one thread's clock, which holds no waiting.
 // The process's CPU outside the workers is read the same way.
-func printCoverage(out io.Writer, timings *program.Timings) {
+func printCoverage(out *bufio.Writer, timings *program.Timings) {
 	account := timings.Account
 	ruleCPU := timings.TotalCPU()
 	var sharedCPU time.Duration
@@ -307,7 +307,7 @@ func printCoverage(out io.Writer, timings *program.Timings) {
 // loader, and a number for either would be a guess presented as a measurement. What the loads and the
 // disk leave of the program's wall is resolution and the loader's bookkeeping together, and the last
 // line says so.
-func printGraphTiming(out io.Writer, timing *program.GraphTiming, buildDuration time.Duration, contentPackOpened time.Duration, checkers int) {
+func printGraphTiming(out *bufio.Writer, timing *program.GraphTiming, buildDuration time.Duration, contentPackOpened time.Duration, checkers int) {
 	accounted := contentPackOpened + timing.Config + timing.Program + timing.Verify
 	builds := ""
 	if timing.Builds > 1 {

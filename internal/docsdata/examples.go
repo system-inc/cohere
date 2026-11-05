@@ -78,13 +78,13 @@ func ReadCaptures(directory string) ([]capture.Record, error) {
 		for scanner.Scan() {
 			var record capture.Record
 			if decodeError := json.Unmarshal(scanner.Bytes(), &record); decodeError != nil {
-				file.Close()
+				file.Close() // Ignored: the file was only read, and the decode error is the failure to report.
 				return nil, fmt.Errorf("docsdata: %s: %w", path, decodeError)
 			}
 			records = append(records, record)
 		}
 		err = scanner.Err()
-		file.Close()
+		file.Close() // Ignored: the file was only read, and everything it held was already scanned.
 		if err != nil {
 			return nil, fmt.Errorf("docsdata: %s: %w", path, err)
 		}
@@ -126,7 +126,9 @@ func PickExamples(records []capture.Record) (map[string]Examples, int) {
 	for name, cases := range byRule {
 		examples := Examples{Rule: name}
 		messageIds := map[string]bool{}
-		var firing, clean, fixed []capture.Record
+		var firing []capture.Record
+		var clean []capture.Record
+		var fixed []capture.Record
 		for _, record := range cases {
 			for _, finding := range record.Findings {
 				messageIds[finding.MessageId] = true

@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -43,9 +45,10 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(test *testing.T) {
 		command := exec.Command(binary, verboseArguments(arguments)...)
 		command.Dir = root
 		command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME=")
-		var stdout, stderr bytes.Buffer
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
 		command.Stdout, command.Stderr = &stdout, &stderr
-		_ = command.Run()
+		requireChildRan(test, command.Run())
 		return stdout.String(), stderr.String()
 	}
 
@@ -56,7 +59,12 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(test *testing.T) {
 	if len(cacheTableFiles(test, first)) == 0 {
 		test.Fatalf("the table is not in the project %s", first)
 	}
-	if entries, _ := os.ReadDir(filepath.Join(home, "Library", "Caches", "cohere")); len(entries) > 0 {
+	// Absent is the answer wanted; any other failure to read it is no answer.
+	entries, readDirectoryError := os.ReadDir(filepath.Join(home, "Library", "Caches", "cohere"))
+	if readDirectoryError != nil && !errors.Is(readDirectoryError, fs.ErrNotExist) {
+		test.Fatal(readDirectoryError)
+	}
+	if len(entries) > 0 {
 		test.Fatalf("a project run wrote to the user cache: %v", entries)
 	}
 	second := project("tsconfig.tsbuildinfo\n")
@@ -102,7 +110,10 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(test *testing.T) {
 			if statError != nil {
 				test.Fatalf("%s: %v", path, statError)
 			}
-			contents, _ := os.ReadFile(path)
+			contents, readError := os.ReadFile(path)
+			if readError != nil {
+				test.Fatalf("%s: %v", path, readError)
+			}
 			state[path] = information.ModTime().Format(time.RFC3339Nano) + " " + string(contents)
 		}
 		return state

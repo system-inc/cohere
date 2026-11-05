@@ -15,7 +15,7 @@ const unnecessaryTypeConstraintFile = "/repository/source/no_unnecessary_type_co
 // TestNoUnnecessaryTypeConstraintFires is upstream's twenty failing inputs, verbatim.
 //
 // Nineteen report once and one reports twice. The extractor flags the mismatch as a
-// DISCREPANCY (21 diagnostics against 20 inputs) and it is real rather than the
+// discrepancy (21 diagnostics against 20 inputs) and it is real rather than the
 // multiple-snapshot artifact: this rule has one snapshot file with 21 location headers, and
 // aligning them against the inputs in order shows `<T extends any, U extends any>` printed
 // twice, once for each parameter. That is the whole of the discrepancy.

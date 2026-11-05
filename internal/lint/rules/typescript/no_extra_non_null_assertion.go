@@ -72,13 +72,13 @@ var NoExtraNonNullAssertion = rule.Rule{
 					return
 				}
 
-				// foo!! — an assertion whose parent is another assertion.
+				// foo!!: an assertion whose parent is another assertion.
 				if parent.Kind == ast.KindNonNullExpression {
 					reportRedundantAssertion(ruleContext, node)
 					return
 				}
 
-				// foo!?.bar and foo!?.() — an assertion sitting directly under the link that owns
+				// foo!?.bar and foo!?.(): an assertion sitting directly under the link that owns
 				// the `?.`, in the position that link reaches through.
 				switch parent.Kind {
 				case ast.KindPropertyAccessExpression,

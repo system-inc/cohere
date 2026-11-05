@@ -28,7 +28,7 @@ type NoBaseToStringOptions struct {
 	CheckUnknown bool
 	// IgnoredTypeNames are stringified type names to leave alone.
 	//
-	// This is the one option in this family whose default is NOT a zero value, which makes the
+	// This is the one option in this family whose default is not a zero value, which makes the
 	// decoder load bearing rather than defensive: a decoder returning an empty slice for an absent
 	// key would silently start reporting on Error, RegExp, URL and URLSearchParams.
 	IgnoredTypeNames []string
@@ -89,7 +89,7 @@ func DecodeNoBaseToStringOptions(raw []byte) (any, error) {
 // nothing throws, the type system is satisfied, and the information is simply gone. The rule asks
 // whether a value being coerced to a string has anything to say.
 //
-// # The judgment is a three-valued recursion over the TYPE, not over the syntax
+// # The judgment is a three-valued recursion over the type, not over the syntax
 //
 // A value stringifies usefully Always, Never, or Sometimes, and the third is what a union produces
 // when its constituents disagree. That value is interpolated into the message, so the certainty is
@@ -105,7 +105,7 @@ func DecodeNoBaseToStringOptions(raw []byte) (any, error) {
 // The intersection rule is the one that reads oddly and is right: intersecting a useless shape with
 // a useful one gives a value that has the useful `toString`, so the whole is fine.
 //
-// # The base question is where a coercion method is DECLARED
+// # The base question is where a coercion method is declared
 //
 // Upstream asks for `toLocaleString`, `toString` and `valueOf` in that order, and for each looks at
 // every declaration. A declaration whose parent is anything other than the `Object` interface means
@@ -123,7 +123,7 @@ func DecodeNoBaseToStringOptions(raw []byte) (any, error) {
 // `any` and `unknown`. Upstream distinguishes them by flags, and only reports on `unknown` when
 // `checkUnknown` is set. An unconstrained type parameter is treated as `unknown` for the same reason.
 //
-// # This rule reads the PROGRAM
+// # This rule reads the program
 //
 // `IsSymbolFromDefaultLibrary` walks the program's own default-library files to decide whether the
 // `Symbol` in `[Symbol.toPrimitive]` is the builtin one, which is a read outside the file being
@@ -172,7 +172,7 @@ var NoBaseToString = rule.Rule{
 					return
 				}
 
-				// Only a concatenation WITH a string coerces the other side, and upstream checks the
+				// Only a concatenation with a string coerces the other side, and upstream checks the
 				// left first, so `'' + {}` reports the right and `{} + ''` reports the left.
 				if type_checking.GetTypeName(ruleContext.TypeChecker, leftType) == "string" {
 					state.checkExpression(binary.Right, rightType)
@@ -286,7 +286,7 @@ func (state *noBaseToStringState) checkExpression(node *ast.Node, knownType *che
 		return
 	}
 
-	// Upstream's literal skip, SUBSUMED here and kept anyway.
+	// Upstream's literal skip, subsumed here and kept anyway.
 	//
 	// A mutation removing it survives every fixture, so the rule was run with and without the branch
 	// over a regular expression, a string, a number, a boolean and a template, and both versions
@@ -370,7 +370,7 @@ func (state *noBaseToStringState) collectJoinCertainty(
 // collectTupleCertainty is upstream's `collectTupleCertainty`.
 //
 // The combining rule differs from a union's on purpose: every element of a tuple is stringified, so
-// ANY useless element makes the join useless, where a union only takes one branch.
+// any useless element makes the join useless, where a union only takes one branch.
 func (state *noBaseToStringState) collectTupleCertainty(
 	subjectType *checker.Type,
 	visited []*checker.Type,
@@ -435,7 +435,7 @@ func (state *noBaseToStringState) collectToStringCertainty(
 	// Upstream's comment says the Boolean type definition is missing toString(), so without this the
 	// base question would answer Never for a boolean and report on `${true}`.
 	//
-	// It is SUBSUMED here and kept anyway. A mutation removing it survives every fixture, which sent
+	// It is subsumed here and kept anyway. A mutation removing it survives every fixture, which sent
 	// this to a direct comparison rather than to an equivalence argument: the rule was run with and
 	// without the branch over a boolean, a boolean literal, a boolean under String(), and an array of
 	// booleans joined, and both versions answered zero findings on all four. Our lib declares
@@ -492,7 +492,7 @@ func (state *noBaseToStringState) collectToStringCertainty(
 
 // isIgnoredTypeName is upstream's two ignoredTypeNames checks.
 //
-// The first covers a GENERIC ignored type, where the type as written carries type arguments and the
+// The first covers a generic ignored type, where the type as written carries type arguments and the
 // name has to be read off the alias or the symbol rather than off the rendered form. The second is
 // the ordinary case and also walks base types, so a class extending Error is ignored too.
 func (state *noBaseToStringState) isIgnoredTypeName(subjectType *checker.Type) bool {
@@ -535,7 +535,7 @@ func (state *noBaseToStringState) matchesTypeOrBaseType(
 	return false
 }
 
-// baseTypesOf reaches a class's bases, including through a generic INSTANTIATION.
+// baseTypesOf reaches a class's bases, including through a generic instantiation.
 //
 // `Checker_getBaseTypes` answers nothing for an instantiated generic: measured, `Boom` reports one
 // base and walks to `Error`, while `Boom<number>` and `Boom<T>` report zero and the walk stops
@@ -685,7 +685,7 @@ func combineNoBaseToStringUnion(
 
 // combineNoBaseToStringIntersection is upstream's `collectIntersectionTypeCertainty`.
 //
-// ANY useful constituent makes the whole useful, because the intersection has that constituent's
+// Any useful constituent makes the whole useful, because the intersection has that constituent's
 // coercion method. Everything else is Never, including Sometimes, which is upstream's behavior and
 // reads as a rounding-down rather than an oversight.
 func combineNoBaseToStringIntersection(

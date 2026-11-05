@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"os"
 	"path/filepath"
@@ -42,14 +43,17 @@ func renderRecordsIn(
 ) (string, int, error) {
 	test.Helper()
 	var out bytes.Buffer
-	run := newEngineRun(&out, mode, language, "", time.Now())
+	stream := bufio.NewWriter(&out)
+	run := newEngineRun(stream, mode, language, "", time.Now())
 	for index, line := range lines {
 		if acceptError := run.accept([]byte(line)); acceptError != nil {
 			run.writeUnfinished(language.theEngine() + " broke its contract")
+			flushStream(test, stream)
 			return out.String(), 1, &recordError{index: index, err: acceptError}
 		}
 	}
 	exitCode, finishError := run.finish(engineExit, "exited "+string(rune('0'+engineExit)))
+	flushStream(test, stream)
 	return out.String(), exitCode, finishError
 }
 
@@ -89,17 +93,17 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 			test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 		}
 		requireLines(test, output,
-			"package described in 412ms — 3 Swift files in the package, 2 of them ours\n",
+			"package described in 412ms: 3 Swift files in the package, 2 of them ours\n",
 			"fix: 0 of 2 files rewritten, 0 fixes applied, 0 refused\n",
 			"format scope: changed files (working tree against HEAD): 0\n",
 			"types: 0 diagnostics over 2 files in 820ms\n",
-			"lint: 0 findings — 4 rules over 2 files, 512 nodes visited, walked by the fix phase (nothing was rewritten, so its findings still hold)\n",
+			"lint: 0 findings \u2014 4 rules over 2 files, 512 nodes visited, walked by the fix phase (nothing was rewritten, so its findings still hold)\n",
 			"coverage: 4 rules = 4 ran and found nothing\n",
 			"  0 files crashed · details: cohere --coverage\n",
 			"  config: no CohereSettings.json beside Package.swift, so every house rule ran at error",
 			"  not checked: /project/Sources/Example/Generated.swift (marked // @generated)\n",
 			"phases: fix ran in 31ms · types ran in 820ms · lint reused the fix phase's walk (nothing was rewritten) · unused skipped",
-			"— package 412ms",
+			": package 412ms",
 		)
 		forbidLines(test, output, "did not check everything", "modified tree", "in scope (")
 	})
@@ -127,13 +131,15 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
 	test.Run("FindingsWithCoverage", func(test *testing.T) {
 		var out bytes.Buffer
-		run := newEngineRun(&out, engineModeCheck, swiftLanguage, "", time.Now())
+		stream := bufio.NewWriter(&out)
+		run := newEngineRun(stream, engineModeCheck, swiftLanguage, "", time.Now())
 		run.details = true
 		for _, line := range contractFixture(test, "Findings.jsonl") {
 			if acceptError := run.accept([]byte(line)); acceptError != nil {
 				test.Fatal(acceptError)
 			}
 		}
+		flushStream(test, stream)
 		output := out.String()
 		requireLines(test, output,
 			"  listened to no files (1): nothing gave it a file, or it declined every one",
@@ -156,8 +162,8 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 		requireLines(test, output,
 			"/project/Sources/Example/Broken.swift:3:23 - error: cannot convert value of type 'String' to specified type 'Int'\n",
 			"fix skipped (--no-fix)",
-			"lint did not run (types bailed: 1 type errors — lint findings against wrong semantics are noise)",
-			"  this run did not check everything — the phases above say what was not checked\n",
+			"lint did not run (types bailed: 1 type errors \u2014 lint findings against wrong semantics are noise)",
+			"  this run did not check everything: the phases above say what was not checked\n",
 		)
 		// A compiler finding with no group has no bracket.
 		forbidLines(test, output, "Int' [#")
@@ -174,7 +180,7 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 		requireLines(test, output,
 			"  not checked: /project/Sources/Example/Latin1.swift (could not be read: it is not valid UTF-8 or could not be opened (Foundation could not decode it as UTF-8))\n",
 			"  not checked: /project/Sources/Example/Generated.swift (marked // @generated)\n",
-			"  this run did not check everything — the notes above name the files nothing checked\n",
+			"  this run did not check everything: the notes above name the files nothing checked\n",
 		)
 	})
 
@@ -377,7 +383,7 @@ func TestSwiftRunBelievesAnEngineThatFellShort(test *testing.T) {
 	if renderRecordsError != nil || exitCode != 1 {
 		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 	}
-	requireLines(test, output, "  this run did not check everything — the Swift engine reported that it fell short without a record saying where\n")
+	requireLines(test, output, "  this run did not check everything: the Swift engine reported that it fell short without a record saying where\n")
 }
 
 // TestSwiftRunListingModes holds the two runs that end without a summary on purpose.
@@ -455,7 +461,11 @@ func TestSwiftEngineArguments(test *testing.T) {
 		test.Errorf("arguments %q mode %s, want %q", strings.Join(arguments, " "), mode, want)
 	}
 
-	_, mode, _ = engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{"rules": true}, value, nil)
+	_, mode, rulesError := engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{"rules": true}, value,
+		nil)
+	if rulesError != nil {
+		test.Fatal(rulesError)
+	}
 	if mode != engineModeRules {
 		test.Errorf("--rules ran in mode %s", mode)
 	}
@@ -568,12 +578,14 @@ func TestEngineRunLabelsAGoCompilerFindingGo(test *testing.T) {
 	activeOutput, activeSummary = outputSettings{Mode: outputHuman}, runSummary{}
 
 	var out bytes.Buffer
-	run := newEngineRun(&out, engineModeCheck, goLanguage("module"), "", time.Now())
+	stream := bufio.NewWriter(&out)
+	run := newEngineRun(stream, engineModeCheck, goLanguage("module"), "", time.Now())
 	record := &engineFindingRecord{Source: "compiler", File: "internal/thing/thing.go", Line: 3, Column: 7,
 		Severity: "error", Message: "undefined: missing"}
 	if acceptFindingError := run.acceptFinding(record); acceptFindingError != nil {
 		test.Fatal(acceptFindingError)
 	}
+	flushStream(test, stream)
 	if want := "internal/thing/thing.go:3:7 error go undefined: missing\n"; out.String() != want {
 		test.Errorf("finding:\n got  %q\n want %q", out.String(), want)
 	}
@@ -588,7 +600,8 @@ func TestEngineRunVersionInGoWords(test *testing.T) {
 
 	render := func(provenanceLine string, sourceCommit string) string {
 		var out bytes.Buffer
-		run := newEngineRun(&out, engineModeVersion, goLanguage("module"), "", time.Now())
+		stream := bufio.NewWriter(&out)
+		run := newEngineRun(stream, engineModeVersion, goLanguage("module"), "", time.Now())
 		run.engineSourceCommit = sourceCommit
 		if acceptError := run.accept([]byte(provenanceLine)); acceptError != nil {
 			test.Fatal(acceptError)
@@ -596,6 +609,7 @@ func TestEngineRunVersionInGoWords(test *testing.T) {
 		if _, finishError := run.finish(0, "exited 0"); finishError != nil {
 			test.Fatal(finishError)
 		}
+		flushStream(test, stream)
 		return out.String()
 	}
 

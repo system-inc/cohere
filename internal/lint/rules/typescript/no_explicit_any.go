@@ -70,7 +70,7 @@ type NoExplicitAnyOptions struct {
 // forty different syntactic homes for one token rather than forty judgments. A variable annotation,
 // a return type, a type argument, an array element type, a union member, an intersection member, a
 // type parameter default, a heritage type argument, a constraint, an index signature value, an
-// `as` assertion, a bare type alias — all of them are the same node reached by a different route,
+// `as` assertion, a bare type alias: all of them are the same node reached by a different route,
 // and none of them needs its own arm.
 //
 // That makes the two option flags and the file gate the whole of the port, which is why they carry
@@ -180,9 +180,9 @@ func isTypeScriptSourceFile(fileName string) bool {
 // because all forty-five are `any[]`, `readonly any[]`, `Array<any>` or `ReadonlyArray<any>`. The
 // corpus cannot distinguish the two readings. The release binary can, and does:
 //
-//	function r04(...args: Map<any, any>) {}   silent   — not an array shape at all
-//	function r06(...args: any[][]) {}          silent   — nested two deep
-//	function r01(...args: any) {}              silent   — no array anywhere
+//	function r04(...args: Map<any, any>) {}   silent     not an array shape at all
+//	function r06(...args: any[][]) {}          silent     nested two deep
+//	function r01(...args: any) {}              silent     no array anywhere
 //	function r05(cb: (...a: any[]) => any) {}  reports once, on the RETURN type only
 //
 // The last one is what pins the walk as unbounded-but-scoped: the `any` in `...a: any[]` is two
@@ -190,13 +190,13 @@ func isTypeScriptSourceFile(fileName string) bool {
 // type but no rest-parameter ancestor and reports. A parent-only check would report both; a
 // whole-subtree check would report neither.
 //
-// # The stale TODO
+// # The stale `// todo`
 //
 // Upstream's corpus carries `function foo(...args: any) {}` commented out under a `// todo`, which
 // reads as a known gap where the bare form is not yet exempt. It is stale: measured on the release
 // binary that input is silent, with a control `any` on the next line of the same file firing, so
 // the ancestor walk already covers it. This port matches the measured behavior rather than the
-// comment, and the case is pinned as a fixture so a later reader who finds the TODO does not
+// comment, and the case is pinned as a fixture so a later reader who finds the `// todo` does not
 // "restore" a gap that never shipped.
 func isInsideRestParameter(node *ast.Node) bool {
 	for parent := node.Parent; parent != nil; parent = parent.Parent {

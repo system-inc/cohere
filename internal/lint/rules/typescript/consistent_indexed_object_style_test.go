@@ -663,7 +663,7 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 				}
 
 				if want.wantSuggestion == "" && testCase.wantFixed == "" {
-					// The row records a DECLINE: upstream reports it and deliberately offers no
+					// The row records a decline: upstream reports it and deliberately offers no
 					// repair, because there is no builtin Mutable and a minus-readonly mapped type
 					// has no Record spelling. Without this assertion the decline is unchecked, and a
 					// mutant that emitted a fix anyway survived the whole corpus: every other layer
@@ -701,7 +701,7 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 // TestConsistentIndexedObjectStyleCarriesTheInterfaceModifiers pins what the repair must not delete.
 //
 // This shipped broken. The interface repair replaced the whole declaration starting at its first
-// MODIFIER while building the alias from `type <name> = `, so `export interface X { [k: string]: V }`
+// modifier while building the alias from `type <name> = `, so `export interface X { [k: string]: V }`
 // became `type X = Record<string, V>;` and six imports across the structure library stopped
 // resolving. Upstream never had this defect only because estree hangs `export` on a wrapper node
 // outside the replaced range; our declaration owns its modifiers.
@@ -793,7 +793,7 @@ func TestConsistentIndexedObjectStyleNeedsTheTypedHarness(test *testing.T) {
 
 // TestDecodeConsistentIndexedObjectStyleOptions pins the decoder.
 //
-// This rule's option is a bare enum STRING rather than an object, so `rule.DecodeOptionsInto` has
+// This rule's option is a bare enum string rather than an object, so `rule.DecodeOptionsInto` has
 // no struct to decode into and the decoder is hand-written for that reason rather than for the
 // default-inversion reason its siblings in this package have.
 //

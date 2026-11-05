@@ -90,11 +90,13 @@ func TestStyleForHonorsNoColor(test *testing.T) {
 func TestStyleForAFileIsPlain(test *testing.T) {
 	// Set first so the test restores whatever the environment held, then unset.
 	test.Setenv("NO_COLOR", "")
-	os.Unsetenv("NO_COLOR")
+	// Ignored: Unsetenv fails only for a name holding "=" or a NUL, and NO_COLOR holds neither.
+	_ = os.Unsetenv("NO_COLOR")
 	file, temporaryFileError := os.CreateTemp(test.TempDir(), "output")
 	if temporaryFileError != nil {
 		test.Fatal(temporaryFileError)
 	}
+	// Ignored: only asked whether it is a terminal, and never written.
 	defer file.Close()
 	if style := styleFor(file); style.color {
 		test.Error("output to a file is styled for a terminal")

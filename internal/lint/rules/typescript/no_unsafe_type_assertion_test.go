@@ -17,8 +17,8 @@ func noUnsafeTypeAssertionCaseName(index int) string {
 // TestNoUnsafeTypeAssertionStaysSilent is upstream's five passing cases verbatim, plus shapes
 // upstream does not write whose silence was measured against the installed 8.67.0 build.
 //
-// Every case runs in its OWN program, which for this rule is load-bearing rather than tidy. The
-// first thing it asks is whether two types are REFERENCE identical, and the checker interns one
+// Every case runs in its own program, which for this rule is load-bearing rather than tidy. The
+// first thing it asks is whether two types are reference identical, and the checker interns one
 // type per shape per program. Several of upstream's cases each declare their own `T`; batched into
 // one program those merge, identity starts answering true, and cases that really report come back
 // clean. RunTyped is one file per call, so the fixtures are safe by construction and the oracle
@@ -38,7 +38,7 @@ func TestNoUnsafeTypeAssertionStaysSilent(test *testing.T) {
 		// upstream's corpus does not reach, and each was chosen by naming the input that separates
 		// a surviving mutant from the original rather than by guessing.
 
-		// The object literal widening. `{ foo: 'hi', bar: 1 }` is NOT assignable to `{ foo: string }`
+		// The object literal widening. `{ foo: 'hi', bar: 1 }` is not assignable to `{ foo: string }`
 		// while it carries its excess-property information, so without the widening this reports
 		// `unsafeTypeAssertion`. Measured: removing the widening makes exactly this case report,
 		// and upstream is silent on it. Its excess-property-free sibling below is silent either
@@ -46,7 +46,7 @@ func TestNoUnsafeTypeAssertionStaysSilent(test *testing.T) {
 		"const o = { foo: 'hi', bar: 1 } as { foo: string };\n",
 		"const p = { foo: 'hi' } as { foo: string };\n",
 
-		// The identity early return, which is EQUIVALENT to falling through and is kept anyway.
+		// The identity early return, which is equivalent to falling through and is kept anyway.
 		// Twelve identity shapes were probed against a mutant that disables it, including
 		// `any as any`, `Set<any> as Set<any>`, `T as T`, `never as never` and an error type
 		// asserted to itself, and none of them changed verdict. The argument is one sentence: when
@@ -71,7 +71,7 @@ func TestNoUnsafeTypeAssertionStaysSilent(test *testing.T) {
 // id, the rendered message text, and the span of every finding.
 //
 // The rendered text is asserted by equality rather than by a substring test, because four of the
-// five messages interpolate a type name through the checker and one of them interpolates it TWICE.
+// five messages interpolate a type name through the checker and one of them interpolates it twice.
 // A substring predicate cannot see a wrong name in either slot, and the type name is the only part
 // of this rule's output that a reader uses to find the site.
 func TestNoUnsafeTypeAssertionFires(test *testing.T) {
@@ -343,7 +343,7 @@ func TestNoUnsafeTypeAssertionFires(test *testing.T) {
 			},
 		},
 
-		// The ANGLE BRACKET spelling of an assertion, which upstream's corpus never writes: every one of
+		// The angle bracket spelling of an assertion, which upstream's corpus never writes: every one of
 		// its twenty two cases uses `as`. Both spellings mean the same thing and upstream matches both
 		// node types, so a port registering only the `as` listener passes the entire imported corpus
 		// while being silent on half the syntax. Measured reporting on the installed build.
@@ -377,7 +377,7 @@ func TestNoUnsafeTypeAssertionFires(test *testing.T) {
 				},
 			},
 		},
-		// An ERROR type, which renders as error typed rather than `any`. Upstream draws that
+		// An error type, which renders as error typed rather than `any`. Upstream draws that
 		// distinction deliberately: the type is any-shaped only because something else failed to
 		// compile, and calling it `any` would send the reader looking for an annotation that is not
 		// there. The corpus writes no unresolved name anywhere, so a port dropping the distinction
@@ -396,7 +396,7 @@ func TestNoUnsafeTypeAssertionFires(test *testing.T) {
 				},
 			},
 		},
-		// An object type that is NOT an object literal, which is what keeps the widening narrow. Widening
+		// An object type that is not an object literal, which is what keeps the widening narrow. Widening
 		// every object type rather than only literals would change what this case asks the checker.
 		// The rendered type carries a trailing semicolon the source does not, because the name comes
 		// from the checker rather than from the source text. That is why the message is asserted by

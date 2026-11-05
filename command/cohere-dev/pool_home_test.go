@@ -88,16 +88,19 @@ func TestATrimRefusesACacheItsPoolDoesNotGuard(test *testing.T) {
 		test.Errorf("the trim of a cache its pool does not guard did not exit 2 (%v):\n%s", outputError, output)
 	}
 	remaining := 0
-	filepath.WalkDir(cache, func(path string, entry os.DirEntry, err error) error {
+	walkError := filepath.WalkDir(cache, func(path string, entry os.DirEntry, err error) error {
 		if err == nil && !entry.IsDir() && entry.Name() != "README" {
 			remaining++
 		}
-		return nil
+		return err
 	})
+	if walkError != nil {
+		test.Fatalf("counting the cache's entries: %v", walkError)
+	}
 	if remaining != 10 {
 		test.Errorf("the trim removed entries from a cache its pool does not guard: %d of 10 left", remaining)
 	}
-	log, _ := os.ReadFile(filepath.Join(slots, "gocache-trim.log"))
+	log := readMaybeMissing(test, filepath.Join(slots, "gocache-trim.log"))
 	if !strings.Contains(string(log), "not trimmed: the Go build cache "+cache+" is outside "+userCacheDirectoryIn(home)) {
 		test.Errorf("the pool's log does not say why the cache was not trimmed:\n%s", log)
 	}

@@ -110,8 +110,7 @@ func TestTheProjectReadsItsLibrariesDrift(test *testing.T) {
 
 	got := []string{}
 	for _, drift := range check.Drift {
-		relative, _ := filepath.Rel(root, drift.FileName)
-		got = append(got, drift.Repository+": "+relative)
+		got = append(got, drift.Repository+": "+relativeIn(test, root, drift.FileName))
 	}
 	want := []string{"library/inner: library/inner/Deep.ts", "library: library/source/Thing.ts"}
 	if strings.Join(got, ", ") != strings.Join(want, ", ") {
@@ -144,8 +143,7 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(test *testing.T) {
 		}
 		got := []string{}
 		for _, drift := range result.Drift {
-			relative, _ := filepath.Rel(root, drift.FileName)
-			got = append(got, relative)
+			got = append(got, relativeIn(test, root, drift.FileName))
 		}
 		if strings.Join(got, ", ") != strings.Join(wantDrift, ", ") {
 			test.Fatalf("%s: drift %v, want %v", label, got, wantDrift)
@@ -181,8 +179,7 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(test *testing.T) {
 		}
 		names := []string{}
 		for fileName := range section.Entries {
-			relative, _ := filepath.Rel(root, fileName)
-			names = append(names, relative)
+			names = append(names, relativeIn(test, root, fileName))
 		}
 		sort.Strings(names)
 		return names
@@ -465,4 +462,14 @@ func TestAFreshClonesLibrariesGetTheirCacheAtStartup(test *testing.T) {
 	if got := checked("the third check"); got != 3 {
 		test.Fatalf("after a second start the check formatted %d files, want 3", got)
 	}
+}
+
+// relativeIn is path relative to root, failing the test when no relative path leads there.
+func relativeIn(test testing.TB, root string, path string) string {
+	test.Helper()
+	relative, relativeError := filepath.Rel(root, path)
+	if relativeError != nil {
+		test.Fatal(relativeError)
+	}
+	return relative
 }

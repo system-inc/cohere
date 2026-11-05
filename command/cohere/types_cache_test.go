@@ -77,6 +77,7 @@ func TestTypeDiagnosticsReplayOnlyWhatAnEditCannotReach(test *testing.T) {
 		if match == nil {
 			test.Fatalf("%s: the warm run replayed no file's semantic diagnostics, so it proves nothing about replaying:\n%s", step.name, warm)
 		}
+		// Ignored: the pattern captures digits only.
 		if count, _ := strconv.Atoi(match[1]); count > step.mostReplayed {
 			test.Fatalf("%s: %d files replayed, at most %d may: an edit that reaches an importer must re-check it\n%s",
 				step.name, count, step.mostReplayed, warm)
@@ -138,8 +139,9 @@ func TestTypeDiagnosticsReplayOnAScopedRun(test *testing.T) {
 		}
 		clause := replayed.FindStringSubmatch(warm)
 		if clause != nil {
+			// Ignored: the pattern captures digits only.
 			replayedCount, _ := strconv.Atoi(clause[1])
-			total, _ := strconv.Atoi(clause[2])
+			total, _ := strconv.Atoi(clause[2]) // Ignored: digits only, as above.
 			if replayedCount > total || total != 1 {
 				test.Errorf("%s: the replay clause counts %d of %d files on a run scoped to one:\n%s", step.name, replayedCount, total, warm)
 			}

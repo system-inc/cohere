@@ -41,7 +41,8 @@ func TestAMixedRunUnderJsonWritesOnlyRecordsToStdout(test *testing.T) {
 	command := exec.Command(binary, "--no-fix", "--json")
 	command.Dir = root
 	command.Env = append(os.Environ(), "COHERE_RUN_CACHE=off", "COHERE_SWIFT_ENGINE="+engine)
-	var standardOutput, standardError bytes.Buffer
+	var standardOutput bytes.Buffer
+	var standardError bytes.Buffer
 	command.Stdout, command.Stderr = &standardOutput, &standardError
 	runError := command.Run()
 	var exitError *exec.ExitError

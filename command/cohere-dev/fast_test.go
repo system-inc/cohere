@@ -84,11 +84,14 @@ func measureTests(test *testing.T, root string, pattern string, environment []st
 	test.Helper()
 	deadline, hasDeadline := test.Deadline()
 	timeout := "-timeout=" + inheritedTimeout(deadline, hasDeadline, time.Now())
+	// Uncached: this run exists to do the build now, untimed, and a cached result would skip the work
+	// and leave it to the measured run below.
 	build := exec.Command("go", "test", "-count=1", timeout, "-run", "^$", pattern)
 	build.Dir = root
 	if output, outputError := build.CombinedOutput(); outputError != nil {
 		test.Fatalf("building %s's tests failed, so it measured nothing: %v\n%s", pattern, outputError, output)
 	}
+	// Uncached: this run is the measurement, and a cached pass replays an old result in no time and no CPU.
 	command := exec.Command("go", "test", "-count=1", timeout, pattern)
 	command.Dir = root
 	for _, variable := range os.Environ() {

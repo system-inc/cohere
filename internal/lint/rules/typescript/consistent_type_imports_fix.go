@@ -13,7 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// The repair for `consistent-type-imports`, ported from upstream's fixer and delivered as ONE edit.
+// The repair for `consistent-type-imports`, ported from upstream's fixer and delivered as one edit.
 //
 // # Why one edit
 //

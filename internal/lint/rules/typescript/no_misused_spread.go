@@ -42,7 +42,7 @@ type NoMisusedSpreadOptions struct {
 // yields Unicode code points and so splits a family emoji or a combining sequence that a reader
 // sees as one glyph, and it asks for `Intl.Segmenter`. Cohere drops that branch on purpose, by
 // Kirk's ruling of 2026-10-01. Whether a string should be walked by code point or by grapheme is
-// intent the rule cannot see, and spread is the CORRECT code-point iteration (it is what
+// intent the rule cannot see, and spread is the correct code-point iteration (it is what
 // `.split("")`, which the upstream message lumps it with, gets wrong). Every string spread ahra
 // had wanted code points on purpose, and upstream's only repair, `Array.from(text)`, is the same
 // iteration under another name, which launders the finding rather than fixing anything. A finding
@@ -53,10 +53,10 @@ type NoMisusedSpreadOptions struct {
 //
 // # The object cascade
 //
-// A spread in an OBJECT, or a JSX attribute, which is the same operation with different syntax, is
+// A spread in an object, or a JSX attribute, which is the same operation with different syntax, is
 // wrong in eight ways, and the order they are asked in is the rule rather than an implementation
 // detail. The cascade is: promise, function without properties, Map, array, iterable, class
-// instance, class declaration. Each arm returns, so the FIRST match wins and nothing reports twice.
+// instance, class declaration. Each arm returns, so the first match wins and nothing reports twice.
 //
 // The ordering is load-bearing in both directions. A Map is iterable, so asking `isIterable` first
 // would report every Map with the iterable message and lose the `Object.fromEntries` suggestion
@@ -85,19 +85,19 @@ type NoMisusedSpreadOptions struct {
 // than a port of upstream's general fixer.
 //
 // A Map gets `replaceMapSpreadInObject`, which rewrites the spread into `Object.fromEntries(...)`.
-// It has two forms and the difference is real: when the spread is the object's ONLY property, the
+// It has two forms and the difference is real: when the spread is the object's only property, the
 // whole object literal is replaced, so `{ ...map }` becomes `Object.fromEntries(map)` rather than
 // `{ ...Object.fromEntries(map) }`, which would still be wrong. With any sibling property, only the
 // spread's argument is wrapped.
 //
-// Both are SUGGESTIONS rather than fixes, and upstream declares no `fixable` at all. That is right:
+// Both are suggestions rather than fixes, and upstream declares no `fixable` at all. That is right:
 // awaiting a value changes when the surrounding code runs, and rewriting a Map spread changes the
 // shape of the result. Neither is a repair the engine may apply unattended.
 //
 // # What upstream's general fixer does that this does not, and why the corpus permits it
 //
 // Upstream builds the Map suggestion through `getWrappingFixer`, a 276-line general utility that
-// re-prints the inner node, parenthesizes it when its precedence is weak, parenthesizes the RESULT
+// re-prints the inner node, parenthesizes it when its precedence is weak, parenthesizes the result
 // when the parent's precedence is weak, and inserts a leading semicolon when the previous statement
 // lacks one. Only the first of those three can fire here, because the node being replaced is always
 // an object literal or a JSX attribute value, neither of which is a weak-precedence parent and
@@ -111,7 +111,7 @@ type NoMisusedSpreadOptions struct {
 var NoMisusedSpread = rule.Rule{
 	Name: "@typescript-eslint/no-misused-spread",
 
-	// Every arm asks the checker what the spread argument IS. None of it is answerable from syntax.
+	// Every arm asks the checker what the spread argument is. None of it is answerable from syntax.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
@@ -189,7 +189,7 @@ var NoMisusedSpread = rule.Rule{
 			// Upstream writes four selectors; two of them (`ArrayExpression > SpreadElement` and
 			// `CallExpression > SpreadElement`) fed only the string branch dropped above, so a
 			// KindSpreadElement has no listener here. The remaining two are the object spread and
-			// the JSX spread attribute. Our parser gives an object spread its own KIND, a
+			// the JSX spread attribute. Our parser gives an object spread its own kind, a
 			// KindSpreadAssignment, which is why there is no `if parent is ObjectExpression`.
 			ast.KindSpreadAssignment: func(node *ast.Node) {
 				argument := node.AsSpreadAssignment().Expression
@@ -266,9 +266,9 @@ func noMisusedSpreadIsMap(ruleContext rule.Context, t *checker.Type) bool {
 
 // noMisusedSpreadIsClassInstance separates an instance from the class itself.
 //
-// The two tests are opposite ends of the same question and both are needed. A type with its OWN
+// The two tests are opposite ends of the same question and both are needed. A type with its own
 // construct signature is the class, not an instance, so it is declined here and picked up by the
-// class-declaration arm below. A type whose SYMBOL resolves, at one of its declarations, to
+// class-declaration arm below. A type whose symbol resolves, at one of its declarations, to
 // something with a construct signature is an instance of that class.
 func noMisusedSpreadIsClassInstance(typeChecker *checker.Checker, t *checker.Type) bool {
 	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
@@ -282,10 +282,10 @@ func noMisusedSpreadIsClassInstance(typeChecker *checker.Checker, t *checker.Typ
 		}
 
 		// Every declaration is asked, matching upstream's `some` over `getDeclarations()`, and the
-		// loop is INERT here rather than load-bearing. Restricting it to the first declaration
+		// loop is inert here rather than load-bearing. Restricting it to the first declaration
 		// survives the whole suite, and that verdict is correct.
 		//
-		// The reason is that `GetTypeOfSymbolAtLocation` resolves the MERGED symbol's type at
+		// The reason is that `GetTypeOfSymbolAtLocation` resolves the merged symbol's type at
 		// whichever declaration it is handed, so every entry answers the same question. Probed
 		// directly over three merged shapes, printing the construct-signature count per declaration:
 		//
@@ -311,7 +311,7 @@ func noMisusedSpreadIsClassInstance(typeChecker *checker.Checker, t *checker.Typ
 	})
 }
 
-// noMisusedSpreadIsClassDeclaration answers whether the type IS a class rather than an instance.
+// noMisusedSpreadIsClassDeclaration answers whether the type is a class rather than an instance.
 //
 // Two ways to be one. An instantiation expression type, which is what `Foo<string>` produces when
 // `Foo` is a generic class referenced without `new`, carries an object flag saying so. Otherwise the
@@ -489,7 +489,7 @@ func noMisusedSpreadIsOwnSource(declaration *ast.Node) bool {
 // The shelf's `IsHigherPrecedenceThanAwait` answers this, comparing the node's expression precedence
 // against the await operator's. Upstream asks the identical question of its own tree.
 func noMisusedSpreadAwaitSuggestion(ruleContext rule.Context, argument *ast.Node) rule.Suggestion {
-	// The precedence question is asked of the node INSIDE any parentheses, not of the parenthesized
+	// The precedence question is asked of the node inside any parentheses, not of the parenthesized
 	// expression, and that is a substrate difference rather than a refinement. ESTree has no
 	// parenthesis node, so upstream asks this of the `||` or the conditional directly. Ours wraps
 	// them, and a parenthesized expression is high precedence, so asking the outer node takes the
@@ -498,7 +498,7 @@ func noMisusedSpreadAwaitSuggestion(ruleContext rule.Context, argument *ast.Node
 	//
 	// Measured on the two corpus cases that carry the low-precedence shape, printing both kinds:
 	// the argument is KindParenthesizedExpression answering true, and the inner node is
-	// KindBinaryExpression or KindConditionalExpression answering false. A parenthesized IDENTIFIER
+	// KindBinaryExpression or KindConditionalExpression answering false. A parenthesized identifier
 	// still answers true from the inside, which is why the skip is the right correction rather than
 	// simply inverting the branch.
 	inner := argument
@@ -512,9 +512,9 @@ func noMisusedSpreadAwaitSuggestion(ruleContext rule.Context, argument *ast.Node
 			Fixes:   []rule.Fix{ruleContext.InsertBefore(argument, "await ")},
 		}
 	}
-	// The wrap goes around the INNER node rather than around the argument, for the same substrate
+	// The wrap goes around the inner node rather than around the argument, for the same substrate
 	// reason. Upstream's `node` here is the unparenthesized expression, so when the source already
-	// spells `(promise || {})` the parentheses it inserts land INSIDE the existing pair and the
+	// spells `(promise || {})` the parentheses it inserts land inside the existing pair and the
 	// result reads `(await (promise || {}))`. Wrapping our argument instead, which includes those
 	// parentheses, doubles them into `await ((promise || {}))`, which is valid and is not what
 	// upstream writes. Both corpus rows assert the exact text, which is what caught it.
@@ -529,7 +529,7 @@ func noMisusedSpreadAwaitSuggestion(ruleContext rule.Context, argument *ast.Node
 
 // noMisusedSpreadMapSuggestions offers the `Object.fromEntries` rewrite.
 //
-// Two shapes. When the spread is the object's ONLY property the whole literal is replaced, because
+// Two shapes. When the spread is the object's only property the whole literal is replaced, because
 // `{ ...Object.fromEntries(map) }` would still be an object built by spreading. With any sibling the
 // argument alone is wrapped, so the other properties survive.
 //
@@ -572,13 +572,13 @@ func noMisusedSpreadMapSuggestions(ruleContext rule.Context, spread *ast.Node, a
 		}}
 	}
 
-	// The span is the INNER node, so existing parentheses around the argument SURVIVE the rewrite:
+	// The span is the inner node, so existing parentheses around the argument survive the rewrite:
 	// `{ ...(map), other: 1 }` becomes `{ ...(Object.fromEntries(map)), other: 1 }`. That reads like
 	// a defect and it is upstream's behaviour, measured rather than assumed. Upstream replaces the
 	// node its own tree hands it, which is the unparenthesized expression, so the parentheses are
 	// simply outside the range it touches.
 	//
-	// This port originally replaced the whole argument INCLUDING the parentheses, which produces the
+	// This port originally replaced the whole argument including the parentheses, which produces the
 	// tidier `{ ...Object.fromEntries(map), other: 1 }`. Every imported fixture stayed green over
 	// that, because the corpus writes a parenthesized argument only in the sole-property shape, where
 	// the whole object literal is replaced and this branch never runs. Found by mutation and settled
