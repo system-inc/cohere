@@ -15,6 +15,9 @@ import (
 	"honnef.co/go/tools/unused"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
+	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_checked_assertion"
+	"github.com/system-inc/cohere/internal/goengine/rules/testing_no_machine_path"
+	"github.com/system-inc/cohere/internal/goengine/rules/testing_require_parallel"
 )
 
 // syntaxOnly names the passes that read no type information, decided by reading each pass's source at
@@ -104,7 +107,19 @@ func All() []rule.Rule {
 		TypeAware:    true,
 		Analyzer:     unusedReport,
 	})
+	// The house rules come last, each from its own package, which holds its name, origin and analyzer
+	// together so the registry restates none of them.
+	registered = append(registered, House()...)
 	return registered
+}
+
+// House is every house rule, in the order the registry lists them after the ported ones.
+func House() []rule.Rule {
+	return []rule.Rule{
+		correctness_require_checked_assertion.Rule,
+		testing_no_machine_path.Rule,
+		testing_require_parallel.Rule,
+	}
 }
 
 // portedRule is the rule that runs an upstream analyzer under the name it has upstream.

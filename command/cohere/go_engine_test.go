@@ -126,6 +126,12 @@ func runRealCohereAtAGoRoot(test *testing.T, environment ...string) (string, int
 	if writeError := os.WriteFile(moduleFile, moduleContents, 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
+	// One finding only the engine's own rules can make, so a run that reports it is a run the engine did.
+	sourceContents := []byte("package lonely\n\nimport \"fmt\"\n\nfunc Greet() string {\n" +
+		"\treturn fmt.Sprintf(\"%d\", \"text\")\n}\n")
+	if writeError := os.WriteFile(filepath.Join(root, "lonely.go"), sourceContents, 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
 	deadline, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	command := exec.CommandContext(deadline, binary, "--no-fix")
@@ -148,14 +154,16 @@ func runRealCohereAtAGoRoot(test *testing.T, environment ...string) (string, int
 }
 
 // TestARealCohereAtAGoRootStartsOneEngine: the front door starts the Go engine once, the hidden dispatch
-// answers it, and with no engine built in yet the run says nothing was checked and fails. The guard against
-// a second engine never trips, because the dispatch is what answered.
+// answers it, and the engine checks the module: vet's printf rule finds the mismatched verb, and the run fails
+// for it. The guard against a second engine never trips, because the dispatch is what answered.
 func TestARealCohereAtAGoRootStartsOneEngine(test *testing.T) {
 	test.Parallel()
 	output, exitCode := runRealCohereAtAGoRoot(test)
-	if exitCode != 1 || !strings.Contains(output, "The Go engine is not built into this cohere yet") ||
-		!strings.Contains(output, "The Go engine did not run, so nothing was checked.") {
-		test.Fatalf("exit %d, expected 1 with the dispatch's sentence and nothing checked:\n%s", exitCode, output)
+	if exitCode != 1 || !strings.Contains(output, "lonely.go:6:") || !strings.Contains(output, "cohere-go/printf") {
+		test.Fatalf("exit %d, expected 1 with the engine's printf finding on lonely.go:6:\n%s", exitCode, output)
+	}
+	if strings.Contains(output, "nothing was checked") {
+		test.Errorf("the engine's run read as one that checked nothing:\n%s", output)
 	}
 	if strings.Contains(output, goEngineChildVariable) {
 		test.Errorf("the guard against a second engine tripped, so the dispatch did not answer:\n%s", output)
@@ -170,7 +178,7 @@ func TestAFrontDoorStartedAsAGoEngineStartsNoOther(test *testing.T) {
 	if exitCode != 2 || !strings.Contains(output, "was about to start another, so it refused") {
 		test.Fatalf("exit %d, expected 2 with the guard's sentence:\n%s", exitCode, output)
 	}
-	if strings.Contains(output, "not built into this cohere") {
+	if strings.Contains(output, "cohere-go/printf") {
 		test.Errorf("an engine was started though the guard should have refused first:\n%s", output)
 	}
 }

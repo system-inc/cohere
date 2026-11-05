@@ -166,8 +166,8 @@ func TestNilnessAndUnusedwriteFollowVetsSuite(test *testing.T) {
 }
 
 // TestStaticcheckFollowsTheToolsPasses holds the registry, after the x/tools passes, to every default SA
-// and S check, then the ruled ST checks, then U1000 last through the analyzer that reports it, and nothing
-// else, which also keeps out every QF check, since a quick fix is not a finding.
+// and S check, then the ruled ST checks, then U1000 through the analyzer that reports it, then the house
+// rules, and nothing else, which also keeps out every QF check, since a quick fix is not a finding.
 func TestStaticcheckFollowsTheToolsPasses(test *testing.T) {
 	test.Parallel()
 	offset := len(vet.Suite) + 2
@@ -176,7 +176,8 @@ func TestStaticcheckFollowsTheToolsPasses(test *testing.T) {
 	styleChecks := stylecheckAnalyzers()
 	expectBlock(test, offset+len(checks), styleChecks, rule.OriginStaticcheck)
 
-	expectedCount := offset + len(checks) + len(styleChecks) + 1
+	unusedIndex := offset + len(checks) + len(styleChecks)
+	expectedCount := unusedIndex + 1 + len(House())
 	if len(registry) != expectedCount {
 		test.Fatalf("the registry has %d rules, expected %d", len(registry), expectedCount)
 	}
@@ -188,8 +189,15 @@ func TestStaticcheckFollowsTheToolsPasses(test *testing.T) {
 		Analyzer:     unusedReport,
 	}
 	// reflect.DeepEqual because ConfiguredBy is a slice, which leaves rule.Rule without ==.
-	if last := registry[len(registry)-1]; !reflect.DeepEqual(last, expectedUnused) {
-		test.Errorf("the last rule is %+v, expected %+v", last, expectedUnused)
+	if unusedRule := registry[unusedIndex]; !reflect.DeepEqual(unusedRule, expectedUnused) {
+		test.Errorf("rule %d is %+v, expected %+v", unusedIndex, unusedRule, expectedUnused)
+	}
+	for index, houseRule := range House() {
+		registeredRule := registry[unusedIndex+1+index]
+		if registeredRule.Name != houseRule.Name || registeredRule.Origin != rule.OriginHouse {
+			test.Errorf("rule %d is %q (%s), expected the house rule %q", unusedIndex+1+index, registeredRule.Name,
+				registeredRule.Origin, houseRule.Name)
+		}
 	}
 }
 

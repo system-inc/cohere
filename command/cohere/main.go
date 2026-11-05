@@ -44,7 +44,7 @@ func main() {
 	// The Go engine is this binary in a hidden mode, matched before anything reads the command line or starts
 	// a run cache, since an engine is neither a front door nor a run of its own.
 	if len(os.Args) > 1 && os.Args[1] == goEngineVerb {
-		os.Exit(runGoEngineVerb(os.Stderr))
+		os.Exit(runGoEngineVerb(os.Args[2:], os.Stdout, os.Stderr))
 	}
 	if err := run(); err != nil {
 		// A failure of the tool is never recorded by the run cache, and the recording stops before the
