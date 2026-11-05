@@ -35,7 +35,7 @@ var Analyzer = &analysis.Analyzer{
 		"variable or named type this package declares, a type argument inside one included, since the house states " +
 		"a value's type. Left alone: a method matching a method of another package in the import graph, a value " +
 		"handed to a place whose type is no interface or taken from another package's declaration of the same " +
-		"type, a constraint, a type written inside an expression, and a generated file.",
+		"type, a constraint, and a type written inside an expression.",
 	Run: run,
 }
 
@@ -54,10 +54,6 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 	candidates := []candidate{}
 	for _, file := range pass.Files {
-		// A generated file's declarations are its generator's, and an edit by hand is lost on the next generation.
-		// This is the one place the rule skips a file, so a driver filter can take it over by deleting these lines.
-		// Its flows are still read, since a value a generated file hands on fixes a type as surely as any other.
-		judged := !ast.IsGenerated(file)
 		stack := []ast.Node{}
 		ast.Inspect(file, func(node ast.Node) bool {
 			if node == nil {
@@ -65,10 +61,8 @@ func run(pass *analysis.Pass) (any, error) {
 				return true
 			}
 			flows.record(node, stack)
-			if judged {
-				if found, isCandidate := flows.candidateAt(node, stack); isCandidate {
-					candidates = append(candidates, found)
-				}
+			if found, isCandidate := flows.candidateAt(node, stack); isCandidate {
+				candidates = append(candidates, found)
 			}
 			stack = append(stack, node)
 			return true

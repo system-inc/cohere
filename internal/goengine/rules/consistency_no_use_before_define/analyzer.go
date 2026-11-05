@@ -27,7 +27,7 @@ var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_use_before_define",
 	Doc: "Flags a reference to a package-level var or const that is declared further down the same file, because a " +
 		"reader meets the name before the value it holds. Functions, types and references from other files are not " +
-		"judged, and a generated file is left alone.",
+		"judged.",
 	Run: run,
 }
 
@@ -40,11 +40,6 @@ var useBeforeDefinitionMessage = policy.MessageOf(Name, "useBeforeDefinition")
 func run(pass *analysis.Pass) (any, error) {
 	packageScope := pass.Pkg.Scope()
 	for _, file := range pass.Files {
-		// A generated file is its generator's to order, and the generator's next run puts the order back. This is the
-		// one place the rule skips a file, so a driver filter can take it over by deleting these lines.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		ast.Inspect(file, func(node ast.Node) bool {
 			identifier, isIdentifier := node.(*ast.Ident)
 			if !isIdentifier {

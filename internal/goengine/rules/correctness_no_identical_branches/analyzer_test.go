@@ -27,7 +27,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // statement shadows a name. analysistest fails on a finding no want expects as much as on a want nothing found, so
 // the allowed and lookalike fixtures prove the rule stays quiet on branches that differ, empty branches, a chain
 // with no final else, a switch with no default, a type switch that binds its variable, a spread against a slice, a
-// raw string against a quoted one, a fallthrough, a select, and a generated file.
+// raw string against a quoted one, a fallthrough, and a select.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

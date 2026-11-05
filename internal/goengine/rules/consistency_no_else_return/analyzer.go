@@ -31,7 +31,7 @@ var Analyzer = &analysis.Analyzer{
 	Doc: "Flags the final else of an if or else-if chain whose every branch always returns, since the code after " +
 		"the chain runs only when no branch returned and the else adds a level of indentation to say nothing. An " +
 		"else that reads a variable declared in an if's init statement is left alone, since dropping it would mean " +
-		"widening that variable's scope, and so is a labeled if and a generated file.",
+		"widening that variable's scope, and so is a labeled if.",
 	Run: run,
 }
 
@@ -43,11 +43,6 @@ var elseAfterReturnMessage = policy.MessageOf(Name, "elseAfterReturn")
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// A generated file is its generator's to shape, and the generator's next run undoes any edit by hand. This is
-		// the one place the rule skips a file, so a driver filter can take it over by deleting these lines.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		// An if that is another if's else, or that a label holds, is no chain head and is never judged on its own.
 		// The walk reaches a parent before its children, so each is set aside before the walk arrives at it.
 		notHeads := map[*ast.IfStmt]bool{}

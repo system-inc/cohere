@@ -22,12 +22,12 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 }
 
 // The flagged fixtures carry a // want at the package clause of each package the rule must report: folders named
-// utils, util and _utils, a utils folder nested below another, and a utils clause in a folder named otherwise. The
-// utils package also holds a second file, an in-package test and an external test, and the util package opens with a
-// generated file, so a finding anywhere but the first written file, or a second finding for one package, fails. The
-// allowed and lookalike fixtures prove the rule stays quiet on the house spelling, on names that only contain utils,
-// on a package whose every file is generated, and on a file, import or variable named utils. The packages are named
-// one by one, since a ... pattern skips a folder whose name begins with an underscore.
+// utils, util and _utils, a utils folder nested below another, a utils clause in a folder named otherwise, and a
+// package whose every file is generated, reported at its first. The utils package also holds a second file, an
+// in-package test and an external test, and the util package opens with a generated file, so a finding anywhere but
+// the first written file, or a second finding for one package, fails. The allowed and lookalike fixtures prove the
+// rule stays quiet on the house spelling, on names that only contain utils, and on a file, import or variable named
+// utils. The packages are named one by one, since a ... pattern skips a folder whose name begins with an underscore.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(
@@ -39,11 +39,11 @@ func TestAnalyzer(test *testing.T) {
 		"flagged/_utils",
 		"flagged/clause",
 		"flagged/nested/utils",
+		"flagged/generated/utils",
 		"allowed/utilities",
 		"allowed/plain",
 		"lookalike/utilsomething",
 		"lookalike/myutils",
-		"lookalike/generated/utils",
 		"lookalike/mention",
 	)
 }

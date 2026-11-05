@@ -5,7 +5,7 @@
 // rule reads every comment and every string literal's value, raw or interpreted, and reports each dash at the rune
 // itself. A dash an interpreted string spells with an escape is in the value all the same, so it is reported too, at
 // the literal, since the escape is where the source holds it. A hyphen-minus and the minus sign (U+2212) are other
-// characters and are never read as dashes. Generated files are not read.
+// characters and are never read as dashes.
 package consistency_no_dash_punctuation
 
 import (
@@ -28,7 +28,7 @@ const Name = "cohere-go/consistency-no-dash-punctuation"
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_dash_punctuation",
 	Doc: "Flags each em-dash or en-dash in a comment or a string literal's value, because readers clock them as " +
-		"generated text and tune out. Generated files are not read.",
+		"generated text and tune out.",
 	Run: run,
 }
 
@@ -58,10 +58,6 @@ var dashNames = []struct {
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// A generated file's text is its generator's, and the fix belongs there.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		for _, group := range file.Comments {
 			for _, comment := range group.List {
 				// comment.Text is the comment's source from its first slash, so it starts at comment.Pos().

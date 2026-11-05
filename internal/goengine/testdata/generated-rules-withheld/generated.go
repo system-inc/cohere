@@ -68,3 +68,45 @@ type Position struct {
 func (position Position) Line() int {
 	return position.line
 }
+
+var payload any = 1
+
+var pages = "pages 3–7"
+
+func generatedSign(count int) int {
+	if count < 0 {
+		return -1
+	} else {
+		return 1
+	}
+}
+
+func generatedMode(fast bool) string {
+	mode := ""
+	if fast {
+		mode = "quick"
+	} else {
+		mode = "quick"
+	}
+	return mode
+}
+
+func generatedColumn(position Position) int {
+	line := position.line
+	return line
+}
+
+func generatedCeiling() int {
+	return ceiling
+}
+
+var ceiling = 8
+
+func generatedIndex() {
+	seen := map[string]bool{}
+	seen["first"] = true
+}
+
+func generatedTotal() int {
+	return result.Result
+}

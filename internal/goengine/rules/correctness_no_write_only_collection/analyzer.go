@@ -27,7 +27,7 @@ var Analyzer = &analysis.Analyzer{
 	Doc: "Flags a map or slice declared in a function, fresh from a composite literal, make or its zero value, whose " +
 		"every use writes it (collection[key] = value, delete, clear, collection = append(collection, ...)) and at " +
 		"least one write is not an append. A slice only ever appended to is staticcheck's SA4010, which holds the " +
-		"append half, so this rule leaves it alone. Generated files are not judged.",
+		"append half, so this rule leaves it alone.",
 	Run: run,
 }
 
@@ -60,11 +60,6 @@ type collection struct {
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// A generated file is its generator's to change, and the generator's next run puts any edit by hand back.
-		// This is the one place generated files are skipped.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		collections := freshCollections(pass, file)
 		if len(collections) == 0 {
 			continue

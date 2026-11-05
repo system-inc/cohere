@@ -25,7 +25,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // a pointer receiver, a package variable's field, a generic struct, a function literal's own local, an if's init, a
 // range expression, a deferred call's argument, a multi-byte name, and a read after harmless work. analysistest fails
 // on a finding no want expects as much as on a want nothing found, so the allowed and lookalike fixtures prove the
-// rule stays quiet on reaches written directly, different names, package scope, generated files, and every alias
+// rule stays quiet on reaches written directly, different names, package scope, and every alias
 // that may be a snapshot: read twice, in a closure or a loop, written through, after a call or a write, after a
 // shadowing declaration, beside a goto, or through a chain holding a call, an index, a method or a package name.
 func TestAnalyzer(test *testing.T) {

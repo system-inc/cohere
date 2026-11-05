@@ -23,10 +23,11 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 
 // The flagged fixtures carry a want on every stutter the rule must report: a field or method, exported or not,
 // reached through a local, a parameter, a receiver, a range or closure variable, a package variable, a variable of a
-// type parameter, and through parentheses or a dereference. analysistest fails on a finding no want expects as much
-// as on a want nothing found, so the allowed and lookalike fixtures prove the rule stays quiet on generic names doing
-// their job, a stutter on a word off the list, a member chain, a map key, an imported package, a type's method
-// expression, a dot-imported variable, and a generated file or a variable a generated file declares.
+// type parameter, through parentheses or a dereference, and in a generated file reading a hand-written variable.
+// analysistest fails on a finding no want expects as much as on a want nothing found, so the allowed and lookalike
+// fixtures prove the rule stays quiet on generic names doing their job, a stutter on a word off the list, a member
+// chain, a map key, an imported package, a type's method expression, a dot-imported variable, and a variable a
+// generated file declares, wherever it is read.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

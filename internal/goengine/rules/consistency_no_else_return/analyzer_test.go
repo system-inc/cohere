@@ -26,7 +26,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // clause, a select clause, a function literal and a generic function. analysistest fails on a finding no want expects
 // as much as on a want nothing found, so the allowed and lookalike fixtures prove the rule stays quiet on an early
 // return with no else, a branch that can fall through, a chain with no final else, an else that reads an init
-// statement's variable, a labeled if, a generated file, and a branch that ends in a panic, a continue, a goto, a
+// statement's variable, a labeled if, and a branch that ends in a panic, a continue, a goto, a
 // switch, or a return that belongs to a function literal.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()

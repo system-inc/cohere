@@ -34,7 +34,8 @@ var Analyzer = &analysis.Analyzer{
 	Doc: "Flags a field or method reached through a variable spelled as the member is, up to the case of the first " +
 		"letter, when the word is a placeholder (outcome, result, data, value, output, response, state, item, " +
 		"thing): result.Result, outcome.Outcome(). The variable must be one this package declares, so an imported " +
-		"package, a type's method expression and a dot-imported variable are left alone, as are generated files.",
+		"package, a type's method expression, a dot-imported variable and a variable a generated file declares are " +
+		"left alone.",
 	Run: run,
 }
 
@@ -68,11 +69,6 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 	}
 	for _, file := range pass.Files {
-		// A generated file is its generator's to name, and the generator's next run writes the stutter back. This is
-		// the one place generated files are skipped.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		ast.Inspect(file, func(node ast.Node) bool {
 			selector, isSelector := node.(*ast.SelectorExpr)
 			if !isSelector {

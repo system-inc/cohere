@@ -4,7 +4,8 @@ package allowed
 
 type Result struct{ Result int }
 
-// A generated file is its generator's to name, so a stutter in one is never reported.
+// A variable a generated file declares is its generator's to name, so a stutter on one is never reported, here or
+// where hand-written code reads it.
 func generatedStutter(result Result) int {
 	return result.Result
 }

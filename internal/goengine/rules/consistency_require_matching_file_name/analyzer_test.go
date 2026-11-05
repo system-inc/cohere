@@ -27,7 +27,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // a type whose only method sits in a test file, and main.go outside package main. analysistest fails on a finding no
 // want expects as much as on a want nothing found, so the allowed and lookalike fixtures prove the rule stays quiet
 // on a file named for its type in any spelling of its words, a themed file of methods, a //line directive, a test
-// file's helper, a generated file, a file serving no type or two, and main.go in package main.
+// file's helper, a file serving no type or two, and main.go in package main.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

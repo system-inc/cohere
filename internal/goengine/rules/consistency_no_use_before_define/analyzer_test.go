@@ -27,7 +27,7 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // earlier var's initializer, in an array length, as a map key, and from an earlier spec of the same group.
 // analysistest fails on a finding no want expects as much as on a want nothing found, so the allowed and lookalike
 // fixtures prove the rule stays quiet on a var or const declared above its use, a type or function used before its
-// definition, a use from another file of the package, a generated file, a local or parameter that shadows a later
+// definition, a use from another file of the package, a local or parameter that shadows a later
 // package name, a struct field and a method of the same name, and another package's name.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()

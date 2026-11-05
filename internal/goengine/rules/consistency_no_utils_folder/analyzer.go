@@ -25,7 +25,8 @@ const Name = "cohere-go/consistency-no-utils-folder"
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_utils_folder",
 	Doc: "Flags a package whose folder, the last element of its import path, or whose package clause is utils, " +
-		"util or _utils, once per package at the package clause of its first file that is not generated. Only " +
+		"util or _utils, once per package at the package clause of its first file that is not generated, or of its " +
+		"first file when every file is generated. Only " +
 		"the package's own folder is judged, never the folders above it, since the pass does not know where the " +
 		"module starts.",
 	Run: run,
@@ -52,10 +53,11 @@ var replacements = map[string]string{
 }
 
 func run(pass *analysis.Pass) (any, error) {
-	first := firstWrittenFile(pass)
-	if first == nil {
+	// A package with no files has no package clause to report at.
+	if len(pass.Files) == 0 {
 		return nil, nil
 	}
+	first := findingFile(pass)
 	// The folder is read from the import path, whose last element names the package's folder, rather than from a
 	// file's path, which for a cgo package is a translation in the build cache and which a //line directive can
 	// rename. Only the last element is judged: the pass does not know where the module starts, and judging every
@@ -82,19 +84,16 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-// firstWrittenFile is the package's first file that is not generated, where the package's one finding sits, or nil
-// when every file is generated.
-func firstWrittenFile(pass *analysis.Pass) *ast.File {
+// findingFile is the file whose package clause holds the package's one finding: the first file that is not generated,
+// since a finding in a generated file points a reader at a file they cannot edit, and the first file when every file
+// is generated, where the engine withholds the finding and counts it. pass.Files is not empty.
+func findingFile(pass *analysis.Pass) *ast.File {
 	for _, file := range pass.Files {
-		// A generated file's package clause is its generator's, and a finding there points a reader at a file they
-		// cannot edit. This is the one place the rule skips a file, so a package whose every file is generated is
-		// its generator's to name and is not judged.
-		if ast.IsGenerated(file) {
-			continue
+		if !ast.IsGenerated(file) {
+			return file
 		}
-		return file
 	}
-	return nil
+	return pass.Files[0]
 }
 
 // report flags file's package clause, which names the package a reader is about to rename.

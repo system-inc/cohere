@@ -28,8 +28,8 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // The flagged fixtures carry a want for every dash: in a doc comment, a line comment, a block comment on one line and
 // across lines, an interpreted string, a raw string on one line and across lines, and spelled by \u, \U, \x and octal
 // escapes. analysistest fails on a finding no want expects as much as on a want nothing found, so the allowed and
-// lookalike fixtures prove the rule stays quiet on a hyphen-minus, the minus sign, the Unicode hyphen, a rune literal
-// and a generated file. Each finding's span is then checked against the dash it names.
+// lookalike fixtures prove the rule stays quiet on a hyphen-minus, the minus sign, the Unicode hyphen and a rune
+// literal. Each finding's span is then checked against the dash it names.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	results := analysistest.Run(

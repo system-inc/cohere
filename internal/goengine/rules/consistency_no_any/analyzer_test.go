@@ -25,8 +25,8 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // fields, interface methods, variables, named types and type arguments, and analysistest fails on a finding no want
 // expects as much as on a want nothing found. So the allowed fixtures prove the rule stays quiet where another
 // package fixes the type: a method matching another package's, a callback, a forwarded slice, a value taken from
-// another package; and the lookalike fixtures prove it stays quiet on constraints, types inside expressions, a local
-// type or parameter named any, and a generated file.
+// another package; and the lookalike fixtures prove it stays quiet on constraints, types inside expressions, and a
+// local type or parameter named any.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

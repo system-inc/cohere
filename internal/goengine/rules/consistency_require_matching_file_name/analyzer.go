@@ -31,8 +31,8 @@ var Analyzer = &analysis.Analyzer{
 	Name: "consistency_require_matching_file_name",
 	Doc: "Flags a file that serves exactly one type with methods and is not named for it: a file declaring the type " +
 		"is its name in snake_case, with Go's own _GOOS, _GOARCH or _GOOS_GOARCH suffix if it has one, and a file " +
-		"of only its methods may add a theme, graph_walk.go for Graph. A test file, a generated file, main.go in " +
-		"package main, and a file serving no type or several are not judged.",
+		"of only its methods may add a theme, graph_walk.go for Graph. A test file, main.go in package main, and " +
+		"a file serving no type or several are not judged.",
 	Run: run,
 }
 
@@ -87,11 +87,6 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 	}
 	for _, file := range pass.Files {
-		// A generated file is named by its generator, and the generator's next run undoes a rename by hand. This is
-		// the one place the rule skips a file, so a driver filter can take it over by deleting these lines.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		judgeFile(pass, file, hasMethods)
 	}
 	return nil, nil

@@ -73,8 +73,8 @@ var Analyzer = &analysis.Analyzer{
 	Name: "correctness_no_identical_branches",
 	Doc: "Flags an if with an else, and a switch or type switch with a default, whose every branch is the same code, " +
 		"since its condition then chooses nothing and one branch was usually meant to differ. Comments and layout do " +
-		"not count, and every name must denote the same thing on both sides. Empty branches, a select, a type switch " +
-		"that binds a variable, and a generated file are left alone.",
+		"not count, and every name must denote the same thing on both sides. Empty branches, a select, and a type " +
+		"switch that binds a variable are left alone.",
 	Run: run,
 }
 
@@ -86,11 +86,6 @@ var identicalBranchesMessage = policy.MessageOf(Name, "identicalBranches")
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// A generated file is its generator's to write, and the generator's next run undoes any edit by hand. This is
-		// the one place the rule skips a file, so a driver filter can take it over by deleting these lines.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		// elseOf maps an if that is another's else to that other if. The walk reaches a parent before its children,
 		// so by the time the last if of a chain is judged, every link above it is here to widen the finding through.
 		elseOf := map[*ast.IfStmt]*ast.IfStmt{}

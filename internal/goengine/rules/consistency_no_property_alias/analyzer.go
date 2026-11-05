@@ -78,11 +78,6 @@ var measuringBuiltins = map[string]bool{
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
-		// A generated file is its generator's to change, and the generator's next run undoes any edit by hand. A
-		// driver filter will take this over.
-		if ast.IsGenerated(file) {
-			continue
-		}
 		ast.Inspect(file, func(node ast.Node) bool {
 			switch function := node.(type) {
 			case *ast.FuncDecl:
