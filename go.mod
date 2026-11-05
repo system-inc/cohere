@@ -59,9 +59,11 @@ require (
 	golang.org/x/mod v0.39.0
 	golang.org/x/sys v0.47.0
 
-	// Tests only: the registry's option-decoding guard loads the rules tree with type information,
-	// because whether a decode is strict depends on the type it decodes into, which a regex over the
-	// source cannot see. It was already in the graph through stringer.
+	// The Go engine's analysis framework: every Go rule is a go/analysis analyzer (internal/goengine/rule),
+	// so vet's own suite, analysistest and facts across packages work unchanged, and the engine loads with
+	// go/packages and runs the rules with go/analysis/checker. Tests use it too: the registry's
+	// option-decoding guard loads the rules tree with type information, because whether a decode is strict
+	// depends on the type it decodes into, which a regex over the source cannot see.
 	golang.org/x/tools v0.49.0
 )
 
