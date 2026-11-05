@@ -23,7 +23,8 @@ var messageNoDerivingStateInEffects = rule.Message{
 //
 //	valid:   function C({a}) { const [v, setV] = useState(0); useEffect(() => { setV(a); log(); }, [a]); return v; }
 //	valid:   function C({a, b}) { const [v, setV] = useState(0); useEffect(() => { setV(a); }, [a, b]); return v; }
-//	invalid: function C({a, b}) { const [v, setV] = useState(''); useEffect(() => { setV(a + b); }, [a, b]); return v; }
+//	invalid: function C({a, b}) { const [v, setV] = useState(''); useEffect(() => { setV(a + b); }, [a, b]);
+//	         return v; }
 //
 // # The authority, and which of two passes it is
 //
@@ -173,9 +174,9 @@ func analyzeDerivedComputationsSubject(
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
+	compilationUnit := high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunctionWithoutManualMemoization)
-	reportDerivedComputationsInEffects(ruleContext, function)
+	reportDerivedComputationsInEffects(ruleContext, compilationUnit)
 }
 
 // reportDerivedComputationsInEffects is upstream's `validateNoDerivedComputationsInEffects` over one
@@ -190,7 +191,8 @@ func reportDerivedComputationsInEffects(
 
 	// Upstream's three maps, keyed the same way. Single-assignment form is what lets each be one
 	// entry per value rather than per binding.
-	candidateDependencies := map[static_single_assignment.IdentifierId]*high_level_intermediate_representation.ArrayExpression{}
+	candidateDependencies :=
+		map[static_single_assignment.IdentifierId]*high_level_intermediate_representation.ArrayExpression{}
 	functions := map[static_single_assignment.IdentifierId]*high_level_intermediate_representation.FunctionExpression{}
 	locals := map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{}
 
@@ -444,7 +446,9 @@ func validateDerivedEffect(
 
 			switch value := instruction.Value.(type) {
 			// Upstream's inert set: a constant contributes no taint and is not a reason to give up.
-			case *high_level_intermediate_representation.Primitive, *high_level_intermediate_representation.JsxText, *high_level_intermediate_representation.LoadGlobal:
+			case *high_level_intermediate_representation.Primitive,
+				*high_level_intermediate_representation.JsxText,
+				*high_level_intermediate_representation.LoadGlobal:
 
 			case *high_level_intermediate_representation.LoadLocal:
 				if deps, ok := values[value.Place.Identifier]; ok {
@@ -461,8 +465,12 @@ func validateDerivedEffect(
 					values[instruction.LValue.Identifier] = deps
 				}
 
-			case *high_level_intermediate_representation.ComputedLoad, *high_level_intermediate_representation.PropertyLoad, *high_level_intermediate_representation.BinaryExpression, *high_level_intermediate_representation.TemplateLiteral,
-				*high_level_intermediate_representation.CallExpression, *high_level_intermediate_representation.MethodCall:
+			case *high_level_intermediate_representation.ComputedLoad,
+				*high_level_intermediate_representation.PropertyLoad,
+				*high_level_intermediate_representation.BinaryExpression,
+				*high_level_intermediate_representation.TemplateLiteral,
+				*high_level_intermediate_representation.CallExpression,
+				*high_level_intermediate_representation.MethodCall:
 				aggregate := map[static_single_assignment.IdentifierId]bool{}
 				high_level_intermediate_representation.EachPlace(instruction.Value, func(
 					place high_level_intermediate_representation.Place,

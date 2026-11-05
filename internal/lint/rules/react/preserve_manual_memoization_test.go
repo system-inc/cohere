@@ -74,7 +74,8 @@ function Component(props) {
 }
 `
 
-// optionalMemberDependencyNonOptionalInBody is `error.invalid-optional-member-expression-as-memo-dep-non-optional-in-body.js`.
+// optionalMemberDependencyNonOptionalInBody is
+// `error.invalid-optional-member-expression-as-memo-dep-non-optional-in-body.js`.
 //
 // An optional member expression written as a dependency and read non-optionally in the body.
 const optionalMemberDependencyNonOptionalInBody = `// @validatePreserveExistingMemoizationGuarantees
@@ -88,7 +89,8 @@ function Component(props) {
 }
 `
 
-// useMemoOverlappingScopes is `preserve-memo-validation/error.false-positive-useMemo-overlap-scopes.ts`.
+// useMemoOverlappingScopes is
+// `preserve-memo-validation/error.false-positive-useMemo-overlap-scopes.ts`.
 //
 // Overlapping reactive scopes; upstream anchors at 23:10 on the dependency identifier.
 const useMemoOverlappingScopes = "// @validatePreserveExistingMemoizationGuarantees:true\nimport {useMemo} from 'react';\nimport {arrayPush} from 'shared-runtime';\n\n/**\n * Repro showing differences between mutable ranges and scope ranges.\n *\n * For useMemo dependency `x`:\n * - mutable range ends after the `arrayPush(x, b)` instruction\n * - scope range is extended due to MergeOverlappingScopes\n *\n * Since manual memo deps are guaranteed to be named (guaranteeing valid\n * codegen), it's correct to take a dependency on a dep *before* the end\n * of its scope (but after its mutable range ends).\n */\n\nfunction useFoo(a, b) {\n  const x = [];\n  const y = [];\n  arrayPush(x, b);\n  const result = useMemo(() => {\n    return [Math.max(x[1], a)];\n  }, [a, x]);\n  arrayPush(y, 3);\n  return {result, y};\n}\n\nexport const FIXTURE_ENTRYPOINT = {\n  fn: useFoo,\n  params: [1, 2],\n};\n"
@@ -360,20 +362,23 @@ export const FIXTURE_ENTRYPOINT = {
 // preserveManualMemoizationFixtureSources maps each fixture to the corpus file it was copied
 // from, so the copies can be diffed against the originals.
 var preserveManualMemoizationFixtureSources = map[string]string{
-	"new-mutability/error.invalid-useCallback-captures-reassigned-context.js":      reassignedContextCapture,
-	"error.hoist-optional-member-expression-with-conditional-optional.js":          hoistOptionalMemberWithConditionalOptional,
-	"error.invalid-optional-member-expression-as-memo-dep-non-optional-in-body.js": optionalMemberDependencyNonOptionalInBody,
-	"preserve-memo-validation/error.false-positive-useMemo-overlap-scopes.ts":      useMemoOverlappingScopes,
-	"error.todo-preserve-memo-deps-mixed-optional-nonoptional-property-chain.js":   mixedOptionalNonOptionalPropertyChain,
-	"preserve-memo-validation/preserve-use-callback-stable-built-ins.ts":           preserveManualMemoizationClean1,
-	"preserve-memo-validation/preserve-use-memo-ref-missing-ok.ts":                 preserveManualMemoizationClean2,
-	"preserve-memo-validation/preserve-use-memo-transition.ts":                     preserveManualMemoizationClean3,
-	"preserve-memo-validation/prune-nonescaping-useMemo.ts":                        preserveManualMemoizationClean4,
-	"preserve-memo-validation/maybe-invalid-useMemo-no-memoblock-sideeffect.ts":    preserveManualMemoizationClean5,
-	"optional-member-expression-as-memo-dep.js":                                    preserveManualMemoizationClean6,
-	"preserve-memo-deps-conditional-property-chain.js":                             preserveManualMemoizationClean7,
-	"preserve-memo-deps-optional-property-chain.js":                                preserveManualMemoizationClean8,
-	"memoize-primitive-function-calls.js":                                          preserveManualMemoizationClean9,
+	"new-mutability/error.invalid-useCallback-captures-reassigned-context.js": reassignedContextCapture,
+	"error.hoist-optional-member-expression-" +
+		"with-conditional-optional.js": hoistOptionalMemberWithConditionalOptional,
+	"error.invalid-optional-member-expression-as-memo-dep-" +
+		"non-optional-in-body.js": optionalMemberDependencyNonOptionalInBody,
+	"preserve-memo-validation/error.false-positive-useMemo-overlap-scopes.ts": useMemoOverlappingScopes,
+	"error.todo-preserve-memo-deps-" +
+		"mixed-optional-nonoptional-property-chain.js": mixedOptionalNonOptionalPropertyChain,
+	"preserve-memo-validation/preserve-use-callback-stable-built-ins.ts":        preserveManualMemoizationClean1,
+	"preserve-memo-validation/preserve-use-memo-ref-missing-ok.ts":              preserveManualMemoizationClean2,
+	"preserve-memo-validation/preserve-use-memo-transition.ts":                  preserveManualMemoizationClean3,
+	"preserve-memo-validation/prune-nonescaping-useMemo.ts":                     preserveManualMemoizationClean4,
+	"preserve-memo-validation/maybe-invalid-useMemo-no-memoblock-sideeffect.ts": preserveManualMemoizationClean5,
+	"optional-member-expression-as-memo-dep.js":                                 preserveManualMemoizationClean6,
+	"preserve-memo-deps-conditional-property-chain.js":                          preserveManualMemoizationClean7,
+	"preserve-memo-deps-optional-property-chain.js":                             preserveManualMemoizationClean8,
+	"memoize-primitive-function-calls.js":                                       preserveManualMemoizationClean9,
 }
 
 // preserveManualMemoizationReactDeclarations is a minimal `react` module for the fixtures.
@@ -482,20 +487,23 @@ func TestFixturesMatchTheVendoredCorpus(test *testing.T) {
 
 	const corpus = "conformance/testdata/fixtures"
 	copies := map[string]string{
-		"new-mutability/error.invalid-useCallback-captures-reassigned-context.js":      reassignedContextCapture,
-		"error.hoist-optional-member-expression-with-conditional-optional.js":          hoistOptionalMemberWithConditionalOptional,
-		"error.invalid-optional-member-expression-as-memo-dep-non-optional-in-body.js": optionalMemberDependencyNonOptionalInBody,
-		"preserve-memo-validation/error.false-positive-useMemo-overlap-scopes.ts":      useMemoOverlappingScopes,
-		"error.todo-preserve-memo-deps-mixed-optional-nonoptional-property-chain.js":   mixedOptionalNonOptionalPropertyChain,
-		"preserve-memo-validation/preserve-use-callback-stable-built-ins.ts":           preserveManualMemoizationClean1,
-		"preserve-memo-validation/preserve-use-memo-ref-missing-ok.ts":                 preserveManualMemoizationClean2,
-		"preserve-memo-validation/preserve-use-memo-transition.ts":                     preserveManualMemoizationClean3,
-		"preserve-memo-validation/prune-nonescaping-useMemo.ts":                        preserveManualMemoizationClean4,
-		"preserve-memo-validation/maybe-invalid-useMemo-no-memoblock-sideeffect.ts":    preserveManualMemoizationClean5,
-		"optional-member-expression-as-memo-dep.js":                                    preserveManualMemoizationClean6,
-		"preserve-memo-deps-conditional-property-chain.js":                             preserveManualMemoizationClean7,
-		"preserve-memo-deps-optional-property-chain.js":                                preserveManualMemoizationClean8,
-		"memoize-primitive-function-calls.js":                                          preserveManualMemoizationClean9,
+		"new-mutability/error.invalid-useCallback-captures-reassigned-context.js": reassignedContextCapture,
+		"error.hoist-optional-member-expression-" +
+			"with-conditional-optional.js": hoistOptionalMemberWithConditionalOptional,
+		"error.invalid-optional-member-expression-as-memo-dep-" +
+			"non-optional-in-body.js": optionalMemberDependencyNonOptionalInBody,
+		"preserve-memo-validation/error.false-positive-useMemo-overlap-scopes.ts": useMemoOverlappingScopes,
+		"error.todo-preserve-memo-deps-" +
+			"mixed-optional-nonoptional-property-chain.js": mixedOptionalNonOptionalPropertyChain,
+		"preserve-memo-validation/preserve-use-callback-stable-built-ins.ts":        preserveManualMemoizationClean1,
+		"preserve-memo-validation/preserve-use-memo-ref-missing-ok.ts":              preserveManualMemoizationClean2,
+		"preserve-memo-validation/preserve-use-memo-transition.ts":                  preserveManualMemoizationClean3,
+		"preserve-memo-validation/prune-nonescaping-useMemo.ts":                     preserveManualMemoizationClean4,
+		"preserve-memo-validation/maybe-invalid-useMemo-no-memoblock-sideeffect.ts": preserveManualMemoizationClean5,
+		"optional-member-expression-as-memo-dep.js":                                 preserveManualMemoizationClean6,
+		"preserve-memo-deps-conditional-property-chain.js":                          preserveManualMemoizationClean7,
+		"preserve-memo-deps-optional-property-chain.js":                             preserveManualMemoizationClean8,
+		"memoize-primitive-function-calls.js":                                       preserveManualMemoizationClean9,
 	}
 	if len(copies) != len(preserveManualMemoizationFixtureSources) {
 		test.Fatalf("the byte check covers %d fixtures and %d are declared; a fixture added above and "+

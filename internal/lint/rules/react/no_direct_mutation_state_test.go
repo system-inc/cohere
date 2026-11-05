@@ -179,7 +179,13 @@ func TestNoDirectMutationStateFires(test *testing.T) {
               this.state.items[id].prop++;
             }
           }
-        `, []string{"this.state.x[id]", "this.state.x[id].y", "this.state.items[id].prop", "this.state.x[id]++", "this.state.items[id].prop++"}},
+        `, []string{
+			"this.state.x[id]",
+			"this.state.x[id].y",
+			"this.state.items[id].prop",
+			"this.state.x[id]++",
+			"this.state.items[id].prop++",
+		}},
 	}
 
 	for _, testCase := range cases {
