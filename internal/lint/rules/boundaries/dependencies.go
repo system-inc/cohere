@@ -180,20 +180,22 @@ func decodeOneOrMany[Item any](raw []byte, into *[]Item, shape string) error {
 //
 // A refusal names the key. The alternative, loading a config whose policy this port only partly
 // understands, would enforce a narrower boundary than the one written and say nothing about it.
-func decodeDependenciesOptions(raw []byte, base rule.OptionsBase) (any, error) {
+func decodeDependenciesOptions(raw []byte, base rule.OptionsBase) (DependenciesOptions, error) {
 	if len(raw) == 0 {
-		return nil, fmt.Errorf("boundaries/dependencies needs its options: the elements that say which " +
-			"folder is which layer, and the policies between them. With neither, no file is an element " +
-			"and the rule would decide nothing")
+		return DependenciesOptions{}, fmt.Errorf(
+			"boundaries/dependencies needs its options: the elements that say which " +
+				"folder is which layer, and the policies between them. With neither, no file is an element " +
+				"and the rule would decide nothing",
+		)
 	}
 
 	var settings DependenciesOptions
 	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &settings); unmarshalOptionsError != nil {
-		return nil, fmt.Errorf("boundaries/dependencies: %w", unmarshalOptionsError)
+		return DependenciesOptions{}, fmt.Errorf("boundaries/dependencies: %w", unmarshalOptionsError)
 	}
 
 	if settings.Default != "" && settings.Default != "allow" && settings.Default != "disallow" {
-		return nil, fmt.Errorf(
+		return DependenciesOptions{}, fmt.Errorf(
 			"boundaries/dependencies: default is %q, and upstream accepts only \"allow\" or \"disallow\"",
 			settings.Default,
 		)
@@ -204,53 +206,80 @@ func decodeDependenciesOptions(raw []byte, base rule.OptionsBase) (any, error) {
 		"checkInternals":     settings.CheckInternals,
 	} {
 		if flag != nil && *flag {
-			return nil, fmt.Errorf("boundaries/dependencies: %s is true, and this port implements only its "+
-				"default, false. Reading it as false would check fewer dependencies than the config asks for", name)
+			return DependenciesOptions{}, fmt.Errorf(
+				"boundaries/dependencies: %s is true, and this port implements only its "+
+					"default, false. Reading it as false would check fewer dependencies than the config asks for",
+				name,
+			)
 		}
 	}
 
 	if len(settings.Elements) == 0 {
-		return nil, fmt.Errorf("boundaries/dependencies has no elements, so no file would belong to a layer " +
-			"and the rule would report nothing. Write them under \"elements\", the shape of upstream's " +
-			"boundaries/elements setting")
+		return DependenciesOptions{}, fmt.Errorf(
+			"boundaries/dependencies has no elements, so no file would belong to a layer " +
+				"and the rule would report nothing. Write them under \"elements\", the shape of upstream's " +
+				"boundaries/elements setting",
+		)
 	}
 	for index, descriptor := range settings.Elements {
 		if descriptor.Type == "" {
-			return nil, fmt.Errorf("boundaries/dependencies: element %d has no type", index)
+			return DependenciesOptions{}, fmt.Errorf("boundaries/dependencies: element %d has no type", index)
 		}
 		if len(descriptor.Pattern) == 0 {
-			return nil, fmt.Errorf("boundaries/dependencies: element %q has no pattern", descriptor.Type)
+			return DependenciesOptions{}, fmt.Errorf(
+				"boundaries/dependencies: element %q has no pattern",
+				descriptor.Type,
+			)
 		}
 		for _, pattern := range descriptor.Pattern {
 			if strings.ContainsAny(pattern, "{}()") {
-				return nil, fmt.Errorf("boundaries/dependencies: element %q has pattern %q, and this port matches "+
-					"`*`, `?`, `[...]` and `**` but not micromatch's brace or extglob syntax", descriptor.Type, pattern)
+				return DependenciesOptions{}, fmt.Errorf(
+					"boundaries/dependencies: element %q has pattern %q, and this port matches "+
+						"`*`, `?`, `[...]` and `**` but not micromatch's brace or extglob syntax",
+					descriptor.Type,
+					pattern,
+				)
 			}
 		}
 		if descriptor.Mode != "" && descriptor.Mode != "folder" {
-			return nil, fmt.Errorf("boundaries/dependencies: element %q has mode %q, and this port implements "+
-				"only the default folder mode", descriptor.Type, descriptor.Mode)
+			return DependenciesOptions{}, fmt.Errorf(
+				"boundaries/dependencies: element %q has mode %q, and this port implements "+
+					"only the default folder mode",
+				descriptor.Type,
+				descriptor.Mode,
+			)
 		}
 	}
 
 	for index, policy := range settings.Policies {
 		if len(policy.Allow) == 0 && len(policy.Disallow) == 0 {
-			return nil, fmt.Errorf("boundaries/dependencies: policy %d has neither allow nor disallow, so it "+
-				"could never decide a dependency", index)
+			return DependenciesOptions{}, fmt.Errorf(
+				"boundaries/dependencies: policy %d has neither allow nor disallow, so it "+
+					"could never decide a dependency",
+				index,
+			)
 		}
 		if refuseTemplateError := refuseTemplate(policy.Message); refuseTemplateError != nil {
-			return nil, fmt.Errorf("boundaries/dependencies: policy %d: %w", index, refuseTemplateError)
+			return DependenciesOptions{}, fmt.Errorf(
+				"boundaries/dependencies: policy %d: %w",
+				index,
+				refuseTemplateError,
+			)
 		}
 		for _, selectors := range []entitySelectors{policy.From, policy.To} {
 			if checkEntitySelectorsError := checkEntitySelectors(selectors); checkEntitySelectorsError != nil {
-				return nil, fmt.Errorf("boundaries/dependencies: policy %d: %w", index, checkEntitySelectorsError)
+				return DependenciesOptions{}, fmt.Errorf(
+					"boundaries/dependencies: policy %d: %w",
+					index,
+					checkEntitySelectorsError,
+				)
 			}
 		}
 		for _, entries := range []dependencySelectors{policy.Allow, policy.Disallow} {
 			for _, entry := range entries {
 				for _, selectors := range []entitySelectors{entry.From, entry.To} {
 					if checkEntitySelectorsError := checkEntitySelectors(selectors); checkEntitySelectorsError != nil {
-						return nil, fmt.Errorf(
+						return DependenciesOptions{}, fmt.Errorf(
 							"boundaries/dependencies: policy %d: %w",
 							index,
 							checkEntitySelectorsError,
@@ -261,7 +290,7 @@ func decodeDependenciesOptions(raw []byte, base rule.OptionsBase) (any, error) {
 		}
 	}
 	if refuseTemplateError := refuseTemplate(settings.Message); refuseTemplateError != nil {
-		return nil, fmt.Errorf("boundaries/dependencies: %w", refuseTemplateError)
+		return DependenciesOptions{}, fmt.Errorf("boundaries/dependencies: %w", refuseTemplateError)
 	}
 
 	// Anchored where the config was written, which is where upstream's rootPath sits for every project
@@ -554,15 +583,15 @@ func (settings DependenciesOptions) messageFor(policyIndex int, from element, to
 // only `.ts`, `.mts` and `.tsx`, and those files hold no `require` call by that bare name (the six
 // `require(` matches are `request.require(key)`, which upstream's `callee.name=require` skips too),
 // so the divergence reaches nothing there today.
-var Dependencies = rule.Rule{
+var Dependencies = rule.Rule[DependenciesOptions]{
 	Name: "boundaries/dependencies",
 	// The project root, and where this file's imports resolve.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsModuleResolution,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[DependenciesOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil || ruleContext.Program == nil {
 			return nil
 		}
-		settings, configured := rule.OptionsAs[DependenciesOptions](options)
+		settings, configured := options.Read()
 		if !configured || len(settings.Elements) == 0 {
 			// The decoder refuses an empty element list, so this is a hand-built Context's case, and a
 			// skip rather than a silence if it is ever reached in a run (#pa7k7zv).
