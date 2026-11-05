@@ -200,6 +200,8 @@ func decorateComment[N Node[N]](
 			right = middle
 			continue
 		}
+		// Invariant: a comment is a token between tokens, so the parser builds no node whose range cuts through
+		// one, as Prettier's attacher assumes when it throws "Comment location overlaps with node location".
 		panic(fmt.Sprintf(
 			"printing: comment at %d-%d overlaps a %s at %d-%d",
 			commentStart,
@@ -230,6 +232,8 @@ func decorateComment[N Node[N]](
 // sortedChildNodes is upstream's getSortedChildNodes, src/main/utilities/get-sorted-child-nodes.js: the
 // attachable descendants of node, flattening through nodes a comment cannot attach to, sorted by
 // position. Cached per node, as upstream caches in childNodesCache.
+//
+// Mutates: cache every node walked gets its sorted children stored, so the next comment's search reuses them
 func sortedChildNodes[N Node[N]](node N, ancestors []N, options *Options[N], cache map[N][]N) []N {
 	if cached, present := cache[node]; present {
 		return cached
@@ -367,6 +371,9 @@ func breakTies[N Node[N]](tiesToBreak []*CommentContext[N], options *Options[N])
 	for ; indexOfFirstLeadingComment > 0; indexOfFirstLeadingComment-- {
 		tie := tiesToBreak[indexOfFirstLeadingComment-1]
 		if tie.Preceding != preceding || tie.Following != following {
+			// Invariant: AttachComments flushes the ties whenever the following node changes, and two comments
+			// with one following node have no child between them, so they share the preceding one too, as
+			// Prettier's assert.strictEqual on both holds.
 			panic("printing: a tie to break does not share its neighbours")
 		}
 		gap := options.OriginalText[printer.LocEnd(tie.Comment):gapEnd]

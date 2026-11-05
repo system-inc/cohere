@@ -313,11 +313,22 @@ func attachedSummary(root *toyNode) [][]any {
 	}
 	walk(root)
 	for left := 1; left < len(attached); left++ {
-		for right := left; right > 0 && attached[right][0].(float64) < attached[right-1][0].(float64); right-- {
+		for right := left; right > 0 && attachedStart(attached[right]) < attachedStart(attached[right-1]); right-- {
 			attached[right], attached[right-1] = attached[right-1], attached[right]
 		}
 	}
 	return attached
+}
+
+// attachedStart is the comment offset that opens an attachedSummary entry.
+func attachedStart(entry []any) float64 {
+	start, isNumber := entry[0].(float64)
+	if !isNumber {
+		// Invariant: attachedSummary's walk is the only writer of entries, and it opens each with
+		// float64(comment.From), the number JSON gives upstream's side.
+		panic(fmt.Sprintf("printing: an attached entry opens with a %T, not a float64", entry[0]))
+	}
+	return start
 }
 
 // TestCoreAgreesWithUpstream is the differential. Off unless COHERE_PRETTIER_FORK names the fork.
@@ -339,7 +350,8 @@ func TestCoreAgreesWithUpstream(test *testing.T) {
 	command := exec.Command("node", "--input-type=module", "-e", toyUpstreamScript)
 	command.Dir = root
 	command.Stdin = bytes.NewReader(encoded)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if runError := command.Run(); runError != nil {
 		test.Fatalf("node: %v\n%s", runError, stderr.String())
@@ -378,8 +390,14 @@ func TestCoreAgreesWithUpstream(test *testing.T) {
 		}
 		formatted := doc.Print(printed, doc.Options{PrintWidth: testCase.Width, TabWidth: 2})
 
-		attachedGo, _ := json.Marshal(attachedSummary(testCase.Ast))
-		attachedUpstream, _ := json.Marshal(upstream[index].Attached)
+		attachedGo, attachedGoError := json.Marshal(attachedSummary(testCase.Ast))
+		if attachedGoError != nil {
+			test.Fatalf("case %d: encoding Go's attachment: %v", index, attachedGoError)
+		}
+		attachedUpstream, attachedUpstreamError := json.Marshal(upstream[index].Attached)
+		if attachedUpstreamError != nil {
+			test.Fatalf("case %d: encoding upstream's attachment: %v", index, attachedUpstreamError)
+		}
 		if string(attachedGo) != string(attachedUpstream) {
 			attachMismatches++
 			if attachMismatches <= 3 {

@@ -147,6 +147,8 @@ func isNil(value any) bool {
 // resolve embedded languages, then print from the root, wrapping each node's doc in its comments.
 //
 // Cursor handling is not ported. cohere formats whole files and never tracks a cursor.
+//
+// Mutates: options the print's comments and printed-comment set live on it, for the printers that read them
 func PrintAstToDoc[N Node[N]](ast N, comments []N, options *Options[N]) (doc.Doc, error) {
 	options.Comments = comments
 	if options.printedComments == nil {
@@ -154,12 +156,13 @@ func PrintAstToDoc[N Node[N]](ast N, comments []N, options *Options[N]) (doc.Doc
 	}
 
 	AttachComments(ast, comments, options)
+	root := ast
 	if options.Printer.Preprocess != nil {
-		ast = options.Printer.Preprocess(ast, options)
+		root = options.Printer.Preprocess(root, options)
 	}
 
 	cache := make(map[N]doc.Doc, options.NodeCount)
-	path := NewAstPath(ast)
+	path := NewAstPath(root)
 	path.Settings = options.Settings
 	embeds := map[N]doc.Doc{}
 
@@ -191,6 +194,8 @@ func PrintAstToDoc[N Node[N]](ast N, comments []N, options *Options[N]) (doc.Doc
 			if typed == path {
 				return mainPrintInternal(args)
 			}
+			// Invariant: a printer only ever hands print the path it was given, the one this function made, as
+			// Prettier's mainPrint assumes when it takes any other selector for a property name.
 			panic("printing: print was called with a path other than the one being printed")
 		case []any:
 			return Call(path, func(*AstPath[N]) doc.Doc { return mainPrintInternal(args) }, typed...)
@@ -278,6 +283,8 @@ func ensurePrintingNode[N Node[N]](path *AstPath[N], options *Options[N]) {
 	if slices.Contains(options.Printer.VisitorKeys(parent), key) {
 		return
 	}
+	// Invariant: a printer port calls print only on a property its visitor keys name, as Prettier's printers do
+	// and its development build checks here, so a stop is a bug in the port, never something in the input.
 	panic(fmt.Sprintf("printing: print() called on %q of a %s, which is not one of its visitor keys %v",
 		key, parent.Type(), options.Printer.VisitorKeys(parent)))
 }
@@ -287,6 +294,9 @@ func ensurePrintingNode[N Node[N]](path *AstPath[N], options *Options[N]) {
 //
 // An embed that fails is dropped and the node prints normally, as upstream's try/catch drops it. That
 // is observable: a fenced code block that does not parse prints as written rather than failing the file.
+//
+// Mutates: path each embed runs with the path at its node, and the stack is back where it was on return
+// Mutates: embeds every embed that printed is stored by node, for callPluginPrintFunction to print in its place
 func printEmbeddedLanguages[N Node[N]](path *AstPath[N], print PrintFunc, options *Options[N], embeds map[N]doc.Doc) {
 	if options.EmbeddedLanguageFormatting != "" && options.EmbeddedLanguageFormatting != "auto" {
 		return
