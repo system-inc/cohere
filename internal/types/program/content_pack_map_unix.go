@@ -15,6 +15,8 @@ func mapFile(path string) []byte {
 	if err != nil {
 		return nil
 	}
+	// Ignored: the file is opened read-only, only to map it, so closing it loses no write, and the mapping
+	// outlives the descriptor.
 	defer file.Close()
 	information, err := file.Stat()
 	if err != nil || information.Size() == 0 {

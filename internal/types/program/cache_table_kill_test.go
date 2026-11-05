@@ -37,7 +37,10 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(test *testing.T) {
 	}
 	if directory := os.Getenv("COHERE_TEST_WRITE_TABLE"); directory != "" {
 		// The writer: the new table, held just before its nth rename until it is killed.
-		stopAt, _ := strconv.Atoi(os.Getenv("COHERE_TEST_STOP_AT_RENAME"))
+		stopAt, parseError := strconv.Atoi(os.Getenv("COHERE_TEST_STOP_AT_RENAME"))
+		if parseError != nil {
+			test.Fatalf("reading the rename to stop at: %v", parseError)
+		}
 		marker := os.Getenv("COHERE_TEST_HELD_MARKER")
 		renames := 0
 		beforeCacheTableRename = func(temporaryName string) {
@@ -46,12 +49,18 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(test *testing.T) {
 				return
 			}
 			// Written beside the marker and renamed onto it, so the test never reads half a name.
-			if writeError := os.WriteFile(marker+".partial", []byte(temporaryName), 0o644); writeError == nil {
-				os.Rename(marker+".partial", marker)
+			if writeError := os.WriteFile(marker+".partial", []byte(temporaryName), 0o644); writeError != nil {
+				test.Fatalf("writing the held marker: %v", writeError)
+			}
+			if renameError := os.Rename(marker+".partial", marker); renameError != nil {
+				test.Fatalf("renaming the held marker into place: %v", renameError)
 			}
 			time.Sleep(time.Minute)
 		}
-		WriteCacheTable(directory, tableSaying("new"), identity, sections, PathAnchor{})
+		writeCacheTableError := WriteCacheTable(directory, tableSaying("new"), identity, sections, PathAnchor{})
+		if writeCacheTableError != nil {
+			test.Fatal(writeCacheTableError)
+		}
 		return
 	}
 
@@ -82,11 +91,17 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(test *testing.T) {
 				time.Sleep(10 * time.Millisecond)
 			}
 			if temporary == "" {
+				// Ignored: this only stops a writer that never got there, and the test fails on the next line
+				// whatever the kill and the wait say.
 				writer.Process.Kill()
+				// Ignored: the writer was just killed, so Wait reports that, and the test fails next either way.
 				writer.Wait()
 				test.Fatal("the writer never reached its held rename, so the kill tests nothing")
 			}
-			writer.Process.Signal(syscall.SIGKILL)
+			if signalError := writer.Process.Signal(syscall.SIGKILL); signalError != nil {
+				test.Fatalf("killing the writer held at its rename: %v", signalError)
+			}
+			// Ignored: a killed writer's Wait reports the kill, which is what the test did on purpose.
 			writer.Wait()
 
 			read, err := ReadCacheTable(directory, identity, sections, PathAnchor{})

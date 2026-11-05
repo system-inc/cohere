@@ -45,16 +45,19 @@ var fixtureDirectory string
 func TestMain(suite *testing.M) {
 	directory, createError := os.MkdirTemp("", "cohere-goengine-format-")
 	if createError != nil {
+		// Ignored: standard error is the only place left to say it, and the test binary exits next.
 		fmt.Fprintf(os.Stderr, "creating the fixture directory: %v\n", createError)
 		os.Exit(1)
 	}
 	fixtureDirectory = directory
 	if writeError := writeFixtures(); writeError != nil {
+		// Ignored: standard error is the only place left to say it, and the test binary exits next.
 		fmt.Fprintf(os.Stderr, "writing the fixtures: %v\n", writeError)
 		os.Exit(1)
 	}
 	code := suite.Run()
 	if removeError := os.RemoveAll(directory); removeError != nil {
+		// Ignored: standard error is the only place left to say it, and the test binary exits next.
 		fmt.Fprintf(os.Stderr, "removing the fixture directory: %v\n", removeError)
 	}
 	os.Exit(code)

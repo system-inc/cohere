@@ -82,8 +82,9 @@ func encodeLine(record Record) ([]byte, error) {
 }
 
 // encodeWithoutHTMLEscaping is json.Marshal without its escaping of <, > and &, which is for JSON
-// embedded in HTML. A message that says `a <- b` should read that way in the stream too.
-func encodeWithoutHTMLEscaping(value any) ([]byte, error) {
+// embedded in HTML. A message that says `a <- b` should read that way in the stream too. It takes a value of
+// any type, as json.Marshal does.
+func encodeWithoutHTMLEscaping[Value any](value Value) ([]byte, error) {
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetEscapeHTML(false)

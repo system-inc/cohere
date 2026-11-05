@@ -45,10 +45,10 @@ const (
 
 	// VerdictUnreachableFixture means the fixture never reaches this validator upstream either.
 	//
-	// Measured, not assumed: the fixture's expected diagnostics belong to a DIFFERENT rule than the
+	// Measured, not assumed: the fixture's expected diagnostics belong to a different rule than the
 	// one being scored. React's pipeline aborts earlier, so the golden records the earlier
 	// diagnostic and the rule under test is never consulted. The three fixtures named for
-	// error-boundaries are the clearest case — all three expect a `Todo` from BuildHIR, because
+	// error-boundaries are the clearest case: all three expect a `Todo` from BuildHIR, because
 	// lowering aborts on a `try` with no `catch`.
 	VerdictUnreachableFixture Verdict = "declined: unreachable fixture"
 
@@ -79,10 +79,10 @@ const (
 
 	// VerdictNotScored means a rule cohere ships owns this fixture but no rule engine was run.
 	//
-	// This is the honest name for the state the harness is in today, and it is deliberately NOT
+	// This is the honest name for the state the harness is in today, and it is deliberately not
 	// folded into any decline. A decline says something about the fixture; this says something
 	// about the run. Collapsing it into `unreachable` would claim these fixtures cannot be scored,
-	// when in fact they are precisely the ones that can — and the addressable set going unmeasured
+	// when in fact they are precisely the ones that can, and the addressable set going unmeasured
 	// is the single thing a reader most needs to see.
 	VerdictNotScored Verdict = "not scored: no rule engine run"
 )

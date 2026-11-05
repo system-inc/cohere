@@ -10,7 +10,7 @@ import (
 // ShippedRules are the upstream rule names cohere has an implementation for, mapped to the name
 // cohere registers that rule under.
 //
-// Keyed by UPSTREAM's rule name rather than cohere's, because the join to the corpus goes through
+// Keyed by upstream's rule name rather than cohere's, because the join to the corpus goes through
 // upstream's `getRuleForCategory`.
 //
 // # The value side was wrong for every entry, and nothing could see it
@@ -18,11 +18,11 @@ import (
 // Until 2026-08-24 every value here read `react/<name>`, on the strength of a doc comment claiming
 // the two sides "happen to agree on spelling" and that the map was explicit so a rename would be "a
 // visible edit rather than a silent unjoin". Measured against `registry.All()`: not one of those
-// eleven strings is a registered rule. The react-compiler rules register BARE — `globals`,
-// `rules-of-hooks`, `use-memo` — and the namespace was never part of the name.
+// eleven strings is a registered rule. The react-compiler rules register bare names (`globals`,
+// `rules-of-hooks`, `use-memo`), and the namespace was never part of the name.
 //
 // The unjoin was silent for the reason the comment did not anticipate: nothing in this package ever
-// READ the value. `Classify` asks only `_, found := ShippedRules[ruleName]`, so the right-hand side
+// read the value. `Classify` asks only `_, found := ShippedRules[ruleName]`, so the right-hand side
 // was decorative, and a decorative field that claims to be a join is worse than no field, because
 // it reads as checked. `TestShippedRuleNamesAreRegistered` now reads it, which is what makes this
 // map's second column a claim rather than a caption. That is the open finding `#5vyycz7` measured:
@@ -47,7 +47,7 @@ var ShippedRules = map[string]string{
 	"void-use-memo":        "react-hooks/void-use-memo",
 }
 
-// TypeAwareRules are the shipped rules whose DECISION depends on resolving React's own types.
+// TypeAwareRules are the shipped rules whose decision depends on resolving React's own types.
 //
 // This list is what makes `VerdictUnresolvableTypes` a measurement rather than an excuse: only a
 // rule that actually reads types can be excused by a fixture that has none. A syntax-only rule
@@ -75,8 +75,8 @@ var ShippedRules = map[string]string{
 // `set_state_in_effect_test.go:57` for exactly this reason), and `refs` joins it on the measurement
 // above.
 //
-// `static-components` was in this map and is REMOVED. It declares `NeedsTypeChecker: true` at
-// `static_components.go:100` and then never touches `ctx.TypeChecker` anywhere in its body —
+// `static-components` was in this map and is removed. It declares `NeedsTypeChecker: true` at
+// `static_components.go:100` and then never touches `ctx.TypeChecker` anywhere in its body:
 // grepped for the selector, zero hits. It was in here on the strength of a declaration it does not
 // use, which is the generous direction this comment warns about, arriving through the flag rather
 // than through a guess.
@@ -91,7 +91,7 @@ var TypeAwareRules = map[string]bool{
 // Written to match the module specifier exactly rather than the substring `react`, which would also
 // match `react-dom`, `@testing-library/react`, and a local `./react-utils`. That over-match would
 // move fixtures out of `VerdictUnresolvableTypes` and into `failed`, inflating the failure count
-// with cases that are really corpus artifacts — an error in the direction that looks like rigor.
+// with cases that are really corpus artifacts, an error in the direction that looks like rigor.
 var reactImportPattern = regexp.MustCompile(`(?m)(?:^|\n)\s*import\b[^\n;]*?['"]react['"]|require\(\s*['"]react['"]\s*\)`)
 
 // hookCallPattern matches a call to something named like a hook.
@@ -112,7 +112,7 @@ func (f Fixture) CallsHook() bool {
 //
 // Entries are the machine-checked ones. A divergence that lives only in a doc comment is not in
 // here, because the entry's whole value is that something else fails when the divergence stops
-// being true — otherwise this map is a place to park failures with a nice label on them.
+// being true. Otherwise this map is a place to park failures with a nice label on them.
 type StatedDivergence struct {
 	// Fixture is the corpus fixture, by name.
 	Fixture string
@@ -133,13 +133,13 @@ type StatedDivergence struct {
 //   - exhaustive-deps at 15 of 17 kinds (`TestExhaustiveDepsScopeIsStated`, eight named cases): its
 //     rule is `exhaustive-deps`, an ESLint rule. The corpus's nearest categories are
 //     `memo-dependencies` (14 fixtures) and `exhaustive-effect-dependencies` (4), which are the
-//     COMPILER's dependency validators and a different mechanism. Neither is a rule cohere ships.
+//     compiler's dependency validators and a different mechanism. Neither is a rule cohere ships.
 //   - set-state-in-effect's ref exemption, pinned as a fixture that fails when fixed: that rule has
 //     zero error-named fixtures in this corpus, so the divergence cannot be exercised here.
 //   - no-unused-vars at 301 of 303: not a react rule and not in this corpus at all.
 //
 // The eleven entries below are `globals` fixtures, and they are here because the rule was actually
-// RUN against them (`internal/react_conformance_score`) rather than because a doc comment predicted
+// run against them (`internal/react_conformance_score`) rather than because a doc comment predicted
 // them. Every one declines on a construct its doc comment already names as out of scope: eight on
 // the nested-function subset that needs an inter-procedural effects pass, three on the compilation
 // gate that requires JSX or a hook call in the body.
@@ -150,7 +150,7 @@ type StatedDivergence struct {
 // entirely outside it.
 //
 // What that means for the number is worth stating plainly rather than leaving implicit: 0 passed
-// and 11 excluded is NOT the same claim as 11 passed. The rule is unmeasured against this corpus,
+// and 11 excluded is not the same claim as 11 passed. The rule is unmeasured against this corpus,
 // not validated by it. The honest reading is that React's error goldens for `globals` and cohere's
 // `globals` do not overlap, and closing that gap is a scope decision rather than a bug fix.
 var statedDivergences = map[string]StatedDivergence{
@@ -194,7 +194,7 @@ var statedDivergences = map[string]StatedDivergence{
 	// The compilation gate. cohere's react rules fire only inside a function React Compiler would
 	// compile, which for a `Component`-named function requires JSX or a hook call in the body. The
 	// gate was measured over seventeen probe rounds against React's own rule and is shared with
-	// `unsupported-syntax`. These fixtures are components by NAME with neither JSX nor a hook, so
+	// `unsupported-syntax`. These fixtures are components by name with neither JSX nor a hook, so
 	// upstream's test harness compiles them and cohere's gate correctly does not.
 	//
 	// This is the one divergence here that is arguably worth closing, and it is recorded rather
@@ -232,9 +232,9 @@ var statedDivergences = map[string]StatedDivergence{
 
 	// The `config` rule's input does not exist in this tree, by construction rather than by
 	// accident. All four of upstream's Config error fixtures import from modules that exist only
-	// inside upstream's own test harness — `ReactCompilerTest` and `useDefaultExportNotTypedAsHook`
-	// — and the diagnostic is produced by consulting a `moduleTypeProvider`, which React 7.1.1
-	// takes as a JavaScript FUNCTION VALUE handed to the Babel plugin programmatically. It is not a
+	// inside upstream's own test harness (`ReactCompilerTest` and `useDefaultExportNotTypedAsHook`),
+	// and the diagnostic is produced by consulting a `moduleTypeProvider`, which React 7.1.1
+	// takes as a JavaScript function value handed to the Babel plugin programmatically. It is not a
 	// file, not a JSON key, and not anything a linter can read off disk; upstream supplies it from
 	// `snap/src/sprout/shared-runtime-type-provider.ts`.
 	//
@@ -270,7 +270,7 @@ var statedDivergences = map[string]StatedDivergence{
 	},
 
 	// Three `set-state-in-render` goldens recorded under an upstream feature flag that defaults to
-	// OFF, so the expectation describes a compiler cohere does not implement rather than a finding
+	// off, so the expectation describes a compiler cohere does not implement rather than a finding
 	// cohere missed.
 	//
 	// Measured in React's own unminified bundle rather than inferred:
@@ -279,10 +279,10 @@ var statedDivergences = map[string]StatedDivergence{
 	// flag, upstream itself reports nothing on these inputs.
 	//
 	// This is the narrow, real half of the pragma question. Most pragmas on this corpus restate a
-	// default that is already on (`validateNoSetStateInRender` defaults TRUE), which is why the
+	// default that is already on (`validateNoSetStateInRender` defaults `true`), which is why the
 	// engine deliberately does not gate on pragmas in general. These three are the exception, and
 	// they were found by enumerating every wired fixture carrying a pragma measured as
-	// `default(false)` — exactly three across all seven wired rules, all in this one rule.
+	// `default(false)`: exactly three across all seven wired rules, all in this one rule.
 	"error.invalid-setstate-unconditional-with-keyed-state.js": {
 		Fixture:  "error.invalid-setstate-unconditional-with-keyed-state.js",
 		Boundary: "TestOptInPragmaFixturesAreEnumerated",
@@ -299,8 +299,8 @@ var statedDivergences = map[string]StatedDivergence{
 		Reason:   "the golden was recorded under `@enableTreatSetIdentifiersAsStateSetters`, an upstream flag defaulting to false",
 	},
 
-	// The gate again, in its sharpest form. `useFoo` is hook-NAMED but calls no hook, and cohere's
-	// gate requires a hook CALL in the body, not a hook name on the function. The rule's own doc
+	// The gate again, in its sharpest form. `useFoo` is hook-named but calls no hook, and cohere's
+	// gate requires a hook call in the body, not a hook name on the function. The rule's own doc
 	// comment states this directly at globals.go:195 (`function useFoo() { useState(0); g = 1; }
 	// reports, hook`), and it was re-confirmed by probe here rather than read off that line:
 	//
@@ -310,7 +310,7 @@ var statedDivergences = map[string]StatedDivergence{
 	//
 	// The middle and bottom probes are the controls. Without them "the rule is silent" would be
 	// consistent with the compound-assignment path being broken, which is a completely different
-	// defect and the one worth ruling out — the doc comment makes a specific claim about `+=`
+	// defect and the one worth ruling out, since the doc comment makes a specific claim about `+=`
 	// pointing at the whole assignment expression, so a silent `+=` had to be shown to be the gate
 	// rather than the span logic.
 	"error.update-global-should-bailout.tsx": {
@@ -341,7 +341,7 @@ var statedDivergences = map[string]StatedDivergence{
 	// upstream itself disowns, so reproducing them would mean copying a bug -- which is the one
 	// case where matching the answer key is the wrong goal.
 	//
-	// `error.useMemo-aliased-var.ts` is deliberately NOT here. Its header says "This is technically
+	// `error.useMemo-aliased-var.ts` is deliberately not here. Its header says "This is technically
 	// a false positive, but source is already breaking `exhaustive-deps`", which is upstream
 	// describing an input it considers invalid rather than a verdict it considers wrong, and cohere
 	// fires on it today. The distinction is the second clause: a fixture upstream calls a mistake
@@ -385,8 +385,8 @@ func divergenceRuleIsShipped(rules []string) bool {
 // StatedDivergenceNames returns the fixtures recorded as deliberate divergences, keyed by name.
 //
 // Exported so the boundary tests in `react_conformance_score` can assert that a divergence they hold
-// in place is actually recorded here. Without it the two halves of a stated divergence — the entry
-// and the test named in its `Boundary` field — could drift apart silently, which would leave the
+// in place is actually recorded here. Without it the two halves of a stated divergence (the entry
+// and the test named in its `Boundary` field) could drift apart silently, which would leave the
 // entry as a label with nothing behind it. That is precisely what the `StatedDivergence` doc
 // comment says must not happen.
 func StatedDivergenceNames() map[string]StatedDivergence {
@@ -426,7 +426,7 @@ func Classify(fixture Fixture, result Result, err error) FixtureVerdict {
 		return verdict
 	}
 
-	// A stated divergence outranks everything below it EXCEPT the question of whether cohere ships a
+	// A stated divergence outranks everything below it, except the question of whether cohere ships a
 	// rule that could have been asked at all. Claiming "we deliberately differ" about a fixture no
 	// registered rule reaches would be the score taking credit for a judgment nothing acts on, which
 	// is the same error `VerdictNoRuleShipped`'s comment warns about from the other side.

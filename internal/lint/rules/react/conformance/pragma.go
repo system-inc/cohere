@@ -84,7 +84,7 @@ func (p Pragma) String() string {
 // A pragma reconfigures what a fixture expects. `@validateRefAccessDuringRender` turns a validation
 // on; without it the same source is legal and the expectation is wrong. So an unmodelled directive
 // does not make a fixture merely unrunnable, it makes the fixture's verdict *unrelated to the
-// implementation being scored* — and a runner that skips it reports "not applicable" for a case it
+// implementation being scored*, and a runner that skips it reports "not applicable" for a case it
 // silently got wrong, while a runner that ignores it reports a pass or a fail it has not earned.
 //
 // Upstream demonstrates the failure rather than merely permitting it. `parseConfigPragmaForTests`
@@ -99,7 +99,7 @@ func (p Pragma) String() string {
 // `EnvironmentConfigSchema.shape`. Both drop an unrecognised key without a word. Measured against
 // the 325 error fixtures at the pinned sha, six distinct directives in active use fall through
 // those two `continue`s: `@skip`, `@flow`, `@enableFlowSuppressions`, `@enableNewMutationAliasingModel`,
-// `@enablePropagateDepsInHIR`, and `@compilationMode(infer)` — the last because `splitPragma` splits
+// `@enablePropagateDepsInHIR`, and `@compilationMode(infer)`, the last because `splitPragma` splits
 // values on `:` only, so the parenthesised spelling yields the key `compilationMode(infer)`, which
 // matches nothing. `@skip` is the sharpest of them: it is not read anywhere in `packages/snap`, so
 // eight fixtures carry an instruction that has never done anything.
@@ -231,7 +231,7 @@ var ignoredPragmas = map[string]string{
 // upstream ignored and disagree with the goldens for a reason that looks like a rule defect.
 //
 // The split reproduces upstream's `splitPragma` exactly, including its sharp edge: the value is
-// everything after the FIRST `:`, and a key with no `:` is truncated at the first space. That is why
+// everything after the first `:`, and a key with no `:` is truncated at the first space. That is why
 // `@compilationMode(infer)` yields the key `compilationMode(infer)` here rather than being helpfully
 // normalised. Reproducing the flaw is the point; a parser that is kinder than upstream's scores
 // fixtures under a configuration upstream did not use.

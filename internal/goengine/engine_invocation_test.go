@@ -127,6 +127,9 @@ func TestRefusalSentence(test *testing.T) {
 	}{
 		{fmt.Errorf("reading %s: %w", "/project/go.work", errors.New("permission denied")),
 			"Reading /project/go.work: permission denied."},
+		// A trailing period here stands for an error from code we don't own, and it is the input under test:
+		// refusalSentence must not add a second period to a foreign error's.
+		//cohere:ignore consistency-require-error-clause the period is this case's input, as a foreign error carries one
 		{errors.New("reading the go block. The go block takes \"rules\"."),
 			"Reading the go block. The go block takes \"rules\"."},
 		{errors.New("  "), "The Go engine refused the run and gave no reason."},

@@ -55,27 +55,57 @@ var dictionaryFields = map[string]bool{
 // and for an array the merged shape of its elements.
 type shape map[string]shape
 
-func shapeOf(name string, value any) shape {
+// shapeOf is the shape of one JSON value, read as raw text so each object and array is decoded only as far as
+// its members, into types that hold no value of unknown kind. The value was already decoded once whole, so it is
+// well formed, and a decode that fails here fails the test rather than reading as a value with no fields.
+func shapeOf(test *testing.T, name string, value json.RawMessage) shape {
+	test.Helper()
 	if dictionaryFields[name] {
 		return nil
 	}
-	switch typed := value.(type) {
-	case map[string]any:
+	trimmed := bytes.TrimSpace(value)
+	if len(trimmed) == 0 {
+		return nil
+	}
+	switch trimmed[0] {
+	case '{':
+		members := map[string]json.RawMessage{}
+		if decodeError := json.Unmarshal(trimmed, &members); decodeError != nil {
+			test.Fatalf("reading an object's members: %v\n%s", decodeError, trimmed)
+		}
 		fields := shape{}
-		for key, member := range typed {
-			fields[key] = mergeShapes(fields[key], shapeOf(key, member))
+		for key, member := range members {
+			fields[key] = mergeShapes(fields[key], shapeOf(test, key, member))
 		}
 		return fields
-	case []any:
-		var elements shape
-		for _, element := range typed {
-			elements = mergeShapes(elements, shapeOf(name, element))
+	case '[':
+		var elements []json.RawMessage
+		if decodeError := json.Unmarshal(trimmed, &elements); decodeError != nil {
+			test.Fatalf("reading an array's elements: %v\n%s", decodeError, trimmed)
 		}
-		return elements
+		var merged shape
+		for _, element := range elements {
+			merged = mergeShapes(merged, shapeOf(test, name, element))
+		}
+		return merged
 	}
 	return nil
 }
 
+// kindOf is a record's kind, and whether it has one written as a string.
+func kindOf(record json.RawMessage) (Kind, bool) {
+	var envelope struct {
+		Kind *string `json:"kind"`
+	}
+	if decodeError := json.Unmarshal(record, &envelope); decodeError != nil || envelope.Kind == nil {
+		return "", false
+	}
+	return Kind(*envelope.Kind), true
+}
+
+// mergeShapes is first with second's fields merged in at every depth, or second when first is nil.
+//
+// Mutates: first takes second's fields, and is returned, so the caller folds every shape into one map
 func mergeShapes(first shape, second shape) shape {
 	if first == nil {
 		return second
@@ -89,6 +119,8 @@ func mergeShapes(first shape, second shape) shape {
 // indexFields records the shape of every field at any depth by its name, so a field whose example in
 // one record is empty (a finding's `suggestions: []`) is compared against its example in another (an
 // unused record's suggestions).
+//
+// Mutates: index gains every field of fields, at any depth, merged with the shape it already held for that name
 func indexFields(fields shape, index map[string]shape) {
 	for key, member := range fields {
 		if member != nil {
@@ -102,7 +134,7 @@ func indexFields(fields shape, index map[string]shape) {
 // Contract.md and every line of its fixtures, plus every nested field's shape by name.
 func contractShapes(test *testing.T) (map[Kind]shape, map[string]shape) {
 	test.Helper()
-	objects := []map[string]any{}
+	objects := []json.RawMessage{}
 
 	document, readError := os.ReadFile(contractDocument)
 	if readError != nil {
@@ -119,7 +151,7 @@ func contractShapes(test *testing.T) (map[Kind]shape, map[string]shape) {
 			inBlock = false
 			decoder := json.NewDecoder(strings.NewReader(block.String()))
 			for {
-				object := map[string]any{}
+				var object json.RawMessage
 				decodeError := decoder.Decode(&object)
 				if errors.Is(decodeError, io.EOF) {
 					break
@@ -145,24 +177,23 @@ func contractShapes(test *testing.T) (map[Kind]shape, map[string]shape) {
 			test.Fatal(readError)
 		}
 		for _, line := range strings.Split(strings.TrimSpace(string(contents)), "\n") {
-			object := map[string]any{}
-			if decodeError := json.Unmarshal([]byte(line), &object); decodeError != nil {
-				test.Fatalf("%s: %v\n%s", fixture, decodeError, line)
+			if !json.Valid([]byte(line)) {
+				test.Fatalf("%s: a fixture line is not JSON\n%s", fixture, line)
 			}
-			objects = append(objects, object)
+			objects = append(objects, json.RawMessage(line))
 		}
 	}
 
 	shapes := map[Kind]shape{}
 	fieldIndex := map[string]shape{}
 	for _, object := range objects {
-		kind, isString := object["kind"].(string)
-		if !isString {
-			test.Fatalf("a contract example has no kind: %v", object)
+		kind, hasKind := kindOf(object)
+		if !hasKind {
+			test.Fatalf("a contract example has no kind: %s", object)
 		}
-		fields := shapeOf("", object)
+		fields := shapeOf(test, "", object)
 		delete(fields, "kind")
-		shapes[Kind(kind)] = mergeShapes(shapes[Kind(kind)], fields)
+		shapes[kind] = mergeShapes(shapes[kind], fields)
 		indexFields(fields, fieldIndex)
 	}
 	return shapes, fieldIndex
@@ -258,15 +289,15 @@ func TestEveryRecordWritesTheContractsFields(test *testing.T) {
 
 	written := map[Kind]bool{}
 	for index, record := range records {
-		object := map[string]any{}
-		if decodeError := json.Unmarshal([]byte(lines[index]), &object); decodeError != nil {
-			test.Fatalf("%s: %v\n%s", record.kind(), decodeError, lines[index])
+		object := json.RawMessage(lines[index])
+		if !json.Valid(object) {
+			test.Fatalf("%s wrote a line that is not JSON\n%s", record.kind(), lines[index])
 		}
-		if object["kind"] != string(record.kind()) {
-			test.Errorf("a %s record wrote kind %v", record.kind(), object["kind"])
+		if kind, _ := kindOf(object); kind != record.kind() {
+			test.Errorf("a %s record wrote kind %q", record.kind(), kind)
 		}
 		written[record.kind()] = true
-		ours := shapeOf("", object)
+		ours := shapeOf(test, "", object)
 		delete(ours, "kind")
 		for _, additive := range additiveFields[record.kind()] {
 			if _, present := ours[additive]; !present {
@@ -353,7 +384,9 @@ func TestFixtureRecordsReencodeToTheSameJSON(test *testing.T) {
 				continue
 			}
 			compared++
-			var reencoded, original any
+			// Every record is a JSON object, so each side decodes into one.
+			reencoded := map[string]any{}
+			original := map[string]any{}
 			if decodeError := json.Unmarshal(output.Bytes(), &reencoded); decodeError != nil {
 				test.Fatalf("%s: the reencoded %s record does not decode: %v\n%s", filepath.Base(fixture), envelope.Kind, decodeError, output.String())
 			}
@@ -361,11 +394,9 @@ func TestFixtureRecordsReencodeToTheSameJSON(test *testing.T) {
 				test.Fatal(decodeError)
 			}
 			// A fixture from before an additive field has none, and this engine always writes it.
-			if reencodedObject, isObject := reencoded.(map[string]any); isObject {
-				for _, additive := range additiveFields[envelope.Kind] {
-					if !strings.Contains(line, `"`+additive+`"`) {
-						delete(reencodedObject, additive)
-					}
+			for _, additive := range additiveFields[envelope.Kind] {
+				if !strings.Contains(line, `"`+additive+`"`) {
+					delete(reencoded, additive)
 				}
 			}
 			if !reflect.DeepEqual(reencoded, original) {

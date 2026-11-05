@@ -258,7 +258,8 @@ func parseFormat(format string, argumentCount int) ([]directive, bool) {
 			index++
 		}
 		sharp := strings.IndexByte(format[start:index], '#') >= 0
-		var afterIndex, good bool
+		var afterIndex bool
+		var good bool
 		argument, index, afterIndex, good = argumentNumber(format, index, argument, argumentCount)
 		if !good || (index < len(format) && format[index] == '*') {
 			return nil, false

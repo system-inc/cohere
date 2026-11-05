@@ -155,7 +155,7 @@ func TestExportDataStandsOnlyForWhatImportsNothingOfTheSource(test *testing.T) {
 	}
 }
 
-// A runner of prebuilt tests refuses a go command whose GOFLAGS carries -overlay, and the loader reads an
+// A runner of prebuilt tests refuses a go command whose `GOFLAGS` carries `-overlay`, and the loader reads an
 // overlay itself, so its go commands never see one; every other flag reaches them as set.
 func TestTheGoCommandsSeeNoOverlay(test *testing.T) {
 	test.Parallel()

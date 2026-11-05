@@ -50,3 +50,69 @@ whose closing line runs its data past the limit and then has code after its back
 type Record struct {
 	FirstName, SecondName map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[string]string `json:"name" description:"a struct field's tag past the limit, after only a short name and typeand so on and"` // want `This line is \d+ columns, a tab counted as four, and the house limit is 120\.`
 }
+
+// Entry is what the keyed cases build.
+type Entry struct{ Name, Other string }
+
+// keyed holds strings given to a key or a name past the limit, with code before or after them that could wrap. Each
+// expectation sits on the line above its case, so no trailing comment is what makes the case a finding.
+func keyed(entry *Entry, other string) []any {
+	// A struct literal opening on its key's line, which could open on a line above the key.
+	// want +1 `the house limit is 120`
+	opened := Entry{Name: "a keyed string past the limit after a struct literal that could wrap and so on and so and so o"}
+	// Two names on the left, given two values.
+	// want +1 `the house limit is 120`
+	first, second := "a string past the limit after two names on the left, which could wrap and so on and so on and", other
+	// want +1 `the house limit is 120`
+	entry.Name, entry.Other = other, "a string past the limit after two selectors and a name, which could wrap and so on a"
+	// want +1 `the house limit is 120`
+	var left, right = "a var's string past the limit after two names, which could wrap and so on and so on and so a", other
+	// A string followed by more code, which could move to the next line.
+	// want +1 `the house limit is 120`
+	joined := "a string past the limit after a name and :=, followed by code that could wrap and so on and so o an" + other
+	// want +1 `the house limit is 120`
+	entry.Name = "a string past the limit after a selector and =, followed by a call that could wrap and so a" + use(other)
+	// A trailing comment, which could sit above the line instead.
+	// want +1 `the house limit is 120`
+	joined = "a string past the limit after a name and =, followed by a trailing note and so on and so on and so" // a note
+	// An index, a compound operator, a type and an if statement's opening are code, and wrap.
+	values := []string{other}
+	// want +1 `the house limit is 120`
+	values[0] = "a string past the limit after an index on the left, which is code and so on and so on and so on and and s"
+	// want +1 `the house limit is 120`
+	joined += "a string past the limit after a name and +=, a compound operator, and so on and so on and so on and so and "
+	// want +1 `the house limit is 120`
+	var typed string = "a var's string past the limit after a name and a type, which could be long and so on and so on and"
+	// want +1 `the house limit is 120`
+	if initialized := "a string past the limit after the if keyword, which could wrap and so on and so"; initialized != "" {
+		joined = initialized
+	}
+	return []any{
+		opened, first, second, left, right, joined, values, typed,
+		Entry{
+			// Another key before the string, which could wrap after its comma.
+			// want +1 `the house limit is 120`
+			Other: other, Name: "a keyed string past the limit after another key that could wrap and so on and so on and ",
+		},
+		Entry{
+			// A comment between the key and its string, which could sit above the key instead.
+			// want +1 `the house limit is 120`
+			Name: /* a note */ "a keyed string past the limit after a comment that could move and so on and so on and and",
+		},
+		Entry{
+			// More code after the string, which could move to the next line.
+			// want +1 `the house limit is 120`
+			Name: "a keyed string past the limit followed by code that could wrap and so on and so on and so and " + other,
+		},
+		Entry{
+			// Another key after the string, which could wrap after the string's comma.
+			// want +1 `the house limit is 120`
+			Other: "a keyed string past the limit followed by another key that could wrap and so on and so o", Name: other,
+		},
+		map[string]string{
+			// A key built by a call, which is code and could wrap.
+			// want +1 `the house limit is 120`
+			use(other): "a keyed string past the limit after a key built by a call and so on and so on and so on and so o",
+		},
+	}
+}

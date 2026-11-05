@@ -30,7 +30,10 @@ func TestAPackTrustsTheCheckStatsAndTheRunClockRefusesAChangeAfterThem(test *tes
 	if !statted {
 		test.Skip("this platform gives the content pack no identity, so it serves nothing")
 	}
-	recording, _ := OpenContentPack(cache)
+	recording, openRecordingError := OpenContentPack(cache)
+	if openRecordingError != nil {
+		test.Fatal(openRecordingError)
+	}
 	recording.noteRead(file, identity, true, "export const a = 1;\n")
 	if saveError := recording.Save(); saveError != nil {
 		test.Fatal(saveError)
@@ -56,12 +59,18 @@ func TestAPackTrustsTheCheckStatsAndTheRunClockRefusesAChangeAfterThem(test *tes
 		test.Fatal(writeError)
 	}
 
-	trusting, _ := OpenContentPack(cache)
+	trusting, openTrustingError := OpenContentPack(cache)
+	if openTrustingError != nil {
+		test.Fatal(openTrustingError)
+	}
 	trusting.TrustStats(snapshot)
 	if served, ok := trusting.serve(file); !ok || served != "export const a = 1;\n" {
 		test.Errorf("a pack trusting the check served %q (%v), want the bytes the check saw", served, ok)
 	}
-	statting, _ := OpenContentPack(cache)
+	statting, openStattingError := OpenContentPack(cache)
+	if openStattingError != nil {
+		test.Fatal(openStattingError)
+	}
 	if served, ok := statting.serve(file); ok {
 		test.Errorf("a pack statting afresh served %q, so the snapshot was not what decided above", served)
 	}

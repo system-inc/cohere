@@ -71,7 +71,7 @@ func TestCheckerSurvivesTheParallelWalk(test *testing.T) {
 
 		// Declared, because the walk hands out a checker only to rules that ask for one. Without
 		// this the probe is dispatched with a nil checker and the test fails on its own first
-		// assertion — which is the guard working, and is why that assertion is worth keeping.
+		// assertion, which is the guard working, and is why that assertion is worth keeping.
 		NeedsTypeChecker: true,
 
 		Run: func(ruleContext rule.Context, options any) rule.Listeners {

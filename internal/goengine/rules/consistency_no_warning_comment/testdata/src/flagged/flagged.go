@@ -58,3 +58,22 @@ FIXME at the start of a line inside a block comment
 // XXX the generator above is slow // want `"XXX"`
 
 func generated() {}
+
+// sweep clears the cache, and TODO: make it incremental. // want `"TODO"`
+//
+//	sweep() // TODO in a code block is an example and is not read
+//
+// FIXME the prose after the block is read again. // want `"FIXME"`
+//
+//	fmt.Println("`")
+//
+// The lone backtick in the block above pairs with none here, so TODO is read before `this`. // want "TOD[O]"
+func sweep() {
+	// An indented line straight after prose continues the paragraph, as CommonMark reads it, so it is read:
+	//	TODO in a continuation line // want `"TODO"`
+
+	// A block ends at the first line that is not indented, blank line or not:
+	//
+	//	sweep() // XXX in the block
+	// XXX in the prose straight after it // want `"XXX"`
+}

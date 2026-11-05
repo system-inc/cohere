@@ -34,7 +34,7 @@ func DefaultForbidPropTypesOptions() ForbidPropTypesOptions {
 // DecodeForbidPropTypesOptions reads this rule's configuration from the config layer.
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto` for one key. `forbid` has to be distinguishable
-// as ABSENT, because absent means upstream's three defaults while an explicitly empty list forbids
+// as absent, because absent means upstream's three defaults while an explicitly empty list forbids
 // nothing. The generic helper would decode both to a nil slice and silently turn `forbid: []` into
 // the default list, which is the opposite of what it asks for. Measured on the installed build:
 // `{forbid: []}` over `PropTypes.any` is clean.
@@ -123,7 +123,7 @@ func forbidPropTypesMessage(target string) rule.Message {
 //	PropTypes.oneOfType([...])   SILENT, because the argument is an array literal rather than a
 //	                             member expression or an identifier
 //
-// The finding always points at the PROPERTY, not at the value, so `a: PropTypes.any` underlines the
+// The finding always points at the property, not at the value, so `a: PropTypes.any` underlines the
 // whole `a: PropTypes.any`. For a nested shape it underlines the inner property. Measured by
 // slicing the reported range.
 //
@@ -142,7 +142,7 @@ func forbidPropTypesMessage(target string) rule.Message {
 // # One arm is not reproduced, and the reason is a missing substrate rather than a decision
 //
 // Upstream also unwraps a "prop wrapper" call, so `C.propTypes = forbidExtraProps({...})` is looked
-// inside. Which functions count comes from `settings.propWrapperFunctions`, a SHARED setting read
+// inside. Which functions count comes from `settings.propWrapperFunctions`, a shared setting read
 // by four rules in this plugin. Our `rule.Context` exposes `SourceFile`, `Program`, `TypeChecker`,
 // `Report` and `FileCache` and no path to configuration settings, and the setting is not in this
 // rule's own schema so it cannot be carried as a rule option without inventing a surface the other
@@ -157,7 +157,7 @@ func forbidPropTypesMessage(target string) rule.Message {
 // `rule.Context`, the arm is `checkNode`'s call-expression branch and the 14 cases are in the
 // corpus waiting.
 //
-// # The same missing setting makes a SIBLING RULE unportable outright, which is worth knowing here
+// # The same missing setting makes a sibling rule unportable outright, which is worth knowing here
 //
 // `react/prefer-exact-props` is on the audit as an unported line item rated Yes with no violations,
 // and it is not work outstanding. The same `settings.propWrapperFunctions` this arm needs is the
@@ -170,7 +170,7 @@ func forbidPropTypesMessage(target string) rule.Message {
 //	no settings                    0 findings
 //	settings.propWrapperFunctions  1 finding, messageId propTypes
 //
-// Its corpus is 31 cases, 17 of which carry a settings block. Replaying all 12 of its REPORTING
+// Its corpus is 31 cases, 17 of which carry a settings block. Replaying all 12 of its reporting
 // cases with no settings: all twelve go silent, none survive. Its other message id is `flow` and
 // needs Flow annotations a TypeScript tree does not have. Ahra configures `propWrapperFunctions`
 // nowhere.
@@ -328,7 +328,7 @@ func forbidPropTypesLocalNameForImported(node *ast.Node, imported string) string
 	return ""
 }
 
-// forbidPropTypesBindsLocalName reports whether an import declaration binds a given LOCAL name.
+// forbidPropTypesBindsLocalName reports whether an import declaration binds a given local name.
 //
 // Upstream tests `node.specifiers.some((x) => x.local.name === 'PropTypes')`, which is the local
 // side rather than the imported one, so `import { Foo as PropTypes } from 'other'` trips the guard.
@@ -413,7 +413,7 @@ func (w *forbidPropTypesWalker) checkClassProperty(node *ast.Node) {
 func (w *forbidPropTypesWalker) checkMemberAssignment(node *ast.Node) {
 	assignment := node.AsBinaryExpression()
 	if !ast.IsAssignmentOperator(assignment.OperatorToken.Kind) {
-		// EVERY assignment operator qualifies, not only `=`, and this line was wrong before it was
+		// Every assignment operator qualifies, not only `=`, and this line was wrong before it was
 		// measured. Upstream anchors on the member expression and reads `node.parent.right`, which
 		// any assignment carries, so `C.propTypes ||= {...}` and `+=` both report. Verified on the
 		// installed build across four operators, all reporting.
@@ -458,11 +458,11 @@ func (w *forbidPropTypesWalker) checkObjectLiteral(node *ast.Node) {
 			continue
 		}
 		// Upstream checks only for an object expression here, not the full `checkNode` surface, so
-		// a factory whose `propTypes` is an IDENTIFIER is silent while the same identifier through
+		// a factory whose `propTypes` is an identifier is silent while the same identifier through
 		// a member assignment reports. That asymmetry is real and measured, and
 		// TestForbidPropTypesObjectLiteralArmDoesNotFollowIdentifiers pins it.
 		//
-		// The kind test on this line is nonetheless EQUIVALENT rather than load-bearing, and a
+		// The kind test on this line is nonetheless equivalent rather than load-bearing, and a
 		// mutation widening it survives correctly. `checkProperties` opens with the same test and
 		// returns on anything that is not an object literal, so no input can distinguish the two
 		// versions. What produces the asymmetry is this arm calling `checkProperties` directly
@@ -491,7 +491,7 @@ func (w *forbidPropTypesWalker) checkGetter(node *ast.Node) {
 	if body == nil {
 		return
 	}
-	// Upstream's `findReturnStatement` takes the LAST return statement in the body's statement
+	// Upstream's `findReturnStatement` takes the last return statement in the body's statement
 	// list, at the top level only.
 	statements := body.AsBlock().Statements
 	if statements == nil {
@@ -520,11 +520,11 @@ func (w *forbidPropTypesWalker) checkShapeCall(node *ast.Node) {
 		return
 	}
 
-	// The RECEIVER has to look like the prop types package, and this guard is the whole reason
+	// The receiver has to look like the prop types package, and this guard is the whole reason
 	// `Yup.object().shape({...})` is clean. Upstream declines a member callee whose object fails
 	// `isPropTypesPackage` and is not itself a prop types declaration.
 	//
-	// `isPropTypesPackage` accepts an identifier or a member expression and nothing else, so a CALL
+	// `isPropTypesPackage` accepts an identifier or a member expression and nothing else, so a call
 	// receiver such as `Yup.object()` falls through to false whatever is imported. That is what
 	// separates a validation schema from a prop type, and it is not the foreign-import flag:
 	// measured with and without the `yup` import, both clean, while `X.propTypes = { a:
@@ -607,7 +607,7 @@ func (w *forbidPropTypesWalker) resolveToObjectLiteral(identifier *ast.Node) *as
 
 // checkProperties reads each property of a prop types object and reports the forbidden ones.
 //
-// It deliberately does NOT recurse into a nested object literal. A nested `shape({...})` is reached
+// It deliberately does not recurse into a nested object literal. A nested `shape({...})` is reached
 // by the shape arm instead, which visits every such call in the file independently.
 func (w *forbidPropTypesWalker) checkProperties(object *ast.Node) {
 	if object == nil || object.Kind != ast.KindObjectLiteralExpression {
@@ -630,7 +630,7 @@ func (w *forbidPropTypesWalker) checkProperties(object *ast.Node) {
 
 // checkPropertyValue unwraps one property's value and reports if the resulting name is forbidden.
 //
-// The finding is anchored on the PROPERTY rather than on the value, which is upstream passing the
+// The finding is anchored on the property rather than on the value, which is upstream passing the
 // declaration node to `report`.
 func (w *forbidPropTypesWalker) checkPropertyValue(property *ast.Node, value *ast.Node) {
 	if value == nil {
@@ -649,7 +649,7 @@ func (w *forbidPropTypesWalker) checkPropertyValue(property *ast.Node, value *as
 		}
 	}
 
-	// `PropTypes.arrayOf(PropTypes.object)` reports on the ARGUMENT's name, then continues with the
+	// `PropTypes.arrayOf(PropTypes.object)` reports on the argument's name, then continues with the
 	// callee so the wrapper's own name is considered too.
 	if value.Kind == ast.KindCallExpression {
 		call := value.AsCallExpression()
@@ -698,7 +698,7 @@ func forbidPropTypesTypeName(node *ast.Node) string {
 // prop types package.
 //
 // Upstream's test is written as a disjunction whose last term dominates: unless a foreign
-// `PropTypes` was imported, EVERYTHING passes. So in an ordinary file with no such import this is
+// `PropTypes` was imported, everything passes. So in an ordinary file with no such import this is
 // always true, and the whole predicate exists to narrow the rule once the name has been claimed by
 // another module. Measured: with a foreign import present, only the recorded local name qualifies.
 func (w *forbidPropTypesWalker) isPropTypesPackage(node *ast.Node) bool {
@@ -715,13 +715,13 @@ func (w *forbidPropTypesWalker) isPropTypesPackage(node *ast.Node) bool {
 			return !w.isForeignPropTypesPackage
 		}
 		if receiver.Kind == ast.KindIdentifier {
-			// The member arm compares against `reactPackageName` ONLY, never against
+			// The member arm compares against `reactPackageName` alone, never against
 			// `propTypesPackageName`. That reads as an oversight upstream, since a
 			// `import PT from 'prop-types'` alias is exactly what you would expect to qualify
 			// here, and a first draft of this port helpfully added it.
 			//
 			// It is a divergence. Measured on the installed build with both a prop-types alias and
-			// a foreign PropTypes import present: `PT.any` is SILENT upstream, in either import
+			// a foreign PropTypes import present: `PT.any` is silent upstream, in either import
 			// order, while the same file without the foreign import reports. Adding the second
 			// comparison made this port report where upstream does not, and the whole imported
 			// corpus stayed green because no case writes both imports at once.
@@ -750,7 +750,7 @@ func (w *forbidPropTypesWalker) reportIfForbidden(property *ast.Node, typeName s
 
 // isPropTypesDeclarationAccess reports whether a member access names one of the three declarations.
 //
-// Upstream's shape guard has a second escape hatch beside the package test: a callee that IS a prop
+// Upstream's shape guard has a second escape hatch beside the package test: a callee that is a prop
 // types declaration passes even when its receiver does not look like the package. Reproduced for
 // fidelity; no corpus case reaches it, and the shape it would need is a `shape` call written
 // directly as `something.propTypes(...)`.

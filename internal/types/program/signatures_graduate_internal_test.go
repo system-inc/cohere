@@ -93,6 +93,8 @@ func TestGraduationStopsAtItsDeadlineAndNeverRetriesTheFileItAbandoned(test *tes
 	}
 	started := time.Now()
 	graduated, abandoned := graph.GraduateSignatures(shapes, started.Add(200*time.Millisecond), 0)
+	// Timing assertion: the bound is 25 times the 200ms deadline, and the planted file blocks until cleanup,
+	// so the only run it can catch is one that honored the deadline late, never one slowed by load.
 	if elapsed := time.Since(started); elapsed > 5*time.Second {
 		test.Fatalf("graduating returned after %s, so the deadline did not stop it", elapsed)
 	}

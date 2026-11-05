@@ -188,6 +188,8 @@ func ignoredByDirective(moduleRelative string, directives []string) bool {
 
 // enterScope records the matcher for a directory the walk enters, from its parent's when the walk came
 // through it, and from the repository root's for a module's own directory.
+//
+// Mutates: scopes gains the matcher for directory, by its repository-relative path, for the directories below it
 func enterScope(
 	rootMatcher *gitignore.Matcher, scopes map[string]*gitignore.Matcher, repositoryRoot string, directory string,
 ) error {
