@@ -24,7 +24,7 @@ import (
 // `async` changes a function's contract: it wraps the return value in a promise and makes every
 // caller either await it or handle a floating promise. A function that never awaits pays that cost
 // and buys nothing, and a reader seeing `async` reasonably assumes there is asynchrony inside to
-// find. Removing the keyword is offered as a SUGGESTION rather than applied, because it changes the
+// find. Removing the keyword is offered as a suggestion rather than applied, because it changes the
 // function's return type from `Promise<T>` to `T` and every caller has to agree.
 //
 // # Three things count as awaiting, and missing any one reports a legitimate function
@@ -36,18 +36,18 @@ import (
 //	                         expression node at all
 //
 // That last one is the sharpest and it carries a trap worth stating: `NodeFlagsAwaitUsing` is
-// `Const|Using` rather than a bit of its own, so `flags&NodeFlagsAwaitUsing != 0` is TRUE for an
+// `Const|Using` rather than a bit of its own, so `flags&NodeFlagsAwaitUsing != 0` is true for an
 // ordinary `const`. Measured: a plain `const x` in a `for...of` header answers true to the naive
 // test. The correct discrimination is the mask idiom typescript-go itself uses at
 // `ast/utilities.go:1214`, comparing the block-scoped bits for equality.
 //
 // # Two exclusions, both deliberate upstream
 //
-// An EMPTY body is never reported. Upstream declines it on the reasoning that an empty async
+// An empty body is never reported. Upstream declines it on the reasoning that an empty async
 // function is a stub or an interface implementation rather than an oversight, and reporting it
 // would fire on every unimplemented method in a codebase.
 //
-// A GENERATOR is never reported, whatever its body. An async generator's `async` governs its
+// A generator is never reported, whatever its body. An async generator's `async` governs its
 // iteration protocol rather than its return value, so the keyword is doing work even with no
 // `await` inside.
 //
@@ -57,7 +57,7 @@ import (
 // fresh frame per function, so the inner await sets the inner frame's flag and the outer one stays
 // unset. Here the search stops at every nested function boundary, which is the same rule stated as
 // a walk. Measured on upstream's own case: `async function foo() { async () => { await x; } }`
-// reports the OUTER function, and the inner arrow is separately clean because it does await.
+// reports the outer function, and the inner arrow is separately clean because it does await.
 var RequireAwait = rule.Rule{
 	Name: "require-await",
 	// The contract check reads the checker. Without this the checker is nil, the guard silently
@@ -162,7 +162,7 @@ func requireAwaitIsGenerator(node *ast.Node) bool {
 //
 // Upstream's `isEmptyFunction`, which tests for a block with an empty body. A concise arrow body is
 // an expression rather than a block and is never empty, so it always answers false. A block holding
-// only an empty statement is NOT empty -- measured, `async function f() { ; }` reports.
+// only an empty statement is not empty -- measured, `async function f() { ; }` reports.
 func requireAwaitBodyIsEmpty(body *ast.Node) bool {
 	if body.Kind != ast.KindBlock {
 		return false
@@ -211,7 +211,7 @@ func requireAwaitContainsAwait(node *ast.Node) bool {
 			return found
 		})
 	}
-	// The body itself is walked rather than passed to the switch, so a body that IS one of the
+	// The body itself is walked rather than passed to the switch, so a body that is one of the
 	// stopping kinds -- which it never is, being a block or an expression -- could not end the
 	// search before it starts.
 	node.ForEachChild(func(child *ast.Node) bool {
@@ -232,7 +232,7 @@ func requireAwaitContainsAwait(node *ast.Node) bool {
 //
 // `NodeFlagsAwaitUsing` is defined as `NodeFlagsConst | NodeFlagsUsing`, not as a bit of its own,
 // and typescript-go's own definition carries the note that on a single node those flags would
-// otherwise be mutually exclusive. So `flags&NodeFlagsAwaitUsing != 0` is true for ANY const and
+// otherwise be mutually exclusive. So `flags&NodeFlagsAwaitUsing != 0` is true for any const and
 // for any using, which measured true on a plain `const` in a for-of header.
 //
 // The correct test compares the block-scoped bits for equality, which is the idiom typescript-go
@@ -256,7 +256,7 @@ func requireAwaitIsAwaitUsing(list *ast.Node) bool {
 // Upstream calls `getFunctionHeadLoc`, which is three branches in a specific order, and the order
 // is the part worth stating because the branches overlap:
 //
-//  1. If the function's PARENT is a property, a method definition or a property definition, the
+//  1. If the function's parent is a property, a method definition or a property definition, the
 //     span starts at the parent and runs to the opening parenthesis of the parameters. This branch
 //     is tested first, so it wins over the arrow branch below.
 //  2. Otherwise, if the function is an arrow, the span is the arrow token alone.
@@ -315,8 +315,8 @@ func requireAwaitHeadRange(ruleContext rule.Context, node *ast.Node) core.TextRa
 
 // requireAwaitHeadStart finds where the reported span begins for a function that owns its own head.
 //
-// Upstream starts at `node.loc.start`, and the subtlety is what that node CONTAINS. ESTree treats a
-// class member's modifiers as part of the function's parent and an `export` as a wrapper AROUND the
+// Upstream starts at `node.loc.start`, and the subtlety is what that node contains. ESTree treats a
+// class member's modifiers as part of the function's parent and an `export` as a wrapper around the
 // declaration, so the two kinds of leading keyword fall on opposite sides of the start:
 //
 //	class A { static async foo() {} }           "static async foo"
@@ -379,7 +379,7 @@ func requireAwaitSkipSpaces(ruleContext rule.Context, start int) int {
 // a property declaration in a class.
 //
 // Upstream also has no value test and needs none, and neither does this. A function nested deeper
-// inside an initializer, `foo = [async function(){}]`, has the ARRAY as its parent rather than the
+// inside an initializer, `foo = [async function(){}]`, has the array as its parent rather than the
 // property, so the kind test alone already declines it. A guard comparing the initializer against
 // the node was written here first and then removed: it survived every mutation because nothing can
 // reach it, which is the signature of a condition that only looks like it is doing work. The four
@@ -410,7 +410,7 @@ func requireAwaitParametersStart(ruleContext rule.Context, node *ast.Node, start
 
 // requireAwaitAsyncKeywordRange returns the span the suggestion replaces.
 //
-// Upstream's range runs from the `async` token to the start of the NEXT token including comments,
+// Upstream's range runs from the `async` token to the start of the next token including comments,
 // so the trailing whitespace goes with the keyword while a comment after it survives. Measured:
 // `async /* c */ function foo` becomes `/* c */ function foo`.
 func requireAwaitAsyncKeywordRange(ruleContext rule.Context, node *ast.Node) (core.TextRange, bool) {
@@ -442,7 +442,7 @@ func requireAwaitAsyncKeywordRange(ruleContext rule.Context, node *ast.Node) (co
 
 // requireAwaitReplacement returns what the suggestion writes in place of `async`.
 //
-// Almost always the empty string. Upstream substitutes a SEMICOLON instead when removing the
+// Almost always the empty string. Upstream substitutes a semicolon instead when removing the
 // keyword would let automatic semicolon insertion join this construct to the previous line, which
 // its corpus exercises three times:
 //
@@ -467,7 +467,7 @@ func requireAwaitReplacement(ruleContext rule.Context, node *ast.Node) string {
 // # Both halves are required, and each was measured
 //
 // Upstream asks two questions and emits a semicolon only when both answer yes: whether the token
-// after `async` could CONTINUE the preceding expression, and whether the preceding construct
+// after `async` could continue the preceding expression, and whether the preceding construct
 // actually needs a semicolon. Testing only the second reports a semicolon on shapes upstream leaves
 // alone, which is how this arm was wrong on two of upstream's own cases before it was measured:
 //
@@ -477,8 +477,8 @@ func requireAwaitReplacement(ruleContext rule.Context, node *ast.Node) string {
 //	class A { a \n async [b](){} }        ""    the property has no initializer to continue
 //	class A { foo() {} \n async [bar](){} } ""  a method needs no semicolon after it
 //
-// So the continuation test is about the token AFTER `async`, and the semicolon test is about what
-// comes BEFORE the member. Reproduced narrowly rather than by porting upstream's full
+// So the continuation test is about the token after `async`, and the semicolon test is about what
+// comes before the member. Reproduced narrowly rather than by porting upstream's full
 // `needsPrecedingSemicolon`, because the shapes that reach it here are exactly these.
 func requireAwaitNeedsPrecedingSemicolon(ruleContext rule.Context, node *ast.Node) bool {
 	if !requireAwaitTokenAfterAsyncContinuesExpression(ruleContext, node) {
@@ -505,7 +505,7 @@ func requireAwaitNeedsPrecedingSemicolon(ruleContext rule.Context, node *ast.Nod
 
 // requireAwaitCanBeContinued answers whether a preceding member could still be an open expression.
 //
-// A property declaration WITH an initializer is the only class member that can, because the
+// A property declaration with an initializer is the only class member that can, because the
 // initializer is an expression and the next line can extend it. A property with no initializer, a
 // method, an accessor and a constructor are all closed already.
 func requireAwaitCanBeContinued(previous *ast.Node) bool {
@@ -575,7 +575,7 @@ func requireAwaitIsIdentifierByte(character byte) bool {
 // Only two containers matter: a class body, where a property with an initializer can run into the
 // next member, and a statement list, where an expression statement can continue onto the next line.
 //
-// The walk climbs through intermediate nodes so a function EXPRESSION reaches the statement that
+// The walk climbs through intermediate nodes so a function expression reaches the statement that
 // holds it: `foo \n async () => {}` has the arrow nested inside an expression statement rather than
 // sitting in the statement list itself.
 func requireAwaitPreviousSibling(node *ast.Node) *ast.Node {
@@ -661,8 +661,8 @@ func requireAwaitDescribe(ruleContext rule.Context, node *ast.Node) string {
 //
 // A computed name answers nothing, which is what produces the bare `Async method` rendering. A
 // string-literal name answers its cooked value, so a method named with an empty string
-// literal renders WITH that empty name rather than as an unnamed method -- the
-// empty string is a NAME rather than an absent one, and the two render differently.
+// literal renders with that empty name rather than as an unnamed method -- the
+// empty string is a name rather than an absent one, and the two render differently.
 func requireAwaitNameText(name *ast.Node) (string, bool) {
 	switch name.Kind {
 	case ast.KindIdentifier, ast.KindPrivateIdentifier:
@@ -687,7 +687,7 @@ func requireAwaitNameText(name *ast.Node) (string, bool) {
 // not-yet-wired ads collector in a map typed `=> Promise<...>`, a test double standing in for a
 // dependency whose real implementation awaits, a condition function matching its interface.
 //
-// Upstream already concedes the case in a narrower form. An EMPTY body is exempt precisely because
+// Upstream already concedes the case in a narrower form. An empty body is exempt precisely because
 // reporting it "would fire on every unimplemented method in a codebase" — the same reasoning,
 // drawn by body shape rather than by contract. A stub with one `return emptyReport(...)` in it is
 // the same animal and falls outside that line.
@@ -697,8 +697,8 @@ func requireAwaitNameText(name *ast.Node) (string, bool) {
 // promise, the `async` is load-bearing and removing it would break the assignment. Reporting it
 // would be telling the author to make their code wrong.
 //
-// The check is deliberately narrow. It fires only when a contextual type exists AND every call
-// signature it offers returns a thenable. A position that accepts `T | Promise<T>` is NOT exempt,
+// The check is deliberately narrow. It fires only when a contextual type exists and every call
+// signature it offers returns a thenable. A position that accepts `T | Promise<T>` is not exempt,
 // because there the keyword really is optional and the finding is real — that union is exactly
 // what a widened interface looks like, and widening is the right repair when no implementation
 // awaits. Absent contextual type means absent exemption.
@@ -707,7 +707,7 @@ func requireAwaitSatisfiesPromiseContract(ruleContext rule.Context, node *ast.No
 		return false
 	}
 
-	// A position inside a generic call is judged by what the call DECLARES, not by what it inferred.
+	// A position inside a generic call is judged by what the call declares, not by what it inferred.
 	// See requireAwaitDeclaredGenericDemand for why the inferred answer is the function grading its
 	// own homework.
 	if declared, substitutions, throughGenericCall := requireAwaitDeclaredGenericDemand(ruleContext, node); throughGenericCall {
@@ -743,7 +743,7 @@ func requireAwaitTypesDemandPromise(ruleContext rule.Context, node *ast.Node, ty
 			sawSignature = true
 			returnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature)
 
-			// Split the RETURN type, not the function type. A position declared
+			// Split the return type, not the function type. A position declared
 			// `T | Promise<T>` offers one signature whose return is a union, and the author may
 			// legitimately answer with either, so the keyword is optional and the finding stands.
 			// Only a return type that is thenable in every branch actually demands a promise.
@@ -796,7 +796,7 @@ type requireAwaitContextStep struct {
 	index int
 }
 
-// requireAwaitDeclaredGenericDemand finds the type a generic call DECLARES for the position this
+// requireAwaitDeclaredGenericDemand finds the type a generic call declares for the position this
 // function is written into, when the position's contextual type comes from a generic call.
 //
 // # Why the inferred contextual type is the wrong question here
@@ -811,7 +811,7 @@ type requireAwaitContextStep struct {
 //
 // TypeScript's own `ContextFlagsIgnoreNodeInferences` does not close this. It blocks an inference
 // only when the inferred source type's own symbol is the blocked node, which catches
-// `identity(async () => 1)` and misses `map`, whose `U` is inferred from the callback's RETURN type
+// `identity(async () => 1)` and misses `map`, whose `U` is inferred from the callback's return type
 // (a `Promise` whose symbol is the global one). It also works by re-resolving the enclosing calls
 // with inference blocked, which leaves expression types cached from that blocked run on a checker
 // every other rule reads afterwards. This walk only reads.
@@ -821,7 +821,7 @@ type requireAwaitContextStep struct {
 // From the function up to the nearest call it is an argument of, record each step a contextual
 // type takes on the way down: an object literal's property, an array's element, a contextually
 // typed function's return. If that call resolved to an instantiation of a generic signature and
-// wrote no explicit type arguments, replay the steps over the DECLARED parameter type instead of
+// wrote no explicit type arguments, replay the steps over the declared parameter type instead of
 // the instantiated one. A type parameter met on the way is read through its constraint, which is
 // how `(api) => Promise<T>` and `T extends () => Promise<void>` still demand a promise and `() => U`
 // does not, with two stand-ins where the parameter is fixed by something other than this function:
@@ -836,7 +836,7 @@ type requireAwaitContextStep struct {
 //     assignment, so the demand is real.
 //
 // A deeper mention of the parameter in another argument is not followed, and an overload chosen
-// BECAUSE this function returns a promise is not undone; both are named here rather than claimed.
+// because this function returns a promise is not undone; both are named here rather than claimed.
 //
 // The third result is false when the position does not come from a generic call, or when the walk
 // meets a shape it does not model; the caller then asks for the ordinary contextual type, which is

@@ -11,7 +11,7 @@ import (
 // with a stubbed rule tester so nothing was retyped, then verified byte against byte afterwards.
 //
 // Twenty seven of the invalid cases carry `output: null`, so the declines are nearly half this
-// rule rather than an edge. Each is asserted as reporting AND offering no fix, because a fixer that
+// rule rather than an edge. Each is asserted as reporting and offering no fix, because a fixer that
 // repaired one of them would be a defect no message assertion could see: the finding would look
 // right and the repair would change the program's value.
 

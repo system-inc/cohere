@@ -340,7 +340,7 @@ func TestNoHtmlLinkForPagesFindsNoDirectory(test *testing.T) {
 	})
 
 	// Divergence, kept: a file named `pages` passes upstream's existsSync and then readdirSync throws
-	// ENOTDIR, so the rule fails to load. Here it is not a directory and is not found.
+	// `ENOTDIR`, so the rule fails to load. Here it is not a directory and is not found.
 	test.Run("a file named pages", func(test *testing.T) {
 		test.Parallel()
 		runHtmlLinkTree(test, []htmlLinkRow{{`<a href="/">x</a>`, []string{"/"}}}, "pages", "app/page.tsx")

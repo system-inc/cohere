@@ -115,7 +115,7 @@ var NoCondAssign = rule.Rule{
 			}
 		}
 
-		// Under `except-parens`, only an assignment that IS the test reports, so parentheses around
+		// Under `except-parens`, only an assignment that is the test reports, so parentheses around
 		// it make the test a ParenthesizedExpression and the rule stays silent.
 		//
 		// `test` is nil for `for(;;)`, and `isAssignmentExpression` answers false for nil on its

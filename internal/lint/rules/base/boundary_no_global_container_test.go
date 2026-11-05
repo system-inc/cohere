@@ -19,13 +19,13 @@ func asTheNoGlobalContainerHarnessWroteIt(text string) string {
 	return strings.TrimSpace(text) + "\n"
 }
 
-// TestNoGlobalContainer measures this port against the SOURCE rule, shape by shape.
+// TestNoGlobalContainer measures this port against the source rule, shape by shape.
 //
 // These rules are ours rather than an upstream port, so there is no published corpus to import and
 // no fixture-provenance question. That inverts the usual guidance: a fixture invented here would
 // encode the same belief as the rule, and pass for exactly the reason the rule is wrong.
 //
-// So every row was measured by DRIVING the real rule from api-phi-health, loaded directly with its
+// So every row was measured by driving the real rule from api-phi-health, loaded directly with its
 // @nexus alias supplied by a loader hook, over the exact source text below. Two of them taught this
 // port something it would not have invented: a property key reports, and a locally declared
 // function of that name reports too.

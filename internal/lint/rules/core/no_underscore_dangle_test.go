@@ -14,7 +14,7 @@ const noUnderscoreDangleFile = "/repository/source/NoUnderscoreDangle.ts"
 // noUnderscoreDangleExpectation is one finding, with its span and the identifier the message names.
 //
 // The identifier is asserted because all forty-six findings share one message id, so it is the only
-// varying part, and the span is asserted because several destructuring cases report TWICE at the
+// varying part, and the span is asserted because several destructuring cases report twice at the
 // same span. A fixture checking ids and count alone cannot see either.
 type noUnderscoreDangleExpectation struct {
 	line       int
@@ -31,7 +31,7 @@ type noUnderscoreDangleCase struct {
 	findings    []noUnderscoreDangleExpectation
 }
 
-// decodeNoUnderscoreDangleOptionsForTest routes a case's options through the SHIPPED decoder.
+// decodeNoUnderscoreDangleOptionsForTest routes a case's options through the shipped decoder.
 func decodeNoUnderscoreDangleOptionsForTest(test *testing.T, optionsJson string) any {
 	test.Helper()
 	if optionsJson == "" {
@@ -111,7 +111,7 @@ func TestNoUnderscoreDangleFires(test *testing.T) {
 // TestNoUnderscoreDangleDecoderAcceptsTheShapesTheConfigLayerDelivers crosses the config boundary.
 //
 // Every fixture above reaches the decoder with bytes this test file built; the config layer builds
-// different bytes. `meta.schema` declares ONE element here, so the cohere spelling and upstream's
+// different bytes. `meta.schema` declares one element here, so the cohere spelling and upstream's
 // coincide, and that is pinned rather than assumed.
 //
 // The unknown-key rows matter more for this rule than for most. There are nine keys, four beginning
@@ -135,7 +135,7 @@ func TestNoUnderscoreDangleDecoderAcceptsTheShapesTheConfigLayerDelivers(test *t
 				if o.AllowAfterThis || o.AllowAfterSuper || len(o.Allow) != 0 {
 					test.Error("these allow flags default OFF, so nothing is exempt")
 				}
-				// The three that default TRUE arrive as nil and are resolved by the accessor, which
+				// The three that default true arrive as nil and are resolved by the accessor, which
 				// is the distinction a plain bool cannot carry.
 				if o.AllowFunctionParams != nil || o.AllowInArrayDestructuring != nil ||
 					o.AllowInObjectDestructuring != nil {
@@ -244,8 +244,8 @@ func TestNoUnderscoreDangleEveryOptionReachesTheRule(test *testing.T) {
 			on: `{"allowAfterSuper":true}`},
 		{option: "allowAfterThisConstructor", source: `this.constructor._bar`,
 			on: `{"allowAfterThisConstructor":true}`},
-		// These three default TRUE upstream, so the pair runs the other way: silent by default,
-		// reporting when explicitly turned off. That direction is what proves an EXPLICIT false is
+		// These three default true upstream, so the pair runs the other way: silent by default,
+		// reporting when explicitly turned off. That direction is what proves an explicit false is
 		// distinguishable from an absent key, which a plain bool field would collapse.
 		{option: "allowFunctionParams", source: `function foo(_bar) {}`,
 			on: `{"allowFunctionParams":false}`, defaultsAllow: true},
@@ -253,7 +253,7 @@ func TestNoUnderscoreDangleEveryOptionReachesTheRule(test *testing.T) {
 			on: `{"allowInArrayDestructuring":false}`, defaultsAllow: true},
 		{option: "allowInObjectDestructuring", source: `const { _bar } = o`,
 			on: `{"allowInObjectDestructuring":false}`, defaultsAllow: true},
-		// These two run the other way: the flag turns an arm ON rather than exempting it.
+		// These two run the other way: the flag turns an arm on rather than exempting it.
 		{option: "enforceInMethodNames", source: `class A { _m() {} }`,
 			on: `{"enforceInMethodNames":true}`, reports: true},
 		{option: "enforceInClassFields", source: `class A { _f = 1; }`,
@@ -308,7 +308,7 @@ func TestNoUnderscoreDangleEveryOptionReachesTheRule(test *testing.T) {
 // TestNoUnderscoreDangleNestedDestructuringSeparatesTheTwoFlags is the case that pins the walk.
 //
 // `allowInArrayDestructuring` and `allowInObjectDestructuring` are separate questions asked about
-// the pattern that COINED each name, not about the declarator. A port testing "is this declarator
+// the pattern that coined each name, not about the declarator. A port testing "is this declarator
 // destructured at all" collapses them into one flag and still passes most of the corpus.
 //
 // The distinguishing source coins two names under different pattern kinds in one declaration, and
@@ -324,7 +324,7 @@ func TestNoUnderscoreDangleNestedDestructuringSeparatesTheTwoFlags(test *testing
 	rule_testing.ExpectFindings(test, both,
 		messageNoUnderscoreDangle.Id, messageNoUnderscoreDangle.Id)
 
-	// `_bar` is coined by the ARRAY pattern and `_a` by the OBJECT one. Allowing arrays must
+	// `_bar` is coined by the array pattern and `_a` by the object one. Allowing arrays must
 	// silence exactly one of the two, and it must be `_bar`.
 	arraysAllowed := runNoUnderscoreDangle(test, noUnderscoreDangleCase{
 		source:      source,
@@ -475,7 +475,7 @@ var noUnderscoreDangleCleanCases = []noUnderscoreDangleCase{
 
 // noUnderscoreDangleReportingCases are upstream's `invalid` list, verbatim.
 //
-// Upstream asserts a count and an identifier per case; the SPANS were measured by driving the
+// Upstream asserts a count and an identifier per case; the spans were measured by driving the
 // installed 10.8.1 build. Several destructuring cases report twice at one span, which is the
 // shape a per-identifier anchor would get wrong while passing every message-id assertion.
 var noUnderscoreDangleReportingCases = []noUnderscoreDangleCase{
@@ -838,7 +838,7 @@ var noUnderscoreDangleReportingCases = []noUnderscoreDangleCase{
 // TestNoUnderscoreDangleThisConstructorIsThreeConditions pins each half of the receiver test.
 //
 // `allowAfterThisConstructor` exempts `this.constructor._bar` and nothing else, but upstream's
-// corpus contains only the POSITIVE case, so a port that checked merely "the receiver is a member
+// corpus contains only the positive case, so a port that checked merely "the receiver is a member
 // access on `this`" passes every imported fixture. A mutation dropping the `constructor` name check
 // survived the whole 116-case corpus for exactly that reason.
 //
