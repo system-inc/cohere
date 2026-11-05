@@ -63,7 +63,7 @@ func proposeFromRules(rules ...rule.Bound) Propose {
 	}
 }
 
-// unconfigured is subject as a config writing its bare severity runs it, handed no options.
+// unconfigured is subject bound to the zero Given, as a bare severity runs it and as nil options used to.
 func unconfigured[Options any](subject rule.Rule[Options]) rule.Bound {
 	return rule.Bind(subject, rule.Given[Options]{})
 }
