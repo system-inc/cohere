@@ -936,7 +936,8 @@ func TestCorrectnessNoCallerDataMutationArrayRemoval(test *testing.T) {
 			fixture := func(body string) string {
 				return correctnessNoCallerDataMutationSource(
 					"interface WindowInterface { rowsDeleted: number; finished: boolean }",
-					"export async function runJunkDeleteWindows(state: { windows: WindowInterface[] }, rows: number, statementLimit: number) { "+
+					"export async function runJunkDeleteWindows(state: { windows: WindowInterface[] }, "+
+						"rows: number, statementLimit: number) { "+
 						body+
 						" }")
 			}
