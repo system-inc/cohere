@@ -19,7 +19,7 @@ const noUselessConcatFile = "/repository/source/NoUselessConcat.ts"
 // conversion is asserted rather than assumed, because a span fixture derived from the wrong
 // arithmetic would pin the wrong answer just as confidently as the right one.
 //
-// Two cases carry TWO findings, which is why the expectation is a list rather than a count: a
+// Two cases carry two findings, which is why the expectation is a list rather than a count: a
 // three-literal chain reports at both operators, and so does the parenthesized pair.
 func TestNoUselessConcatFires(test *testing.T) {
 	test.Parallel()
@@ -50,11 +50,11 @@ func TestNoUselessConcatFires(test *testing.T) {
 			}
 			rule_testing.ExpectFindings(test, result, wantIds...)
 
-			// The span is the whole rule's other half. Upstream points at the `+` OPERATOR rather
+			// The span is the whole rule's other half. Upstream points at the `+` operator rather
 			// than at the expression, so a port reporting the node passes every id assertion while
 			// pointing at column 1 of a chain.
 			//
-			// The spans are compared as a SORTED set rather than in emission order, and that is a
+			// The spans are compared as a sorted set rather than in emission order, and that is a
 			// fact about the harness rather than a weakening of the assertion. A chain like
 			// `'a' + 'b' + 'c'` parses with the second `+` as the outer node, the walk here is
 			// pre-order, so the rule emits the outer operator first while upstream lists column 5
@@ -154,7 +154,7 @@ func TestNoUselessConcatSkipsParentheses(test *testing.T) {
 // TestNoUselessConcatTemplatesWithSubstitutions pins a piece of upstream behaviour that reads like a
 // defect and is not.
 //
-// `astUtils.isStringLiteral` accepts ANY template literal, so a template carrying a substitution
+// `astUtils.isStringLiteral` accepts any template literal, so a template carrying a substitution
 // counts even though it is not a constant and the concatenation is not actually useless. Measured
 // against the installed build rather than inferred from the helper's name. Reproduced deliberately;
 // narrowing it to constant templates would be a silent improvement on upstream, which is the thing
@@ -180,7 +180,7 @@ func TestNoUselessConcatTemplatesWithSubstitutions(test *testing.T) {
 // TestNoUselessConcatSameLine states the line rule, including the shapes that separate the two ways
 // of asking it.
 //
-// Upstream compares the left operand's END line against the right operand's START line. A template
+// Upstream compares the left operand's end line against the right operand's start line. A template
 // literal spanning lines is what makes that different from "are the two operands on one line": a
 // template opening on line 1 and closing on line 2 leaves the operator on line 2 beside a literal
 // that starts on line 1, and upstream reports it. Every verdict below was measured against the

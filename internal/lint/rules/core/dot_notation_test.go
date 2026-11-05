@@ -20,7 +20,7 @@ type dotNotationCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through the rule's own
+	// options is the raw JSON of upstream's options object, routed through the rule's own
 	// exported decoder rather than built as a struct, so the decoder's defaults and its
 	// empty-input path are under test.
 	options string
@@ -456,7 +456,7 @@ func TestDotNotationStaysSilent(test *testing.T) {
 
 // dotNotationFixCase is one of upstream's `output` fixtures.
 //
-// `output` is the SPECIFICATION for the repair: it asserts the rewritten file byte for
+// `output` is the specification for the repair: it asserts the rewritten file byte for
 // byte, which is what catches a fixer that repairs the right span with the wrong text, or
 // the right text over the wrong span. A message-id fixture cannot see either.
 type dotNotationFixCase struct {
@@ -676,7 +676,7 @@ var dotNotationRepairCases = []dotNotationFixCase{
 	},
 }
 
-// dotNotationDeclineCases are the rows upstream reports on and deliberately does NOT repair.
+// dotNotationDeclineCases are the rows upstream reports on and deliberately does not repair.
 //
 // Every one is a repair that would change meaning rather than spelling: three would delete a
 // comment sitting inside the span, and `let.if()` is a statement whose bracketed form parses

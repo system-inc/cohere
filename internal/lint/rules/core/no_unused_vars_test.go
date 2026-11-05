@@ -10,7 +10,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// TestNoUnusedVarsReportsAtTheBindingName asserts WHERE the finding points, which no message-id
+// TestNoUnusedVarsReportsAtTheBindingName asserts where the finding points, which no message-id
 // assertion can see. A rule naming the right message over the wrong span passes a complete fixture
 // pair while being wrong, and this rule has several candidate spans to get wrong: the declaration
 // statement, the declarator, and the name.
@@ -166,7 +166,7 @@ func TestNoUnusedVarsReportsAtTheLastWrite(test *testing.T) {
 // TestNoUnusedVarsRequiresTheTypedHarness pins that this rule answers nothing without a checker.
 //
 // A rule declaring NeedsTypeChecker and reading it without a nil guard does not crash on our shim,
-// it goes SILENT, and every StaysSilent fixture then passes vacuously. That failure is invisible
+// it goes silent, and every StaysSilent fixture then passes vacuously. That failure is invisible
 // from a green suite, so it gets its own assertion with a control on the other side.
 func TestNoUnusedVarsRequiresTheTypedHarness(test *testing.T) {
 	test.Parallel()
@@ -310,10 +310,10 @@ func TestNoUnusedVarsDeclarationMergingExportsFromEitherSide(test *testing.T) {
 	}
 }
 
-// TestNoUnusedVarsSkipsDeclarationFiles pins the `.d.ts` behavior, and says what it does NOT prove.
+// TestNoUnusedVarsSkipsDeclarationFiles pins the `.d.ts` behavior, and says what it does not prove.
 //
 // It asserts the observable answer, which is real: a declaration file reports nothing while the same
-// source as `.ts` reports both. It does NOT prove the suffix test in the rule is what produces that,
+// source as `.ts` reports both. It does not prove the suffix test in the rule is what produces that,
 // and a mutant disabling that test survives this fixture. The cause is recorded at the rule's own
 // line: typescript-go marks declarations in a `.d.ts` ambient, so the ambient guard already declines
 // them and the suffix test is subsumed today.
@@ -344,7 +344,7 @@ func TestNoUnusedVarsSkipsDeclarationFiles(test *testing.T) {
 func TestNoUnusedVarsExemptsMappedTypeKeys(test *testing.T) {
 	test.Parallel()
 
-	// NOT exported, and that is the whole point of the case. The first fixture written for this
+	// Not exported, and that is the whole point of the case. The first fixture written for this
 	// survivor used an exported type and the mutant survived it again: an exported declaration is
 	// already exempt for a different reason, so both the guarded and the unguarded rule reach
 	// silence by different routes and no fixture over that shape can separate them. Measured on the
@@ -373,7 +373,7 @@ func TestNoUnusedVarsExemptsMappedTypeKeys(test *testing.T) {
 // namespace's body. Before this, the export climb walked from the binding all the way to the
 // enclosing `export` and exempted everything under it.
 //
-// The controls matter as much as the cases: the exported binding ITSELF must still be exempt, or
+// The controls matter as much as the cases: the exported binding itself must still be exempt, or
 // this test would pass on a rule that had simply stopped believing in exports.
 func TestNoUnusedVarsExportedContainerDoesNotExemptItsContents(test *testing.T) {
 	test.Parallel()
@@ -418,7 +418,7 @@ func TestNoUnusedVarsDiscardedReads(test *testing.T) {
 		source string
 		want   int
 	}{
-		// A comma sequence yields its RIGHT operand, so only the left one is discarded.
+		// A comma sequence yields its right operand, so only the left one is discarded.
 		{"sequence left operand", "let a = 0; let b = (a, 0) + 1; f(b);", 1},
 		{"control, sequence right operand", "let a = 0; let b = (0, a) + 1; f(b);", 0},
 

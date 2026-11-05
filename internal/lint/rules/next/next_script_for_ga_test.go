@@ -11,7 +11,7 @@ import (
 // mechanically rather than transcribed, because three of the fail cases contain template literals
 // whose escapes a hand copy or a heredoc would cook.
 //
-// Two of the fail inputs contain a second <script> that does NOT report, which is the corpus'
+// Two of the fail inputs contain a second <script> that does not report, which is the corpus'
 // sharpest content and the thing a reading of the rule name gets backwards. Those are asserted with
 // a single finding each rather than two.
 
@@ -118,8 +118,8 @@ func TestNextScriptForGaReportsTheMeasuredEdgeCases(test *testing.T) {
 		source string
 	}{
 		{
-			// The attribute NAME is matched case-insensitively even though the tag name and the
-			// attribute VALUE are not. Upstream reaches both attributes through
+			// The attribute name is matched case-insensitively even though the tag name and the
+			// attribute value are not. Upstream reaches both attributes through
 			// `has_jsx_prop_ignore_case`.
 			name:   "an uppercase src attribute name",
 			source: "export const A = <script SRC=\"https://www.google-analytics.com/analytics.js\" />;\n",
@@ -136,7 +136,7 @@ func TestNextScriptForGaReportsTheMeasuredEdgeCases(test *testing.T) {
 			source: "export const A = <script src=\"http://www.google-analytics.com/analytics.js\" />;\n",
 		},
 		{
-			// Only the first template chunk is searched, so a URL BEFORE the interpolation is
+			// Only the first template chunk is searched, so a URL before the interpolation is
 			// found. Its mirror image below is silent, and the pair is what pins the index.
 			name:   "a url before an interpolation",
 			source: "export const A = <script dangerouslySetInnerHTML={{__html: `www.google-analytics.com/analytics.js${x}tail`}} />;\n",
@@ -184,7 +184,7 @@ func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(test *testing.T) {
 		source string
 	}{
 		{
-			// The two substring lists are NOT the same list. `gtm.js` is inline-only, so a src
+			// The two substring lists are not the same list. `gtm.js` is inline-only, so a src
 			// naming it is silent even though the identical string reports inline.
 			name:   "the tag manager gtm.js path in a src",
 			source: "export const A = <script src=\"https://www.googletagmanager.com/gtm.js?id=X\" />;\n",
@@ -201,7 +201,7 @@ func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(test *testing.T) {
 			source: "export const A = <SCRIPT src=\"https://www.google-analytics.com/analytics.js\" />;\n",
 		},
 		{
-			// The VALUE is compared case-sensitively, which is the opposite of how its attribute
+			// The value is compared case-sensitively, which is the opposite of how its attribute
 			// name was found two lines earlier in the same rule.
 			name:   "an uppercase src value",
 			source: "export const A = <script src=\"WWW.GOOGLE-ANALYTICS.COM/ANALYTICS.JS\" />;\n",
@@ -232,13 +232,13 @@ func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(test *testing.T) {
 			source: "export const A = <script dangerouslySetInnerHTML={{__html: \"www.google-analytics.com/analytics.js\"}} />;\n",
 		},
 		{
-			// Only quasis[0]. The mirror of the reporting case above: a URL AFTER an interpolation
+			// Only quasis[0]. The mirror of the reporting case above: a URL after an interpolation
 			// sits in a later chunk that upstream never reads.
 			name:   "a url after an interpolation",
 			source: "export const A = <script dangerouslySetInnerHTML={{__html: `head${x}www.google-analytics.com/analytics.js`}} />;\n",
 		},
 		{
-			// The RAW text is searched, not the cooked value. A unicode escape for the period
+			// The raw text is searched, not the cooked value. A unicode escape for the period
 			// survives as six characters upstream and matches nothing. Reading Node.Text() here
 			// would cook it to a period and report, which is the single most invisible way this
 			// port could have diverged.
@@ -252,7 +252,7 @@ func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(test *testing.T) {
 		},
 		{
 			// Nor is a computed one. ast.TryGetTextOfPropertyName resolves both of these shapes and
-			// is deliberately not used, because using it would silence nothing and instead START
+			// is deliberately not used, because using it would silence nothing and instead start
 			// reporting two inputs upstream declines.
 			name:   "a computed __html key",
 			source: "export const A = <script dangerouslySetInnerHTML={{[\"__html\"]: `www.google-analytics.com/analytics.js`}} />;\n",
@@ -422,7 +422,7 @@ func TestNextScriptForGaSurvivesPropertyShapesItCannotConvert(test *testing.T) {
 	}
 }
 
-// The attribute search stops at the FIRST dangerouslySetInnerHTML and answers from it, rather than
+// The attribute search stops at the first dangerouslySetInnerHTML and answers from it, rather than
 // searching on for one that yields a usable value. Upstream's `has_jsx_prop_ignore_case` is a
 // `find`, so a second copy of the attribute is never consulted whatever it holds.
 //

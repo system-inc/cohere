@@ -20,7 +20,7 @@ type classMethodsUseThisCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through the rule's own
+	// options is the raw JSON of upstream's options object, routed through the rule's own
 	// exported decoder rather than built as a struct, so the decoder's defaults and its
 	// empty-input path are under test.
 	options string
@@ -328,7 +328,7 @@ func TestClassMethodsUseThisStaysSilent(test *testing.T) {
 //
 // Found by differential rather than by fixtures. Driving ESLint over the 1,163 files this rule
 // touches on the real tree gave 217 against an earlier draft's 226, and every one of the nine extras
-// was bodiless. The overload case is the sharper half, because the same NAME then reports twice and
+// was bodiless. The overload case is the sharper half, because the same name then reports twice and
 // reads as a duplicated finding rather than as a wrong verdict.
 //
 // After the fix the two agree on all 1,163 files with zero disagreements.

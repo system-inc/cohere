@@ -14,9 +14,9 @@ const noLoneBlocksFile = "/repository/source/NoLoneBlocks.ts"
 // Verbatim from `eslint/tests/lib/rules/no-lone-blocks.js`, extracted by loading that file with the
 // rule tester stubbed out. 23 valid and 27 invalid.
 //
-// # The one case that is NOT imported, and why
+// # The one case that is not imported, and why
 //
-// Upstream's corpus runs `{ function bar() {} }` twice, at the SAME ecmaVersion 6, and gets
+// Upstream's corpus runs `{ function bar() {} }` twice, at the same ecmaVersion 6, and gets
 // opposite verdicts. The discriminator is strictness, not the language version, and it is easy to
 // misread as the latter because the two rows differ in a nested `parserOptions` key:
 //
@@ -77,7 +77,7 @@ func TestNoLoneBlocksStaysSilent(test *testing.T) {
 
 // The failing cases, with the exact ids the corpus names and in its order.
 //
-// Two messages, and which one fires is decided by the block's PARENT: a block sitting directly
+// Two messages, and which one fires is decided by the block's parent: a block sitting directly
 // inside another block or inside a static block is `redundantNestedBlock`, everything else is
 // `redundantBlock`. The three-finding case pins both the count and the interleaving.
 func TestNoLoneBlocksFires(test *testing.T) {
@@ -175,10 +175,10 @@ func TestNoLoneBlocksExemptsTypeScriptBlockScopedDeclarations(test *testing.T) {
 		"{ foo(); }"), "redundantBlock")
 }
 
-// A static block's own body is not a lone block, and this is a PARSER DIFFERENCE rather than a rule
+// A static block's own body is not a lone block, and this is a parser difference rather than a rule
 // decision.
 //
-// ESTree gives a `StaticBlock` node that IS the statement list, so upstream never sees a block in
+// ESTree gives a `StaticBlock` node that is the statement list, so upstream never sees a block in
 // that position. typescript-go gives a `ClassStaticBlockDeclaration` whose `Body` is a separate
 // `KindBlock`, which looks exactly like a redundant block inside a static block. Without the guard,
 // eight of upstream's clean cases reported and eleven of its failing ones reported twice.
@@ -199,7 +199,7 @@ func TestNoLoneBlocksDoesNotReportAStaticBlockBody(test *testing.T) {
 		})
 	}
 
-	// A real block INSIDE a static block still reports, and as nested, which is what shows the
+	// A real block inside a static block still reports, and as nested, which is what shows the
 	// guard is about the body node rather than about static blocks generally.
 	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoLoneBlocks, noLoneBlocksFile,
 		"class C { static { { block; } } }"), "redundantNestedBlock")
@@ -288,7 +288,7 @@ func TestNoLoneBlocksSpansTheBlock(test *testing.T) {
 	}
 }
 
-// The identity test in both arms: "the parent's only statement" means THIS block, not merely that
+// The identity test in both arms: "the parent's only statement" means this block, not merely that
 // the parent has one statement.
 //
 // Found as two surviving mutants, one per arm, both deleting `Nodes[0] == block` while keeping
@@ -301,10 +301,10 @@ func TestNoLoneBlocksSpansTheBlock(test *testing.T) {
 //
 // Without the identity test the consequent block satisfies "the only statement" and reports, which
 // would be a false positive on the block a construct requires. All four rows measured against the
-// installed eslint 10.8.1 build: the OUTER block reports once and the inner one never does.
+// installed eslint 10.8.1 build: the outer block reports once and the inner one never does.
 //
 // The switch rows are the same question in the clause arm, and they invert: a clause holding one
-// statement exempts the block only when the block IS that statement, so `case 1: if (a) { bar; }`
+// statement exempts the block only when the block is that statement, so `case 1: if (a) { bar; }`
 // is clean throughout while `case 1: { bar; }` is clean for a different reason.
 func TestNoLoneBlocksIdentityNotJustLength(test *testing.T) {
 	test.Parallel()
@@ -341,7 +341,7 @@ func TestNoLoneBlocksIdentityNotJustLength(test *testing.T) {
 	}
 }
 
-// A block-scoped block still reports when it is a function body's ONLY statement, and the
+// A block-scoped block still reports when it is a function body's only statement, and the
 // TypeScript exemption does not rescue it.
 //
 // Written after a seeded probe made this look like a defect in the TypeScript exemption. It is not:

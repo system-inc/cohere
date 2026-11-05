@@ -29,7 +29,7 @@ type useBeforeDefineCase struct {
 	name     string
 	source   string
 	fileName string
-	// rawOptions is the options object as upstream writes it, MINUS the array wrapper. cohere's
+	// rawOptions is the options object as upstream writes it, minus the array wrapper. cohere's
 	// config layer unwraps the [severity, options] tuple before dispatch, so a decoder receives the
 	// bare object; copying ESLint's array spelling straight in would fail every row.
 	rawOptions string
@@ -40,7 +40,7 @@ type useBeforeDefineCase struct {
 // exported decoder rather than building the settings struct directly.
 //
 // That routing is the point rather than a convenience. Six of this rule's seven options default to
-// TRUE, so a test that constructed the struct itself would exercise a shape the live config never
+// `true`, so a test that constructed the struct itself would exercise a shape the live config never
 // produces, and a default inversion or a broken "nofunc" string form would pass unnoticed.
 func runUseBeforeDefineCase(test *testing.T, testCase useBeforeDefineCase) rule_testing.Result {
 	test.Helper()
@@ -2154,7 +2154,7 @@ func TestNoUseBeforeDefineStaysSilent(test *testing.T) {
 	}
 }
 
-// TestNoUseBeforeDefineReportsTheUseNotTheDeclaration pins WHERE the finding points.
+// TestNoUseBeforeDefineReportsTheUseNotTheDeclaration pins where the finding points.
 //
 // ExpectFindings asserts ids and count and nothing else, so a rule anchored on the declaration
 // rather than on the reference passes the entire imported corpus while pointing every finding at the
@@ -2208,7 +2208,7 @@ func TestNoUseBeforeDefineReportsTheUseNotTheDeclaration(test *testing.T) {
 //
 // The message used to be one constant telling every finding that the read "throws at runtime" (for
 // `let`, `const` or a class) or "yields `undefined`" (for `var`). Measured on ahra, 10 of the 12
-// findings read a FUNCTION DECLARATION, which is hoisted with its body, so the read works and the
+// findings read a function declaration, which is hoisted with its body, so the read works and the
 // message described a crash that cannot happen; the other two read a module-level `let` and `const`
 // from inside a function written above them, which throws only if that function is called first.
 // Each row below is a kind the message now distinguishes, asserted against literals typed here.
@@ -2331,7 +2331,7 @@ func TestNoUseBeforeDefineDecodesTheStringForm(test *testing.T) {
 // A rule configured as a bare "error" is handed nil options. DecodeOptionsInto errors on empty
 // input, the config layer turns that into nil for a non-required rule, and a type assertion on nil
 // yields the zero value, which for a struct of bools is false everywhere. Six of this rule's seven
-// options default to TRUE, so that path would leave a rule registered on every file and judging
+// options default to `true`, so that path would leave a rule registered on every file and judging
 // almost nothing, with every fixture above still green because every one of them reaches the rule
 // through the decoder.
 func TestNoUseBeforeDefineDefaultsSurviveAnAbsentConfiguration(test *testing.T) {
@@ -2427,9 +2427,9 @@ func TestNoUseBeforeDefineSubstrateDivergences(test *testing.T) {
 // TestNoUseBeforeDefineMergedDeclarations pins which declaration of a merged symbol the rule judges
 // against, which the imported corpus does not cover at all.
 //
-// A merged symbol carries several declarations and their order in `symbol.Declarations` is NOT
+// A merged symbol carries several declarations and their order in `symbol.Declarations` is not
 // source order. Measured with a probe on this tree: for `interface Foo {} function Foo() {}` the
-// checker returns the FUNCTION first even though the interface is written above it, so an
+// checker returns the function first even though the interface is written above it, so an
 // index-zero read compares the reference against a position 16 bytes later than the real one.
 //
 // The rule takes the earliest by position instead, because the question it asks is "when does this
@@ -2465,15 +2465,15 @@ func TestNoUseBeforeDefineMergedDeclarations(test *testing.T) {
 		})
 	}
 
-	// The rows above establish that a merged symbol reports at all. They do NOT separate the two
-	// readings, and finding that out cost a round: with the reference above BOTH declarations, index
+	// The rows above establish that a merged symbol reports at all. They do not separate the two
+	// readings, and finding that out cost a round: with the reference above both declarations, index
 	// zero and earliest-by-position give different declarations and the same verdict, because every
 	// declaration is below the reference either way.
 	//
-	// The input that separates them puts the reference BETWEEN the two declarations. Upstream was
+	// The input that separates them puts the reference between the two declarations. Upstream was
 	// driven on each of these and reports zero: the binding is usable from the first declaration, so
 	// a reference after it is fine even though a later declaration of the same name follows. Reading
-	// index zero here compares against the LATER declaration and reports a false positive.
+	// index zero here compares against the later declaration and reports a false positive.
 	for _, clean := range []struct {
 		name   string
 		source string
@@ -2490,7 +2490,7 @@ func TestNoUseBeforeDefineMergedDeclarations(test *testing.T) {
 		})
 	}
 
-	// The control for the block above: the same merged shape with the reference below EVERY
+	// The control for the block above: the same merged shape with the reference below every
 	// declaration is also clean, so a rule reporting nothing at all would pass those four rows. The
 	// reporting rows earlier in this function are what make the pair meaningful.
 	control := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", "interface Foo {} function Foo() {} Foo;")
@@ -2501,7 +2501,7 @@ func TestNoUseBeforeDefineMergedDeclarations(test *testing.T) {
 // ignoreTypeReferences option, which the imported corpus does not exercise and which two plausible
 // readings of upstream answer differently.
 //
-// Upstream's exemption is an IMMEDIATE-parent test: `identifier.parent.type === "TSTypeReference"`.
+// Upstream's exemption is an immediate-parent test: `identifier.parent.type === "TSTypeReference"`.
 // So `Foo` in `let x: Foo` is exempt and `A` in `let x: A.B` is not, because `A`'s parent is the
 // qualified name rather than the type reference. Walking upward through the qualified name reads as
 // the obvious correction and is wrong, and it fails silently: it exempts every namespaced type
@@ -2518,10 +2518,10 @@ func TestNoUseBeforeDefineQualifiedNames(test *testing.T) {
 		source   string
 		findings int
 	}{
-		// The direct type reference IS exempt: the identifier's parent is the type reference itself.
+		// The direct type reference is exempt: the identifier's parent is the type reference itself.
 		{"plain type reference is exempt", "let x: Foo; type Foo = 1;", 0},
 
-		// The namespaced ones are NOT, and this is the whole point of the immediate-parent test.
+		// The namespaced ones are not, and this is the whole point of the immediate-parent test.
 		{"namespaced type reference reports", "let x: A.B; namespace A { export type B = 1 }", 1},
 		{"deeper namespaced type reference reports", "let x: A.B.C; namespace A { export namespace B { export type C = 1 } }", 1},
 
@@ -2548,7 +2548,7 @@ func TestNoUseBeforeDefineQualifiedNames(test *testing.T) {
 	}
 }
 
-// TestNoUseBeforeDefineJsxAttributes separates a JSX attribute NAME, which names nothing, from a JSX
+// TestNoUseBeforeDefineJsxAttributes separates a JSX attribute name, which names nothing, from a JSX
 // component reference, which does.
 //
 // The corpus cannot express this difference. eslint-scope creates no reference for an attribute
@@ -2572,7 +2572,7 @@ func TestNoUseBeforeDefineJsxAttributes(test *testing.T) {
 		{"key attribute is not a reference", `const a = <div key="x" />; export {};`, 0},
 		{"several attributes are not references", `const a = <div className="x" id="y" />; export {};`, 0},
 
-		// Component references ARE, and this is the pair the guard has to preserve. Losing these
+		// Component references are, and this is the pair the guard has to preserve. Losing these
 		// would make the guard look correct while switching the rule off for every JSX file.
 		{"component used above its declaration", "const a = <Section />; function Section() { return <div/>; } export {};", 1},
 		{"component used from a function above its declaration", "function App() { return <Section/>; } function Section() { return <div/>; } export {};", 1},
@@ -2593,7 +2593,7 @@ func TestNoUseBeforeDefineJsxAttributes(test *testing.T) {
 
 // TestNoUseBeforeDefineShorthandProperties pins the accessor a shorthand property needs.
 //
-// `GetSymbolAtLocation` on the `form` in `{ form }` resolves to the PROPERTY's own symbol, whose
+// `GetSymbolAtLocation` on the `form` in `{ form }` resolves to the property's own symbol, whose
 // only declaration is the shorthand node itself, so comparing positions against it compares the
 // reference with itself. The recovery is GetShorthandAssignmentValueSymbol.
 //
@@ -2613,7 +2613,7 @@ func TestNoUseBeforeDefineShorthandProperties(test *testing.T) {
 		{"shorthand beside another property", "const a = 1; const o = { a, b: 2 };", 0},
 		{"shorthand inside a function", "function f() { const form = 1; return { form }; }", 0},
 
-		// The control: a shorthand reading a LATER binding is a genuine forward reference and must
+		// The control: a shorthand reading a later binding is a genuine forward reference and must
 		// still report, or the guard above has switched the rule off for object literals.
 		{"shorthand reads a later binding", "const o = { form }; const form = 1;", 1},
 	}
@@ -2639,9 +2639,9 @@ func TestNoUseBeforeDefineShorthandProperties(test *testing.T) {
 // element, and the checker resolves it to whatever declares that property, which is often later in
 // the file, so without a guard the rule reports the property name as a forward reference.
 //
-// `isDeclaringName` cannot cover it: that helper already answers true for the binding NAME of a
+// `isDeclaringName` cannot cover it: that helper already answers true for the binding name of a
 // binding element, and the property name is a different slot on the same node. Upstream's corpus
-// writes destructuring DEFAULTS (`var {a = 0, b = a} = {}`) but never a rename, so nothing imported
+// writes destructuring defaults (`var {a = 0, b = a} = {}`) but never a rename, so nothing imported
 // can see this. It was found by differencing the real tree against the installed rule.
 //
 // Every count below was measured against that rule.
@@ -2653,7 +2653,7 @@ func TestNoUseBeforeDefineDestructuringPropertyNames(test *testing.T) {
 		source   string
 		findings int
 	}{
-		// One finding each, on the BINDING or on the source value, never on the property name.
+		// One finding each, on the binding or on the source value, never on the property name.
 		{"renamed binding from a later function", "const { sorted: sortedTypes } = f(); function f() { return { sorted: 1 }; }", 1},
 		{"shorthand binding from a later function", "const { sorted } = f(); function f() { return { sorted: 1 }; }", 1},
 		{"two renamed bindings from a later object", "const { a: b, c: d } = o; const o = { a: 1, c: 2 };", 1},

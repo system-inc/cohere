@@ -35,7 +35,7 @@ func uselessRenameOptions(test *testing.T, ignoreDestructuring bool, ignoreImpor
 //
 // Extracted by loading upstream's tester with a stubbed RuleTester and rendering these literals
 // from that JSON, so nothing was retyped and no escape sequence was hand-written. That matters
-// more here than usual: five cases turn on a unicode ESCAPE being preserved as an escape, and a
+// more here than usual: five cases turn on a unicode escape being preserved as an escape, and a
 // tool that cooked \\u0061 into a would leave them asserting the opposite of upstream while still
 // passing. The generator refuses any byte outside printable ASCII, and TestNoUselessRenameCorpus
 // ByteCheck compares the escape cases against upstream's own bytes.
@@ -257,11 +257,11 @@ func TestNoUselessRenameStaysSilent(test *testing.T) {
 
 // The fix vectors, which are upstream's own output fields.
 //
-// These assert what the repair WRITES rather than that a finding appeared, and they are the only
+// These assert what the repair writes rather than that a finding appeared, and they are the only
 // thing that can see a fixer repairing the right span with the wrong text. The escape rows are
 // the sharpest: let {a: \\u0061} = obj fixes to let {\\u0061} = obj, keeping the escape, while
 // let {\\u0061: a} = obj fixes to let {a} = obj. Which side survives is decided by the repair
-// keeping the LOCAL text, and nothing but an output comparison could tell the two apart.
+// keeping the local text, and nothing but an output comparison could tell the two apart.
 func TestNoUselessRenameFixes(test *testing.T) {
 	test.Parallel()
 
@@ -378,7 +378,7 @@ func TestNoUselessRenameFixes(test *testing.T) {
 // parenthesized left side of a default cannot become a shorthand property, because parentheses
 // are not legal there.
 //
-// Asserted as the ABSENCE of a proposal rather than through ExpectFixedSource, which refuses a
+// Asserted as the absence of a proposal rather than through ExpectFixedSource, which refuses a
 // result carrying no fixes rather than treating it as an unchanged rewrite. The count is what
 // separates a withheld repair from one that lands and happens to write the same bytes.
 func TestNoUselessRenameDeclinesToFix(test *testing.T) {
@@ -437,7 +437,7 @@ func TestNoUselessRenameDeclinesToFix(test *testing.T) {
 // The escape cases still hold real escape sequences on disk.
 //
 // Five corpus cases turn on a unicode escape being preserved rather than cooked, and a tool that
-// cooked one would leave the fixture asserting the opposite of upstream WHILE STILL PASSING,
+// cooked one would leave the fixture asserting the opposite of upstream while still passing,
 // because a cooked and an uncooked name compare equal through this rule. So the bytes are checked
 // rather than the behaviour: the literal must still contain a backslash-u sequence.
 func TestNoUselessRenameCorpusByteCheck(test *testing.T) {
@@ -509,8 +509,8 @@ func TestNoUselessRenamePointsAtTheWholeRename(test *testing.T) {
 
 // Which of the two names the repair keeps differs between an import and an export.
 //
-// Upstream writes the text of node.local in both cases, and local is the name AFTER `as` in an
-// import and the name BEFORE it in an export. So the same-looking pair of inputs repairs to
+// Upstream writes the text of node.local in both cases, and local is the name after `as` in an
+// import and the name before it in an export. So the same-looking pair of inputs repairs to
 // opposite sides, and a port keeping one consistent side passes every message-id assertion while
 // writing the wrong text half the time. It did exactly that here until these vectors ran.
 //
@@ -622,7 +622,7 @@ func TestDecodeNoUselessRenameOptions(test *testing.T) {
 
 // An ordinary object literal is not a destructuring pattern, and only the context says which.
 //
-// Our parser produces an object LITERAL for `({foo: foo} = obj)` and only the surrounding assignment
+// Our parser produces an object literal for `({foo: foo} = obj)` and only the surrounding assignment
 // makes it a pattern, where upstream's parser reinterprets and hands the rule an ObjectPattern. So
 // this port has to ask whether the literal is an assignment target, and a port that skipped the
 // question would report every `{foo: foo}` written as a value.

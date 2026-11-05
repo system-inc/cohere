@@ -24,7 +24,7 @@ func messageNoGlobalContainer() rule.Message {
 //	invalid: import { getGlobalContainer } from './c';
 //
 // Reaching for the global container hides a dependency and defeats the injection graph, so the ban
-// is on the NAME rather than on any particular use of it. The original says this outright: one
+// is on the name rather than on any particular use of it. The original says this outright: one
 // identifier visitor catches the call, member access on its result, and the import alike, where
 // separate call and member visitors would report the same usage twice.
 //
@@ -40,7 +40,7 @@ func messageNoGlobalContainer() rule.Message {
 // That breadth is the point. A rule that resolved the name would exempt a local shadow, and a local
 // shadow of the global container is exactly as bad as the global container.
 //
-// # Where this project is exempted is CONFIG, not rule
+// # Where this project is exempted is config, not rule
 //
 // The source repository turns this off for its own dependency-injection folders, because that is
 // where the container hierarchy is built. That exemption lives in BaseLintConfiguration.ts as a
@@ -49,7 +49,7 @@ func messageNoGlobalContainer() rule.Message {
 //
 // # One divergence, and it is a parser difference in our favour
 //
-// The source rule reports an unaliased import specifier TWICE, at the identical span. Its parser
+// The source rule reports an unaliased import specifier twice, at the identical span. Its parser
 // gives `import { getGlobalContainer }` two Identifier nodes in one place, the imported name and the
 // local binding, and the visitor sees both. Measured: `import { getGlobalContainer } from './c';`
 // alone produces two findings at columns 10 through 28, and the same import followed by a call

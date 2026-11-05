@@ -13,7 +13,7 @@ type PreferArrowCallbackSettings struct {
 	// Upstream's default is false.
 	AllowNamedFunctions bool
 	// AllowUnboundThis permits a callback that uses `this` without being `.bind(this)`-ed.
-	// Upstream's default is TRUE, which is why this type exists separately from its wire shape.
+	// Upstream's default is `true`, which is why this type exists separately from its wire shape.
 	AllowUnboundThis bool
 }
 
@@ -27,7 +27,7 @@ func DefaultPreferArrowCallbackSettings() PreferArrowCallbackSettings {
 
 // preferArrowCallbackRawOptions is the wire shape.
 //
-// AllowUnboundThis is a pointer because its default is TRUE, so an absent key and a written `false`
+// AllowUnboundThis is a pointer because its default is `true`, so an absent key and a written `false`
 // mean opposite things and a plain bool cannot tell them apart.
 type preferArrowCallbackRawOptions struct {
 	AllowNamedFunctions bool  `json:"allowNamedFunctions"`
@@ -82,12 +82,12 @@ var messagePreferArrowCallbackPreferArrowCallback = rule.Message{
 //
 // # The judgment needs resolution, and a text comparison gets two shapes wrong
 //
-// Upstream asks two scope questions through eslint-scope: does the function reference its OWN name,
+// Upstream asks two scope questions through eslint-scope: does the function reference its own name,
 // and does it reference `arguments`. Both matter because an arrow can express neither -- it has no
 // binding for itself and none for `arguments` -- so converting such a function changes meaning.
 //
 // Neither question is answerable by comparing text, and both were probed before this rule was
-// written. A self-reference has to be RESOLVED, because a nested declaration or a `const` of the
+// written. A self-reference has to be resolved, because a nested declaration or a `const` of the
 // same name shadows it:
 //
 //	foo(function bar() { bar(); });                     1 resolved self-reference, clean upstream
@@ -97,7 +97,7 @@ var messagePreferArrowCallbackPreferArrowCallback = rule.Message{
 // Measured against the checker, `GetSymbolAtLocation` gives exactly those three answers, and they
 // match upstream's verdicts on the same inputs.
 //
-// `arguments` needs the opposite kind of care: it belongs to the nearest enclosing FUNCTION, so a
+// `arguments` needs the opposite kind of care: it belongs to the nearest enclosing function, so a
 // reference inside a nested function is not this one's.
 //
 //	foo(function() { arguments; });                       owned by the subject, clean
@@ -235,7 +235,7 @@ func (w *preferArrowCallbackWalker) walk(node *ast.Node, owner *preferArrowCallb
 //
 // Upstream's `getVariableOfArguments` returns the scope variable only when
 // `variable.identifiers.length === 0`, which is its way of saying nobody declared the name. So
-// `foo(function(arguments) { arguments; })` REPORTS: the parameter shadows the implicit binding,
+// `foo(function(arguments) { arguments; })` reports: the parameter shadows the implicit binding,
 // the function does not depend on it, and converting to an arrow is safe. Measured against the
 // installed rule, which reports it.
 func preferArrowCallbackResolvesToADeclaration(ruleContext rule.Context, node *ast.Node) bool {
@@ -404,7 +404,7 @@ func preferArrowCallbackInfoFor(node *ast.Node) preferArrowCallbackInfo {
 			// KindParenthesizedExpression between the member and its call, where upstream's parser
 			// has none. Upstream reaches the same place through its ChainExpression arm, which is
 			// what an optional chain is in ESTree. Looking through the wrapper here keeps the walk
-			// finding the call; the FIXER separately declines this shape, because its own test is
+			// finding the call; the fixer separately declines this shape, because its own test is
 			// about adjacency rather than about reachability.
 			callee := parent
 			for callee.Parent != nil && callee.Parent.Kind == ast.KindParenthesizedExpression {
@@ -416,7 +416,7 @@ func preferArrowCallbackInfoFor(node *ast.Node) preferArrowCallbackInfo {
 				return info
 			}
 			if !bound {
-				// Only the FIRST `.bind()` decides isLexicalThis, which is upstream's comment.
+				// Only the first `.bind()` decides isLexicalThis, which is upstream's comment.
 				bound = true
 				arguments := call.AsCallExpression().Arguments
 				info.isLexicalThis = arguments != nil && len(arguments.Nodes) == 1 &&
@@ -426,13 +426,13 @@ func preferArrowCallbackInfoFor(node *ast.Node) preferArrowCallbackInfo {
 			}
 			current = call
 
-		// Being the CALLEE is not being a callback; being anything else in the call is.
+		// Being the callee is not being a callback; being anything else in the call is.
 		//
 		// The two kinds are separate arms rather than one, because the accessor has to match the
-		// kind: `AsCallExpression()` on a NewExpression is an interface conversion that PANICS
+		// kind: `AsCallExpression()` on a NewExpression is an interface conversion that panics
 		// rather than returning nil. A first draft called it before the kind test and crashed
 		// **71 files** on the real tree, which no fixture saw -- upstream's corpus has no
-		// `new Foo(function() {})` case, and the walk recovers per FILE, so one panic silently
+		// `new Foo(function() {})` case, and the walk recovers per file, so one panic silently
 		// costs every rule its verdict on that file.
 		case ast.KindCallExpression:
 			call := parent.AsCallExpression()
@@ -513,7 +513,7 @@ func preferArrowCallbackFix(ruleContext rule.Context, node *ast.Node, expression
 	if callback.isLexicalThis {
 		// Decline 5: the shape the fixer would unwrap is not a member access.
 		//
-		// Upstream tests `node.parent.type !== "MemberExpression"` -- the function's IMMEDIATE
+		// Upstream tests `node.parent.type !== "MemberExpression"` -- the function's immediate
 		// parent, not the member the callback walk found. The two differ whenever anything sits
 		// between them, and upstream declines in exactly those cases:
 		//
@@ -523,12 +523,12 @@ func preferArrowCallbackFix(ruleContext rule.Context, node *ast.Node, expression
 		//
 		// Our parser keeps `KindParenthesizedExpression` as a real node, so a parenthesised form
 		// puts one between the function and the member and this test catches it the same way. The
-		// callback walk deliberately looks THROUGH those nodes to decide `isCallback`, so the walk
+		// callback walk deliberately looks through those nodes to decide `isCallback`, so the walk
 		// and the fixer ask different questions and only the fixer's is about adjacency.
 		if callback.bindMember == nil || callback.bindCall == nil {
 			return nil, false
 		}
-		// The function must be the member's object AND the member must be the call's callee, with
+		// The function must be the member's object and the member must be the call's callee, with
 		// nothing in between on either side. Upstream gets both for free from its parser: it tests
 		// `node.parent.type !== "MemberExpression"` and then reads `memberNode.parent` as the call,
 		// so any intervening node breaks one or the other. Ours keeps parentheses as real nodes, so
@@ -582,14 +582,14 @@ func preferArrowCallbackFix(ruleContext rule.Context, node *ast.Node, expression
 	// argument position and a conditional branch are already delimited, and when either the node or
 	// the replaced span is parenthesised.
 	//
-	// The replaced span is the `.bind(this)` CALL when there was one, not the function, because
+	// The replaced span is the `.bind(this)` call when there was one, not the function, because
 	// that whole expression is what the arrow replaces.
 	replaced := node
 	if callback.isLexicalThis && callback.bindCall != nil {
 		replaced = callback.bindCall
 	}
 	if preferArrowCallbackNeedsParentheses(text, replaced, node) {
-		// The TOKEN start, not `Pos()`: `Pos()` begins at the previous token's end and so includes
+		// The token start, not `Pos()`: `Pos()` begins at the previous token's end and so includes
 		// the leading whitespace, which would place the `(` before the space and produce
 		// `nativeCb ||( () => {})`. Same trap sort-vars has for its declarator spans.
 		open := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, replaced.Pos()).Pos()
@@ -643,7 +643,7 @@ func preferArrowCallbackIsParenthesised(text string, node *ast.Node) bool {
 
 // preferArrowCallbackHasDuplicateParameters is upstream's `hasDuplicateParams`.
 //
-// It applies only when EVERY parameter is a plain identifier, because a destructuring pattern
+// It applies only when every parameter is a plain identifier, because a destructuring pattern
 // cannot collide the way two identifiers can.
 func preferArrowCallbackHasDuplicateParameters(node *ast.Node) bool {
 	seen := map[string]bool{}
