@@ -140,6 +140,8 @@ func constantCasingFingerprint(program rule.Program, options any) [sha256.Size]b
 }
 
 // recordImportedNames adds what one specifier's statement takes from its target.
+//
+// Mutates: entry the index keeps one entry per target file, and every specifier naming that file adds to it
 func recordImportedNames(entry *importedNames, specifier *ast.Node) {
 	statement := specifier.Parent
 	if statement == nil {
