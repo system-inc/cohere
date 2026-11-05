@@ -14,6 +14,9 @@ import (
 	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
+// escapeQuoteAndBackslash is upstream's replaceAll(/["\\]/g, String.raw`\$&`).
+var escapeQuoteAndBackslash = strings.NewReplacer(`"`, `\"`, `\`, `\\`)
+
 func genericPrint(path *astPath, options *printerOptions, print printing.PrintFunc, _ any) doc.Doc {
 	node := currentNode(path)
 
@@ -410,6 +413,8 @@ func genericPrint(path *astPath, options *printerOptions, print printing.PrintFu
 
 	default:
 		/* c8 ignore next */
+		// Invariant: the parser builds only the kinds this switch has an arm for, and the core prints
+		// only nodes of the tree; Format and PrintToDoc recover the panic into their error.
 		panic(fmt.Sprintf("Unexpected Graphql node kind: '%s'.", node.Type()))
 	}
 }
@@ -422,9 +427,6 @@ func choose(condition bool, value doc.Doc) doc.Doc {
 	return empty
 }
 
-// escapeQuoteAndBackslash is upstream's replaceAll(/["\\]/g, String.raw`\$&`).
-var escapeQuoteAndBackslash = strings.NewReplacer(`"`, `\"`, `\`, `\\`)
-
 func canAttachComment(node *estree.Node, _ []*estree.Node) bool {
 	return !node.Is("Comment")
 }
@@ -436,7 +438,10 @@ func printComment(path *astPath, _ *printerOptions) doc.Doc {
 	}
 
 	/* c8 ignore next */
+	// Ignored: json.Marshal of a string cannot fail, so there is no error to report.
 	encoded, _ := json.Marshal(comment.Type())
+	// Invariant: the core prints only the comments Parse collected, each a "Comment" node; Format and
+	// PrintToDoc recover the panic into their error.
 	panic("Not a comment: " + string(encoded))
 }
 

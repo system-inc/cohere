@@ -145,6 +145,8 @@ func (parser *parser) parseDefinition() *estree.Node {
 	}
 
 	if hasDescription && keywordToken.kind == tokenKindBraceL {
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 		panic(syntaxError(parser.lexer.body, parser.lexer.token.start,
 			"Unexpected description, descriptions are not supported on shorthand queries."))
 	}
@@ -177,6 +179,8 @@ func (parser *parser) parseDefinition() *estree.Node {
 		}
 
 		if hasDescription {
+			// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+			// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 			panic(syntaxError(parser.lexer.body, parser.lexer.token.start,
 				"Unexpected description, only GraphQL definitions support descriptions."))
 		}
@@ -187,6 +191,8 @@ func (parser *parser) parseDefinition() *estree.Node {
 		}
 	}
 
+	// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+	// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 	panic(parser.unexpected(keywordToken))
 }
 
@@ -237,6 +243,8 @@ func (parser *parser) parseOperationType() string {
 		return "subscription"
 	}
 
+	// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+	// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 	panic(parser.unexpected(operationToken))
 }
 
@@ -306,7 +314,8 @@ func (parser *parser) parseField() *estree.Node {
 	start := parser.lexer.token
 
 	nameOrAlias := parser.parseName()
-	var alias, name *estree.Node
+	var alias *estree.Node
+	var name *estree.Node
 	if parser.expectOptionalToken(tokenKindColon) {
 		alias = nameOrAlias
 		name = parser.parseName()
@@ -456,6 +465,8 @@ func (parser *parser) parseFragmentDefinition() *estree.Node {
 // parseFragmentName parses FragmentName : Name but not `on`
 func (parser *parser) parseFragmentName() *estree.Node {
 	if parser.lexer.token.value == "on" {
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 		panic(parser.unexpected(nil))
 	}
 	return parser.parseName()
@@ -523,13 +534,19 @@ func (parser *parser) parseValueLiteral(isConst bool) *estree.Node {
 			parser.expectToken(tokenKindDollar)
 			if parser.lexer.token.kind == tokenKindName {
 				variableName := parser.lexer.token.value
+				// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+				// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 				panic(syntaxError(parser.lexer.body, token.start,
 					`Unexpected variable "$`+variableName+`" in constant value.`))
 			}
+			// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+			// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 			panic(parser.unexpected(token))
 		}
 		return parser.parseVariable()
 	default:
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 		panic(parser.unexpected(nil))
 	}
 }
@@ -896,6 +913,8 @@ func (parser *parser) parseEnumValueDefinition() *estree.Node {
 func (parser *parser) parseEnumValueName() *estree.Node {
 	switch parser.lexer.token.value {
 	case "true", "false", "null":
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 		panic(syntaxError(parser.lexer.body, parser.lexer.token.start,
 			getTokenDesc(parser.lexer.token)+" is reserved and cannot be used for an enum value."))
 	}
@@ -966,6 +985,8 @@ func (parser *parser) parseTypeSystemExtension() *estree.Node {
 		}
 	}
 
+	// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+	// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 	panic(parser.unexpected(keywordToken))
 }
 
@@ -981,6 +1002,8 @@ func (parser *parser) parseSchemaExtension() *estree.Node {
 	directives := parser.parseConstDirectives()
 	operationTypes := parser.optionalMany(tokenKindBraceL, parser.parseOperationTypeDefinition, tokenKindBraceR)
 	if directives == nil && operationTypes == nil {
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "SchemaExtension",
@@ -1000,6 +1023,8 @@ func (parser *parser) parseScalarTypeExtension() *estree.Node {
 	name := parser.parseName()
 	directives := parser.parseConstDirectives()
 	if directives == nil {
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "ScalarTypeExtension",
@@ -1023,6 +1048,8 @@ func (parser *parser) parseObjectTypeExtension() *estree.Node {
 	directives := parser.parseConstDirectives()
 	fields := parser.parseFieldsDefinition()
 	if interfaces == nil && directives == nil && fields == nil {
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "ObjectTypeExtension",
@@ -1048,6 +1075,8 @@ func (parser *parser) parseInterfaceTypeExtension() *estree.Node {
 	directives := parser.parseConstDirectives()
 	fields := parser.parseFieldsDefinition()
 	if interfaces == nil && directives == nil && fields == nil {
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "InterfaceTypeExtension",
@@ -1071,6 +1100,8 @@ func (parser *parser) parseUnionTypeExtension() *estree.Node {
 	directives := parser.parseConstDirectives()
 	types := parser.parseUnionMemberTypes()
 	if directives == nil && types == nil {
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "UnionTypeExtension",
@@ -1093,6 +1124,8 @@ func (parser *parser) parseEnumTypeExtension() *estree.Node {
 	directives := parser.parseConstDirectives()
 	values := parser.parseEnumValuesDefinition()
 	if directives == nil && values == nil {
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "EnumTypeExtension",
@@ -1115,6 +1148,8 @@ func (parser *parser) parseInputObjectTypeExtension() *estree.Node {
 	directives := parser.parseConstDirectives()
 	fields := parser.parseInputFieldsDefinition()
 	if directives == nil && fields == nil {
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "InputObjectTypeExtension",
@@ -1132,6 +1167,8 @@ func (parser *parser) parseDirectiveExtension() *estree.Node {
 	name := parser.parseName()
 	directives := parser.parseConstDirectives()
 	if directives == nil {
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "DirectiveExtension",
@@ -1235,6 +1272,8 @@ func (parser *parser) parseDirectiveLocation() *estree.Node {
 	if directiveLocation[name.String("value")] {
 		return name
 	}
+	// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+	// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 	panic(parser.unexpected(start))
 }
 
@@ -1246,6 +1285,9 @@ func (parser *parser) parseDirectiveLocation() *estree.Node {
 // graphql-js reads lastToken after the object literal is built, so the end covers every field; here
 // the fields are the arguments, which Go evaluates before the call, to the same effect. A field that
 // is a nil list is stored as nil itself: a typed nil slice in an interface would read as present.
+//
+// Mutates: keysAndValues every caller lists the fields inline, so the slice is the call's own, and the nil
+// lists are cleared in it before estree.New takes it
 func (parser *parser) node(startToken *token, kind string, keysAndValues ...any) *estree.Node {
 	for index := 1; index < len(keysAndValues); index += 2 {
 		if list, isList := keysAndValues[index].([]*estree.Node); isList && list == nil {
@@ -1269,6 +1311,8 @@ func (parser *parser) expectToken(kind tokenKind) *token {
 		return token
 	}
 
+	// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+	// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 	panic(syntaxError(parser.lexer.body, token.start,
 		"Expected "+getTokenKindDesc(kind)+", found "+getTokenDesc(token)+"."))
 }
@@ -1276,8 +1320,7 @@ func (parser *parser) expectToken(kind tokenKind) *token {
 // expectOptionalToken: if the next token is of the given kind, return "true" after advancing the
 // lexer. Otherwise, do not change the parser state and return "false".
 func (parser *parser) expectOptionalToken(kind tokenKind) bool {
-	token := parser.lexer.token
-	if token.kind == kind {
+	if parser.lexer.token.kind == kind {
 		parser.advanceLexer()
 		return true
 	}
@@ -1291,6 +1334,8 @@ func (parser *parser) expectKeyword(value string) {
 	if token.kind == tokenKindName && token.value == value {
 		parser.advanceLexer()
 	} else {
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 		panic(syntaxError(parser.lexer.body, token.start,
 			`Expected "`+value+`", found `+getTokenDesc(token)+"."))
 	}

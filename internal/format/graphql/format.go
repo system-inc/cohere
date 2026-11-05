@@ -38,7 +38,13 @@ var graphqlPrinter = &printing.Printer[*estree.Node]{
 // settingsOf is the resolved Prettier options a format carries in options.Settings. The printer reads
 // one of them, bracketSpacing (options.js).
 func settingsOf(options *printerOptions) formatoptions.Options {
-	return options.Settings.(formatoptions.Options)
+	settings, isOptions := options.Settings.(formatoptions.Options)
+	if !isOptions {
+		// Invariant: printToDoc is the only place a graphql printerOptions is built, and it always sets
+		// Settings to the formatoptions.Options it was given; Format and PrintToDoc recover the panic.
+		panic(fmt.Sprintf("graphql: the printer's settings are a %T, not formatoptions.Options", options.Settings))
+	}
+	return settings
 }
 
 // Format is Prettier's format for a GraphQL file: parse, attach comments, print to a doc, lay it out.

@@ -188,16 +188,17 @@ func codePointAt(body string, position int) (int, int) {
 // U+FFFD, which is what Node writes for it when the message leaves as UTF-8.
 func sliceUnits(body string, start int, units int) string {
 	end := start
+	remaining := units
 	for end < len(body) {
 		character, size := utf8.DecodeRuneInString(body[end:])
-		if units < utf16.RuneLen(character) {
-			if units > 0 {
+		if remaining < utf16.RuneLen(character) {
+			if remaining > 0 {
 				return body[start:end] + string(utf8.RuneError)
 			}
 			break
 		}
 		end += size
-		units -= utf16.RuneLen(character)
+		remaining -= utf16.RuneLen(character)
 	}
 	return body[start:end]
 }
@@ -257,15 +258,17 @@ func printCodePointAt(lexer *lexer, location int) string {
 
 // createToken creates a token with line and column location information.
 func createToken(lexer *lexer, kind tokenKind, start int, end int, value ...string) *token {
-	line := lexer.line
 	column := 1 + start - lexer.lineStart
-	return newToken(kind, start, end, line, column, value...)
+	return newToken(kind, start, end, lexer.line, column, value...)
 }
 
 // readNextToken gets the next token from the source starting at the given position.
 //
 // This skips over whitespace until it finds the next lexable token, then lexes punctuators immediately
 // or calls the appropriate helper function for more complicated tokens.
+//
+// Mutates: lexer the whitespace it skips moves the lexer's line and lineStart past each line terminator,
+// as graphql-js's readNextToken writes them, so the next token's line and column count from there
 func readNextToken(lexer *lexer, start int) *token {
 	body := lexer.body
 	bodyLength := len(body)
@@ -345,9 +348,13 @@ func readNextToken(lexer *lexer, start int) *token {
 				return createToken(lexer, tokenKindSpread, position, position+3)
 			}
 			if nextCode == 0x002e {
+				// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+				// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 				panic(syntaxError(body, position, `Unexpected "..", did you mean "..."?`))
 			} else if isDigit(nextCode) {
 				digits := body[position+1 : readDigits(lexer, position+1, nextCode)]
+				// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+				// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 				panic(syntaxError(
 					body,
 					position,
@@ -392,14 +399,20 @@ func readNextToken(lexer *lexer, start int) *token {
 		character, _ := codePointAt(body, position)
 		switch {
 		case code == 0x0027:
+			// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+			// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 			panic(syntaxError(
 				body,
 				position,
 				`Unexpected single quote character ('), did you mean to use a double quote (")?`,
 			))
 		case isUnicodeScalarValue(character) || isSupplementaryCodePoint(body, position):
+			// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+			// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 			panic(syntaxError(body, position, "Unexpected character: "+printCodePointAt(lexer, position)+"."))
 		default:
+			// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+			// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 			panic(syntaxError(body, position, "Invalid character: "+printCodePointAt(lexer, position)+"."))
 		}
 	}
@@ -480,6 +493,8 @@ func readNumber(lexer *lexer, start int, firstCode int) *token {
 		position++
 		code = charCodeAt(body, position)
 		if isDigit(code) {
+			// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+			// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 			panic(syntaxError(
 				body,
 				position,
@@ -518,6 +533,8 @@ func readNumber(lexer *lexer, start int, firstCode int) *token {
 
 	// Numbers cannot be followed by . or NameStart
 	if code == 0x002e || isNameStart(code) {
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 		panic(syntaxError(
 			body,
 			position,
@@ -535,6 +552,8 @@ func readNumber(lexer *lexer, start int, firstCode int) *token {
 // readDigits returns the new position in the source after reading one or more digits.
 func readDigits(lexer *lexer, start int, firstCode int) int {
 	if !isDigit(firstCode) {
+		// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+		// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 		panic(syntaxError(
 			lexer.body,
 			start,
@@ -614,12 +633,16 @@ func readString(lexer *lexer, start int) *token {
 		} else if isSupplementaryCodePoint(body, position) {
 			position += 2
 		} else {
+			// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+			// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 			panic(
 				syntaxError(body, position, "Invalid character within String: "+printCodePointAt(lexer, position)+"."),
 			)
 		}
 	}
 
+	// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+	// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 	panic(syntaxError(body, position, "Unterminated string."))
 }
 
@@ -655,6 +678,8 @@ func readEscapedUnicodeVariableWidth(lexer *lexer, position int) escapeSequence 
 		}
 	}
 
+	// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+	// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 	panic(syntaxError(body, position, `Invalid Unicode escape sequence: "`+sliceUnits(body, position, size)+`".`))
 }
 
@@ -685,6 +710,8 @@ func readEscapedUnicodeFixedWidth(lexer *lexer, position int) escapeSequence {
 		}
 	}
 
+	// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+	// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 	panic(syntaxError(body, position, `Invalid Unicode escape sequence: "`+sliceUnits(body, position, 6)+`".`))
 }
 
@@ -758,6 +785,8 @@ func readEscapedCharacter(lexer *lexer, position int) escapeSequence {
 	case 0x0074: // t
 		return escapeSequence{value: "\t", size: 2}
 	}
+	// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+	// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 	panic(syntaxError(body, position, `Invalid character escape sequence: "`+sliceUnits(body, position, 2)+`".`))
 }
 
@@ -769,6 +798,9 @@ func readEscapedCharacter(lexer *lexer, position int) escapeSequence {
 //	BlockStringCharacter ::
 //	  - SourceCharacter but not `"""` or `\"""`
 //	  - `\"""`
+//
+// Mutates: lexer a block string spans lines, so it moves the lexer's line and lineStart past its own
+// line terminators, as graphql-js's readBlockString writes them
 func readBlockString(lexer *lexer, start int) *token {
 	body := lexer.body
 	bodyLength := len(body)
@@ -837,12 +869,16 @@ func readBlockString(lexer *lexer, start int) *token {
 		} else if isSupplementaryCodePoint(body, position) {
 			position += 2
 		} else {
+			// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+			// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 			panic(
 				syntaxError(body, position, "Invalid character within String: "+printCodePointAt(lexer, position)+"."),
 			)
 		}
 	}
 
+	// Invariant: this is graphql-js's throw of a syntax error, which malformed input reaches; Parse
+	// recovers every *SyntaxError into its error return, so the panic never leaves the package.
 	panic(syntaxError(body, position, "Unterminated string."))
 }
 
