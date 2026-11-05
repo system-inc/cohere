@@ -4,6 +4,8 @@ package allowed
 import (
 	"strings"
 
+	"representation"
+
 	longpath "longimport/a_package_whose_import_path_runs_past_the_limit_so_its_import_line_is_longer_than_one_hundred_and_twenty"
 )
 
@@ -65,4 +67,31 @@ and the line it closes on too, with only closing punctuation after it and so on 
 		use(Record{
 			Name: `a raw string past the limit after only a key, closed by a brace and a paren and so on and so on and`}),
 	}
+}
+
+// resolve takes a parameter past the limit whose map of qualified names gofmt rejoins however it is broken, so only a
+// new name or an alias added for width could bring it in, which is no cure.
+func resolve(
+	candidateDependencies map[representation.IdentifierOfAValueInStaticSingleAssignmentForm]*representation.ArrayExpressionOfTheHighLevelIntermediateRepresentation,
+) {
+}
+
+// dependencies returns a named result past the limit, with nothing in its type that could wrap.
+func dependencies() (
+	resolvedDependencies map[representation.IdentifierOfAValueInStaticSingleAssignmentForm]*representation.ArrayExpressionOfTheHighLevelIntermediateRepresentation,
+) {
+	return nil
+}
+
+// Graph holds a field past the limit with no tag.
+type Graph struct {
+	dependencies map[representation.IdentifierOfAValueInStaticSingleAssignmentForm][]*representation.ArrayExpressionOfTheHighLevelIntermediateRepresentation
+}
+
+// schedule takes a channel, a slice and a box of one type argument, each of a qualified pointer past the limit.
+func schedule(
+	expressionsStillWaitingForTheirDependencies chan *representation.ArrayExpressionOfTheHighLevelIntermediateRepresentation,
+	expressionsWhoseDependenciesAreAllResolved []*representation.ArrayExpressionOfTheHighLevelIntermediateRepresentation,
+	expressionsBoxedForTheNextPass representation.Box[*representation.ArrayExpressionOfTheHighLevelIntermediateRepresentation],
+) {
 }
