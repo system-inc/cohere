@@ -5,7 +5,9 @@ package checker
 type declaredFact struct{}
 
 // AFact makes declaredFact an analysis.Fact.
-func (*declaredFact) AFact() {}
+func (*declaredFact) AFact() {
+	// Nothing to do: analysis.Fact is a marker interface, and having the method is what it asks.
+}
 
 // String is how a fact log would print it.
 func (*declaredFact) String() string { return "declared" }
