@@ -438,7 +438,8 @@ A value is a severity, or an array of a severity and one object of options. Only
 option may be given it: today that is `cohere-swift/file-length`'s `max`, a whole number at or below the
 house's 2,000, which the rule then judges by. An option no rule reads, a value of the wrong type, a `max`
 above the house's (an allowance) and more than one object are each refused by name with exit 2, never
-dropped (#4x9h976).
+dropped (#4x9h976). The block holds only `rules`, and a rule name cohere-swift does not have is refused the
+same way, as is any other key in the block (#naazhm0).
 
 **Formatting is not configured.** Swift has one house format, built into the engine
 (`Sources/CohereSwift/Format/HouseSwiftFormat.swift`, ruled 2026-10-03 in #mg4dgjm), the way
