@@ -39,7 +39,7 @@ var declareRequiringColumnDecorators = map[string]bool{
 // TypeScript the property is set elsewhere and skips that emit, which is what preserves the
 // decorator's behavior at runtime. So this is a correctness rule wearing the clothes of a style one.
 //
-// # It accepts a decorator written WITHOUT parentheses, unlike its relation sibling
+// # It accepts a decorator written without parentheses, unlike its relation sibling
 //
 // The two ORM rules in this package use different helpers from the source library and the difference
 // is real rather than incidental. `relation-must-be-optional` goes through `hasDecoratorInSet`, which
@@ -58,7 +58,7 @@ var declareRequiringColumnDecorators = map[string]bool{
 // private name is its own node type in the source's tree rather than an identifier. Measured: both
 // report, and both render as `<computed>` in the message while the finding still points at the key.
 //
-// The SPAN needs one adjustment our tree makes necessary. A computed key is one node here, a
+// The span needs one adjustment our tree makes necessary. A computed key is one node here, a
 // KindComputedPropertyName carrying the brackets, and two in the source's tree, where `key` is the
 // inner expression. Reporting our node directly would underline `['computed']` where the source
 // underlines `'computed'`, so the inner expression is what the finding anchors on. That was the one
@@ -130,7 +130,7 @@ var CorrectnessRequireOrmColumnDeclare = rule.Rule{
 	},
 }
 
-// ormColumnDecoratorName is the source library's `getDecoratorName` at its DEFAULT options.
+// ormColumnDecoratorName is the source library's `getDecoratorName` at its default options.
 //
 // Two shapes resolve: a call with a bare identifier callee, and a bare identifier expression. A
 // member-expression callee does not, because `resolveMemberExpression` defaults to false and this
@@ -141,7 +141,7 @@ var CorrectnessRequireOrmColumnDeclare = rule.Rule{
 //
 // The shelf has a helper for reading a decorator's name and this rule cannot use it. Measured on the
 // same three shapes rather than read off its doc comment: `CallName` answers "" for a bare
-// `@OrmColumn` while this answers "OrmColumn", and the source rule REPORTS on that shape. Using the
+// `@OrmColumn` while this answers "OrmColumn", and the source rule reports on that shape. Using the
 // shelf here would make the rule silent on a decorator written without parentheses.
 //
 // The difference is real rather than an oversight in either place. The source library keeps two

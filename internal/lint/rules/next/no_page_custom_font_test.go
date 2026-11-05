@@ -29,7 +29,7 @@ func TestNoPageCustomFontFires(test *testing.T) {
 		want     []string
 	}{
 		{
-			// Upstream fail 1. A link correctly inside `<Head>` AND correctly inside the default export, and
+			// Upstream fail 1. A link correctly inside `<Head>` and correctly inside the default export, and
 			// it reports anyway, because the filename is not the document. This is the case that proves
 			// the `<Head>` ancestor named in upstream's other message is irrelevant to the decision.
 			name:     "upstream fail in pages/index.tsx",
@@ -38,8 +38,8 @@ func TestNoPageCustomFontFires(test *testing.T) {
 			want:     []string{"noPageCustomFontNotInDocument"},
 		},
 		{
-			// Upstream fail 2, and it carries TWO diagnostics, one per link, which the snapshot confirms and
-			// the extractor's discrepancy warning is about. Both links sit in a `Links()` helper that IS
+			// Upstream fail 2, and it carries two diagnostics, one per link, which the snapshot confirms and
+			// the extractor's discrepancy warning is about. Both links sit in a `Links()` helper that is
 			// rendered inside `<Head>`; `Links` is not the default export, so both fire. A fixture
 			// asserting one finding per input would be wrong here.
 			name:     "upstream fail in pages/_document.jsx",
@@ -49,7 +49,7 @@ func TestNoPageCustomFontFires(test *testing.T) {
 		},
 		{
 			// Invented. Upstream's gate is a bare basename test with no `pages` component at all, so a
-			// document outside a pages directory IS the document. Measured on the release binary, which
+			// document outside a pages directory is the document. Measured on the release binary, which
 			// reports the outside-the-default-export finding here. Without this case a port that quietly
 			// adopted eslint's `pages` split would pass every upstream fixture.
 			name:     "a document outside a pages directory",
@@ -58,7 +58,7 @@ func TestNoPageCustomFontFires(test *testing.T) {
 			want:     []string{"noPageCustomFontOutsideDefaultExport"},
 		},
 		{
-			// Invented, and it pins the trailing dot. `_documentation.tsx` is NOT the document, so the page
+			// Invented, and it pins the trailing dot. `_documentation.tsx` is not the document, so the page
 			// finding fires even though the JSX is inside the default export. Measured: reports upstream.
 			// oxc's shared `is_document_page` carries no trailing dot and would answer the opposite.
 			name:     "a page whose name merely begins with the word",
@@ -98,7 +98,7 @@ func TestNoPageCustomFontFires(test *testing.T) {
 		},
 		{
 			// Invented, and it is the distinguishing input for the name-resolution rule. The function has its
-			// OWN name, `Inner`, so the declarator's `D` is never consulted and the default export never
+			// own name, `Inner`, so the declarator's `D` is never consulted and the default export never
 			// matches. Measured: reports. Its silent twin is in the clean list below, and the pair is the
 			// only thing that can tell a correct implementation from one that always reads the declarator.
 			name:     "a named function expression takes its own name",
@@ -127,7 +127,7 @@ func TestNoPageCustomFontFires(test *testing.T) {
 			want:     []string{"noPageCustomFontOutsideDefaultExport"},
 		},
 		{
-			// Invented. `export { D as default }` REPORTS upstream, measured, so the aliased spelling is not
+			// Invented. `export { D as default }` reports upstream, measured, so the aliased spelling is not
 			// recognized as the default export by the rule even though it is one to the language. That is
 			// reproduced rather than fixed, and this fixture is what would catch a helpful improvement.
 			name:     "an aliased default export",
@@ -163,7 +163,7 @@ func TestNoPageCustomFontStaysSilent(test *testing.T) {
 			source:   "import Document, { Html, Head } from \"next/document\";\n\t\t\tclass MyDocument extends Document {\n\t\t\t\trender() {\n\t\t\t\t\treturn (\n\t\t\t\t\t\t<Html>\n\t\t\t\t\t\t\t<Head>\n\t\t\t\t\t\t\t\t<link\n\t\t\t\t\t\t\t\t\thref=\"https://fonts.googleapis.com/css2?family=Krona+One&display=swap\"\n\t\t\t\t\t\t\t\t\trel=\"stylesheet\"\n\t\t\t\t\t\t\t\t/>\n\t\t\t\t\t\t\t</Head>\n\t\t\t\t\t\t</Html>\n\t\t\t\t\t);\n\t\t\t\t}\n\t\t\t}\n\t\t\texport default MyDocument;",
 		},
 		{
-			// Upstream pass 2. The local class is named `Document` while the IMPORT is renamed `NextDocument`.
+			// Upstream pass 2. The local class is named `Document` while the import is renamed `NextDocument`.
 			// This is the case that separates oxc from eslint: eslint requires the superclass to be the
 			// tracked document import, oxc never looks at the superclass at all.
 			name:     "upstream pass 2",
@@ -178,14 +178,14 @@ func TestNoPageCustomFontStaysSilent(test *testing.T) {
 			source:   "export default function CustomDocument() {\n\t\t\t      return (\n\t\t\t        <Html>\n\t\t\t          <Head>\n\t\t\t            <link\n\t\t\t              href=\"https://fonts.googleapis.com/css2?family=Krona+One&display=swap\"\n\t\t\t              rel=\"stylesheet\"\n\t\t\t            />\n\t\t\t          </Head>\n\t\t\t        </Html>\n\t\t\t      )\n\t\t\t    }",
 		},
 		{
-			// Upstream pass 4. The export statement sits BELOW the JSX, which is why the name collection is a
+			// Upstream pass 4. The export statement sits below the JSX, which is why the name collection is a
 			// pass over the whole file at rule entry rather than a stateful visitor.
 			name:     "upstream pass 4",
 			fileName: documentFile,
 			source:   "function CustomDocument() {\n\t\t\t      return (\n\t\t\t        <Html>\n\t\t\t          <Head>\n\t\t\t            <link\n\t\t\t              href=\"https://fonts.googleapis.com/css2?family=Krona+One&display=swap\"\n\t\t\t              rel=\"stylesheet\"\n\t\t\t            />\n\t\t\t          </Head>\n\t\t\t        </Html>\n\t\t\t      )\n\t\t\t    }\n\n\t\t\t    export default CustomDocument;\n\t\t\t    ",
 		},
 		{
-			// Upstream pass 5, and the surprising one: the class has NO `extends` clause, and `Document` is
+			// Upstream pass 5, and the surprising one: the class has no `extends` clause, and `Document` is
 			// imported but unused as a superclass. oxc only asks whether the node is inside the default
 			// export, so this passes. eslint reports it. Reproducing oxc means not adding the check.
 			name:     "upstream pass 5",
@@ -193,7 +193,7 @@ func TestNoPageCustomFontStaysSilent(test *testing.T) {
 			source:   "\n\t\t\t      import Document, { Html, Head } from \"next/document\";\n\t\t\t      class MyDocument {\n\t\t\t        render() {\n\t\t\t          return (\n\t\t\t            <Html>\n\t\t\t              <Head>\n\t\t\t                <link\n\t\t\t                  href=\"https://fonts.googleapis.com/css2?family=Krona+One&display=swap\"\n\t\t\t                  rel=\"stylesheet\"\n\t\t\t                />\n\t\t\t              </Head>\n\t\t\t            </Html>\n\t\t\t          );\n\t\t\t        }\n\t\t\t      }\n\n\t\t\t      export default MyDocument;",
 		},
 		{
-			// Upstream pass 6. An ANONYMOUS default-exported function. Reached through the modifier pair with
+			// Upstream pass 6. An anonymous default-exported function. Reached through the modifier pair with
 			// no name ever resolved, so a port that walks up looking for a named function and then
 			// consults an export table reports this one.
 			name:     "upstream pass 6",
@@ -202,8 +202,8 @@ func TestNoPageCustomFontStaysSilent(test *testing.T) {
 		},
 		{
 			// Upstream pass 7, and it is not a font at all: an `apple-touch-startup-image` with a relative
-			// href, inside a bare `function a()` that is NOT exported. It passes purely because the href
-			// prefix fails, and the location check never runs. This is the case that pins the ORDER: href
+			// href, inside a bare `function a()` that is not exported. It passes purely because the href
+			// prefix fails, and the location check never runs. This is the case that pins the order: href
 			// first, location second. Were the order reversed it would report.
 			name:     "upstream pass 7",
 			fileName: documentFile,
@@ -212,9 +212,9 @@ func TestNoPageCustomFontStaysSilent(test *testing.T) {
 		{
 			// Invented, and it is where a recorded research pass had the rule inverted. It read oxc's
 			// `ArrowFunctionExpression => None` as "arrows contribute no name" and concluded the
-			// declarator fallback applies only to anonymous function expressions. That `None` IS the id,
+			// declarator fallback applies only to anonymous function expressions. That `None` is the id,
 			// and it flows into the fallback that reads the declarator. Measured on the release binary:
-			// SILENT. Its reporting twin, with the binding renamed, is in the list above.
+			// silent. Its reporting twin, with the binding renamed, is in the list above.
 			name:     "an arrow bound to the default-exported const",
 			fileName: "pages/_document.tsx",
 			source:   "const D = () => (<link href=\"https://fonts.googleapis.com/css2?family=Inter\" />);\nexport default D;\n",
@@ -250,7 +250,7 @@ func TestNoPageCustomFontStaysSilent(test *testing.T) {
 			source:   "const u = \"https://fonts.googleapis.com/css2?family=Inter\";\nexport default function D() { return (<link rel=\"stylesheet\" href={u} />) }\n",
 		},
 		{
-			// Invented, and worth pinning because a spread is NOT invisible to us the way it is to oxc's
+			// Invented, and worth pinning because a spread is not invisible to us the way it is to oxc's
 			// attribute loop: it arrives as a real KindJsxSpreadAttribute node with its object literal
 			// right there to read. Resolving it would catch more and decide differently, so it is declined
 			// deliberately. Measured: silent. `jsx.StringAttributeValue` already skips it.
@@ -261,9 +261,9 @@ func TestNoPageCustomFontStaysSilent(test *testing.T) {
 		{
 			// Invented, and it was added for a surviving mutant rather than written up front. A
 			// mutation rewriting the prefix test to strings.Contains survived the entire fixture
-			// set, because every case in the corpus writes the URL at the START of the href and
+			// set, because every case in the corpus writes the URL at the start of the href and
 			// nothing votes on the difference. Measured on the release binary: this proxied URL,
-			// which CONTAINS the prefix without beginning with it, is silent, so Contains is a real
+			// which contains the prefix without beginning with it, is silent, so Contains is a real
 			// behavioral difference rather than a harmless relaxation.
 			name:     "an href containing the prefix without starting with it",
 			fileName: "pages/index.tsx",
@@ -297,7 +297,7 @@ func TestNoPageCustomFontStaysSilent(test *testing.T) {
 		},
 		{
 			// Invented, and it is the clearest statement that this is not a font rule. A genuine custom-font
-			// stylesheet from Typekit, in a page, with the right `rel`: exactly what the rule's NAME
+			// stylesheet from Typekit, in a page, with the right `rel`: exactly what the rule's name
 			// describes, and measured silent. `https://fonts.gstatic.com/css?family=X` is silent too.
 			name:     "another font host entirely",
 			fileName: "pages/index.tsx",

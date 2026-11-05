@@ -21,7 +21,7 @@ type noPlusplusCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through the rule's own
+	// options is the raw JSON of upstream's options object, routed through the rule's own
 	// exported decoder rather than built as a struct, so the decoder's defaults and its
 	// empty-input path are under test.
 	options string
@@ -199,11 +199,11 @@ func TestNoPlusplusStaysSilent(test *testing.T) {
 	}
 }
 
-// TestNoPlusplusNamesTheOperator asserts the message TEXT, not just the id.
+// TestNoPlusplusNamesTheOperator asserts the message text, not just the id.
 //
 // The generated tables above compare message ids, so the operator this rule interpolates is never
 // read and a port that always said `++` would pass all 23 cases. Mutating the operator renderer to
-// return `++` unconditionally SURVIVES those tables for exactly that reason.
+// return `++` unconditionally survives those tables for exactly that reason.
 //
 // The coverage was already paid for: upstream's corpus asserts `Unary operator '--' used.` on three
 // cases. This reads it. Widening an assertion is cheaper than adding a fixture, and it is the first

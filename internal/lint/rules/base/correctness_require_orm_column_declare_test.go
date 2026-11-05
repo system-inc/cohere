@@ -15,7 +15,7 @@ func asTheOrmColumnHarnessWroteIt(text string) string {
 	return strings.TrimSpace(text) + "\n"
 }
 
-// TestOrmColumnRequiresDeclare measures this port against the SOURCE rule, shape by shape.
+// TestOrmColumnRequiresDeclare measures this port against the source rule, shape by shape.
 //
 // No corpus exists to import, so every row was measured by driving the real rule from
 // api-phi-health over that exact source text. All eight decorators in the set are exercised

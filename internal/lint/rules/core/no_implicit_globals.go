@@ -29,7 +29,7 @@ var messageGlobalVariableLeak = rule.Message{
 
 // NoImplicitGlobalsSettings is the decoded option surface.
 //
-// Upstream's schema is one object with a single `lexicalBindings` boolean, defaulting to FALSE, so
+// Upstream's schema is one object with a single `lexicalBindings` boolean, defaulting to `false`, so
 // the zero value happens to be right here and the usual default-inversion hazard does not apply.
 // It is still decoded through a pointer so that an explicit `false` and an absent key stay
 // distinguishable, which keeps the shape correct if the default ever moves.
@@ -75,18 +75,18 @@ func DecodeNoImplicitGlobalsOptions(raw []byte) (any, error) {
 //	invalid: function foo() {}               in a script
 //	invalid: foo = 1;                        in sloppy code, since nothing declared foo
 //
-// # It only fires in a SCRIPT, and that is the whole reason it measures zero here
+// # It only fires in a script, and that is the whole reason it measures zero here
 //
 // A module has its own scope, so nothing declared at its top level is global and the first two
 // judgments cannot apply. Measured against the installed rule: every one of `var a = 1`,
 // `function f(){}`, `let a = 1`, `const a = 1`, `class C {}`, `a = 1` and `for (b in c) {}` is
-// CLEAN under `sourceType: "module"` and reports under `"script"`.
+// clean under `sourceType: "module"` and reports under `"script"`.
 //
 // This tree is essentially all modules. A scan of `app`, `modules` and the structure libraries found
 // 3174 files carrying a top level import or export against 2 that do not, which is why the audit
 // measured zero violations. That zero is a real property of the tree rather than a blind rule, and
 // the fixtures below prove the rule can fire: the harness builds a file with no import or export as
-// a SCRIPT, verified with two module controls.
+// a script, verified with two module controls.
 //
 // # Three of the five messages are ported and two are declined, for a reason already settled here
 //
@@ -167,7 +167,7 @@ func reportGlobalDeclarations(ruleContext rule.Context, node *ast.Node, lexicalB
 	for _, statement := range node.AsSourceFile().Statements.Nodes {
 		switch statement.Kind {
 		case ast.KindFunctionDeclaration:
-			// A function EXPRESSION assigned to a global var is reported through the var rather
+			// A function expression assigned to a global var is reported through the var rather
 			// than here, which is why upstream's `var foo = function foo() {};` is one finding and
 			// not two: the inner name is scoped to the expression itself.
 			name := statement.Name()
@@ -205,7 +205,7 @@ func reportGlobalDeclarations(ruleContext rule.Context, node *ast.Node, lexicalB
 				// A destructuring pattern binds several names and upstream reports each one, so
 				// `const [a, b, ...c] = [];` is three findings rather than one.
 				//
-				// A plain identifier reports on the whole DECLARATOR rather than on the name,
+				// A plain identifier reports on the whole declarator rather than on the name,
 				// because upstream reports `def.node`, which is the VariableDeclarator. Measured
 				// against the installed rule: `var foo = 1;` reports columns 5 to 12, which is
 				// `foo = 1` and not `foo`. Every message-id fixture is satisfied by either reading,
@@ -268,7 +268,7 @@ func reportGlobalVariableLeaks(ruleContext rule.Context, node *ast.Node) {
 			// Only a bare target leaks. A `for (var x in y)` declares, and that declaration is
 			// judged by the declaration half if it is global.
 			//
-			// This kind test is EQUIVALENT rather than load bearing, and it is kept because it
+			// This kind test is equivalent rather than load bearing, and it is kept because it
 			// states the intent at the point a reader looks for it. A declaration list matches no
 			// arm of reportIfTargetIsUndeclared's switch, so dropping the test reaches the same
 			// silence by falling through instead of by declining. Measured over seven for-in and

@@ -14,7 +14,7 @@ const objectConstructorFile = "/repository/source/ObjectConstructor.ts"
 //
 // `eslint/tests/lib/rules/no-object-constructor.js` at eslint 10.8.1 carries 6 valid and 50 invalid.
 // Extracted by executing that file against a stub RuleTester, which matters more here than anywhere
-// else in this batch: 44 of the 50 invalid cases are BUILT by a `.map()` over a list of code
+// else in this batch: 44 of the 50 invalid cases are built by a `.map()` over a list of code
 // snippets, with the expected `output` computed by a regular expression at test-definition time. No
 // reader could transcribe those correctly and none of them appear as literals in the source file.
 //
@@ -24,7 +24,7 @@ const objectConstructorFile = "/repository/source/ObjectConstructor.ts"
 //
 // All 56 were additionally driven through the installed build and agreed with the file.
 //
-// One valid case is NOT imported: `new Object()` with `globals: { Object: "off" }`. That case turns
+// One valid case is not imported: `new Object()` with `globals: { Object: "off" }`. That case turns
 // a global off through ESLint's own configuration surface, which has no analogue here, and it is
 // clean upstream for a reason that is not about the rule. It is recorded here rather than silently
 // dropped.
@@ -110,7 +110,7 @@ func TestNoObjectConstructorFires(test *testing.T) {
 				test.Fatalf("suggestion id was %q, wanted %q", suggestion.Message.Id, testCase.suggestionId)
 			}
 
-			// The repair itself, asserted by APPLYING it and comparing the whole resulting source
+			// The repair itself, asserted by applying it and comparing the whole resulting source
 			// rather than by comparing the fix text: a fix writing the right string over the wrong
 			// span passes a text comparison and is a real defect.
 			if len(suggestion.Fixes) != 1 {
@@ -156,7 +156,7 @@ func TestNoObjectConstructorStaysSilent(test *testing.T) {
 	}
 }
 
-// A parenthesized callee is CLEAN, which is upstream's reading and looks like an omission.
+// A parenthesized callee is clean, which is upstream's reading and looks like an omission.
 //
 // Upstream tests `node.callee.type !== "Identifier"` with no parenthesis skipping, and a
 // parenthesized callee is a different node in ESTree as well. Measured on eslint 10.8.1: `(Object)()`
@@ -201,7 +201,7 @@ func TestNoObjectConstructorReportsWhyItMatters(test *testing.T) {
 
 // The one divergence from upstream in this rule, kept visible rather than dropped.
 //
-// `with (obj) Object();` is an upstream REPORTING case and is silent here. The checker returns no
+// `with (obj) Object();` is an upstream reporting case and is silent here. The checker returns no
 // symbol for `Object` inside a `with` block, because whether that name reaches the global genuinely
 // depends on what `obj` holds at runtime, so `resolvesToAGlobal` declines and the rule declines with
 // it. See the rule's doc comment for the measurement.
@@ -215,7 +215,7 @@ func TestNoObjectConstructorDeclinesInsideAWithBlock(test *testing.T) {
 		"with (obj) Object();"))
 }
 
-// Where the FINDING points, which the fix assertions above cannot see.
+// Where the finding points, which the fix assertions above cannot see.
 //
 // Every reporting fixture in this file asserts the applied repair, and a repair is anchored on its
 // own range rather than on the diagnostic's, so a rule reporting the callee while fixing the call

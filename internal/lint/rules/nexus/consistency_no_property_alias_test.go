@@ -44,8 +44,8 @@ func TestConsistencyNoPropertyAliasFires(test *testing.T) {
 		{"inside a method", "export class Thing {\n    run(options: OptionsInterface) {\n        const limit = options.limit;\n        return limit;\n    }\n}\n"},
 		{"with a let binding", "export function run(options: OptionsInterface) {\n    let cursor = options.cursor;\n    return cursor;\n}\n"},
 		// The hatch is for hooks, and only hooks. This rule reports when it fails to find the
-		// exemption, so its polarity is inverted from most: a hatch that is too WIDE loses
-		// findings quietly, and a hatch that is too NARROW manufactures accusations against
+		// exemption, so its polarity is inverted from most: a hatch that is too wide loses
+		// findings quietly, and a hatch that is too narrow manufactures accusations against
 		// correct files. 117 of the 231 alias-shaped declarations on the ahra tree are exempted by
 		// this hatch alone, so both directions get a case.
 		// The two exemptions of #nd52037, each from the side that must still report. A write to the
@@ -109,7 +109,7 @@ func TestConsistencyNoPropertyAliasStaysSilent(test *testing.T) {
 		// one step in. The chain still computes, so the local is still caching rather than
 		// aliasing, and the exemption has to survive the extra depth.
 		{"a call deeper in the chain", "export function run(a: AInterface) {\n    const value = a.make().inner.value;\n    return value;\n}\n"},
-		// The call sits BELOW an element access, which is the only shape that exercises the
+		// The call sits below an element access, which is the only shape that exercises the
 		// element-access arm of the chain walk. It is here because reasoning said the arm was dead
 		// and a probe said otherwise: `a[k].make()` finds its call before ever descending, but
 		// `make()[k]` does not, so deleting the arm turns a computed-caching case into a reported
