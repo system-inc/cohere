@@ -188,21 +188,21 @@ func yamlCorpora(test *testing.T, roots string) []yamlCorpus {
 
 		// Nested repositories regardless of root's own ignore lists, as the differential finds them
 		// (#k6vebep): a repository under a path root never formats is still a corpus.
-		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
-		if err != nil {
-			test.Fatalf("finding the repositories nested in %s: %v", root, err)
+		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(root)
+		if nestedRepositoriesBelowError != nil {
+			test.Fatalf("finding the repositories nested in %s: %v", root, nestedRepositoriesBelowError)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(root, nested))
 		}
 
-		enumeration, err := enumerator.Enumerate(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
-			test.Logf("skipping %s, not yet adopted: %v", root, err)
+		enumeration, enumerateError := enumerator.Enumerate(root)
+		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+			test.Logf("skipping %s, not yet adopted: %v", root, enumerateError)
 			continue
 		}
-		if err != nil {
-			test.Fatalf("enumerating %s: %v", root, err)
+		if enumerateError != nil {
+			test.Fatalf("enumerating %s: %v", root, enumerateError)
 		}
 		corpus := yamlCorpus{root: root}
 		for _, file := range enumeration.Files {
@@ -249,13 +249,13 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 		test.Skip("set COHERE_YAML_CORPUS to measure; this is a measuring run, not a unit test")
 	}
 
-	bundles, err := prettier.Bundles()
-	if err != nil {
-		test.Fatal(err)
+	bundles, bundlesError := prettier.Bundles()
+	if bundlesError != nil {
+		test.Fatal(bundlesError)
 	}
-	digest, err := prettier.DigestBundles(bundles.Files)
-	if err != nil {
-		test.Fatal(err)
+	digest, digestBundlesError := prettier.DigestBundles(bundles.Files)
+	if digestBundlesError != nil {
+		test.Fatal(digestBundlesError)
 	}
 	directory := os.Getenv("COHERE_FORMAT_CACHE")
 	if directory == "" {
@@ -314,19 +314,19 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 			Directory: directory,
 			Identity:  digest + "|" + string(bundles.Origin) + "|filepath|" + fmt.Sprintf("%+v", options),
 		}
-		yamlReport, err := differential.Compare(corpus.root, yamlFiles,
+		yamlReport, compareError := differential.Compare(corpus.root, yamlFiles,
 			func() (differential.Formatter, error) { return newEngine() },
 			func() (differential.Formatter, error) { return candidate, nil },
 			runtime.NumCPU(), yamlCache)
-		if err != nil {
-			test.Fatalf("comparing %s: %v", corpus.root, err)
+		if compareError != nil {
+			test.Fatalf("comparing %s: %v", corpus.root, compareError)
 		}
-		yamlFullStackReport, err := differential.Compare(corpus.root, yamlFiles,
+		yamlFullStackReport, compareError := differential.Compare(corpus.root, yamlFiles,
 			func() (differential.Formatter, error) { return newEngine() },
 			func() (differential.Formatter, error) { return fullStack, nil },
 			runtime.NumCPU(), yamlCache)
-		if err != nil {
-			test.Fatalf("comparing %s: %v", corpus.root, err)
+		if compareError != nil {
+			test.Fatalf("comparing %s: %v", corpus.root, compareError)
 		}
 
 		// The front matter of the markdown files: yaml, with a value left once trimmed.
@@ -392,17 +392,23 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 				fmt.Sprintf("%+v", options),
 		}
 		newFrontMatterOracle := func() (differential.Formatter, error) {
-			engine, err := newEngine()
-			return frontMatterOracle{engine: engine}, err
+			engine, newEngineError := newEngine()
+			return frontMatterOracle{engine: engine}, newEngineError
 		}
-		frontMatterReport, err := differential.Compare(corpus.root, measuredFrontMatterFiles, newFrontMatterOracle,
-			func() (differential.Formatter, error) { return frontMatters, nil }, runtime.NumCPU(), frontMatterCache)
-		if err != nil {
-			test.Fatalf("comparing %s: %v", corpus.root, err)
+		frontMatterReport, compareError := differential.Compare(
+			corpus.root,
+			measuredFrontMatterFiles,
+			newFrontMatterOracle,
+			func() (differential.Formatter, error) { return frontMatters, nil },
+			runtime.NumCPU(),
+			frontMatterCache,
+		)
+		if compareError != nil {
+			test.Fatalf("comparing %s: %v", corpus.root, compareError)
 		}
 		frontMatterFullStack := frontMatters
 		frontMatterFullStack.fullStack = true
-		frontMatterFullStackReport, err := differential.Compare(
+		frontMatterFullStackReport, compareError := differential.Compare(
 			corpus.root,
 			measuredFrontMatterFiles,
 			newFrontMatterOracle,
@@ -410,8 +416,8 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 			runtime.NumCPU(),
 			frontMatterCache,
 		)
-		if err != nil {
-			test.Fatalf("comparing %s: %v", corpus.root, err)
+		if compareError != nil {
+			test.Fatalf("comparing %s: %v", corpus.root, compareError)
 		}
 
 		for _, named := range []struct {

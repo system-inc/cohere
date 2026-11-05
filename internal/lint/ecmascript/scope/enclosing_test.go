@@ -95,7 +95,7 @@ func TestEnclosingFunctionLikeAnswersNilOutsideAFunction(test *testing.T) {
 // TestNameOf covers the names a function-like node is known by, including the borrowed ones.
 func TestNameOf(test *testing.T) {
 	test.Parallel()
-	for _, c := range []struct {
+	for _, testCase := range []struct {
 		source string
 		want   string
 	}{
@@ -119,7 +119,7 @@ func TestNameOf(test *testing.T) {
 		{"call(() => { marker; });", ""},
 		{"const outer = [function () { marker; }];", ""},
 	} {
-		source, want := c.source, c.want
+		source, want := testCase.source, testCase.want
 		atMarker(test, "declare function call(x: any): void;\n"+source, func(node *ast.Node) {
 			enclosing := scope.EnclosingFunctionLike(node)
 			if got := scope.NameOf(enclosing); got != want {
@@ -136,7 +136,7 @@ func TestNameOf(test *testing.T) {
 // there would answer "" everywhere it is meant to fire. This continues outward until it finds a name.
 func TestEnclosingNamedFunctionWalksPastAnonymousOnes(test *testing.T) {
 	test.Parallel()
-	for _, c := range []struct {
+	for _, testCase := range []struct {
 		source string
 		want   string
 	}{
@@ -146,7 +146,7 @@ func TestEnclosingNamedFunctionWalksPastAnonymousOnes(test *testing.T) {
 		// Nothing named anywhere above.
 		{"effect(() => { marker; });", ""},
 	} {
-		source, want := c.source, c.want
+		source, want := testCase.source, testCase.want
 		atMarker(test, "declare function effect(x: any): void;\n"+source, func(node *ast.Node) {
 			_, got := scope.EnclosingNamedFunction(node)
 			if got != want {

@@ -2044,9 +2044,11 @@ func TestSwitchExhaustivenessCheckOptionsBindFromCamelCaseJson(test *testing.T) 
 
 	decode := rule.DecodeOptionsInto[SwitchExhaustivenessCheckOptions]()
 
-	decoded, err := decode([]byte(`{"allowDefaultCaseForExhaustiveSwitch":false,"requireDefaultForNonUnion":true}`))
-	if err != nil {
-		test.Fatalf("decoding options: %v", err)
+	decoded, decodeError := decode(
+		[]byte(`{"allowDefaultCaseForExhaustiveSwitch":false,"requireDefaultForNonUnion":true}`),
+	)
+	if decodeError != nil {
+		test.Fatalf("decoding options: %v", decodeError)
 	}
 
 	if decoded.AllowDefaultCaseForExhaustiveSwitch == nil || *decoded.AllowDefaultCaseForExhaustiveSwitch {
@@ -2064,9 +2066,9 @@ func TestSwitchExhaustivenessCheckOptionsBindFromCamelCaseJson(test *testing.T) 
 
 	// And the option that binds and then does nothing, which is the trap this rule carries. It must
 	// still decode cleanly, because refusing it would reject configs upstream accepts.
-	withPattern, err := decode([]byte(`{"defaultCaseCommentPattern":"^skip"}`))
-	if err != nil {
-		test.Fatalf("decoding the inert option: %v", err)
+	withPattern, decodeError := decode([]byte(`{"defaultCaseCommentPattern":"^skip"}`))
+	if decodeError != nil {
+		test.Fatalf("decoding the inert option: %v", decodeError)
 	}
 	if withPattern.DefaultCaseCommentPattern == nil {
 		test.Fatal("defaultCaseCommentPattern did not bind")

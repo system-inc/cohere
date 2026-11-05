@@ -75,9 +75,9 @@ func TestNoUnreachableLoopOptions(test *testing.T) {
 	for _, testCase := range unreachableLoopOptionCases {
 		test.Run(testCase.source+" "+testCase.options, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := decode([]byte(testCase.options))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.options, err)
+			decoded, decodeError := decode([]byte(testCase.options))
+			if decodeError != nil {
+				test.Fatalf("decoding %s: %v", testCase.options, decodeError)
 			}
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
@@ -215,11 +215,11 @@ func TestNoUnreachableLoopIgnoringEveryKindDisablesTheRule(test *testing.T) {
 	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[NoUnreachableLoopOptions]()
-	decoded, err := decode(
+	decoded, decodeError := decode(
 		[]byte(`{"ignore":["WhileStatement","DoWhileStatement","ForStatement","ForInStatement","ForOfStatement"]}`),
 	)
-	if err != nil {
-		test.Fatalf("decoding: %v", err)
+	if decodeError != nil {
+		test.Fatalf("decoding: %v", decodeError)
 	}
 
 	// Five loops, one of every kind, every one of them invalid without the option.

@@ -380,8 +380,8 @@ func parameterListRange(ruleContext rule.Context, function *ast.Node, parameters
 	return core.NewTextRange(start, parameters[len(parameters)-1].End())
 }
 
-func isSpaceByte(b byte) bool {
-	return b == ' ' || b == '\t' || b == '\r' || b == '\n'
+func isSpaceByte(character byte) bool {
+	return character == ' ' || character == '\t' || character == '\r' || character == '\n'
 }
 
 // functionSourceText is the unwrapped function's own text, without leading trivia.

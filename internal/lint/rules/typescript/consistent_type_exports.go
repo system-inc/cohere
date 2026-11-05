@@ -779,9 +779,9 @@ type consistentTypeExportsRawOptions struct {
 
 // DecodeConsistentTypeExportsOptions maps the wire key onto the rule's setting.
 func DecodeConsistentTypeExportsOptions(raw []byte) (ConsistentTypeExportsOptions, error) {
-	decoded, err := rule.DecodeOptionsInto[consistentTypeExportsRawOptions]()(raw)
-	if err != nil {
-		return DefaultConsistentTypeExportsOptions(), err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[consistentTypeExportsRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultConsistentTypeExportsOptions(), decodeOptionsError
 	}
 
 	options := DefaultConsistentTypeExportsOptions()

@@ -113,9 +113,9 @@ func adamicPrograms(test *testing.T) map[string]string {
 	test.Helper()
 	programs := map[string]string{}
 	root := filepath.Join("testdata", "programs")
-	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil || entry.IsDir() {
+			return pathError
 		}
 		contents, readError := os.ReadFile(path)
 		if readError != nil {

@@ -53,9 +53,9 @@ func (fixture *landFixture) pinLibrary() string {
 // directory through /private where the test's path has /var.
 func sameFile(test *testing.T, one string, other string) bool {
 	test.Helper()
-	resolvedOne, errOne := filepath.EvalSymlinks(one)
-	resolvedOther, errOther := filepath.EvalSymlinks(other)
-	return errOne == nil && errOther == nil && resolvedOne == resolvedOther
+	resolvedOne, oneError := filepath.EvalSymlinks(one)
+	resolvedOther, otherError := filepath.EvalSymlinks(other)
+	return oneError == nil && otherError == nil && resolvedOne == resolvedOther
 }
 
 // A new name makes a worktree at main beside the checkout of main, its submodule a symlink to that checkout's

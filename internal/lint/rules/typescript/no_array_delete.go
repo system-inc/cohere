@@ -159,26 +159,26 @@ var NoArrayDelete = rule.Rule[rule.NoOptions]{
 	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
-		isUnderlyingTypeArray := func(t *checker.Type) bool {
-			if type_checking.IsTypeFlagSet(t, checker.TypeFlagsUnion) {
-				for _, t := range t.Types() {
-					if !checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, t) {
+		isUnderlyingTypeArray := func(subjectType *checker.Type) bool {
+			if type_checking.IsTypeFlagSet(subjectType, checker.TypeFlagsUnion) {
+				for _, memberType := range subjectType.Types() {
+					if !checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, memberType) {
 						return false
 					}
 				}
 				return true
 			}
 
-			if type_checking.IsTypeFlagSet(t, checker.TypeFlagsIntersection) {
-				for _, t := range t.Types() {
-					if checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, t) {
+			if type_checking.IsTypeFlagSet(subjectType, checker.TypeFlagsIntersection) {
+				for _, memberType := range subjectType.Types() {
+					if checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, memberType) {
 						return true
 					}
 				}
 				return false
 			}
 
-			return checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, t)
+			return checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, subjectType)
 		}
 
 		return rule.Listeners{

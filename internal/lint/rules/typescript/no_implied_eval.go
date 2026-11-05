@@ -236,18 +236,23 @@ var NoImpliedEval = rule.Rule[rule.NoOptions]{
 		}
 
 		isFunctionType := func(node *ast.Node) bool {
-			t := ruleContext.TypeChecker.GetTypeAtLocation(node)
-			symbol := checker.Type_symbol(t)
+			subjectType := ruleContext.TypeChecker.GetTypeAtLocation(node)
+			symbol := checker.Type_symbol(subjectType)
 
 			if symbol != nil && type_checking.IsSymbolFlagSet(symbol, ast.SymbolFlagsFunction|ast.SymbolFlagsMethod) {
 				return true
 			}
 
-			if type_checking.IsBuiltinSymbolLike(ruleContext.Program, ruleContext.TypeChecker, t, "Function") {
+			if type_checking.IsBuiltinSymbolLike(
+				ruleContext.Program,
+				ruleContext.TypeChecker,
+				subjectType,
+				"Function",
+			) {
 				return true
 			}
 
-			return len(type_checking.GetCallSignatures(ruleContext.TypeChecker, t)) > 0
+			return len(type_checking.GetCallSignatures(ruleContext.TypeChecker, subjectType)) > 0
 		}
 
 		isBind := func(node *ast.Node) bool {
@@ -283,14 +288,14 @@ var NoImpliedEval = rule.Rule[rule.NoOptions]{
 			}
 
 			if calleeName == "Function" {
-				t := ruleContext.TypeChecker.GetTypeAtLocation(node.Expression())
-				symbol := checker.Type_symbol(t)
+				subjectType := ruleContext.TypeChecker.GetTypeAtLocation(node.Expression())
+				symbol := checker.Type_symbol(subjectType)
 
 				if symbol != nil {
 					if type_checking.IsBuiltinSymbolLike(
 						ruleContext.Program,
 						ruleContext.TypeChecker,
-						t,
+						subjectType,
 						"FunctionConstructor",
 					) {
 						ruleContext.ReportNode(node, buildNoFunctionConstructorMessage())
@@ -309,8 +314,8 @@ var NoImpliedEval = rule.Rule[rule.NoOptions]{
 
 			if slices.Contains(evalLikeFunctions, calleeName) && !isFunction(handler) {
 				symbol := ruleContext.TypeChecker.GetSymbolAtLocation(node.Expression())
-				if symbol == nil || !type_checking.Some(symbol.Declarations, func(d *ast.Node) bool {
-					return ast.GetSourceFileOfNode(d) == ruleContext.SourceFile
+				if symbol == nil || !type_checking.Some(symbol.Declarations, func(declaration *ast.Node) bool {
+					return ast.GetSourceFileOfNode(declaration) == ruleContext.SourceFile
 				}) {
 					ruleContext.ReportNode(handler, buildNoImpliedEvalErrorMessage())
 				}

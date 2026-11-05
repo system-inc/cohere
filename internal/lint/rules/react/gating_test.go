@@ -516,18 +516,18 @@ func TestGatingOptionDecodesAndDefaultsToChecking(test *testing.T) {
 		"invalidGatingDirective")
 
 	// An empty object is the same default arriving through the decoder rather than past it.
-	empty, err := decode(json.RawMessage(`{}`))
-	if err != nil {
-		test.Fatalf("decoding an empty object: %v", err)
+	empty, decodeError := decode(json.RawMessage(`{}`))
+	if decodeError != nil {
+		test.Fatalf("decoding an empty object: %v", decodeError)
 	}
 	rule_testing.ExpectFindings(test,
 		rule_testing.RunWithOptions(test, Gating, gatingFile, gatingUpstreamInvalidIdentifier, empty),
 		"invalidGatingDirective")
 
 	// Set explicitly false, which must not be read as unset.
-	off, err := decode(json.RawMessage(`{"requireDynamicGatingOption": false}`))
-	if err != nil {
-		test.Fatalf("decoding an explicit false: %v", err)
+	off, decodeError := decode(json.RawMessage(`{"requireDynamicGatingOption": false}`))
+	if decodeError != nil {
+		test.Fatalf("decoding an explicit false: %v", decodeError)
 	}
 	rule_testing.ExpectFindings(test,
 		rule_testing.RunWithOptions(test, Gating, gatingFile, gatingUpstreamInvalidIdentifier, off),
@@ -535,9 +535,9 @@ func TestGatingOptionDecodesAndDefaultsToChecking(test *testing.T) {
 
 	// Set true, restoring upstream's silence. This is the only configuration under which React and
 	// oxc's own behavior is reproduced exactly, and it must reach the rule through the decoder.
-	on, err := decode(json.RawMessage(`{"requireDynamicGatingOption": true}`))
-	if err != nil {
-		test.Fatalf("decoding an explicit true: %v", err)
+	on, decodeError := decode(json.RawMessage(`{"requireDynamicGatingOption": true}`))
+	if decodeError != nil {
+		test.Fatalf("decoding an explicit true: %v", decodeError)
 	}
 	rule_testing.ExpectClean(test,
 		rule_testing.RunWithOptions(test, Gating, gatingFile, gatingUpstreamInvalidIdentifier, on))

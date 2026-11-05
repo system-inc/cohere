@@ -71,9 +71,9 @@ func main() {
 }
 
 func generate() ([]byte, error) {
-	bundles, err := prettier.Bundles()
-	if err != nil {
-		return nil, err
+	bundles, bundlesError := prettier.Bundles()
+	if bundlesError != nil {
+		return nil, bundlesError
 	}
 	markdown := string(bundles.Files["plugins/markdown.js"])
 
@@ -86,13 +86,13 @@ func generate() ([]byte, error) {
 	}
 
 	runtime := goja.New()
-	punctuation, err := unitRanges(runtime, matches[0][1], "u")
-	if err != nil {
-		return nil, err
+	punctuation, unitRangesError := unitRanges(runtime, matches[0][1], "u")
+	if unitRangesError != nil {
+		return nil, unitRangesError
 	}
-	whitespace, err := unitRanges(runtime, `\s`, "")
-	if err != nil {
-		return nil, err
+	whitespace, unitRangesError := unitRanges(runtime, `\s`, "")
+	if unitRangesError != nil {
+		return nil, unitRangesError
 	}
 
 	// Controls in both directions, so a pattern that compiled into something else cannot pass: ASCII

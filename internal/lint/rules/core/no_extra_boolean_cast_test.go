@@ -1657,9 +1657,9 @@ func TestNoExtraBooleanCastAcceptsTheDeprecatedOptionSpelling(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := rule.DecodeOptionsInto[NoExtraBooleanCastOptions]()([]byte(testCase.rawJson))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.rawJson, err)
+			decoded, decodeOptionsError := rule.DecodeOptionsInto[NoExtraBooleanCastOptions]()([]byte(testCase.rawJson))
+			if decodeOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.rawJson, decodeOptionsError)
 			}
 			if decoded.EnforceForInnerExpressions != testCase.want {
 				test.Fatalf("EnforceForInnerExpressions was %v, wanted %v",

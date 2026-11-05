@@ -48,13 +48,13 @@ func TestByteOrderMarksAndCarriageReturnsMatchTheForkInEveryLanguage(test *testi
 		}
 		for variantName, variant := range variants {
 			input := variant(source)
-			expected, err := oracle.Format(fileName, input)
-			if err != nil {
-				test.Fatalf("the oracle failed on %s, %s: %v", fileName, variantName, err)
+			expected, formatError := oracle.Format(fileName, input)
+			if formatError != nil {
+				test.Fatalf("the oracle failed on %s, %s: %v", fileName, variantName, formatError)
 			}
-			actual, err := formatter.Format(fileName, input)
-			if err != nil {
-				test.Errorf("%s, %s: %v", fileName, variantName, err)
+			actual, formatError := formatter.Format(fileName, input)
+			if formatError != nil {
+				test.Errorf("%s, %s: %v", fileName, variantName, formatError)
 				continue
 			}
 			if actual != expected {

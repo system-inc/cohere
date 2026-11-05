@@ -210,11 +210,11 @@ var ErrTailwindNotInstalled = errors.New("tailwindcss does not resolve from the 
 // skipWithoutTailwind skips the file when err is a missing Tailwind, and says whether it did. A
 // design system that failed to build is not a skip, and the rule declines it loudly instead. Each
 // reason is written at its Skip, where TestEverySkipSaysWhichKindItIs reads it.
-func skipWithoutTailwind(ruleContext rule.Context, err error) bool {
+func skipWithoutTailwind(ruleContext rule.Context, candidateError error) bool {
 	switch {
-	case errors.Is(err, ErrNoTailwindEntryPoint):
+	case errors.Is(candidateError, ErrNoTailwindEntryPoint):
 		ruleContext.Skip("no Tailwind entry point is configured")
-	case errors.Is(err, ErrTailwindNotInstalled):
+	case errors.Is(candidateError, ErrTailwindNotInstalled):
 		ruleContext.Skip("tailwindcss does not resolve from the configured cwd")
 	default:
 		return false
@@ -298,26 +298,31 @@ func loadConfiguredDesignSystem(
 	fileSystem *rule.RecordingFS,
 	location DesignSystemLocation,
 ) DesignSystemResult {
-	entryPoint, packageRoot, err := ConfiguredEntryPoint(
+	entryPoint, packageRoot, configuredEntryPointError := ConfiguredEntryPoint(
 		projectRoot,
 		location,
 		func(path string) bool { return fileSystem.FileExists(tspath.RootedFilePath(path)) },
 	)
-	if err != nil {
-		return DesignSystemResult{Err: err}
+	if configuredEntryPointError != nil {
+		return DesignSystemResult{Error: configuredEntryPointError}
 	}
 
-	resolve, err := stylesheetResolverAt(location.cwdFrom(projectRoot), location.Tsconfig, packageRoot, fileSystem)
-	if err != nil {
-		return DesignSystemResult{EntryPoint: entryPoint, Err: err}
+	resolve, stylesheetResolverAtError := stylesheetResolverAt(
+		location.cwdFrom(projectRoot),
+		location.Tsconfig,
+		packageRoot,
+		fileSystem,
+	)
+	if stylesheetResolverAtError != nil {
+		return DesignSystemResult{EntryPoint: entryPoint, Error: stylesheetResolverAtError}
 	}
-	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
 		Resolve:             resolve,
 	})
-	if err != nil {
-		return DesignSystemResult{EntryPoint: entryPoint, Err: err}
+	if loadDesignSystemError != nil {
+		return DesignSystemResult{EntryPoint: entryPoint, Error: loadDesignSystemError}
 	}
 	for _, stylesheet := range system.Stylesheets {
 		fileSystem.Stat(tspath.RootedPath(stylesheet))

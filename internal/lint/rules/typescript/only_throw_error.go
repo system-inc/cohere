@@ -535,9 +535,9 @@ func (specifier *onlyThrowErrorRawSpecifier) UnmarshalJSON(raw []byte) error {
 // distinguishable from "false"; every one of them defaults to true, so collapsing that distinction
 // would turn an unconfigured rule into a maximally strict one.
 func DecodeOnlyThrowErrorOptions(raw []byte) (OnlyThrowErrorOptions, error) {
-	decoded, err := rule.DecodeOptionsInto[onlyThrowErrorRawOptions]()(raw)
-	if err != nil {
-		return OnlyThrowErrorOptions{}, err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[onlyThrowErrorRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return OnlyThrowErrorOptions{}, decodeOptionsError
 	}
 
 	options := OnlyThrowErrorOptions{

@@ -32,9 +32,9 @@ type preferLiteralEnumMemberRawOptions struct {
 // cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what arrives
 // is the bare object rather than upstream's one-element array.
 func DecodePreferLiteralEnumMemberOptions(raw []byte) (PreferLiteralEnumMemberOptions, error) {
-	decoded, err := rule.DecodeOptionsInto[preferLiteralEnumMemberRawOptions]()(raw)
-	if err != nil {
-		return DefaultPreferLiteralEnumMemberSettings(), err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[preferLiteralEnumMemberRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultPreferLiteralEnumMemberSettings(), decodeOptionsError
 	}
 
 	options := DefaultPreferLiteralEnumMemberSettings()

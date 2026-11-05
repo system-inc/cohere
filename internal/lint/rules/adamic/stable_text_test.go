@@ -41,11 +41,11 @@ func relationMessages(test *testing.T, files map[string]string, anotherFirst boo
 			test.Fatal(writeError)
 		}
 	}
-	graph, err := program.Build(
+	graph, buildError := program.Build(
 		program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), SingleThreaded: true},
 	)
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 	another := graph.Program.GetSourceFile(tspath.RootedFilePath(filepath.Join(directory, "Another.ts")))
 	caseFile := graph.Program.GetSourceFile(tspath.RootedFilePath(filepath.Join(directory, "Case.ts")))
@@ -55,13 +55,13 @@ func relationMessages(test *testing.T, files map[string]string, anotherFirst boo
 	if anotherFirst {
 		graph.Program.GetSemanticDiagnostics(context.Background(), another)
 	}
-	result, err := graph.Walk(
+	result, walkError := graph.Walk(
 		context.Background(),
 		[]*ast.SourceFile{caseFile},
 		rule_testing.EntriesOf(test, InvariantMutable, NoOptionalWidening),
 	)
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 	messages := map[string]string{}
 	for _, diagnostic := range result.Diagnostics {

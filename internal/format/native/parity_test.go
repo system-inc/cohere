@@ -44,26 +44,26 @@ func TestEmptyTextAndNumericSeparatorsMatchTheFork(test *testing.T) {
 	formatter := Formatter{Options: options}
 	compared, refusedByBoth := 0, 0
 	for _, each := range inputs {
-		expected, oracleErr := oracle.Format(each.fileName, each.text)
-		actual, nativeErr := formatter.Format(each.fileName, each.text)
+		expected, oracleError := oracle.Format(each.fileName, each.text)
+		actual, nativeError := formatter.Format(each.fileName, each.text)
 		switch {
-		case oracleErr != nil && nativeErr != nil:
+		case oracleError != nil && nativeError != nil:
 			refusedByBoth++
-		case oracleErr != nil:
+		case oracleError != nil:
 			test.Errorf(
 				"%s %q: the fork refuses it (%v) and Formatter printed %q",
 				each.fileName,
 				each.text,
-				oracleErr,
+				oracleError,
 				actual,
 			)
-		case nativeErr != nil:
+		case nativeError != nil:
 			test.Errorf(
 				"%s %q: the fork prints %q and Formatter refused: %v",
 				each.fileName,
 				each.text,
 				expected,
-				nativeErr,
+				nativeError,
 			)
 		default:
 			compared++

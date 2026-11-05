@@ -153,12 +153,12 @@ func DecodePreferNullishCoalescingOptions(raw []byte) (PreferNullishCoalescingOp
 	return options, nil
 }
 
-// errPreferNullishCoalescingPrimitivesFalse names the one boolean upstream's schema refuses.
+// errorPreferNullishCoalescingPrimitivesFalse names the one boolean upstream's schema refuses.
 //
 // `ignorePrimitives` is `oneOf(object, {type: boolean, enum: [true]})`, so `true` is legal and
 // `false` is not. Measured: ESLint rejects `{"ignorePrimitives": false}` at config load with
 // "Value false should match exactly one schema in oneOf".
-var errPreferNullishCoalescingPrimitivesFalse = errors.New(
+var errorPreferNullishCoalescingPrimitivesFalse = errors.New(
 	"prefer-nullish-coalescing: ignorePrimitives accepts an object or the literal true; " +
 		"false is not a legal value, and upstream refuses it at config load")
 
@@ -177,7 +177,7 @@ func decodePreferNullishCoalescingPrimitives(raw json.RawMessage) (
 	var asBool bool
 	if json.Unmarshal(raw, &asBool) == nil {
 		if !asBool {
-			return primitives, errPreferNullishCoalescingPrimitivesFalse
+			return primitives, errorPreferNullishCoalescingPrimitivesFalse
 		}
 		primitives.IgnoreAll = true
 		return primitives, nil

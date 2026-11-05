@@ -116,9 +116,11 @@ func TestADerivedRuleReplaysWhileItsProgramFingerprintHolds(test *testing.T) {
 			var recorded *program.LintCache
 			walk := func(cached bool) (program.Result, *sync.Map) {
 				test.Helper()
-				graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-				if err != nil {
-					test.Fatal(err)
+				graph, buildError := program.Build(
+					program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")},
+				)
+				if buildError != nil {
+					test.Fatal(buildError)
 				}
 				runs := &sync.Map{}
 				rules := []rule.Rule[rule.NoOptions]{markerRule("test-derived", scenario.fingerprint, runs)}
@@ -127,13 +129,13 @@ func TestADerivedRuleReplaysWhileItsProgramFingerprintHolds(test *testing.T) {
 					reuse = program.NewFindingsReuse(key, recorded, program.PathAnchor{})
 					graph.FindingsReuse = reuse
 				}
-				result, err := graph.Walk(
+				result, walkError := graph.Walk(
 					backgroundContext,
 					graph.ProjectFiles(),
 					rule_testing.EntriesOf(test, rules...),
 				)
-				if err != nil {
-					test.Fatal(err)
+				if walkError != nil {
+					test.Fatal(walkError)
 				}
 				if cached {
 					recorded = roundTripLintCache(test, reuse.Recorded())
@@ -225,20 +227,22 @@ func TestARuleWithNoUsableProgramFingerprintIsWalkedEveryRun(test *testing.T) {
 			key := program.HashRuleSet([]string{"uncacheable"})
 			var recorded *program.LintCache
 			for run := 1; run <= 2; run++ {
-				graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-				if err != nil {
-					test.Fatal(err)
+				graph, buildError := program.Build(
+					program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")},
+				)
+				if buildError != nil {
+					test.Fatal(buildError)
 				}
 				runs := &sync.Map{}
 				reuse := program.NewFindingsReuse(key, recorded, program.PathAnchor{})
 				graph.FindingsReuse = reuse
-				result, err := graph.Walk(
+				result, walkError := graph.Walk(
 					backgroundContext,
 					graph.ProjectFiles(),
 					rule_testing.EntriesOf(test, markerRule("test-reads-other-files", scenario.fingerprint, runs)),
 				)
-				if err != nil {
-					test.Fatal(err)
+				if walkError != nil {
+					test.Fatal(walkError)
 				}
 				if runsOf(runs) != 1 {
 					test.Errorf("run %d: the rule ran on %d files, want a.ts every run", run, runsOf(runs))
@@ -363,11 +367,11 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 				test.Helper()
 				// Four checkers, so the walk runs on several workers and each takes its selections' fingerprints at
 				// once, which is the case -race has to see.
-				graph, err := program.Build(
+				graph, buildError := program.Build(
 					program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), Checkers: 4},
 				)
-				if err != nil {
-					test.Fatal(err)
+				if buildError != nil {
+					test.Fatal(buildError)
 				}
 				if graph.Workers() < 2 {
 					test.Fatalf(
@@ -383,13 +387,13 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 					reuse = program.NewFindingsReuse(key, recorded, program.PathAnchor{})
 					graph.FindingsReuse = reuse
 				}
-				result, err := graph.Walk(
+				result, walkError := graph.Walk(
 					backgroundContext,
 					graph.ProjectFiles(),
 					[]rule.Entry{rule_testing.EntryOf(test, subject)},
 				)
-				if err != nil {
-					test.Fatal(err)
+				if walkError != nil {
+					test.Fatal(walkError)
 				}
 				if cached {
 					recorded = roundTripLintCache(test, reuse.Recorded())

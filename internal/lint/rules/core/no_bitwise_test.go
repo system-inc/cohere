@@ -319,7 +319,7 @@ func TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers(test *testing.T)
 		raw       string
 		wantAllow []string
 		wantHint  bool
-		wantErr   bool
+		wantError bool
 	}{
 		{name: "absent options, which is what a bare \"error\" delivers"},
 		{name: "the cohere spelling: one option object after the severity",
@@ -332,22 +332,22 @@ func TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers(test *testing.T)
 			// A decoder answering "no options" to a shape it did not understand produces a rule that
 			// registers, reports, and enforces something other than what the config says.
 			name: "a shape that is neither must error rather than decode to a default",
-			raw:  `"int32Hint"`, wantErr: true,
+			raw:  `"int32Hint"`, wantError: true,
 		},
 		{
 			name: "upstream's variadic spelling is not one this layer delivers",
-			raw:  `[{"int32Hint":true}]`, wantErr: true,
+			raw:  `[{"int32Hint":true}]`, wantError: true,
 		},
 		{
 			// Upstream gets this refusal from its schema. There is no schema layer here, so a rule
 			// that ignored an unknown spelling would leave a project believing it had exempted
 			// something it had not.
 			name: "an operator outside upstream's enum is refused, not ignored",
-			raw:  `{"allow":[">>>>"]}`, wantErr: true,
+			raw:  `{"allow":[">>>>"]}`, wantError: true,
 		},
 		{
 			name: "a near miss is refused too, since `>>>` and `>>>=` are different operators",
-			raw:  `{"allow":["&&"]}`, wantErr: true,
+			raw:  `{"allow":["&&"]}`, wantError: true,
 		},
 	}
 
@@ -355,7 +355,7 @@ func TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers(test *testing.T)
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			decoded, decodeNoBitwiseOptionsError := DecodeNoBitwiseOptions(json.RawMessage(testCase.raw))
-			if testCase.wantErr {
+			if testCase.wantError {
 				if decodeNoBitwiseOptionsError == nil {
 					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
 				}

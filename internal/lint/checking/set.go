@@ -45,9 +45,9 @@ func (set *Set[T]) Clear() {
 }
 
 func NewSetFromItems[T comparable](items ...T) *Set[T] {
-	s := &Set[T]{}
+	set := &Set[T]{}
 	for _, item := range items {
-		s.Add(item)
+		set.Add(item)
 	}
-	return s
+	return set
 }

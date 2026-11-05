@@ -252,8 +252,8 @@ func queryCoveredPackages(binaryPath string, directory string, noCache bool) (co
 			found = append(found, record)
 		}
 	}
-	if err := scanner.Err(); err != nil {
-		return coveredPackagesRecord{}, fmt.Errorf("reading the engine's answer: %w", err)
+	if scanError := scanner.Err(); scanError != nil {
+		return coveredPackagesRecord{}, fmt.Errorf("reading the engine's answer: %w", scanError)
 	}
 	switch len(found) {
 	case 0:

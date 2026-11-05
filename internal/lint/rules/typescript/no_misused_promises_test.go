@@ -336,9 +336,9 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(test *testin
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := decode([]byte(testCase.config))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.config, err)
+			decoded, decodeError := decode([]byte(testCase.config))
+			if decodeError != nil {
+				test.Fatalf("decoding %s: %v", testCase.config, decodeError)
 			}
 			testCase.assert(test, decoded)
 		})

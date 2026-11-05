@@ -57,11 +57,11 @@ func DefaultBooleanPropNamingOptions() BooleanPropNamingOptions {
 	}
 }
 
-// errBooleanPropNamingNeedsOptions is returned for an absent options object.
+// errorBooleanPropertyNamingNeedsOptions is returned for an absent options object.
 //
 // The text names the pattern because that is the key somebody has to write, and a configuration
 // error a reader cannot act on is barely better than silence.
-var errBooleanPropNamingNeedsOptions = errors.New(
+var errorBooleanPropertyNamingNeedsOptions = errors.New(
 	"needs an options object, because upstream reads its pattern from the options and is inert " +
 		"without one; write {\"rule\": \"" + DefaultBooleanPropNamingRulePattern + "\"} to get " +
 		"upstream's documented default")
@@ -80,7 +80,7 @@ func DecodeBooleanPropNamingOptions(raw []byte) (BooleanPropNamingOptions, error
 		// error on empty input for a rule that is not required, and propagates it for one that is.
 		// A decoder returning defaults here would make the flag inert, which an earlier draft did,
 		// and the rule then ran tree-wide on a bare `"error"` exactly as upstream does not.
-		return options, errBooleanPropNamingNeedsOptions
+		return options, errorBooleanPropertyNamingNeedsOptions
 	}
 
 	// Decoded into a wire struct with pointer-free fields, then defaulted, so an explicitly empty

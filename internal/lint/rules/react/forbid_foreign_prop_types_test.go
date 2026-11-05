@@ -44,9 +44,9 @@ func forbidForeignPropTypesOptions(test *testing.T, raw string) rule.Given[Forbi
 	if raw == "" {
 		return rule.Given[ForbidForeignPropTypesOptions]{}
 	}
-	decoded, err := rule.DecodeOptionsInto[ForbidForeignPropTypesOptions]()([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding %q: %v", raw, err)
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[ForbidForeignPropTypesOptions]()([]byte(raw))
+	if decodeOptionsError != nil {
+		test.Fatalf("decoding %q: %v", raw, decodeOptionsError)
 	}
 	return rule.Configured(decoded)
 }

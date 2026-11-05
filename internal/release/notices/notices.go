@@ -71,26 +71,31 @@ type Files map[string][]byte
 
 // Generate renders both files for the module at moduleDirectory.
 func Generate(moduleDirectory string) (Files, error) {
-	compiled, err := CompiledModules(moduleDirectory)
-	if err != nil {
-		return nil, err
+	compiled, compiledModulesError := CompiledModules(moduleDirectory)
+	if compiledModulesError != nil {
+		return nil, compiledModulesError
 	}
-	repositoryOnly, err := repositoryOnlyModules(moduleDirectory, compiled)
-	if err != nil {
-		return nil, err
+	repositoryOnly, repositoryOnlyModulesError := repositoryOnlyModules(moduleDirectory, compiled)
+	if repositoryOnlyModulesError != nil {
+		return nil, repositoryOnlyModulesError
 	}
-	swiftPins, err := readSwiftPins(moduleDirectory)
-	if err != nil {
-		return nil, err
+	swiftPins, readSwiftPinsError := readSwiftPins(moduleDirectory)
+	if readSwiftPinsError != nil {
+		return nil, readSwiftPinsError
 	}
 
-	notice, err := renderNotice(moduleDirectory)
-	if err != nil {
-		return nil, err
+	notice, renderNoticeError := renderNotice(moduleDirectory)
+	if renderNoticeError != nil {
+		return nil, renderNoticeError
 	}
-	thirdParty, err := renderThirdPartyNotices(moduleDirectory, compiled, repositoryOnly, swiftPins)
-	if err != nil {
-		return nil, err
+	thirdParty, renderThirdPartyNoticesError := renderThirdPartyNotices(
+		moduleDirectory,
+		compiled,
+		repositoryOnly,
+		swiftPins,
+	)
+	if renderThirdPartyNoticesError != nil {
+		return nil, renderThirdPartyNoticesError
 	}
 	return Files{NoticeFileName: notice, ThirdPartyNoticesFileName: thirdParty}, nil
 }

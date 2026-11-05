@@ -41,9 +41,9 @@ func TestClassLiteralSurfacesAreKeyedByTheMergedSettings(test *testing.T) {
 			if testCase.raw != "" {
 				raw = []byte(testCase.raw)
 			}
-			decoded, err := decode(raw, testCase.base)
-			if err != nil {
-				test.Fatalf("%s, %s: %v", ruleName, testCase.name, err)
+			decoded, decodeError := decode(raw, testCase.base)
+			if decodeError != nil {
+				test.Fatalf("%s, %s: %v", ruleName, testCase.name, decodeError)
 			}
 			if surfaces := surfacesOf(test, decoded); surfaces != testCase.want {
 				test.Errorf("%s, %s: decoded to surfaces of their own rather than the ones their settings "+
@@ -60,12 +60,12 @@ func TestClassLiteralSurfacesAreKeyedByTheMergedSettings(test *testing.T) {
 // file reads what its decoder compiled, configured or not. Building them on every ask cost an ahra
 // cold run 41 MB in 456K objects (#y2nj5ex).
 func TestClassLiteralSurfacesAreReadWithoutAllocating(test *testing.T) {
-	decoded, err := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(
+	decoded, decodeTailwindOptionsError := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(
 		[]byte(`{"attributes":["tw"]}`),
 		settingsBase(`{"callees":["merge"]}`),
 	)
-	if err != nil {
-		test.Fatal(err)
+	if decodeTailwindOptionsError != nil {
+		test.Fatal(decodeTailwindOptionsError)
 	}
 	// Handed and read as the rule's Run is handed and reads them.
 	options := rule.Configured(decoded)

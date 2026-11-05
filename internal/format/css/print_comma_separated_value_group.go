@@ -51,10 +51,10 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 		return groups[index]
 	}
 
-	for i := range groups {
-		iPrevNode := groupAt(i - 1)
-		iNode := groups[i]
-		iNextNode := groupAt(i + 1)
+	for index := range groups {
+		iPrevNode := groupAt(index - 1)
+		iNode := groups[index]
+		iNextNode := groupAt(index + 1)
 
 		// If the node is comment and last node print it in a line suffix
 		if isInlineValueCommentNode(iNode) && iNextNode == nil {
@@ -62,11 +62,11 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 			// This `lineSuffix` should be done in `value-comment` print
 			// But since we add `line` to groups in `value-paren_group`,
 			// The format result looks bad for now
-			appendToLast(doc.NewLineSuffix(doc.Concat{doc.Text(" "), printed[i]}))
+			appendToLast(doc.NewLineSuffix(doc.Concat{doc.Text(" "), printed[index]}))
 			continue
 		}
 
-		appendToLast(printed[i])
+		appendToLast(printed[index])
 
 		if insideURLFunction {
 			if (iNextNode != nil && isAdditionNode(iNextNode)) || isAdditionNode(iNode) {
@@ -269,12 +269,12 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 			continue
 		}
 
-		iNextNextNode := groupAt(i + 2)
+		iNextNextNode := groupAt(index + 2)
 
 		// Print spaces after `+` and `-` in color adjuster functions as is (e.g. `color(red l(+ 20%))`)
 		// Adjusters with signed numbers (e.g. `color(red l(+20%))`) output as-is.
 		isColorAdjusterNode := (isAdditionNode(iNode) || isSubtractionNode(iNode)) &&
-			i == 0 &&
+			index == 0 &&
 			(iNextNode.Type() == "value-number" || iNextNode.Truthy("isHex")) &&
 			parentParentNode != nil &&
 			isColorAdjusterFuncNode(parentParentNode) &&
@@ -423,7 +423,7 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 		if atRuleAncestorNode == nil &&
 			iNode.Type() == "value-comment" &&
 			!iNode.Truthy("inline") &&
-			everyNode(groups[:i], func(group *estree.Node) bool { return group.Type() == "value-comment" }) {
+			everyNode(groups[:index], func(group *estree.Node) bool { return group.Type() == "value-comment" }) {
 			parts = append(parts, doc.Dedent(doc.LineDoc), doc.Text(""))
 			continue
 		}

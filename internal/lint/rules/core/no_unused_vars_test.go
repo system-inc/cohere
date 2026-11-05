@@ -563,9 +563,11 @@ func TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern(test *testing.T) {
 			len(result.Diagnostics))
 	}
 	// The variables pattern does not reach a caught error.
-	varsOnly, err := DecodeNoUnusedVarsOptions(json.RawMessage(`{"varsIgnorePattern":"^_"}`))
-	if err != nil {
-		test.Fatalf("decoding failed: %v", err)
+	varsOnly, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(
+		json.RawMessage(`{"varsIgnorePattern":"^_"}`),
+	)
+	if decodeNoUnusedVariablesOptionsError != nil {
+		test.Fatalf("decoding failed: %v", decodeNoUnusedVariablesOptionsError)
 	}
 	if result := rule_testing.RunTypedWithOptions(
 		test,
@@ -577,9 +579,11 @@ func TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern(test *testing.T) {
 		test.Errorf("varsIgnorePattern does not cover a caught error; got %d", len(result.Diagnostics))
 	}
 	// And configuring its own pattern turns it off.
-	options, err := DecodeNoUnusedVarsOptions(json.RawMessage(`{"caughtErrorsIgnorePattern":"^_"}`))
-	if err != nil {
-		test.Fatalf("decoding failed: %v", err)
+	options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(
+		json.RawMessage(`{"caughtErrorsIgnorePattern":"^_"}`),
+	)
+	if decodeNoUnusedVariablesOptionsError != nil {
+		test.Fatalf("decoding failed: %v", decodeNoUnusedVariablesOptionsError)
 	}
 	if result := rule_testing.RunTypedWithOptions(
 		test,
@@ -939,9 +943,11 @@ func TestNoUnusedVarsIgnoreRestSiblings(test *testing.T) {
 func TestNoUnusedVarsAutofixRemovalWritesUpstreamsEdit(test *testing.T) {
 	test.Parallel()
 
-	options, err := DecodeNoUnusedVarsOptions(json.RawMessage(`{"enableAutofixRemoval": {"imports": true}}`))
-	if err != nil {
-		test.Fatal(err)
+	options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(
+		json.RawMessage(`{"enableAutofixRemoval": {"imports": true}}`),
+	)
+	if decodeNoUnusedVariablesOptionsError != nil {
+		test.Fatal(decodeNoUnusedVariablesOptionsError)
 	}
 	cases := []struct {
 		name   string
@@ -975,9 +981,9 @@ func TestNoUnusedVarsAutofixRemovalWritesUpstreamsEdit(test *testing.T) {
 	}
 
 	// The default proposes no fix, only the suggestion, so nothing is rewritten unattended.
-	defaults, err := DecodeNoUnusedVarsOptions(nil)
-	if err != nil {
-		test.Fatal(err)
+	defaults, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(nil)
+	if decodeNoUnusedVariablesOptionsError != nil {
+		test.Fatal(decodeNoUnusedVariablesOptionsError)
 	}
 	result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{
 		"file.ts": "import { Unused } from 'module';\nexport {};\n",

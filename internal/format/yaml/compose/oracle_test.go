@@ -176,20 +176,20 @@ func upstreamOutputs(test *testing.T, texts []string) []string {
 
 func runOracle(test *testing.T, script string, texts []string) []string {
 	test.Helper()
-	encoded, err := json.Marshal(texts)
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(texts)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	timeoutContext, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	command := exec.CommandContext(timeoutContext, "node", script)
 	command.Stdin = strings.NewReader(string(encoded))
-	output, err := command.Output()
-	if err != nil {
-		if exitError, isExit := err.(*exec.ExitError); isExit {
-			test.Fatalf("the composer oracle failed: %v\n%s", err, exitError.Stderr)
+	output, outputError := command.Output()
+	if outputError != nil {
+		if exitError, isExit := outputError.(*exec.ExitError); isExit {
+			test.Fatalf("the composer oracle failed: %v\n%s", outputError, exitError.Stderr)
 		}
-		test.Fatal(err)
+		test.Fatal(outputError)
 	}
 	var outputs []string
 	if decodeError := json.Unmarshal(output, &outputs); decodeError != nil {
@@ -304,23 +304,23 @@ func numberBits(value float64) string {
 }
 
 func (writer *jsonWriter) value(value any) {
-	switch v := value.(type) {
+	switch typed := value.(type) {
 	case nil:
 		writer.raw("null")
 	case string:
-		writer.text(v)
+		writer.text(typed)
 	case bool:
-		writer.raw(strconv.FormatBool(v))
+		writer.raw(strconv.FormatBool(typed))
 	case float64:
-		writer.raw(`{"number":` + numberBits(v) + `}`)
+		writer.raw(`{"number":` + numberBits(typed) + `}`)
 	case *MergeKey:
 		writer.raw(`{"symbol":"<<"}`)
 	case Date:
-		writer.raw(`{"date":` + numberBits(float64(v)) + `}`)
+		writer.raw(`{"date":` + numberBits(float64(typed)) + `}`)
 	case Binary:
-		writer.raw(fmt.Sprintf(`{"bytes":"%x"}`, []byte(v)))
+		writer.raw(fmt.Sprintf(`{"bytes":"%x"}`, []byte(typed)))
 	default:
-		writer.raw(fmt.Sprintf(`{"other":"%T"}`, v))
+		writer.raw(fmt.Sprintf(`{"other":"%T"}`, typed))
 	}
 }
 
@@ -484,8 +484,8 @@ func (writer *jsonWriter) document(document *Document) {
 	for handle := range directives.Tags {
 		handles = append(handles, handle)
 	}
-	slices.SortFunc(handles, func(a string, b string) int {
-		return slices.Compare(stringToUnits(a), stringToUnits(b))
+	slices.SortFunc(handles, func(left string, right string) int {
+		return slices.Compare(stringToUnits(left), stringToUnits(right))
 	})
 	writer.builder.WriteByte('[')
 	for index, handle := range handles {
@@ -636,9 +636,9 @@ func TestCorpusMatchesUpstream(test *testing.T) {
 		test.Skip("set COHERE_YAML_CORPUS to a directory to compare every .yaml and .yml file under it")
 	}
 	var paths, texts []string
-	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git") {
 			return filepath.SkipDir

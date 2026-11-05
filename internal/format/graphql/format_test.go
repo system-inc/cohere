@@ -182,9 +182,9 @@ func TestFormatMatchesTheFork(test *testing.T) {
 			test.Fatal(newPrettierError)
 		}
 		for _, testCase := range formatCases {
-			expected, err := oracle.Format("Probe.graphql", testCase.source)
-			if err != nil {
-				test.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, err)
+			expected, formatError := oracle.Format("Probe.graphql", testCase.source)
+			if formatError != nil {
+				test.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, formatError)
 			}
 			if expected == testCase.source {
 				test.Fatalf(
@@ -204,9 +204,9 @@ func TestFormatMatchesTheFork(test *testing.T) {
 					)
 				}
 			}
-			actual, err := Format(testCase.source, options)
-			if err != nil {
-				test.Errorf("%s (%s): %v", testCase.name, optionsName, err)
+			actual, formatError := Format(testCase.source, options)
+			if formatError != nil {
+				test.Errorf("%s (%s): %v", testCase.name, optionsName, formatError)
 				continue
 			}
 			if actual != expected {
@@ -229,9 +229,9 @@ func TestOptionSetsChangeTheOutput(test *testing.T) {
 		}
 		changed := false
 		for _, testCase := range formatCases {
-			withDefaults, defaultsErr := Format(testCase.source, formatoptions.Default())
-			withOptions, optionsErr := Format(testCase.source, options)
-			if defaultsErr == nil && optionsErr == nil && withDefaults != withOptions {
+			withDefaults, defaultsError := Format(testCase.source, formatoptions.Default())
+			withOptions, optionsError := Format(testCase.source, options)
+			if defaultsError == nil && optionsError == nil && withDefaults != withOptions {
 				changed = true
 				break
 			}
@@ -268,13 +268,13 @@ func TestPrintToDocIsFormatWithoutTheTrailingHardline(test *testing.T) {
 	test.Parallel()
 	options := formatoptions.Default()
 	for _, testCase := range formatCases {
-		formatted, err := Format(testCase.source, options)
-		if err != nil {
-			test.Fatalf("%s: %v", testCase.name, err)
+		formatted, formatError := Format(testCase.source, options)
+		if formatError != nil {
+			test.Fatalf("%s: %v", testCase.name, formatError)
 		}
-		document, err := PrintToDoc(testCase.source, options)
-		if err != nil {
-			test.Fatalf("%s: %v", testCase.name, err)
+		document, printToDocError := PrintToDoc(testCase.source, options)
+		if printToDocError != nil {
+			test.Fatalf("%s: %v", testCase.name, printToDocError)
 		}
 		printed := doc.Print(
 			document,

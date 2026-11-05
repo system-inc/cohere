@@ -42,9 +42,16 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 			location.Root, swiftProjectMarker)
 	}
 
-	arguments, mode, err := engineArguments(swiftLanguage, swiftFlags, location, given, flagValue, positionals)
-	if err != nil {
-		return 1, err
+	arguments, mode, engineArgumentsError := engineArguments(
+		swiftLanguage,
+		swiftFlags,
+		location,
+		given,
+		flagValue,
+		positionals,
+	)
+	if engineArgumentsError != nil {
+		return 1, engineArgumentsError
 	}
 
 	// Building the engine is a step the launcher's progress shows: in full under --verbose, otherwise one
@@ -53,10 +60,10 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 	streams.Show(streams.Output)
 	streams.Show(streams.Errors)
 	dispatch.Report.SetVerbose(given["verbose"] && flagValue("verbose") == "true")
-	binaryPath, sourceCommit, err := resolveSwiftEngineBinary(location, release.Current())
+	binaryPath, sourceCommit, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(location, release.Current())
 	dispatch.Report.Clear()
-	if err != nil {
-		return 1, err
+	if resolveSwiftEngineBinaryError != nil {
+		return 1, resolveSwiftEngineBinaryError
 	}
 
 	run := newEngineRun(streams.Output, mode, swiftLanguage, location.rootNote(), processStart)
@@ -134,22 +141,22 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 		return binaryPath, "", shippedSwiftEngineError
 	}
 
-	moduleDirectory, err := dispatch.FindModuleDirectory()
-	if err != nil {
+	moduleDirectory, findModuleDirectoryError := dispatch.FindModuleDirectory()
+	if findModuleDirectoryError != nil {
 		return "", "", fmt.Errorf(
 			"%s is a Swift package, and the Swift engine is built from a cohere checkout: %w",
 			location.Root,
-			err,
+			findModuleDirectoryError,
 		)
 	}
 	commit := committedSwiftSource(provenance)
-	binaryPath, _, err := dispatch.ResolveSwiftEngine(
+	binaryPath, _, resolveSwiftEngineError := dispatch.ResolveSwiftEngine(
 		dispatch.DefaultPaths(moduleDirectory),
 		commit,
 		engineContractVersion,
 	)
-	if err != nil {
-		return "", "", err
+	if resolveSwiftEngineError != nil {
+		return "", "", resolveSwiftEngineError
 	}
 	return binaryPath, commit, nil
 }

@@ -169,8 +169,8 @@ func TestScopeStructureAgainstUpstreamGuards(test *testing.T) {
 			flowExcluded++
 			continue
 		}
-		body, readErr := os.ReadFile(fixture.ExpectPath)
-		if readErr != nil {
+		body, readError := os.ReadFile(fixture.ExpectPath)
+		if readError != nil {
 			continue
 		}
 		text := string(body)
@@ -399,8 +399,8 @@ func TestScopeStructureAgainstUpstreamGuards(test *testing.T) {
 	}
 
 	if dump := os.Getenv("SCOPE_ORACLE_DUMP"); dump != "" {
-		if writeErr := os.WriteFile(dump, []byte(strings.Join(lines, "\n")+"\n"), 0o644); writeErr != nil {
-			test.Errorf("writing the per-fixture dump to %s: %v", dump, writeErr)
+		if writeError := os.WriteFile(dump, []byte(strings.Join(lines, "\n")+"\n"), 0o644); writeError != nil {
+			test.Errorf("writing the per-fixture dump to %s: %v", dump, writeError)
 		}
 	}
 }

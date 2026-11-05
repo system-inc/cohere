@@ -392,9 +392,9 @@ type tripleSlashReferenceRawOptions struct {
 // user here, so the default is used and the rule keeps its documented behavior instead of going
 // quiet on a typo.
 func DecodeTripleSlashReferenceOptions(raw []byte) (TripleSlashReferenceOptions, error) {
-	decoded, err := rule.DecodeOptionsInto[tripleSlashReferenceRawOptions]()(raw)
-	if err != nil {
-		return DefaultTripleSlashReferenceOptions(), err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[tripleSlashReferenceRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultTripleSlashReferenceOptions(), decodeOptionsError
 	}
 
 	options := DefaultTripleSlashReferenceOptions()

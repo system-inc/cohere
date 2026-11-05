@@ -33,18 +33,18 @@ var cycleProject = map[string]string{
 // buildProject writes files to a directory of its own and builds cohere's program over it.
 func buildProject(test *testing.T, files map[string]string) *program.Graph {
 	test.Helper()
-	directory, err := filepath.EvalSymlinks(test.TempDir())
-	if err != nil {
-		test.Fatal(err)
+	directory, resolveSymlinksError := filepath.EvalSymlinks(test.TempDir())
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
 	}
 	for name, contents := range files {
 		if writeError := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); writeError != nil {
 			test.Fatal(writeError)
 		}
 	}
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 	return graph
 }
@@ -58,9 +58,9 @@ func walkAndRun(
 ) (walked []rule_runner.Finding, ran []rule_runner.Finding) {
 	test.Helper()
 	graph := buildProject(test, files)
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, subject))
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, subject))
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 	for _, diagnostic := range result.Diagnostics {
 		fileName, line, column := diagnostic.Location()
@@ -73,10 +73,10 @@ func walkAndRun(
 		})
 	}
 	typeChecker, done := graph.Program.GetTypeChecker(context.Background())
-	ran, err = rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), subject.Name)
+	ran, runRuleError := rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), subject.Name)
 	done()
-	if err != nil {
-		test.Fatalf("running: %v", err)
+	if runRuleError != nil {
+		test.Fatalf("running: %v", runRuleError)
 	}
 	byPlace := func(left rule_runner.Finding, right rule_runner.Finding) int {
 		if left.File != right.File {

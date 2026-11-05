@@ -25,13 +25,13 @@ func TestRunOutputReadsRealRuns(test *testing.T) {
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			output, err := os.ReadFile(filepath.Join("testdata", "run-output", name))
-			if err != nil {
-				test.Fatal(err)
+			output, readError := os.ReadFile(filepath.Join("testdata", "run-output", name))
+			if readError != nil {
+				test.Fatal(readError)
 			}
-			run, err := ParseRunOutput(output)
-			if err != nil {
-				test.Fatal(err)
+			run, parseRunOutputError := ParseRunOutput(output)
+			if parseRunOutputError != nil {
+				test.Fatal(parseRunOutputError)
 			}
 			if run.EngineSeconds <= 0 {
 				test.Errorf("engine seconds read %g", run.EngineSeconds)

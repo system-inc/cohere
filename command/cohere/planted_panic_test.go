@@ -112,7 +112,9 @@ func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(test *testing.T) {
 				test.Errorf("%s: the crash line lacks %q:\n%s", pass, want, crashLines[0])
 			}
 		}
-		if footer := lines[len(lines)-1]; !strings.HasPrefix(footer, "✗ ☠️ ") || !strings.Contains(footer, "1 rule crash") {
+		if footer := lines[len(
+			lines,
+		)-1]; !strings.HasPrefix(footer, "✗ ☠️ ") || !strings.Contains(footer, "1 rule crash") {
 			test.Errorf(
 				"%s: the footer of a run that lost a verdict to a crash is %q, want a failing verdict that names the crash",
 				pass,
@@ -180,7 +182,12 @@ func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(test *testing.T) {
 			}
 		}
 		if crashes != 1 || summaries != 1 {
-			test.Errorf("--json printed %d crash records and %d summaries, want 1 of each:\n%s", crashes, summaries, output)
+			test.Errorf(
+				"--json printed %d crash records and %d summaries, want 1 of each:\n%s",
+				crashes,
+				summaries,
+				output,
+			)
 		}
 	}
 }

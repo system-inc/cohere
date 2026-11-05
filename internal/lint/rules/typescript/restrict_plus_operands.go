@@ -386,8 +386,8 @@ func restrictPlusOperandsStringLike(settings restrictPlusOperandsSettings) strin
 // Every flag test in the rule body except the early exit goes through here, including the ones
 // upstream spells with an `isTypeFlagSet` imported from its `../util`, because that import is
 // union-aware too. See the note on the rule about why the source reads as though it is not.
-func restrictPlusOperandsIsTypeFlagSetInUnion(t *checker.Type, flags checker.TypeFlags) bool {
-	for part := range type_checking.UnionTypePartsSeq(t) {
+func restrictPlusOperandsIsTypeFlagSetInUnion(subjectType *checker.Type, flags checker.TypeFlags) bool {
+	for part := range type_checking.UnionTypePartsSeq(subjectType) {
 		if type_checking.IsTypeFlagSet(part, flags) {
 			return true
 		}
@@ -400,10 +400,10 @@ func restrictPlusOperandsIsTypeFlagSetInUnion(t *checker.Type, flags checker.Typ
 // An intersection is walked as an intersection and everything else as a union, which is upstream's
 // own spelling. The distinction matters because `string & {}` is an intersection whose members are
 // not all objects, so it is not reported, while `{} & {}` is.
-func restrictPlusOperandsIsDeeplyObjectType(t *checker.Type) bool {
-	parts := type_checking.UnionTypeParts(t)
-	if type_checking.IsIntersectionType(t) {
-		parts = type_checking.IntersectionTypeParts(t)
+func restrictPlusOperandsIsDeeplyObjectType(subjectType *checker.Type) bool {
+	parts := type_checking.UnionTypeParts(subjectType)
+	if type_checking.IsIntersectionType(subjectType) {
+		parts = type_checking.IntersectionTypeParts(subjectType)
 	}
 	if len(parts) == 0 {
 		return false

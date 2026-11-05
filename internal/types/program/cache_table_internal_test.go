@@ -223,10 +223,10 @@ func TestAFileFromAnotherCohereCommitIsDiscardedAlone(test *testing.T) {
 	writeRaw(test, directory, cacheTableFile(cacheTableFormatSection),
 		encodeRaw(test, otherHeader(cacheTableFormatSection), &FormatSection{Key: "formatter"}))
 
-	table, err := ReadCacheTable(directory, internalTestIdentity, EveryCacheTableSection, PathAnchor{})
-	if !errors.Is(err, ErrCacheTablePartlyKept) ||
-		!strings.Contains(err.Error(), cacheTableFile(cacheTableSignaturesSection)) {
-		test.Fatalf("the planted file was not reported as another commit's: %v", err)
+	table, readCacheTableError := ReadCacheTable(directory, internalTestIdentity, EveryCacheTableSection, PathAnchor{})
+	if !errors.Is(readCacheTableError, ErrCacheTablePartlyKept) ||
+		!strings.Contains(readCacheTableError.Error(), cacheTableFile(cacheTableSignaturesSection)) {
+		test.Fatalf("the planted file was not reported as another commit's: %v", readCacheTableError)
 	}
 	if table.Signatures != nil {
 		test.Error("another commit's signatures were used")
@@ -250,14 +250,14 @@ func TestAFileFromAnotherCohereCommitIsDiscardedAlone(test *testing.T) {
 	); renameError != nil {
 		test.Fatal(renameError)
 	}
-	table, err = ReadCacheTable(
+	table, readCacheTableError = ReadCacheTable(
 		directory,
 		internalTestIdentity,
 		CacheTableSections{Runs: []string{"--fix"}},
 		PathAnchor{},
 	)
-	if !errors.Is(err, ErrCacheTableUnreadable) || table.Runs["--fix"] != nil {
-		test.Fatalf("a run recorded for the bare invocation answered for --fix: %v", err)
+	if !errors.Is(readCacheTableError, ErrCacheTableUnreadable) || table.Runs["--fix"] != nil {
+		test.Fatalf("a run recorded for the bare invocation answered for --fix: %v", readCacheTableError)
 	}
 }
 

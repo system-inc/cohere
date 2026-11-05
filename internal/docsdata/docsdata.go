@@ -107,54 +107,54 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 		files[ExamplePath(name)] = encoded
 	}
 
-	sets, err := buildSets(inputs)
-	if err != nil {
-		return nil, err
+	sets, buildSetsError := buildSets(inputs)
+	if buildSetsError != nil {
+		return nil, buildSetsError
 	}
-	encodedSets, err := encode(sets)
-	if err != nil {
-		return nil, err
+	encodedSets, encodeError := encode(sets)
+	if encodeError != nil {
+		return nil, encodeError
 	}
 	files[SetsPath] = encodedSets
 
-	rules, err := buildRules(inputs, sets)
-	if err != nil {
-		return nil, err
+	rules, buildRulesError := buildRules(inputs, sets)
+	if buildRulesError != nil {
+		return nil, buildRulesError
 	}
-	encodedRules, err := encode(rules)
-	if err != nil {
-		return nil, err
+	encodedRules, encodeError := encode(rules)
+	if encodeError != nil {
+		return nil, encodeError
 	}
 	files[RulesPath] = encodedRules
 
-	changelog, err := parseChangelog(inputs.Changelog)
-	if err != nil {
-		return nil, err
+	changelog, parseChangelogError := parseChangelog(inputs.Changelog)
+	if parseChangelogError != nil {
+		return nil, parseChangelogError
 	}
-	encodedChangelog, err := encode(changelog)
-	if err != nil {
-		return nil, err
+	encodedChangelog, encodeError := encode(changelog)
+	if encodeError != nil {
+		return nil, encodeError
 	}
 	files[ChangelogPath] = encodedChangelog
 
-	benchmarks, err := buildBenchmarks(inputs.Benchmarks)
-	if err != nil {
-		return nil, err
+	benchmarks, buildBenchmarksError := buildBenchmarks(inputs.Benchmarks)
+	if buildBenchmarksError != nil {
+		return nil, buildBenchmarksError
 	}
-	encodedBenchmarks, err := encode(benchmarks)
-	if err != nil {
-		return nil, err
+	encodedBenchmarks, encodeError := encode(benchmarks)
+	if encodeError != nil {
+		return nil, encodeError
 	}
 	files[BenchmarksPath] = encodedBenchmarks
 
 	if inputs.Help != nil {
-		cli, err := parseCli(inputs.Help, inputs.VerbHelp)
-		if err != nil {
-			return nil, err
+		cli, parseCommandLineInterfaceError := parseCli(inputs.Help, inputs.VerbHelp)
+		if parseCommandLineInterfaceError != nil {
+			return nil, parseCommandLineInterfaceError
 		}
-		encodedCommandLineInterface, err := encode(cli)
-		if err != nil {
-			return nil, err
+		encodedCommandLineInterface, encodeError := encode(cli)
+		if encodeError != nil {
+			return nil, encodeError
 		}
 		files[CliPath] = encodedCommandLineInterface
 	}
@@ -202,16 +202,16 @@ func Stale(root string, files map[string][]byte) ([]string, error) {
 func OrphanedExamples(root string, files map[string][]byte) ([]string, error) {
 	var orphans []string
 	directory := filepath.Join(root, ExamplesDirectory)
-	walkError := filepath.WalkDir(directory, func(path string, entry os.DirEntry, err error) error {
-		if os.IsNotExist(err) && path == directory {
+	walkError := filepath.WalkDir(directory, func(path string, entry os.DirEntry, pathError error) error {
+		if os.IsNotExist(pathError) && path == directory {
 			return filepath.SkipDir
 		}
-		if err != nil || entry.IsDir() {
-			return err
+		if pathError != nil || entry.IsDir() {
+			return pathError
 		}
-		relative, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
+		relative, relativePathError := filepath.Rel(root, path)
+		if relativePathError != nil {
+			return relativePathError
 		}
 		relative = filepath.ToSlash(relative)
 		if _, produced := files[relative]; !produced {

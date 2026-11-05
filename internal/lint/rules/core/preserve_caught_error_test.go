@@ -135,9 +135,11 @@ func TestPreserveCaughtErrorDecodesErrorClassNames(test *testing.T) {
 
 	decode := rule.DecodeOptionsInto[PreserveCaughtErrorOptions]()
 
-	decoded, err := decode([]byte(`{"errorClassNames": ["AppError", {"name": "WideError", "argumentPosition": 3}]}`))
-	if err != nil {
-		test.Fatalf("decoding both spellings failed: %v", err)
+	decoded, decodeError := decode(
+		[]byte(`{"errorClassNames": ["AppError", {"name": "WideError", "argumentPosition": 3}]}`),
+	)
+	if decodeError != nil {
+		test.Fatalf("decoding both spellings failed: %v", decodeError)
 	}
 	want := []PreserveCaughtErrorClassName{
 		{Name: "AppError", ArgumentPosition: 2},
@@ -151,11 +153,11 @@ func TestPreserveCaughtErrorDecodesErrorClassNames(test *testing.T) {
 
 	// The same name twice takes the later position, as ESLint's Map does. Position 3 reads the third
 	// argument, so the object in second place is not the options and the throw has none.
-	twice, err := decode([]byte(
+	twice, decodeError := decode([]byte(
 		`{"errorClassNames": [{"name": "AppError", "argumentPosition": 2}, {"name": "AppError", "argumentPosition": 3}]}`,
 	))
-	if err != nil {
-		test.Fatalf("decoding a repeated name failed: %v", err)
+	if decodeError != nil {
+		test.Fatalf("decoding a repeated name failed: %v", decodeError)
 	}
 	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, PreserveCaughtError, "input.ts",
 		`try { a(); } catch (err) { throw new AppError("m", { cause: err }); }`, twice), "missingCause")
@@ -169,7 +171,7 @@ func TestPreserveCaughtErrorDecodesErrorClassNames(test *testing.T) {
 		`{"errorClassNames": [7]}`,
 	}
 	for _, configuration := range refused {
-		if _, err := decode([]byte(configuration)); err == nil {
+		if _, decodeError := decode([]byte(configuration)); decodeError == nil {
 			test.Errorf("ESLint's schema refuses %s, and the decoder accepted it", configuration)
 		}
 	}
@@ -188,18 +190,18 @@ func TestPreserveCaughtErrorRequireCatchParameterDefaultsOff(test *testing.T) {
 		rule_testing.RunTyped(test, PreserveCaughtError, "input.ts", bareCatch),
 	)
 
-	explicitFalse, err := decode([]byte(`{"requireCatchParameter": false}`))
-	if err != nil {
-		test.Fatalf("decoding an explicit false failed: %v", err)
+	explicitFalse, decodeError := decode([]byte(`{"requireCatchParameter": false}`))
+	if decodeError != nil {
+		test.Fatalf("decoding an explicit false failed: %v", decodeError)
 	}
 	rule_testing.ExpectClean(
 		test,
 		rule_testing.RunTypedWithOptions(test, PreserveCaughtError, "input.ts", bareCatch, explicitFalse),
 	)
 
-	explicitTrue, err := decode([]byte(`{"requireCatchParameter": true}`))
-	if err != nil {
-		test.Fatalf("decoding an explicit true failed: %v", err)
+	explicitTrue, decodeError := decode([]byte(`{"requireCatchParameter": true}`))
+	if decodeError != nil {
+		test.Fatalf("decoding an explicit true failed: %v", decodeError)
 	}
 	rule_testing.ExpectFindings(
 		test,

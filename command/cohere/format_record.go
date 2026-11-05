@@ -167,16 +167,16 @@ func (record *formatRecord) formatted(fileName string, optionsFor func(fileName 
 	if !present {
 		return false
 	}
-	options, err := optionsFor(fileName)
-	if err != nil || options != entry.Options {
+	options, optionsForError := optionsFor(fileName)
+	if optionsForError != nil || options != entry.Options {
 		return false
 	}
 
 	// Stat before reading. A write after the stat moves the modification time past the one about to be
 	// recorded, so the next run sees a mismatch and reads again; the other order could record a
 	// signature taken after bytes it never read.
-	information, err := os.Stat(fileName)
-	if err != nil || !information.Mode().IsRegular() {
+	information, statError := os.Stat(fileName)
+	if statError != nil || !information.Mode().IsRegular() {
 		return false
 	}
 	if entry.ModifiedNanoseconds != 0 &&
@@ -184,8 +184,8 @@ func (record *formatRecord) formatted(fileName string, optionsFor func(fileName 
 		return true
 	}
 
-	contents, err := os.ReadFile(fileName)
-	if err != nil || formatRecordSum(contents) != entry.Sum {
+	contents, readError := os.ReadFile(fileName)
+	if readError != nil || formatRecordSum(contents) != entry.Sum {
 		return false
 	}
 
@@ -216,8 +216,8 @@ func (record *formatRecord) vouches(
 	if !present {
 		return false
 	}
-	options, err := optionsFor(fileName)
-	return err == nil && options == entry.Options && formatRecordSum([]byte(text)) == entry.Sum
+	options, optionsForError := optionsFor(fileName)
+	return optionsForError == nil && options == entry.Options && formatRecordSum([]byte(text)) == entry.Sum
 }
 
 // observe wraps a format transform so every text it returns is recorded as formatted. A nil record or
@@ -230,9 +230,9 @@ func (record *formatRecord) observe(
 		return inner
 	}
 	return func(fileName string, text string, parsed *ast.SourceFile) (string, error) {
-		formatted, err := inner(fileName, text, parsed)
-		if err != nil {
-			return formatted, err
+		formatted, innerError := inner(fileName, text, parsed)
+		if innerError != nil {
+			return formatted, innerError
 		}
 		if options, optionsError := optionsFor(fileName); optionsError == nil {
 			entry := program.FormatEntry{Sum: formatRecordSum([]byte(formatted)), Options: options}
@@ -417,8 +417,8 @@ func declaredSubmodules(directory string) (map[string]struct{}, error) {
 		}
 		declared[strings.TrimSuffix(value, "/")] = struct{}{}
 	}
-	if err := lines.Err(); err != nil {
-		return nil, fmt.Errorf("reading the submodules %s declares: %w", directory, err)
+	if scanError := lines.Err(); scanError != nil {
+		return nil, fmt.Errorf("reading the submodules %s declares: %w", directory, scanError)
 	}
 	return declared, nil
 }

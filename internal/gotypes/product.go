@@ -101,13 +101,13 @@ type productState struct {
 }
 
 func (product Product) state() (*productState, error) {
-	root, sourceModule, err := moduleAt(product.Directory)
-	if err != nil {
-		return nil, err
+	root, sourceModule, moduleAtError := moduleAt(product.Directory)
+	if moduleAtError != nil {
+		return nil, moduleAtError
 	}
-	listed, err := list(product.Directory, product.Environment, product.Patterns)
-	if err != nil {
-		return nil, err
+	listed, listError := list(product.Directory, product.Environment, product.Patterns)
+	if listError != nil {
+		return nil, listError
 	}
 	for _, listedPackage := range listed.packages {
 		if listedPackage.Error != nil {
@@ -119,18 +119,18 @@ func (product Product) state() (*productState, error) {
 			)
 		}
 	}
-	environment, err := goEnvironmentValues(product.Directory, product.Environment)
-	if err != nil {
-		return nil, err
+	environment, goEnvironmentValuesError := goEnvironmentValues(product.Directory, product.Environment)
+	if goEnvironmentValuesError != nil {
+		return nil, goEnvironmentValuesError
 	}
 	exported := exportSet(listed, sourceModule)
-	key, description, err := productKey(product, root, environment, listed, exported)
-	if err != nil {
-		return nil, err
+	key, description, productKeyError := productKey(product, root, environment, listed, exported)
+	if productKeyError != nil {
+		return nil, productKeyError
 	}
-	cache, err := cacheDirectory()
-	if err != nil {
-		return nil, err
+	cache, cacheDirectoryError := cacheDirectory()
+	if cacheDirectoryError != nil {
+		return nil, cacheDirectoryError
 	}
 	return &productState{key: key, description: description, cache: cache, listed: listed, exported: exported}, nil
 }
@@ -223,27 +223,27 @@ func productKey(
 				origin = module.Path + " " + modulePath + "@" + version
 				field(packageHash, "module", origin)
 			} else {
-				moduleDirectory, err := relative(directory)
-				if err != nil {
-					return "", "", fmt.Errorf("%s: %w", path, err)
+				moduleDirectory, relativeError := relative(directory)
+				if relativeError != nil {
+					return "", "", fmt.Errorf("%s: %w", path, relativeError)
 				}
 				origin = module.Path + " " + moduleDirectory
 				field(packageHash, "module", origin)
 				goMod := filepath.Join(directory, "go.mod")
-				sum, err := contentHash(goMod)
-				if err != nil {
-					return "", "", err
+				sum, contentHashError := contentHash(goMod)
+				if contentHashError != nil {
+					return "", "", contentHashError
 				}
 				field(packageHash, "go.mod", sum)
 				for _, name := range append(append([]string{}, listedPackage.GoFiles...), listedPackage.CgoFiles...) {
 					file := filepath.Join(listedPackage.Dir, name)
-					within, err := relative(file)
-					if err != nil {
-						return "", "", fmt.Errorf("%s: %w", path, err)
+					within, relativeError := relative(file)
+					if relativeError != nil {
+						return "", "", fmt.Errorf("%s: %w", path, relativeError)
 					}
-					sum, err := contentHash(file)
-					if err != nil {
-						return "", "", err
+					sum, contentHashError := contentHash(file)
+					if contentHashError != nil {
+						return "", "", contentHashError
 					}
 					field(packageHash, "file", within+" "+sum)
 				}
@@ -274,12 +274,12 @@ func cacheDirectory() (string, error) {
 // under another key and the first fact the two keyed differently.
 func (product Product) Find() (*Exports, error) {
 	started := time.Now()
-	state, err := product.state()
-	if err != nil {
-		return nil, err
+	state, stateError := product.state()
+	if stateError != nil {
+		return nil, stateError
 	}
-	exports, err := open(product, state)
-	if errors.Is(err, fs.ErrNotExist) {
+	exports, openError := open(product, state)
+	if errors.Is(openError, fs.ErrNotExist) {
 		// The description's first lines say what was keyed; one line per package follows, which otherKeys
 		// compares against any product of this name the cache does hold.
 		lines := strings.SplitAfterN(state.description, "\n", 4)
@@ -298,8 +298,8 @@ func (product Product) Find() (*Exports, error) {
 			strings.Join(lines[:min(3, len(lines))], ""),
 		)
 	}
-	if err != nil {
-		return nil, err
+	if openError != nil {
+		return nil, openError
 	}
 	record(product, state.key, "hit", started)
 	return exports, nil
@@ -390,9 +390,9 @@ func open(product Product, state *productState) (*Exports, error) {
 // replaces it, the uncached proof mode adamic's buildcache has.
 func (product Product) Build() (*Exports, error) {
 	started := time.Now()
-	state, err := product.state()
-	if err != nil {
-		return nil, err
+	state, stateError := product.state()
+	if stateError != nil {
+		return nil, stateError
 	}
 	uncached := os.Getenv("ADAMIC_BUILD_CACHE") == "off"
 	if !uncached {
@@ -401,9 +401,9 @@ func (product Product) Build() (*Exports, error) {
 			return exports, nil
 		}
 	}
-	scratch, err := os.MkdirTemp(state.cache, ".building-"+state.key[:12]+"-")
-	if err != nil {
-		return nil, err
+	scratch, temporaryDirectoryError := os.MkdirTemp(state.cache, ".building-"+state.key[:12]+"-")
+	if temporaryDirectoryError != nil {
+		return nil, temporaryDirectoryError
 	}
 	// Ignored: a scratch directory left behind is only space in the cache, under a name no key reads, and the
 	// build's outcome stands either way.
@@ -435,9 +435,9 @@ func (product Product) Build() (*Exports, error) {
 			return nil, renameError
 		}
 	}
-	exports, err := open(product, state)
-	if err != nil {
-		return nil, err
+	exports, openError := open(product, state)
+	if openError != nil {
+		return nil, openError
 	}
 	record(product, state.key, "miss", started)
 	return exports, nil
@@ -469,13 +469,13 @@ func (product Product) compile(state *productState, directory string) error {
 	sort.Strings(patterns)
 	// -trimpath, so the export data's positions name no checkout path and the product's bytes are the same
 	// from any checkout.
-	output, err := goCommand(
+	output, goCommandError := goCommand(
 		product.Directory,
 		product.Environment,
 		append([]string{"list", "-export", "-trimpath", "-deps", "-json=ImportPath,Export,Error"}, patterns...)...,
 	)
-	if err != nil {
-		return fmt.Errorf("building the %s product: %w", product.Name, err)
+	if goCommandError != nil {
+		return fmt.Errorf("building the %s product: %w", product.Name, goCommandError)
 	}
 	exportFiles := map[string]string{}
 	decoder := json.NewDecoder(bytes.NewReader(output))
@@ -540,9 +540,9 @@ func (product Product) compile(state *productState, directory string) error {
 		}
 		written.Packages[path] = name
 	}
-	encoded, err := json.MarshalIndent(written, "", "\t")
-	if err != nil {
-		return err
+	encoded, encodeError := json.MarshalIndent(written, "", "\t")
+	if encodeError != nil {
+		return encodeError
 	}
 	return os.WriteFile(filepath.Join(directory, manifestName), append(encoded, '\n'), 0o644)
 }

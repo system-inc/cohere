@@ -640,12 +640,12 @@ func DecodeArrayTypeOptions(raw []byte) (ArrayTypeOptions, error) {
 	if trimmed == "" || trimmed == "null" {
 		return DefaultArrayTypeOptions(), nil
 	}
-	decoded, err := rule.DecodeOptionsInto[arrayTypeRawOptions]()(raw)
-	if err != nil {
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[arrayTypeRawOptions]()(raw)
+	if decodeOptionsError != nil {
 		return DefaultArrayTypeOptions(), fmt.Errorf(
 			"expected an object of default and readonly, got %s: %w",
 			trimmed,
-			err,
+			decodeOptionsError,
 		)
 	}
 

@@ -58,11 +58,11 @@ func lowerTypedForSSA(test *testing.T, code string) *Function {
 func cohereEverywhere(test *testing.T, function *Function) {
 	test.Helper()
 	var each func(*Function)
-	each = func(f *Function) {
-		for _, violation := range VerifySSA(f) {
+	each = func(function *Function) {
+		for _, violation := range VerifySSA(function) {
 			test.Errorf("SSA violation: %s", violation.Detail)
 		}
-		for _, nested := range f.Functions {
+		for _, nested := range function.Functions {
 			each(nested)
 		}
 	}
@@ -80,8 +80,8 @@ func TestSSAMatchesReactSpecFixtures(test *testing.T) {
 		fn := lowerTypedForSSA(test, source)
 		Construct(fn)
 		test.Logf("SRC %s\n%s", source, Print(fn))
-		if v := VerifySSA(fn); len(v) > 0 {
-			for _, one := range v {
+		if violations := VerifySSA(fn); len(violations) > 0 {
+			for _, one := range violations {
 				test.Errorf("VIOLATION: %s", one)
 			}
 		}
@@ -101,8 +101,8 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 			"export function f(){ let y = 2; if (y > 1) { y = 1; } else { y = 2; } let x = y; return x; }\n",
 		)
 		Construct(fn)
-		if v := VerifySSA(fn); len(v) != 0 {
-			test.Fatalf("baseline should be clean, got %v", v)
+		if violations := VerifySSA(fn); len(violations) != 0 {
+			test.Fatalf("baseline should be clean, got %v", violations)
 		}
 		return fn
 	}
@@ -114,15 +114,15 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 		var moved *Phi
 		var from *BasicBlock
 		var to *BasicBlock
-		for _, b := range fn.Blocks {
-			if len(b.Phis) > 0 {
-				moved, from = b.Phis[0], b
+		for _, block := range fn.Blocks {
+			if len(block.Phis) > 0 {
+				moved, from = block.Phis[0], block
 				break
 			}
 		}
-		for _, b := range fn.Blocks {
-			if b.Id != from.Id && len(b.Predecessors) == 1 {
-				to = b
+		for _, block := range fn.Blocks {
+			if block.Id != from.Id && len(block.Predecessors) == 1 {
+				to = block
 				break
 			}
 		}
@@ -131,11 +131,11 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 		}
 		from.Phis = nil
 		to.Phis = append(to.Phis, moved)
-		v := VerifySSA(fn)
-		if len(v) == 0 {
+		violations := VerifySSA(fn)
+		if len(violations) == 0 {
 			test.Fatal("moving a phi off its join was NOT detected")
 		}
-		test.Logf("detected: %v", v)
+		test.Logf("detected: %v", violations)
 	})
 
 	// 2. Point a use at a value defined on a sibling branch.
@@ -143,9 +143,9 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 		test.Parallel()
 		fn := build()
 		var join *BasicBlock
-		for _, b := range fn.Blocks {
-			if len(b.Phis) > 0 {
-				join = b
+		for _, block := range fn.Blocks {
+			if len(block.Phis) > 0 {
+				join = block
 				break
 			}
 		}
@@ -156,9 +156,9 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 		operand := join.Phis[0].Operands.At(PhiOperandsInOrder(join.Phis[0])[0])
 		done := false
 		for _, id := range join.Instructions {
-			EachInstructionPlacePointer(fn.Instructions[id], func(p *Place, role PlaceRole) {
+			EachInstructionPlacePointer(fn.Instructions[id], func(place *Place, role PlaceRole) {
 				if role != PlaceRoleDefine && !done {
-					p.Identifier = operand.Identifier
+					place.Identifier = operand.Identifier
 					done = true
 				}
 			})
@@ -166,11 +166,11 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 				break
 			}
 		}
-		v := VerifySSA(fn)
-		if len(v) == 0 {
+		violations := VerifySSA(fn)
+		if len(violations) == 0 {
 			test.Fatal("a use reading a non-dominating sibling definition was NOT detected")
 		}
-		test.Logf("detected: %v", v)
+		test.Logf("detected: %v", violations)
 	})
 
 	// 3. Define one value twice.
@@ -179,8 +179,8 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 		fn := build()
 		var first *Instruction
 		var second *Instruction
-		for _, b := range fn.Blocks {
-			for _, id := range b.Instructions {
+		for _, block := range fn.Blocks {
+			for _, id := range block.Instructions {
 				ins := fn.Instructions[id]
 				if first == nil {
 					first = ins
@@ -193,11 +193,11 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 			test.Skip("too few instructions")
 		}
 		second.LValue.Identifier = first.LValue.Identifier
-		v := VerifySSA(fn)
-		if len(v) == 0 {
+		violations := VerifySSA(fn)
+		if len(violations) == 0 {
 			test.Fatal("a doubly-defined value was NOT detected")
 		}
-		test.Logf("detected: %v", v)
+		test.Logf("detected: %v", violations)
 	})
 
 	// 4. Read a value before it is defined within one block. Rather than hunting for an existing
@@ -213,11 +213,11 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 		last := fn.Instructions[entry.Instructions[len(entry.Instructions)-1]]
 		first := fn.Instructions[entry.Instructions[0]]
 		first.Value = &LoadLocal{Place: Place{Identifier: last.LValue.Identifier}}
-		v := VerifySSA(fn)
-		if len(v) == 0 {
+		violations := VerifySSA(fn)
+		if len(violations) == 0 {
 			test.Fatal("a use before its definition was NOT detected")
 		}
-		test.Logf("detected: %v", v)
+		test.Logf("detected: %v", violations)
 	})
 }
 
@@ -279,8 +279,8 @@ func TestSSAAcrossEveryControlFlowConstruct(test *testing.T) {
 			Construct(fn)
 			var each func(*Function)
 			each = func(f *Function) {
-				for _, v := range VerifySSA(f) {
-					test.Errorf("violation: %s", v.Detail)
+				for _, violation := range VerifySSA(f) {
+					test.Errorf("violation: %s", violation.Detail)
 				}
 				for _, n := range f.Functions {
 					each(n)
@@ -366,17 +366,17 @@ func TestMutatingVisitorCoversEveryValue(test *testing.T) {
 			id   static_single_assignment.IdentifierId
 			role PlaceRole
 		}
-		EachPlace(value, func(p Place, role PlaceRole) {
+		EachPlace(value, func(place Place, role PlaceRole) {
 			byValue = append(byValue, struct {
 				id   static_single_assignment.IdentifierId
 				role PlaceRole
-			}{p.Identifier, role})
+			}{place.Identifier, role})
 		})
-		EachPlacePointer(value, func(p *Place, role PlaceRole) {
+		EachPlacePointer(value, func(place *Place, role PlaceRole) {
 			byPointer = append(byPointer, struct {
 				id   static_single_assignment.IdentifierId
 				role PlaceRole
-			}{p.Identifier, role})
+			}{place.Identifier, role})
 		})
 		if len(byValue) != len(byPointer) {
 			test.Errorf("%T: EachPlace yielded %d places, EachPlacePointer yielded %d",

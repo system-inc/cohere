@@ -76,9 +76,9 @@ func embed(
 			if language != "yaml" {
 				return nil, nil
 			}
-			formatted, err := textToDoc(value, language)
-			if err != nil {
-				return nil, err
+			formatted, textToDocError := textToDoc(value, language)
+			if textToDocError != nil {
+				return nil, textToDocError
 			}
 			embedded = formatted
 		}
@@ -135,16 +135,20 @@ func FormatSCSS(text string, prettierOptions formatoptions.Options) (string, err
 }
 
 // formatWithParser is Format under the parser named, "css" or "scss".
-func formatWithParser(text string, prettierOptions formatoptions.Options, parser string) (formatted string, err error) {
+func formatWithParser(
+	text string,
+	prettierOptions formatoptions.Options,
+	parser string,
+) (formatted string, formatWithParserError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			formatted, err = "", fmt.Errorf("%s: %v", parser, recovered)
+			formatted, formatWithParserError = "", fmt.Errorf("%s: %v", parser, recovered)
 		}
 	}()
 
-	document, err := printToDoc(text, prettierOptions, parser)
-	if err != nil {
-		return "", err
+	document, formatWithParserError := printToDoc(text, prettierOptions, parser)
+	if formatWithParserError != nil {
+		return "", formatWithParserError
 	}
 	return doc.Print(document, doc.Options{
 		PrintWidth:     prettierOptions.PrintWidth,
@@ -170,16 +174,16 @@ func printToDocWithParser(
 	text string,
 	prettierOptions formatoptions.Options,
 	parser string,
-) (document doc.Doc, err error) {
+) (document doc.Doc, printToDocWithParserError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			document, err = nil, fmt.Errorf("%s: %v", parser, recovered)
+			document, printToDocWithParserError = nil, fmt.Errorf("%s: %v", parser, recovered)
 		}
 	}()
 
-	document, err = printToDoc(text, prettierOptions, parser)
-	if err != nil {
-		return nil, err
+	document, printToDocWithParserError = printToDoc(text, prettierOptions, parser)
+	if printToDocWithParserError != nil {
+		return nil, printToDocWithParserError
 	}
 	return doc.StripTrailingHardline(document), nil
 }

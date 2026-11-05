@@ -35,13 +35,13 @@ func runNoWarningComments(test *testing.T, testCase noWarningCommentsCase) rule_
 	if !configured {
 		return rule_testing.Run(test, NoWarningComments, noWarningCommentsFile, testCase.sourceText)
 	}
-	encoded, err := json.Marshal(settings)
-	if err != nil {
-		test.Fatalf("could not encode options: %v", err)
+	encoded, encodeError := json.Marshal(settings)
+	if encodeError != nil {
+		test.Fatalf("could not encode options: %v", encodeError)
 	}
-	decoded, err := DecodeNoWarningCommentsOptions(encoded)
-	if err != nil {
-		test.Fatalf("could not decode options: %v", err)
+	decoded, decodeNoWarningCommentsOptionsError := DecodeNoWarningCommentsOptions(encoded)
+	if decodeNoWarningCommentsOptionsError != nil {
+		test.Fatalf("could not decode options: %v", decodeNoWarningCommentsOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, NoWarningComments, noWarningCommentsFile,
 		testCase.sourceText, decoded)

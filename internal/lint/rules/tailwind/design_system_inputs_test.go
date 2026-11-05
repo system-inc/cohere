@@ -68,8 +68,8 @@ func TestDesignSystemReadsAreRunCacheInputs(test *testing.T) {
 	}
 
 	result := DesignSystemForProgram(designSystemProgram(graph.Program))
-	if result.Err != nil {
-		test.Fatalf("the design system did not load, so this proves nothing: %v", result.Err)
+	if result.Error != nil {
+		test.Fatalf("the design system did not load, so this proves nothing: %v", result.Error)
 	}
 
 	present, absent, _ := recorder.Inputs()

@@ -134,11 +134,11 @@ func pinnedCorpusFiles(test *testing.T, count int) ([]string, map[string]string)
 // readPinnedCorpus lists the first count TypeScript paths at the pinned commit and reads them through
 // one `git cat-file --batch`.
 func readPinnedCorpus(repository string, count int) (paths []string, contents map[string]string, failure string) {
-	listing, err := exec.Command("git", "-C", repository, "ls-tree", "-r", "--name-only",
+	listing, outputError := exec.Command("git", "-C", repository, "ls-tree", "-r", "--name-only",
 		pinnedCorpusCommit, "--", "source").Output()
-	if err != nil {
+	if outputError != nil {
 		return nil, nil, fmt.Sprintf("listing %s at %s: %v; the repository is here and the pinned commit is not",
-			repository, pinnedCorpusCommit, err)
+			repository, pinnedCorpusCommit, outputError)
 	}
 	for _, line := range strings.Split(string(listing), "\n") {
 		if strings.HasSuffix(line, ".ts") || strings.HasSuffix(line, ".tsx") {
@@ -157,17 +157,17 @@ func readPinnedCorpus(repository string, count int) (paths []string, contents ma
 	}
 	batch := exec.Command("git", "-C", repository, "cat-file", "--batch")
 	batch.Stdin = strings.NewReader(request.String())
-	output, err := batch.Output()
-	if err != nil {
-		return nil, nil, fmt.Sprintf("reading the corpus at %s: %v", pinnedCorpusCommit, err)
+	output, outputError := batch.Output()
+	if outputError != nil {
+		return nil, nil, fmt.Sprintf("reading the corpus at %s: %v", pinnedCorpusCommit, outputError)
 	}
 	// Each answer is "<object> blob <size>\n", the size in bytes of contents, then "\n".
 	contents = make(map[string]string, len(paths))
 	reader := bufio.NewReader(bytes.NewReader(output))
 	for _, path := range paths {
-		header, err := reader.ReadString('\n')
+		header, readStringError := reader.ReadString('\n')
 		fields := strings.Fields(header)
-		if err != nil || len(fields) != 3 || fields[1] != "blob" {
+		if readStringError != nil || len(fields) != 3 || fields[1] != "blob" {
 			return nil, nil, fmt.Sprintf(
 				"reading %s at %s: git answered %q",
 				path,
@@ -175,8 +175,8 @@ func readPinnedCorpus(repository string, count int) (paths []string, contents ma
 				strings.TrimSpace(header),
 			)
 		}
-		size, err := strconv.Atoi(fields[2])
-		if err != nil {
+		size, parseError := strconv.Atoi(fields[2])
+		if parseError != nil {
 			return nil, nil, fmt.Sprintf("reading %s at %s: a size of %q", path, pinnedCorpusCommit, fields[2])
 		}
 		blob := make([]byte, size+1)
@@ -200,8 +200,8 @@ func TestLowerRealCodebase(test *testing.T) {
 	skipWithoutCorpus(test)
 
 	var files []string
-	walkError := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
-		if err != nil {
+	walkError := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, pathError error) error {
+		if pathError != nil {
 			return nil
 		}
 		if info.IsDir() {
@@ -257,15 +257,15 @@ func TestLowerRealCodebase(test *testing.T) {
 			})
 
 			var count func(*Function)
-			count = func(f *Function) {
-				totalBlocks += len(f.Blocks)
-				totalInstructions += len(f.Instructions)
-				for _, instruction := range f.Instructions {
+			count = func(function *Function) {
+				totalBlocks += len(function.Blocks)
+				totalInstructions += len(function.Instructions)
+				for _, instruction := range function.Instructions {
 					if node, ok := instruction.Value.(*UnsupportedNode); ok {
 						unsupported[node.Reason]++
 					}
 				}
-				for _, nested := range f.Functions {
+				for _, nested := range function.Functions {
 					count(nested)
 				}
 			}

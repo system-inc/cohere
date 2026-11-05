@@ -696,7 +696,7 @@ func TestDecodeSelfClosingCompOptions(test *testing.T) {
 		raw           string
 		wantComponent bool
 		wantHtml      bool
-		wantErr       bool
+		wantError     bool
 	}{
 		{name: "empty input is the bare error configuration", raw: "", wantComponent: true, wantHtml: true},
 		{name: "empty object keeps both defaults", raw: `{}`, wantComponent: true, wantHtml: true},
@@ -709,14 +709,14 @@ func TestDecodeSelfClosingCompOptions(test *testing.T) {
 			wantComponent: true,
 			wantHtml:      true,
 		},
-		{name: "wrong type is an error", raw: `{"component": "yes"}`, wantErr: true},
+		{name: "wrong type is an error", raw: `{"component": "yes"}`, wantError: true},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			decoded, decodeSelfClosingCompOptionsError := DecodeSelfClosingCompOptions([]byte(testCase.raw))
-			if testCase.wantErr {
+			if testCase.wantError {
 				if decodeSelfClosingCompOptionsError == nil {
 					test.Fatalf("want an error, got %#v", decoded)
 				}

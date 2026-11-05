@@ -387,9 +387,9 @@ func stripNumericSeparators(raw string) string {
 // isRangeError says whether a `strconv` failure was an overflow rather than a malformed literal.
 //
 // An overflow still returns a usable infinity, which is exactly what the rule wants for `2e999`.
-func isRangeError(err error) bool {
+func isRangeError(parseError error) bool {
 	var numberError *strconv.NumError
-	if !errors.As(err, &numberError) {
+	if !errors.As(parseError, &numberError) {
 		return false
 	}
 	return numberError.Err == strconv.ErrRange

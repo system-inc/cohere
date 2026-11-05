@@ -20,14 +20,14 @@ func TestFormatterInputsCoverWhatCanChangeTheOutput(test *testing.T) {
 	test.Parallel()
 
 	// This package sits two directories below the module root.
-	module, err := filepath.Abs(filepath.Join("..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	module, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 
-	inputs, err := dispatch.FormatterInputs(module, nil)
-	if err != nil {
-		test.Fatal(err)
+	inputs, formatterInputsError := dispatch.FormatterInputs(module, nil)
+	if formatterInputsError != nil {
+		test.Fatal(formatterInputsError)
 	}
 	names := map[string]bool{}
 	for _, input := range inputs {

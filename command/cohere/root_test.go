@@ -481,9 +481,9 @@ func TestDotFromASubdirectoryIsThatSubdirectory(test *testing.T) {
 	})
 	modules := filepath.Join(root, "modules")
 
-	scope, err := namedPathsScope(modules, root, []string{"."})
-	if err != nil {
-		test.Fatal(err)
+	scope, namedPathsScopeError := namedPathsScope(modules, root, []string{"."})
+	if namedPathsScopeError != nil {
+		test.Fatal(namedPathsScopeError)
 	}
 	if scope.Everything {
 		test.Fatal("`.` from a subdirectory became the whole project")
@@ -493,9 +493,9 @@ func TestDotFromASubdirectoryIsThatSubdirectory(test *testing.T) {
 	}
 
 	// The control: `.` at the root still means everything.
-	whole, err := namedPathsScope(root, root, []string{"."})
-	if err != nil {
-		test.Fatal(err)
+	whole, namedPathsScopeError := namedPathsScope(root, root, []string{"."})
+	if namedPathsScopeError != nil {
+		test.Fatal(namedPathsScopeError)
 	}
 	if !whole.Everything {
 		test.Errorf("`.` at the root stopped meaning the whole tree: %v", whole.FileNames)

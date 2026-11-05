@@ -191,17 +191,17 @@ func TestSettingsSitBetweenDefaultsAndOptions(test *testing.T) {
 			sample := settingsSamples[key]
 			base := settingsBase(`{"` + key + `": ` + sample[0] + `}`)
 
-			fromSettings, err := decode(nil, base)
-			if err != nil {
-				test.Fatalf("%s, %s in settings: %v", ruleName, key, err)
+			fromSettings, decodeError := decode(nil, base)
+			if decodeError != nil {
+				test.Fatalf("%s, %s in settings: %v", ruleName, key, decodeError)
 			}
 			if got := decodedKey(test, fromSettings, key); got != compactJsonForTest(test, json.RawMessage(sample[0])) {
 				test.Errorf("%s: %s written in settings as %s decoded as %s", ruleName, key, sample[0], got)
 			}
 
-			fromBoth, err := decode([]byte(`{"`+key+`": `+sample[1]+`}`), base)
-			if err != nil {
-				test.Fatalf("%s, %s in settings and options: %v", ruleName, key, err)
+			fromBoth, decodeError := decode([]byte(`{"`+key+`": `+sample[1]+`}`), base)
+			if decodeError != nil {
+				test.Fatalf("%s, %s in settings and options: %v", ruleName, key, decodeError)
 			}
 			if got := decodedKey(test, fromBoth, key); got != compactJsonForTest(test, json.RawMessage(sample[1])) {
 				test.Errorf("%s: %s in options (%s) did not win over settings (%s): decoded %s",
@@ -217,17 +217,23 @@ func TestSettingsReachOnlyTheRulesThatDeclareThem(test *testing.T) {
 	test.Parallel()
 	base := settingsBase(`{"order": "desc", "callees": ["a", "b"]}`)
 
-	duplicateOptions, err := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(nil, base)
-	if err != nil {
-		test.Fatalf("no-duplicate-classes read a key it does not declare instead of leaving it to its sibling: %v", err)
+	duplicateOptions, decodeTailwindOptionsError := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(nil, base)
+	if decodeTailwindOptionsError != nil {
+		test.Fatalf(
+			"no-duplicate-classes read a key it does not declare instead of leaving it to its sibling: %v",
+			decodeTailwindOptionsError,
+		)
 	}
 	if callees := legacyNames(duplicateOptions.Callees); callees != "a,b" {
 		test.Fatalf("no-duplicate-classes' callees = %v, want settings' [a b]", callees)
 	}
 
-	options, err := decodeTailwindOptionsAt[EnforceConsistentClassOrderOptions]()([]byte(`{"callees": ["c"]}`), base)
-	if err != nil {
-		test.Fatal(err)
+	options, decodeTailwindOptionsError := decodeTailwindOptionsAt[EnforceConsistentClassOrderOptions]()(
+		[]byte(`{"callees": ["c"]}`),
+		base,
+	)
+	if decodeTailwindOptionsError != nil {
+		test.Fatal(decodeTailwindOptionsError)
 	}
 	if options.Order != "desc" || legacyNames(options.Callees) != "c" {
 		test.Fatalf("class order decoded order %q and callees %v, want settings' desc and options' [c] alone",
@@ -248,9 +254,9 @@ func legacyNames(selectors []LegacySelector) string {
 func TestARulesOwnOptionsAreDecodedBeforeSettingsMerge(test *testing.T) {
 	test.Parallel()
 	decode := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()
-	_, err := decode([]byte(`{"callee": ["cn"]}`), settingsBase(`{"callees": ["mergeClassNames"]}`))
-	if err == nil || !strings.Contains(err.Error(), "callee") {
-		test.Fatalf("a misspelled key in the rule's own options was not refused by name: %v", err)
+	_, decodeError := decode([]byte(`{"callee": ["cn"]}`), settingsBase(`{"callees": ["mergeClassNames"]}`))
+	if decodeError == nil || !strings.Contains(decodeError.Error(), "callee") {
+		test.Fatalf("a misspelled key in the rule's own options was not refused by name: %v", decodeError)
 	}
 }
 
@@ -304,12 +310,12 @@ const ourSettings = `{
 // #gj5nm6e the defaults were ours, so every one of these went unchecked.
 func TestAnOutsiderIsReadWithUpstreamsDefaults(test *testing.T) {
 	test.Parallel()
-	decoded, err := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(
+	decoded, decodeTailwindOptionsError := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(
 		nil,
 		rule.OptionsBase{ConfigDirectory: "/repo"},
 	)
-	if err != nil {
-		test.Fatal(err)
+	if decodeTailwindOptionsError != nil {
+		test.Fatal(decodeTailwindOptionsError)
 	}
 	read := []string{
 		`const merged = cn('flex flex');`,
@@ -361,9 +367,12 @@ func TestAnOutsiderIsReadWithUpstreamsDefaults(test *testing.T) {
 // its defaults.
 func TestOurSettingsReadOurMatchers(test *testing.T) {
 	test.Parallel()
-	decoded, err := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(nil, settingsBase(ourSettings))
-	if err != nil {
-		test.Fatal(err)
+	decoded, decodeTailwindOptionsError := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(
+		nil,
+		settingsBase(ourSettings),
+	)
+	if decodeTailwindOptionsError != nil {
+		test.Fatal(decodeTailwindOptionsError)
 	}
 	read := []string{
 		`const merged = mergeClassNames('flex flex');`,
@@ -394,9 +403,12 @@ func TestOurSettingsReadOurMatchers(test *testing.T) {
 // An empty list replaces its kind's defaults with nothing, as upstream's `callees !== undefined` does.
 func TestAnEmptyKindReadsNothingOfIt(test *testing.T) {
 	test.Parallel()
-	decoded, err := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(nil, settingsBase(`{"callees": []}`))
-	if err != nil {
-		test.Fatal(err)
+	decoded, decodeTailwindOptionsError := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(
+		nil,
+		settingsBase(`{"callees": []}`),
+	)
+	if decodeTailwindOptionsError != nil {
+		test.Fatal(decodeTailwindOptionsError)
 	}
 	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(
 		test,

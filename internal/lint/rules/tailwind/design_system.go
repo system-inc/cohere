@@ -82,11 +82,11 @@ type DesignSystemResult struct {
 	// set. Built here for the reason Table is: it remembers its answers, and a run asks it about the same
 	// classes from every file (#15swfzq).
 	Canonicalizer *tailwindengine.Canonicalizer
-	// Err is why no design system could be built, nil when System is set.
+	// Error is why no design system could be built, nil when System is set.
 	//
 	// A rule holding this must decline rather than report zero findings. See the failing-safe note
 	// in the file comment.
-	Err error
+	Error error
 	// EntryPoint is the stylesheet the load was attempted from, empty when none was found.
 	EntryPoint string
 	// Reads is every path the load asked the file system about, present or absent: the entry point
@@ -168,7 +168,7 @@ func DesignSystemForProgram(program rule.Program) DesignSystemResult {
 // most once per program and location.
 func DesignSystemForProgramAt(program rule.Program, location DesignSystemLocation) DesignSystemResult {
 	if program == nil {
-		return DesignSystemResult{Err: fmt.Errorf("no program: a design system cannot be located without one")}
+		return DesignSystemResult{Error: fmt.Errorf("no program: a design system cannot be located without one")}
 	}
 
 	designSystemCache.Lock()
@@ -206,7 +206,7 @@ func loadDesignSystemThrough(
 ) DesignSystemResult {
 	projectRoot := projectRootOf(program)
 	if projectRoot == "" {
-		return DesignSystemResult{Err: fmt.Errorf("determining the project root from the program")}
+		return DesignSystemResult{Error: fmt.Errorf("determining the project root from the program")}
 	}
 	if !location.isDefault() {
 		return loadConfiguredDesignSystem(projectRoot, fileSystem, location)
@@ -223,31 +223,36 @@ func loadDesignSystemThrough(
 
 	entryPoint := FindEntryPoint(projectRoot, fileExists)
 	if entryPoint == "" {
-		return DesignSystemResult{Err: fmt.Errorf("%w: looked under %s", ErrNoTailwindEntryPoint, projectRoot)}
+		return DesignSystemResult{Error: fmt.Errorf("%w: looked under %s", ErrNoTailwindEntryPoint, projectRoot)}
 	}
 
 	packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint), fileExists)
 	if packageRoot == "" {
 		return DesignSystemResult{
 			EntryPoint: entryPoint,
-			Err: fmt.Errorf(
+			Error: fmt.Errorf(
 				"%s: no installed tailwindcss package found, so `@import \"tailwindcss\"` cannot resolve",
 				entryPoint,
 			),
 		}
 	}
 
-	resolve, err := stylesheetResolverAt(location.cwdFrom(projectRoot), location.Tsconfig, packageRoot, fileSystem)
-	if err != nil {
-		return DesignSystemResult{EntryPoint: entryPoint, Err: err}
+	resolve, stylesheetResolverAtError := stylesheetResolverAt(
+		location.cwdFrom(projectRoot),
+		location.Tsconfig,
+		packageRoot,
+		fileSystem,
+	)
+	if stylesheetResolverAtError != nil {
+		return DesignSystemResult{EntryPoint: entryPoint, Error: stylesheetResolverAtError}
 	}
-	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
 		Resolve:             resolve,
 	})
-	if err != nil {
-		return DesignSystemResult{EntryPoint: entryPoint, Err: err}
+	if loadDesignSystemError != nil {
+		return DesignSystemResult{EntryPoint: entryPoint, Error: loadDesignSystemError}
 	}
 	// The stylesheets themselves are read by the engine, which does not take a filesystem, so each
 	// one in the `@import` graph is stated through the program's afterwards. That records it as a
@@ -364,7 +369,7 @@ func DesignSystemDeclineMessage(ruleName string, result DesignSystemResult) stri
 	return fmt.Sprintf(
 		"%s could not build this project's Tailwind design system%s, so it is reporting nothing rather "+
 			"than reporting a clean tree: %v",
-		ruleName, where, result.Err,
+		ruleName, where, result.Error,
 	)
 }
 

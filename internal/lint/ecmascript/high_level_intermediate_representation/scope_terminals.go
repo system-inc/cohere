@@ -313,11 +313,11 @@ func scopeItemsInNestingOrder(function *Function, scopes *ReactiveScopes,
 		}
 		EachTerminalPlace(block.Terminal, visit)
 	}
-	sort.SliceStable(items, func(a, b int) bool {
-		if items[a].start != items[b].start {
-			return items[a].start < items[b].start
+	sort.SliceStable(items, func(left, right int) bool {
+		if items[left].start != items[right].start {
+			return items[left].start < items[right].start
 		}
-		return items[a].end > items[b].end
+		return items[left].end > items[right].end
 	})
 	return items
 }

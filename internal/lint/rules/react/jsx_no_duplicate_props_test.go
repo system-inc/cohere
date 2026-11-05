@@ -281,9 +281,9 @@ func TestJsxNoDuplicatePropsThirdCopyComparesAgainstSecond(test *testing.T) {
 func TestJsxNoDuplicatePropsIgnoreCase(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := rule.DecodeOptionsInto[JsxNoDuplicatePropsOptions]()([]byte(`{"ignoreCase": true}`))
-	if err != nil {
-		test.Fatalf("decoding ignoreCase: %v", err)
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[JsxNoDuplicatePropsOptions]()([]byte(`{"ignoreCase": true}`))
+	if decodeOptionsError != nil {
+		test.Fatalf("decoding ignoreCase: %v", decodeOptionsError)
 	}
 	cases := []struct {
 		sourceText string
@@ -311,7 +311,9 @@ func TestJsxNoDuplicatePropsIgnoreCase(test *testing.T) {
 		})
 	}
 
-	if _, err := rule.DecodeOptionsInto[JsxNoDuplicatePropsOptions]()([]byte(`{"ignorecase": true}`)); err == nil {
+	if _, decodeOptionsError := rule.DecodeOptionsInto[JsxNoDuplicatePropsOptions]()(
+		[]byte(`{"ignorecase": true}`),
+	); decodeOptionsError == nil {
 		test.Error("a misspelled ignoreCase decoded")
 	}
 }

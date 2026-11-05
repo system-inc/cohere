@@ -409,13 +409,13 @@ func (parser *parser) splitWord(namespace any, firstCallback func(first string, 
 		hasID = filtered
 	}
 	indices := sortAscending(uniq(flatten([]int{0}, hasClass, hasID)))
-	for i, ind := range indices {
+	for indexIndex, ind := range indices {
 		index := len(units)
-		if i+1 < len(indices) && indices[i+1] != 0 {
-			index = indices[i+1]
+		if indexIndex+1 < len(indices) && indices[indexIndex+1] != 0 {
+			index = indices[indexIndex+1]
 		}
 		value := units[ind:index]
-		if i == 0 && firstCallback != nil {
+		if indexIndex == 0 && firstCallback != nil {
 			firstCallback(unitsToWTF8(value), len(indices))
 			continue
 		}
@@ -431,19 +431,19 @@ func (parser *parser) splitWord(namespace any, firstCallback func(first string, 
 			node = newSelectorNode(typeClass,
 				"value", unitsToWTF8(value[1:]),
 				"source", nodeSource,
-				"sourceIndex", jsAdd(currToken.loose(6), indices[i]),
+				"sourceIndex", jsAdd(currToken.loose(6), indices[indexIndex]),
 			)
 		} else if containsInt(hasID, ind) {
 			node = newSelectorNode(typeID,
 				"value", unitsToWTF8(value[1:]),
 				"source", nodeSource,
-				"sourceIndex", jsAdd(currToken.loose(6), indices[i]),
+				"sourceIndex", jsAdd(currToken.loose(6), indices[indexIndex]),
 			)
 		} else {
 			node = newSelectorNode(typeTag,
 				"value", unitsToWTF8(value),
 				"source", nodeSource,
-				"sourceIndex", jsAdd(currToken.loose(6), indices[i]),
+				"sourceIndex", jsAdd(currToken.loose(6), indices[indexIndex]),
 			)
 		}
 		parser.newNode(node, namespace)

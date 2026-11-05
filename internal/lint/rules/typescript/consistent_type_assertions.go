@@ -73,9 +73,9 @@ func DecodeConsistentTypeAssertionsOptions(raw []byte) (ConsistentTypeAssertions
 		return options, nil
 	}
 
-	decoded, err := rule.DecodeOptionsInto[consistentTypeAssertionsRawOptions]()(raw)
-	if err != nil {
-		return options, err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[consistentTypeAssertionsRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return options, decodeOptionsError
 	}
 
 	if decoded.AssertionStyle != nil {

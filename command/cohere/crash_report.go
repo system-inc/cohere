@@ -120,7 +120,10 @@ func writeCrashGroups(out *bufio.Writer, crashes []runCrash) {
 		return groups[first].message < groups[second].message
 	})
 	for _, group := range groups {
-		sort.Slice(group.crashes, func(first, second int) bool { return group.crashes[first].Path < group.crashes[second].Path })
+		sort.Slice(
+			group.crashes,
+			func(first, second int) bool { return group.crashes[first].Path < group.crashes[second].Path },
+		)
 		if len(group.crashes) == 1 {
 			writeCrashedNote(out, group.crashes[0])
 			continue

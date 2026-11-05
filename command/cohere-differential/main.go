@@ -57,14 +57,14 @@ func main() {
 }
 
 func run() error {
-	options, err := parseArguments(os.Args[1:])
-	if err != nil {
-		return err
+	options, parseArgumentsError := parseArguments(os.Args[1:])
+	if parseArgumentsError != nil {
+		return parseArgumentsError
 	}
 
-	lintConfiguration, err := configuration.Load(filepath.Join(options.root, ".oxlintrc.json"))
-	if err != nil {
-		return fmt.Errorf("loading the lint config: %w", err)
+	lintConfiguration, loadError := configuration.Load(filepath.Join(options.root, ".oxlintrc.json"))
+	if loadError != nil {
+		return fmt.Errorf("loading the lint config: %w", loadError)
 	}
 
 	suppliedRules := slices.Collect(maps.Keys(cohereOnlyRuleSettings(options.root)))
@@ -80,14 +80,14 @@ func run() error {
 	// into the harness, and when the two builds differ every classification describes the wrong
 	// tool. That produced a real wrong answer: 128 findings reported as both-active, meaning both
 	// sides had the rule and disagreed, when the measured binary had no such rule at all.
-	cohereRules, err := differential.CompiledRulesOf(
+	cohereRules, compiledRulesOfError := differential.CompiledRulesOf(
 		context.Background(), options.cohereCommand, ruleListProbeFile,
 	)
-	if err != nil {
-		return err
+	if compiledRulesOfError != nil {
+		return compiledRulesOfError
 	}
 
-	report, err := differential.Run(context.Background(), differential.RunOptions{
+	report, runError := differential.Run(context.Background(), differential.RunOptions{
 		Root:                    options.root,
 		Cohere:                  options.cohereCommand,
 		Gate:                    options.gateCommand,
@@ -96,8 +96,8 @@ func run() error {
 		Controls:                options.controls,
 		ExtraCohereRuleSettings: cohereOnlyRuleSettings(options.root),
 	})
-	if err != nil {
-		return err
+	if runError != nil {
+		return runError
 	}
 
 	rendered := &strings.Builder{}

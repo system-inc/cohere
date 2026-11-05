@@ -259,8 +259,8 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 		composition.atKey = false
 	}
 	offset := fc.Offset + len(fc.FlowStart.Source)
-	for i := 0; i < len(fc.Items); i++ {
-		collItem := fc.Items[i]
+	for index := 0; index < len(fc.Items); index++ {
+		collItem := fc.Items[index]
 		start, key, sep, value := collItem.Start, collItem.Key, collItem.Sep, collItem.Value
 		properties := resolveProps(start, resolvePropsOptions{
 			flow:           fcName,
@@ -273,9 +273,9 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 		})
 		if properties.found == nil {
 			if properties.anchor == nil && properties.tag == nil && sep == nil && value == nil {
-				if i == 0 && properties.comma != nil {
+				if index == 0 && properties.comma != nil {
 					onError(properties.comma, "UNEXPECTED_TOKEN", "Unexpected , in "+fcName, false)
-				} else if i < len(fc.Items)-1 {
+				} else if index < len(fc.Items)-1 {
 					onError(properties.start, "UNEXPECTED_TOKEN", "Unexpected empty item in "+fcName, false)
 				}
 				if properties.comment != "" {
@@ -293,7 +293,7 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 					"MULTILINE_IMPLICIT_KEY", "Implicit keys of flow sequence pairs need to be on a single line", false)
 			}
 		}
-		if i == 0 {
+		if index == 0 {
 			if properties.comma != nil {
 				onError(properties.comma, "UNEXPECTED_TOKEN", "Unexpected , in "+fcName, false)
 			}
@@ -545,8 +545,8 @@ func mapIncludes(composition *composeContext, items []*Node, search *Node) bool 
 		return false
 	}
 	for _, pair := range items {
-		a := pair.Key
-		if a == search || IsScalar(a) && IsScalar(search) && strictEquals(a.ScalarValue, search.ScalarValue) {
+		node := pair.Key
+		if node == search || IsScalar(node) && IsScalar(search) && strictEquals(node.ScalarValue, search.ScalarValue) {
 			return true
 		}
 	}
@@ -554,17 +554,17 @@ func mapIncludes(composition *composeContext, items []*Node, search *Node) bool 
 }
 
 // strictEquals is `a === b` for scalar values: NaN is not itself, and objects are only themselves.
-func strictEquals(a any, b any) bool {
-	switch x := a.(type) {
+func strictEquals(left any, right any) bool {
+	switch x := left.(type) {
 	case float64:
-		y, isNumber := b.(float64)
+		y, isNumber := right.(float64)
 		return isNumber && x == y
 	case Date, Binary:
 		return false
 	}
-	switch b.(type) {
+	switch right.(type) {
 	case Date, Binary:
 		return false
 	}
-	return a == b
+	return left == right
 }

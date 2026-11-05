@@ -29,8 +29,8 @@ func TestWiredRulesAgainstReactsOwnGoldens(test *testing.T) {
 		counts := map[react_conformance.Verdict]int{}
 		var failures []string
 		for _, fixture := range scored {
-			result, analyzeErr := Analyze(subject, fixture, test.TempDir())
-			verdict := react_conformance.Classify(fixture, result, analyzeErr)
+			result, analyzeError := Analyze(subject, fixture, test.TempDir())
+			verdict := react_conformance.Classify(fixture, result, analyzeError)
 			counts[verdict.Verdict]++
 			grand[verdict.Verdict]++
 			if verdict.Verdict == react_conformance.VerdictFailed {
@@ -44,8 +44,8 @@ func TestWiredRulesAgainstReactsOwnGoldens(test *testing.T) {
 			counts[react_conformance.VerdictStatedDivergence],
 			counts[react_conformance.VerdictNotScored],
 			counts[react_conformance.VerdictUnresolvableTypes])
-		for _, f := range failures {
-			test.Log(f)
+		for _, failure := range failures {
+			test.Log(failure)
 		}
 	}
 	test.Logf("TOTAL passed %d failed %d divergence %d notscored %d unresolvable %d",

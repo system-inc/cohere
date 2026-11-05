@@ -192,9 +192,9 @@ var NoUnsafeTypeAssertion = rule.Rule[rule.NoOptions]{
 // below is unchanged. Only a fresh object literal widens to something different. So the flag saves a
 // checker call on the common path and decides nothing, and no fixture can prove it; this comment is
 // the record instead.
-func isObjectLiteralType(t *checker.Type) bool {
-	return type_checking.IsObjectType(t) &&
-		checker.Type_objectFlags(t)&checker.ObjectFlagsObjectLiteral != 0
+func isObjectLiteralType(subjectType *checker.Type) bool {
+	return type_checking.IsObjectType(subjectType) &&
+		checker.Type_objectFlags(subjectType)&checker.ObjectFlagsObjectLiteral != 0
 }
 
 // anyTypeName renders the type the message names, reproducing upstream's `getAnyTypeName`.

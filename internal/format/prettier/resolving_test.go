@@ -42,19 +42,19 @@ func TestResolvingFormatsEachFileWithItsOwnConfig(test *testing.T) {
 	writeFile(test, filepath.Join(apart, "CohereSettings.json"), `{"extends": "./NexusCohereSettings.json"}`)
 	writeFile(test, filepath.Join(together, "CohereSettings.json"), `{"extends": "./NexusCohereSettings.json"}`)
 
-	resolving, err := NewResolving(apart)
-	if err != nil {
-		test.Fatal(err)
+	resolving, newResolvingError := NewResolving(apart)
+	if newResolvingError != nil {
+		test.Fatal(newResolvingError)
 	}
 	source := "const element = <Component firstAttribute=\"a long value here\" secondAttribute=\"another long value\" third=\"x\">child</Component>;\n"
 
-	formattedApart, err := resolving.Format(filepath.Join(apart, "source", "Probe.tsx"), source)
-	if err != nil {
-		test.Fatal(err)
+	formattedApart, formatError := resolving.Format(filepath.Join(apart, "source", "Probe.tsx"), source)
+	if formatError != nil {
+		test.Fatal(formatError)
 	}
-	formattedTogether, err := resolving.Format(filepath.Join(together, "source", "Probe.tsx"), source)
-	if err != nil {
-		test.Fatal(err)
+	formattedTogether, formatError := resolving.Format(filepath.Join(together, "source", "Probe.tsx"), source)
+	if formatError != nil {
+		test.Fatal(formatError)
 	}
 
 	// JSX attributes keep double quotes under singleQuote (that is jsxSingleQuote's job), so the probe

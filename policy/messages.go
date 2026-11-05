@@ -241,13 +241,13 @@ func (catalog *MessageCatalog) add(idea string, data []byte) error {
 		usedTerms := map[string]bool{}
 		for _, language := range languages {
 			ruleName := file.Rules[language]
-			text, err := resolveTerms(message.Text, message.Terms, language, usedTerms)
-			if err != nil {
-				return fmt.Errorf("message %q, %s: %w", id, language, err)
+			text, resolveTermsError := resolveTerms(message.Text, message.Terms, language, usedTerms)
+			if resolveTermsError != nil {
+				return fmt.Errorf("message %q, %s: %w", id, language, resolveTermsError)
 			}
-			template, err := resolvePhrases(text, stringPhrases, objectPhrases, language)
-			if err != nil {
-				return fmt.Errorf("message %q, %s: %w", id, language, err)
+			template, resolvePhrasesError := resolvePhrases(text, stringPhrases, objectPhrases, language)
+			if resolvePhrasesError != nil {
+				return fmt.Errorf("message %q, %s: %w", id, language, resolvePhrasesError)
 			}
 			if _, placeholderNamesError := placeholderNames(template.text, "{{", "}}"); placeholderNamesError != nil {
 				return fmt.Errorf("message %q, %s: %w", id, language, placeholderNamesError)

@@ -32,12 +32,12 @@ func TestInlineMemoCallbacksRepeatIdentically(test *testing.T) {
 			ruleContext rule.Context,
 			node *ast.Node,
 		) *Function {
-			f := Lower(node, ruleContext.TypeChecker)
-			if f != nil {
-				Construct(f)
-				DropManualMemoization(f)
+			function := Lower(node, ruleContext.TypeChecker)
+			if function != nil {
+				Construct(function)
+				DropManualMemoization(function)
 			}
-			return f
+			return function
 		})
 		for index, prepass := range prepasses {
 			name := fmt.Sprintf("%s#%d", fixture.name, index)
@@ -48,8 +48,8 @@ func TestInlineMemoCallbacksRepeatIdentically(test *testing.T) {
 			test.Run(name, func(test *testing.T) {
 				var expected string
 				for run := 0; run < repetitions; run++ {
-					f := CloneFunction(prepass)
-					count := InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(f)
+					function := CloneFunction(prepass)
+					count := InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function)
 					if run == 0 {
 						if _, needed := required[name]; needed && count == 0 {
 							test.Fatal("required regression case did not inline")
@@ -59,15 +59,15 @@ func TestInlineMemoCallbacksRepeatIdentically(test *testing.T) {
 					var out strings.Builder
 					// Preserve raw ids as well as the export bytes; instruction ids can be
 					// renumbered by later construction, which would conceal this allocation bug.
-					for _, block := range f.Blocks {
+					for _, block := range function.Blocks {
 						fmt.Fprintf(&out, "block %d\n", block.Id)
 						for _, id := range block.Instructions {
-							instruction := f.Instructions[id]
+							instruction := function.Instructions[id]
 							fmt.Fprintf(&out, "%d=%d\n", id, instruction.LValue.Identifier)
 						}
 					}
-					writeAdamicRangesCase(&out, "repeat", f)
-					if out.Len() == 0 || len(f.Blocks) == 0 {
+					writeAdamicRangesCase(&out, "repeat", function)
+					if out.Len() == 0 || len(function.Blocks) == 0 {
 						test.Fatal("empty output: repetition would be vacuous")
 					}
 					if run == 0 {

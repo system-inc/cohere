@@ -1575,9 +1575,9 @@ func TestRestrictPlusOperandsDecoder(test *testing.T) {
 
 	decode := func(test *testing.T, raw string) restrictPlusOperandsSettings {
 		test.Helper()
-		decoded, err := rule.DecodeOptionsInto[RestrictPlusOperandsOptions]()(json.RawMessage(raw))
-		if err != nil {
-			test.Fatalf("decoding %s: %v", raw, err)
+		decoded, decodeOptionsError := rule.DecodeOptionsInto[RestrictPlusOperandsOptions]()(json.RawMessage(raw))
+		if decodeOptionsError != nil {
+			test.Fatalf("decoding %s: %v", raw, decodeOptionsError)
 		}
 		return restrictPlusOperandsSettingsFrom(rule.Configured(decoded))
 	}

@@ -77,9 +77,9 @@ func declaredRules(test *testing.T) []ruleDeclaration {
 		}
 
 		fileSet := token.NewFileSet()
-		parsed, parseErr := parser.ParseFile(fileSet, path, nil, 0)
-		if parseErr != nil {
-			test.Fatalf("parsing %s: %v", path, parseErr)
+		parsed, parseError := parser.ParseFile(fileSet, path, nil, 0)
+		if parseError != nil {
+			test.Fatalf("parsing %s: %v", path, parseError)
 		}
 
 		for _, declaration := range parsed.Decls {

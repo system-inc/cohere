@@ -39,36 +39,36 @@ func fields(data []byte) [][]string {
 			continue
 		}
 		row := strings.Split(line, ";")
-		for i := range row {
-			row[i] = strings.TrimSpace(row[i])
+		for index := range row {
+			row[index] = strings.TrimSpace(row[index])
 		}
 		rows = append(rows, row)
 	}
 	return rows
 }
-func span(s string) Range {
-	lo, hi, ok := strings.Cut(s, "..")
+func span(text string) Range {
+	lo, hi, ok := strings.Cut(text, "..")
 	if !ok {
 		hi = lo
 	}
-	a, e := strconv.ParseInt(lo, 16, 32)
-	if e != nil {
-		panic(e)
+	a, parseError := strconv.ParseInt(lo, 16, 32)
+	if parseError != nil {
+		panic(parseError)
 	}
-	b, e := strconv.ParseInt(hi, 16, 32)
-	if e != nil {
-		panic(e)
+	b, parseError := strconv.ParseInt(hi, 16, 32)
+	if parseError != nil {
+		panic(parseError)
 	}
 	return Range{rune(a), rune(b)}
 }
 func merge(rs []Range) []Range {
-	slices.SortFunc(rs, func(a, b Range) int { return int(a.Lo - b.Lo) })
+	slices.SortFunc(rs, func(left, right Range) int { return int(left.Lo - right.Lo) })
 	out := []Range{}
-	for _, r := range rs {
-		if len(out) > 0 && r.Lo <= out[len(out)-1].Hi+1 {
-			out[len(out)-1].Hi = max(out[len(out)-1].Hi, r.Hi)
+	for _, span := range rs {
+		if len(out) > 0 && span.Lo <= out[len(out)-1].Hi+1 {
+			out[len(out)-1].Hi = max(out[len(out)-1].Hi, span.Hi)
 		} else {
-			out = append(out, r)
+			out = append(out, span)
 		}
 	}
 	return out
@@ -76,11 +76,11 @@ func merge(rs []Range) []Range {
 func Complement(rs []Range) []Range {
 	var out []Range
 	next := rune(0)
-	for _, r := range merge(slices.Clone(rs)) {
-		if next < r.Lo {
-			out = append(out, Range{next, r.Lo - 1})
+	for _, span := range merge(slices.Clone(rs)) {
+		if next < span.Lo {
+			out = append(out, Range{next, span.Lo - 1})
 		}
-		next = r.Hi + 1
+		next = span.Hi + 1
 	}
 	if next <= 0x10ffff {
 		out = append(out, Range{next, 0x10ffff})
@@ -94,20 +94,20 @@ func Build() (Tables, error) {
 		return Tables{}, newReaderError
 	}
 	files := map[string][]byte{}
-	for _, f := range z.File {
-		r, e := f.Open()
-		if e != nil {
-			return Tables{}, e
+	for _, file := range z.File {
+		reader, openError := file.Open()
+		if openError != nil {
+			return Tables{}, openError
 		}
-		b, e := io.ReadAll(r)
-		r.Close()
-		if e != nil {
-			return Tables{}, e
+		content, readError := io.ReadAll(reader)
+		reader.Close()
+		if readError != nil {
+			return Tables{}, readError
 		}
-		files[f.Name] = b
+		files[file.Name] = content
 	}
-	t := Tables{map[string]Property{}, map[string]string{}}
-	add := func(id, family string, rs []Range) { t.Properties[id] = Property{family, merge(rs)} }
+	tables := Tables{map[string]Property{}, map[string]string{}}
+	add := func(id, family string, rs []Range) { tables.Properties[id] = Property{family, merge(rs)} }
 	gc := map[string][]Range{}
 	for _, row := range fields(files["extracted/DerivedGeneralCategory.txt"]) {
 		gc[row[1]] = append(gc[row[1]], span(row[0]))
@@ -126,7 +126,7 @@ func Build() (Tables, error) {
 			add(id, "General_Category", gc[row[1]])
 			for _, alias := range row[1:] {
 				for _, prefix := range []string{"", "gc=", "General_Category="} {
-					t.Aliases[prefix+alias] = id
+					tables.Aliases[prefix+alias] = id
 				}
 			}
 		case "sc":
@@ -156,22 +156,22 @@ func Build() (Tables, error) {
 	}
 	overrides = merge(overrides)
 	for name, rs := range scripts {
-		for _, r := range rs {
-			next := r.Lo
-			for _, o := range overrides {
-				if o.Hi < next {
+		for _, span := range rs {
+			next := span.Lo
+			for _, override := range overrides {
+				if override.Hi < next {
 					continue
 				}
-				if o.Lo > r.Hi {
+				if override.Lo > span.Hi {
 					break
 				}
-				if next < o.Lo {
-					extensions[name] = append(extensions[name], Range{next, o.Lo - 1})
+				if next < override.Lo {
+					extensions[name] = append(extensions[name], Range{next, override.Lo - 1})
 				}
-				next = max(next, o.Hi+1)
+				next = max(next, override.Hi+1)
 			}
-			if next <= r.Hi {
-				extensions[name] = append(extensions[name], Range{next, r.Hi})
+			if next <= span.Hi {
+				extensions[name] = append(extensions[name], Range{next, span.Hi})
 			}
 		}
 	}
@@ -191,8 +191,8 @@ func Build() (Tables, error) {
 			id := family + "=" + name
 			add(id, long, rs)
 			for _, alias := range row[1:] {
-				t.Aliases[family+"="+alias] = id
-				t.Aliases[long+"="+alias] = id
+				tables.Aliases[family+"="+alias] = id
+				tables.Aliases[long+"="+alias] = id
 			}
 		}
 	}
@@ -217,14 +217,14 @@ func Build() (Tables, error) {
 			return Tables{}, fmt.Errorf("missing binary property %s", name)
 		}
 		add(name, "Binary", rs)
-		t.Aliases[name] = name
+		tables.Aliases[name] = name
 		for _, row := range fields(files["PropertyAliases.txt"]) {
 			if row[1] == name {
 				for _, alias := range row {
-					t.Aliases[alias] = name
+					tables.Aliases[alias] = name
 				}
 			}
 		}
 	}
-	return t, nil
+	return tables, nil
 }

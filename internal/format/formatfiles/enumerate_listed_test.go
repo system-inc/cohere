@@ -52,13 +52,13 @@ func listedTree(test *testing.T) string {
 func diskListings(test *testing.T, root string) map[string][]os.DirEntry {
 	test.Helper()
 	listings := map[string][]os.DirEntry{}
-	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || !entry.IsDir() {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil || !entry.IsDir() {
+			return pathError
 		}
-		entries, err := os.ReadDir(path)
+		entries, readDirectoryError := os.ReadDir(path)
 		listings[path] = entries
-		return err
+		return readDirectoryError
 	})
 	if walkError != nil {
 		test.Fatal(walkError)

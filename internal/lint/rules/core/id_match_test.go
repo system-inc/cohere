@@ -19,9 +19,9 @@ const idMatchFile = "/repository/source/IdMatch.ts"
 func idMatchOf(pattern string, flags map[string]bool) IdMatchSettings {
 	// Each element is marshalled on its own and the list of them marshalled whole, which is the same bytes as
 	// marshalling `[pattern, flags]`, without a slice that holds a string beside a map.
-	encodedPattern, err := json.Marshal(pattern)
-	if err != nil {
-		panic(err)
+	encodedPattern, encodeError := json.Marshal(pattern)
+	if encodeError != nil {
+		panic(encodeError)
 	}
 	elements := []json.RawMessage{encodedPattern}
 	if flags != nil {
@@ -31,13 +31,13 @@ func idMatchOf(pattern string, flags map[string]bool) IdMatchSettings {
 		}
 		elements = append(elements, encodedFlags)
 	}
-	encoded, err := json.Marshal(elements)
-	if err != nil {
-		panic(err)
+	encoded, encodeError := json.Marshal(elements)
+	if encodeError != nil {
+		panic(encodeError)
 	}
-	settings, err := DecodeIdMatchOptions(encoded)
-	if err != nil {
-		panic(err)
+	settings, decodeIdMatchOptionsError := DecodeIdMatchOptions(encoded)
+	if decodeIdMatchOptionsError != nil {
+		panic(decodeIdMatchOptionsError)
 	}
 	return settings
 }
@@ -591,11 +591,11 @@ func TestIdMatchSpansAndMessages(test *testing.T) {
 func TestIdMatchDecoderReadsBothTupleElements(test *testing.T) {
 	test.Parallel()
 
-	settings, err := DecodeIdMatchOptions([]byte(
+	settings, decodeIdMatchOptionsError := DecodeIdMatchOptions([]byte(
 		`["^[a-z]+$", {"properties": true, "classFields": true, "onlyDeclarations": true, "ignoreDestructuring": true}]`,
 	))
-	if err != nil {
-		test.Fatalf("decoding a full option tuple: %v", err)
+	if decodeIdMatchOptionsError != nil {
+		test.Fatalf("decoding a full option tuple: %v", decodeIdMatchOptionsError)
 	}
 	if settings.PatternText != "^[a-z]+$" || settings.Pattern == nil {
 		test.Errorf("expected the pattern to be read, got %q", settings.PatternText)
@@ -606,9 +606,9 @@ func TestIdMatchDecoderReadsBothTupleElements(test *testing.T) {
 	}
 
 	// A pattern alone leaves every flag off, which is upstream's defaultOptions.
-	settings, err = DecodeIdMatchOptions([]byte(`["^[a-z]+$"]`))
-	if err != nil {
-		test.Fatalf("decoding a pattern-only tuple: %v", err)
+	settings, decodeIdMatchOptionsError = DecodeIdMatchOptions([]byte(`["^[a-z]+$"]`))
+	if decodeIdMatchOptionsError != nil {
+		test.Fatalf("decoding a pattern-only tuple: %v", decodeIdMatchOptionsError)
 	}
 	if settings.CheckProperties || settings.CheckClassFields ||
 		settings.OnlyDeclarations || settings.IgnoreDestructuring {

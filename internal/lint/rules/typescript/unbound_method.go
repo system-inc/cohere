@@ -33,9 +33,9 @@ type unboundMethodRawOptions struct {
 // cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what arrives
 // is the bare object rather than upstream's one-element array.
 func DecodeUnboundMethodOptions(raw []byte) (UnboundMethodOptions, error) {
-	decoded, err := rule.DecodeOptionsInto[unboundMethodRawOptions]()(raw)
-	if err != nil {
-		return DefaultUnboundMethodSettings(), err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[unboundMethodRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultUnboundMethodSettings(), decodeOptionsError
 	}
 
 	options := DefaultUnboundMethodSettings()

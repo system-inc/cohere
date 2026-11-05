@@ -59,9 +59,9 @@ type noBaseToStringRawOptions struct {
 // and asks the rule to report on an `Error`. Upstream expresses the same distinction through
 // `option.ignoredTypeNames ?? []` over a defaults merge.
 func DecodeNoBaseToStringOptions(raw []byte) (NoBaseToStringOptions, error) {
-	decoded, err := rule.DecodeOptionsInto[noBaseToStringRawOptions]()(raw)
-	if err != nil {
-		return DefaultNoBaseToStringSettings(), err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noBaseToStringRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultNoBaseToStringSettings(), decodeOptionsError
 	}
 
 	options := DefaultNoBaseToStringSettings()

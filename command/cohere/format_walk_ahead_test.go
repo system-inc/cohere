@@ -51,15 +51,15 @@ func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	resolving, err := native.NewResolving(root)
-	if err != nil {
-		test.Fatal(err)
+	resolving, newResolvingError := native.NewResolving(root)
+	if newResolvingError != nil {
+		test.Fatal(newResolvingError)
 	}
 	test.Cleanup(func() { aheadFormatWalk = nil })
 
-	direct, err := resolving.Enumerate(root)
-	if err != nil {
-		test.Fatal(err)
+	direct, enumerateError := resolving.Enumerate(root)
+	if enumerateError != nil {
+		test.Fatal(enumerateError)
 	}
 	if len(direct.Files) < 5 {
 		test.Fatalf("the fixture's walk found %d files, too few for a match to prove anything", len(direct.Files))
@@ -67,9 +67,9 @@ func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(test *testing.T) {
 
 	engine := &countingEngine{Resolving: resolving}
 	startFormatWalkAhead(engine, root, nil)
-	taken, err := enumerateFormatTree(engine, root)
-	if err != nil {
-		test.Fatal(err)
+	taken, enumerateFormatTreeError := enumerateFormatTree(engine, root)
+	if enumerateFormatTreeError != nil {
+		test.Fatal(enumerateFormatTreeError)
 	}
 	if engine.walks != 1 {
 		test.Fatalf("the engine walked %d times for one walk begun ahead and taken", engine.walks)

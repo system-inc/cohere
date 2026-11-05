@@ -739,7 +739,7 @@ func TestExplicitFrameworkVariantsStillOverrideTheTable(test *testing.T) {
 	test.Parallel()
 	entryPoint, packageRoot := frameworkVariantStylesheet(test, `@import "tailwindcss";`)
 
-	explicit, err := LoadDesignSystem(LoadOptions{
+	explicit, loadDesignSystemError := LoadDesignSystem(LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
 		FrameworkVariants: []FrameworkVariant{
@@ -747,8 +747,8 @@ func TestExplicitFrameworkVariantsStillOverrideTheTable(test *testing.T) {
 			{Name: "focus", Kind: ParsedVariantKindStatic},
 		},
 	})
-	if err != nil {
-		test.Fatalf("loading: %v", err)
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
 	if got := len(explicit.Variants().Registrations()); got != 2 {
 		test.Errorf("an explicit list of 2 produced %d registrations", got)
@@ -757,13 +757,13 @@ func TestExplicitFrameworkVariantsStillOverrideTheTable(test *testing.T) {
 		test.Error("an explicit list should replace the table, not extend it")
 	}
 
-	empty, err := LoadDesignSystem(LoadOptions{
+	empty, loadDesignSystemError := LoadDesignSystem(LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
 		FrameworkVariants:   []FrameworkVariant{},
 	})
-	if err != nil {
-		test.Fatalf("loading: %v", err)
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
 	if got := len(empty.Variants().Registrations()); got != 0 {
 		test.Errorf("an explicitly empty list produced %d registrations, so it was read as absent", got)

@@ -20,14 +20,14 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: runoutput <log>")
 		os.Exit(2)
 	}
-	output, err := os.ReadFile(os.Args[1])
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "runoutput: %v\n", err)
+	output, readError := os.ReadFile(os.Args[1])
+	if readError != nil {
+		fmt.Fprintf(os.Stderr, "runoutput: %v\n", readError)
 		os.Exit(1)
 	}
-	run, err := benchresults.ParseRunOutput(output)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "runoutput: %s: %v\n", os.Args[1], err)
+	run, parseRunOutputError := benchresults.ParseRunOutput(output)
+	if parseRunOutputError != nil {
+		fmt.Fprintf(os.Stderr, "runoutput: %s: %v\n", os.Args[1], parseRunOutputError)
 		os.Exit(1)
 	}
 	fmt.Printf("%.3f\t%d\t%s\n", run.EngineSeconds, run.Findings, run.Cache)

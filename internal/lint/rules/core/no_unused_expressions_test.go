@@ -827,11 +827,11 @@ func TestNoUnusedExpressionsLeavesUnrecognisedFormsAlone(test *testing.T) {
 func TestNoUnusedExpressionsReadsOptionsFromJson(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := rule.DecodeOptionsInto[NoUnusedExpressionsOptions]()([]byte(
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[NoUnusedExpressionsOptions]()([]byte(
 		`{"allowShortCircuit":true,"allowTernary":true,"allowTaggedTemplates":true,` +
 			`"enforceForJSX":true,"ignoreDirectives":true}`))
-	if err != nil {
-		test.Fatalf("decoding the full option object failed: %v", err)
+	if decodeOptionsError != nil {
+		test.Fatalf("decoding the full option object failed: %v", decodeOptionsError)
 	}
 	if !decoded.AllowShortCircuit || !decoded.AllowTernary || !decoded.AllowTaggedTemplates ||
 		!decoded.EnforceForJsx || !decoded.IgnoreDirectives {

@@ -54,9 +54,14 @@ func TestFixRelintRemovesOnlyDeadDisableNames(test *testing.T) {
 	} {
 		test.Run(fixture.name, func(test *testing.T) {
 			test.Parallel()
-			proposals, err := proposalsForText("/Probe.ts", fixture.source, &program.Graph{}, fixture.rules)
-			if err != nil {
-				test.Fatal(err)
+			proposals, proposalsForTextError := proposalsForText(
+				"/Probe.ts",
+				fixture.source,
+				&program.Graph{},
+				fixture.rules,
+			)
+			if proposalsForTextError != nil {
+				test.Fatal(proposalsForTextError)
 			}
 			wantProposals := 0
 			if fixture.source != fixture.fixed {
@@ -65,7 +70,7 @@ func TestFixRelintRemovesOnlyDeadDisableNames(test *testing.T) {
 			if len(proposals) != wantProposals {
 				test.Fatalf("got %d initial proposals, want %d", len(proposals), wantProposals)
 			}
-			fixed, err := edit.FixText(
+			fixed, fixTextError := edit.FixText(
 				"/Probe.ts",
 				fixture.source,
 				func(fileName, text string) ([]edit.Proposal, error) {
@@ -73,8 +78,8 @@ func TestFixRelintRemovesOnlyDeadDisableNames(test *testing.T) {
 				},
 				2,
 			)
-			if err != nil {
-				test.Fatal(err)
+			if fixTextError != nil {
+				test.Fatal(fixTextError)
 			}
 			if fixed.Text != fixture.fixed {
 				test.Fatalf("fixed %q, want %q", fixed.Text, fixture.fixed)

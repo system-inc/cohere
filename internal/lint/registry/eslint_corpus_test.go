@@ -75,9 +75,9 @@ func bindCorpusOptions(registration rule.Entry, options []json.RawMessage) (rule
 				return rule.Bound{}, "options did not encode: " + encodeError.Error()
 			}
 		}
-		bound, err := registration.Bind(list, rule.OptionsBase{})
-		if err != nil {
-			return rule.Bound{}, "options refused: " + err.Error()
+		bound, bindError := registration.Bind(list, rule.OptionsBase{})
+		if bindError != nil {
+			return rule.Bound{}, "options refused: " + bindError.Error()
 		}
 		return bound, ""
 	case rule.OptionArityOne:
@@ -87,9 +87,9 @@ func bindCorpusOptions(registration rule.Entry, options []json.RawMessage) (rule
 		if len(options) == 0 {
 			return registration.Unconfigured, ""
 		}
-		bound, err := registration.Bind(options[0], rule.OptionsBase{})
-		if err != nil {
-			return rule.Bound{}, "options refused: " + err.Error()
+		bound, bindError := registration.Bind(options[0], rule.OptionsBase{})
+		if bindError != nil {
+			return rule.Bound{}, "options refused: " + bindError.Error()
 		}
 		return bound, ""
 	case rule.OptionArityAt:

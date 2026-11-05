@@ -150,8 +150,8 @@ var NoForInArray = rule.Rule[rule.NoOptions]{
 	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
-		hasArrayishLength := func(t *checker.Type) bool {
-			lengthProperty := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, t, "length")
+		hasArrayishLength := func(subjectType *checker.Type) bool {
+			lengthProperty := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, subjectType, "length")
 			if lengthProperty == nil {
 				return false
 			}
@@ -161,9 +161,10 @@ var NoForInArray = rule.Rule[rule.NoOptions]{
 				checker.TypeFlagsNumberLike,
 			)
 		}
-		isArrayLike := func(t *checker.Type) bool {
-			return type_checking.TypeRecurser(t, func(t *checker.Type) bool {
-				return type_checking.GetNumberIndexType(ruleContext.TypeChecker, t) != nil && hasArrayishLength(t)
+		isArrayLike := func(subjectType *checker.Type) bool {
+			return type_checking.TypeRecurser(subjectType, func(subjectType *checker.Type) bool {
+				return type_checking.GetNumberIndexType(ruleContext.TypeChecker, subjectType) != nil &&
+					hasArrayishLength(subjectType)
 			})
 		}
 
@@ -173,12 +174,12 @@ var NoForInArray = rule.Rule[rule.NoOptions]{
 					return
 				}
 
-				t := type_checking.GetConstrainedTypeAtLocation(
+				subjectType := type_checking.GetConstrainedTypeAtLocation(
 					ruleContext.TypeChecker,
 					node.AsForInOrOfStatement().Expression,
 				)
 
-				if isArrayLike(t) {
+				if isArrayLike(subjectType) {
 					ruleContext.ReportRange(
 						type_checking.GetForStatementHeadLoc(ruleContext.SourceFile, node),
 						buildForInViolationMessage(),

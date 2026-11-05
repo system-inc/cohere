@@ -60,16 +60,16 @@ func readHead(repository string) (string, error) {
 // gitDirectoryOf finds a checkout's git directory: `.git` itself, or where a `.git` file points.
 func gitDirectoryOf(repository string) (string, error) {
 	dotGit := filepath.Join(repository, ".git")
-	information, err := os.Stat(dotGit)
-	if err != nil {
-		return "", fmt.Errorf("%s is not a git checkout: %w", repository, err)
+	information, statError := os.Stat(dotGit)
+	if statError != nil {
+		return "", fmt.Errorf("%s is not a git checkout: %w", repository, statError)
 	}
 	if information.IsDir() {
 		return dotGit, nil
 	}
-	contents, err := os.ReadFile(dotGit)
-	if err != nil {
-		return "", fmt.Errorf("reading %s: %w", dotGit, err)
+	contents, readError := os.ReadFile(dotGit)
+	if readError != nil {
+		return "", fmt.Errorf("reading %s: %w", dotGit, readError)
 	}
 	target, found := strings.CutPrefix(strings.TrimSpace(string(contents)), "gitdir: ")
 	if !found {
@@ -107,8 +107,8 @@ func readReference(gitDirectory string, commonDirectory string, reference string
 			return object, nil
 		}
 	}
-	if err := lines.Err(); err != nil {
-		return "", fmt.Errorf("reading packed-refs: %w", err)
+	if scanError := lines.Err(); scanError != nil {
+		return "", fmt.Errorf("reading packed-refs: %w", scanError)
 	}
 	return "", fmt.Errorf("%s is neither a loose ref nor packed", reference)
 }

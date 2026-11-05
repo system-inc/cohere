@@ -48,9 +48,9 @@ type requireArraySortCompareRawOptions struct {
 // above. On a decode error the default is returned alongside the error, so a malformed option can
 // never leave the rule running inverted.
 func DecodeRequireArraySortCompareOptions(raw []byte) (RequireArraySortCompareOptions, error) {
-	decoded, err := rule.DecodeOptionsInto[requireArraySortCompareRawOptions]()(raw)
-	if err != nil {
-		return DefaultRequireArraySortCompareSettings(), err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[requireArraySortCompareRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultRequireArraySortCompareSettings(), decodeOptionsError
 	}
 
 	options := DefaultRequireArraySortCompareSettings()

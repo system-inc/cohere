@@ -604,9 +604,9 @@ func TestDependenciesRefusesWhatItDoesNotPort(test *testing.T) {
 	test.Parallel()
 	elements := `"elements": [{"type": "api", "pattern": "api/**"}]`
 	cases := []struct {
-		name    string
-		raw     string
-		wantErr string
+		name      string
+		raw       string
+		wantError string
 	}{
 		{"no options", ``, "needs its options"},
 		{"no elements", `{"default": "disallow"}`, "has no elements"},
@@ -670,12 +670,12 @@ func TestDependenciesRefusesWhatItDoesNotPort(test *testing.T) {
 			test.Parallel()
 			_, decodeDependenciesOptionsError := decodeDependenciesOptions([]byte(testCase.raw), rule.OptionsBase{})
 			if decodeDependenciesOptionsError == nil {
-				test.Fatalf("expected a refusal mentioning %q, the options loaded", testCase.wantErr)
+				test.Fatalf("expected a refusal mentioning %q, the options loaded", testCase.wantError)
 			}
-			if !strings.Contains(decodeDependenciesOptionsError.Error(), testCase.wantErr) {
+			if !strings.Contains(decodeDependenciesOptionsError.Error(), testCase.wantError) {
 				test.Fatalf(
 					"expected a refusal mentioning %q, got %v",
-					testCase.wantErr,
+					testCase.wantError,
 					decodeDependenciesOptionsError,
 				)
 			}

@@ -775,10 +775,10 @@ func TestPreferDestructuringDeclinesEveryRepairUpstreamDeclines(test *testing.T)
 func TestPreferDestructuringDecoderReadsBothSchemaElements(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
-		name    string
-		raw     string
-		check   func(*testing.T, PreferDestructuringOptions)
-		wantErr bool
+		name      string
+		raw       string
+		check     func(*testing.T, PreferDestructuringOptions)
+		wantError bool
 	}{
 		{
 			name: "absent options turn every arm on, which is upstream's default",
@@ -835,29 +835,29 @@ func TestPreferDestructuringDecoderReadsBothSchemaElements(test *testing.T) {
 		{
 			// The workaround spelling from when the config layer could deliver one element. It was
 			// never upstream's, and upstream's `additionalProperties: false` refuses the key there.
-			name:    "enforceForRenamedProperties inside the FIRST element is refused",
-			raw:     `[{"object":true,"enforceForRenamedProperties":true}]`,
-			wantErr: true,
+			name:      "enforceForRenamedProperties inside the FIRST element is refused",
+			raw:       `[{"object":true,"enforceForRenamedProperties":true}]`,
+			wantError: true,
 		},
 		{
-			name:    "a third element is refused rather than dropped",
-			raw:     `[{"object":true},{"enforceForRenamedProperties":true},{"object":false}]`,
-			wantErr: true,
+			name:      "a third element is refused rather than dropped",
+			raw:       `[{"object":true},{"enforceForRenamedProperties":true},{"object":false}]`,
+			wantError: true,
 		},
 		{
-			name:    "a bare object, which the config layer never delivers to a list rule, is refused",
-			raw:     `{"object":true}`,
-			wantErr: true,
+			name:      "a bare object, which the config layer never delivers to a list rule, is refused",
+			raw:       `{"object":true}`,
+			wantError: true,
 		},
 		{
-			name:    "a first element that is not an object must error rather than decode to a default",
-			raw:     `["object"]`,
-			wantErr: true,
+			name:      "a first element that is not an object must error rather than decode to a default",
+			raw:       `["object"]`,
+			wantError: true,
 		},
 		{
-			name:    "an unknown key in the second element is refused, matching additionalProperties:false",
-			raw:     `[{"object":true},{"enforceForRenamedProperty":true}]`,
-			wantErr: true,
+			name:      "an unknown key in the second element is refused, matching additionalProperties:false",
+			raw:       `[{"object":true},{"enforceForRenamedProperty":true}]`,
+			wantError: true,
 		},
 	}
 
@@ -867,7 +867,7 @@ func TestPreferDestructuringDecoderReadsBothSchemaElements(test *testing.T) {
 			decoded, decodePreferDestructuringOptionsError := DecodePreferDestructuringOptions(
 				json.RawMessage(testCase.raw),
 			)
-			if testCase.wantErr {
+			if testCase.wantError {
 				if decodePreferDestructuringOptionsError == nil {
 					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
 				}

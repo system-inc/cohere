@@ -43,18 +43,18 @@ type yodaObjectWire struct {
 // `additionalProperties: false`, and so is a third element.
 func DecodeYodaOptions(list []byte) (YodaSettings, error) {
 	settings := DefaultYodaSettings()
-	elements, err := rule.OptionElements(list, 2)
-	if err != nil || len(elements) == 0 {
-		return settings, err
+	elements, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(elements) == 0 {
+		return settings, optionElementsError
 	}
 
 	var when string
 	if decodeError := json.Unmarshal(elements[0], &when); decodeError != nil {
 		return settings, fmt.Errorf("yoda takes \"always\" or \"never\" first, got %s", elements[0])
 	}
-	decoded, err := yodaSettingsFromWhen(when)
-	if err != nil {
-		return settings, err
+	decoded, yodaSettingsFromWhenError := yodaSettingsFromWhen(when)
+	if yodaSettingsFromWhenError != nil {
+		return settings, yodaSettingsFromWhenError
 	}
 	settings = decoded
 	if len(elements) < 2 {

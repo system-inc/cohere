@@ -229,11 +229,11 @@ func noRestrictedTypesNameOf(ruleContext rule.Context, node *ast.Node) string {
 // noRestrictedTypesRemoveSpaces is upstream's `removeSpaces`, applied to both the configured key and
 // the source text so the two are compared in the same shape.
 func noRestrictedTypesRemoveSpaces(typeSpelling string) string {
-	return strings.Map(func(r rune) rune {
-		if text.IsWhitespace(r) {
+	return strings.Map(func(character rune) rune {
+		if text.IsWhitespace(character) {
 			return -1
 		}
-		return r
+		return character
 	}, typeSpelling)
 }
 

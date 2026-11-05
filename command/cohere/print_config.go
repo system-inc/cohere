@@ -44,15 +44,15 @@ func writeResolvedConfig(
 	if checkSettingsError := registry.CheckSettings(base); checkSettingsError != nil {
 		return fmt.Errorf("validating the lint config: %w", checkSettingsError)
 	}
-	settings, err := settingsForFile(base, resolved, rule.RegisteredSettings())
-	if err != nil {
-		return err
+	settings, settingsForFileError := settingsForFile(base, resolved, rule.RegisteredSettings())
+	if settingsForFileError != nil {
+		return settingsForFileError
 	}
-	graph, err := program.Build(
+	graph, buildError := program.Build(
 		program.Options{ConfigFileName: location.ConfigFileName, CurrentDirectory: location.Root, SingleThreaded: true},
 	)
-	if err != nil {
-		return err
+	if buildError != nil {
+		return buildError
 	}
 	if !tspath.IsRootedDiskPath(path) {
 		path = absoluteFrom(lintConfiguration.Root, path)
@@ -155,9 +155,9 @@ func settingsForFile(
 			if !written {
 				continue
 			}
-			parts, err := registration.Split(raw)
-			if err != nil {
-				return nil, fmt.Errorf("settings[%q]: %w", namespace, err)
+			parts, splitError := registration.Split(raw)
+			if splitError != nil {
+				return nil, fmt.Errorf("settings[%q]: %w", namespace, splitError)
 			}
 			read := map[string]json.RawMessage{}
 			for name, part := range parts {

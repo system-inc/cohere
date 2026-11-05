@@ -66,10 +66,10 @@ func formatWithProseWrap(
 	prettierOptions formatoptions.Options,
 	proseWrap string,
 	textToDoc printing.TextToDoc,
-) (formatted string, err error) {
+) (formatted string, formatWithProseWrapError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			formatted, err = "", fmt.Errorf("markdown: %v", recovered)
+			formatted, formatWithProseWrapError = "", fmt.Errorf("markdown: %v", recovered)
 		}
 	}()
 
@@ -82,9 +82,9 @@ func formatWithProseWrap(
 		nodes.Reset()
 		nodeArenas.Put(nodes)
 	}()
-	ast, err := mdast.ParseMarkdown(text, nodes)
-	if err != nil {
-		return "", err
+	ast, formatWithProseWrapError := mdast.ParseMarkdown(text, nodes)
+	if formatWithProseWrapError != nil {
+		return "", formatWithProseWrapError
 	}
 
 	printOptions := &options{
@@ -101,9 +101,9 @@ func formatWithProseWrap(
 		EmbeddedLanguageFormatting: "auto",
 		TextToDoc:                  textToDoc,
 	}
-	document, err := printing.PrintAstToDoc(ast, nil, printOptions)
-	if err != nil {
-		return "", err
+	document, formatWithProseWrapError := printing.PrintAstToDoc(ast, nil, printOptions)
+	if formatWithProseWrapError != nil {
+		return "", formatWithProseWrapError
 	}
 
 	return doc.Print(document, doc.Options{

@@ -306,8 +306,8 @@ func awaitThenableIsPromiseAggregatorCall(ruleContext rule.Context, call *ast.No
 
 // awaitThenableIsAlwaysNonAwaitable is upstream's `isAlwaysNonAwaitableType`: every union part is
 // never awaitable.
-func awaitThenableIsAlwaysNonAwaitable(ruleContext rule.Context, node *ast.Node, t *checker.Type) bool {
-	for part := range type_checking.UnionTypePartsSeq(t) {
+func awaitThenableIsAlwaysNonAwaitable(ruleContext rule.Context, node *ast.Node, subjectType *checker.Type) bool {
+	for part := range type_checking.UnionTypePartsSeq(subjectType) {
 		if type_checking.NeedsToBeAwaited(ruleContext.TypeChecker, node, part) != type_checking.TypeAwaitableNever {
 			return false
 		}
@@ -317,8 +317,8 @@ func awaitThenableIsAlwaysNonAwaitable(ruleContext rule.Context, node *ast.Node,
 
 // awaitThenableContainsNonAwaitable is upstream's `containsNonAwaitableType`: some union part is
 // never awaitable.
-func awaitThenableContainsNonAwaitable(ruleContext rule.Context, node *ast.Node, t *checker.Type) bool {
-	for part := range type_checking.UnionTypePartsSeq(t) {
+func awaitThenableContainsNonAwaitable(ruleContext rule.Context, node *ast.Node, subjectType *checker.Type) bool {
+	for part := range type_checking.UnionTypePartsSeq(subjectType) {
 		if type_checking.NeedsToBeAwaited(ruleContext.TypeChecker, node, part) == type_checking.TypeAwaitableNever {
 			return true
 		}
@@ -331,13 +331,13 @@ func awaitThenableContainsNonAwaitable(ruleContext rule.Context, node *ast.Node,
 //
 // A non-iterable argument is already a type error, so it is left to the checker. An iterable one
 // reports when any of its value types contains a part that is never awaitable.
-func awaitThenableIsInvalidAggregatorInput(ruleContext rule.Context, node *ast.Node, t *checker.Type) bool {
-	for part := range type_checking.UnionTypePartsSeq(t) {
+func awaitThenableIsInvalidAggregatorInput(ruleContext rule.Context, node *ast.Node, subjectType *checker.Type) bool {
+	for part := range type_checking.UnionTypePartsSeq(subjectType) {
 		if type_checking.GetWellKnownSymbolPropertyOfType(part, "iterator", ruleContext.TypeChecker) == nil {
 			return false
 		}
 	}
-	for part := range type_checking.UnionTypePartsSeq(t) {
+	for part := range type_checking.UnionTypePartsSeq(subjectType) {
 		for _, valueType := range awaitThenableValueTypesOfArrayLike(ruleContext, part) {
 			if awaitThenableContainsNonAwaitable(ruleContext, node, valueType) {
 				return true
@@ -360,18 +360,18 @@ func awaitThenableIsAsyncDisposable(ruleContext rule.Context, initializerType *c
 
 // awaitThenableValueTypesOfArrayLike is upstream's `getValueTypesOfArrayLike`: a tuple's members, an
 // array-like's number index type, or an `Iterable<T>`'s first type argument.
-func awaitThenableValueTypesOfArrayLike(ruleContext rule.Context, t *checker.Type) []*checker.Type {
-	if checker.IsTupleType(t) {
-		return ruleContext.TypeChecker.GetTypeArguments(t)
+func awaitThenableValueTypesOfArrayLike(ruleContext rule.Context, subjectType *checker.Type) []*checker.Type {
+	if checker.IsTupleType(subjectType) {
+		return ruleContext.TypeChecker.GetTypeArguments(subjectType)
 	}
-	if ruleContext.TypeChecker.IsArrayLikeType(t) {
-		if indexType := ruleContext.TypeChecker.GetNumberIndexType(t); indexType != nil {
+	if ruleContext.TypeChecker.IsArrayLikeType(subjectType) {
+		if indexType := ruleContext.TypeChecker.GetNumberIndexType(subjectType); indexType != nil {
 			return []*checker.Type{indexType}
 		}
 		return nil
 	}
-	if checker.Type_objectFlags(t)&checker.ObjectFlagsReference != 0 {
-		typeArguments := ruleContext.TypeChecker.GetTypeArguments(t)
+	if checker.Type_objectFlags(subjectType)&checker.ObjectFlagsReference != 0 {
+		typeArguments := ruleContext.TypeChecker.GetTypeArguments(subjectType)
 		if len(typeArguments) > 1 {
 			typeArguments = typeArguments[:1]
 		}

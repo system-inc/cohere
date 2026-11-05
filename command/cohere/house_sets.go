@@ -27,13 +27,13 @@ func loadLintConfig(graph *program.Graph, location projectLocation) (*configurat
 	if !usesHouseSets(location) {
 		return configuration.LoadFor(location.LintConfigFileName, registeredRuleNames())
 	}
-	settings, err := configuration.OwnSettingsOf(location.LintConfigFileName)
-	if err != nil {
-		return nil, err
+	settings, ownSettingsOfError := configuration.OwnSettingsOf(location.LintConfigFileName)
+	if ownSettingsOfError != nil {
+		return nil, ownSettingsOfError
 	}
-	settingsDirectory, err := filepath.Abs(filepath.Dir(location.LintConfigFileName))
-	if err != nil {
-		return nil, err
+	settingsDirectory, absolutePathError := filepath.Abs(filepath.Dir(location.LintConfigFileName))
+	if absolutePathError != nil {
+		return nil, absolutePathError
 	}
 	detection := housesets.Detect(
 		graph.ProjectFiles(),
@@ -89,10 +89,10 @@ func writeSetsLine(out *bufio.Writer, lintConfiguration *configuration.Config) {
 	}
 }
 
-// errHouseSetsPerFile is --print-config's and --list-rules-enabled's answer under zero config. Which house
+// errorHouseSetsPerFile is --print-config's and --list-rules-enabled's answer under zero config. Which house
 // sets a file gets is read from the program, which those two flags do not build, so an answer without it
 // would be a guess; --explain builds it and says what ran on one file and why.
-var errHouseSetsPerFile = errors.New(
+var errorHouseSetsPerFile = errors.New(
 	"this project has no CohereSettings.json that names its sets, so which house sets " +
 		"apply to a file is decided from the program per file, and --print-config does not build the program: " +
 		"run cohere --explain <file> to see what runs on it and why",

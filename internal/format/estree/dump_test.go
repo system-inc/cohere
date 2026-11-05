@@ -118,14 +118,14 @@ func TestConvertAgreesWithPrettier(test *testing.T) {
 			refused++
 			continue
 		}
-		source, err := os.ReadFile(path)
-		if err != nil {
-			test.Fatal(err)
+		source, readError := os.ReadFile(path)
+		if readError != nil {
+			test.Fatal(readError)
 		}
-		got, err := dumpFile(path, string(source))
-		if err != nil {
+		got, dumpFileError := dumpFile(path, string(source))
+		if dumpFileError != nil {
 			different++
-			test.Errorf("%s: the fork parses it and the converter refused: %v", path, err)
+			test.Errorf("%s: the fork parses it and the converter refused: %v", path, dumpFileError)
 			continue
 		}
 		for _, key := range []string{"ast", "comments"} {
@@ -157,9 +157,9 @@ func TestConvertAgreesWithPrettier(test *testing.T) {
 // dumpFile converts one file and renders it the way the oracle script does, through JSON, so both sides
 // compare as the same Go values.
 func dumpFile(path string, text string) (map[string]any, error) {
-	program, comments, _, err := ParseTypeScript(path, text, nil)
-	if err != nil {
-		return nil, err
+	program, comments, _, parseTypeScriptError := ParseTypeScript(path, text, nil)
+	if parseTypeScriptError != nil {
+		return nil, parseTypeScriptError
 	}
 	offsets := utf16Offsets(text)
 	dumped := make([]any, len(comments))
@@ -170,13 +170,13 @@ func dumpFile(path string, text string) (map[string]any, error) {
 			"value": comment.String("value"),
 		}
 	}
-	encoded, err := json.Marshal(map[string]any{"ast": dumpValue(program, offsets), "comments": dumped})
-	if err != nil {
-		return nil, err
+	encoded, encodeError := json.Marshal(map[string]any{"ast": dumpValue(program, offsets), "comments": dumped})
+	if encodeError != nil {
+		return nil, encodeError
 	}
 	var result map[string]any
-	err = json.Unmarshal(encoded, &result)
-	return result, err
+	decodeError := json.Unmarshal(encoded, &result)
+	return result, decodeError
 }
 
 // firstDifference names the first path where two decoded JSON values differ, or "".

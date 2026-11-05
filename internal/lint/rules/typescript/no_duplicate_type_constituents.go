@@ -41,9 +41,9 @@ type noDuplicateTypeConstituentsRawOptions struct {
 // cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what
 // arrives is the bare object rather than upstream's one-element array.
 func DecodeNoDuplicateTypeConstituentsOptions(raw []byte) (NoDuplicateTypeConstituentsOptions, error) {
-	decoded, err := rule.DecodeOptionsInto[noDuplicateTypeConstituentsRawOptions]()(raw)
-	if err != nil {
-		return DefaultNoDuplicateTypeConstituentsSettings(), err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noDuplicateTypeConstituentsRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultNoDuplicateTypeConstituentsSettings(), decodeOptionsError
 	}
 
 	options := DefaultNoDuplicateTypeConstituentsSettings()

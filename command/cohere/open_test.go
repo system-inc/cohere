@@ -267,9 +267,9 @@ func TestOpenDiscoveredProjects(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	// cohere reports real paths, and on macOS the temp directory sits behind the /tmp symlink.
-	root, err := filepath.EvalSymlinks(test.TempDir())
-	if err != nil {
-		test.Fatal(err)
+	root, resolveSymlinksError := filepath.EvalSymlinks(test.TempDir())
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
 	}
 	writeTree(test, root, map[string]string{
 		"types/tsconfig.json":       `{"compilerOptions":{"strict":true,"noEmit":true},"include":["*.ts"]}`,
@@ -291,18 +291,18 @@ func TestOpenDiscoveredProjects(test *testing.T) {
 	command := exec.Command(binary, "--no-fix", "--no-format", "--no-cache", "--json", "--open")
 	command.Dir = root
 	command.Env = append(os.Environ(), "PATH="+editor, "OPEN_LOG="+log)
-	output, err := command.CombinedOutput()
-	if exited, ok := err.(*exec.ExitError); !ok || exited.ExitCode() != 1 {
-		test.Fatalf("exit %v: %s", err, output)
+	output, outputError := command.CombinedOutput()
+	if exited, ok := outputError.(*exec.ExitError); !ok || exited.ExitCode() != 1 {
+		test.Fatalf("exit %v: %s", outputError, output)
 	}
-	contents, err := os.ReadFile(log)
+	contents, readError := os.ReadFile(log)
 	want := "invocation\n--\n" +
 		filepath.Join(root, "lint", "Lint.ts") +
 		"\n" +
 		filepath.Join(root, "types", "Types.ts") +
 		"\n"
-	if err != nil || string(contents) != want {
-		test.Fatalf("editor got %q (%v), want %q\n%s", contents, err, want, output)
+	if readError != nil || string(contents) != want {
+		test.Fatalf("editor got %q (%v), want %q\n%s", contents, readError, want, output)
 	}
 	if !strings.Contains(string(output), "TS2322") || !strings.Contains(string(output), "no-debugger") {
 		test.Fatalf("missing the planted type or lint finding: %s", output)
@@ -348,7 +348,7 @@ func TestOpenCrash(test *testing.T) {
 func TestOpenSwiftArguments(test *testing.T) {
 	test.Parallel()
 	location := projectLocation{Root: "/work/project"}
-	baseline, mode, err := engineArguments(
+	baseline, mode, engineArgumentsError := engineArguments(
 		swiftLanguage,
 		swiftFlags,
 		location,
@@ -356,10 +356,10 @@ func TestOpenSwiftArguments(test *testing.T) {
 		func(string) string { return "true" },
 		nil,
 	)
-	if err != nil {
-		test.Fatal(err)
+	if engineArgumentsError != nil {
+		test.Fatal(engineArgumentsError)
 	}
-	arguments, openMode, err := engineArguments(
+	arguments, openMode, engineArgumentsError := engineArguments(
 		swiftLanguage,
 		swiftFlags,
 		location,
@@ -367,7 +367,12 @@ func TestOpenSwiftArguments(test *testing.T) {
 		func(string) string { return "true" },
 		nil,
 	)
-	if err != nil || mode != openMode || !reflect.DeepEqual(arguments, baseline) {
-		test.Fatalf("--open must be handled by the Go front door: %v, %v, %v", arguments, openMode, err)
+	if engineArgumentsError != nil || mode != openMode || !reflect.DeepEqual(arguments, baseline) {
+		test.Fatalf(
+			"--open must be handled by the Go front door: %v, %v, %v",
+			arguments,
+			openMode,
+			engineArgumentsError,
+		)
 	}
 }

@@ -30,13 +30,13 @@ func elseReturnOptions(test *testing.T, allowElseIf *bool) NoElseReturnSettings 
 		}
 		return decoded
 	}
-	raw, err := json.Marshal(map[string]bool{"allowElseIf": *allowElseIf})
-	if err != nil {
-		test.Fatalf("could not marshal the option: %v", err)
+	raw, encodeError := json.Marshal(map[string]bool{"allowElseIf": *allowElseIf})
+	if encodeError != nil {
+		test.Fatalf("could not marshal the option: %v", encodeError)
 	}
-	decoded, err := DecodeNoElseReturnOptions(raw)
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	decoded, decodeNoElseReturnOptionsError := DecodeNoElseReturnOptions(raw)
+	if decodeNoElseReturnOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeNoElseReturnOptionsError)
 	}
 	return decoded
 }

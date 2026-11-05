@@ -33,9 +33,9 @@ const corpusDirectory = "../registry/testdata/eslint-corpus/eslint-10.8.1"
 func TestValidatorAgreesWithAjv(test *testing.T) {
 	test.Parallel()
 
-	data, err := os.ReadFile(filepath.Join("testdata", "samples.json"))
-	if err != nil {
-		test.Fatal(err)
+	data, readError := os.ReadFile(filepath.Join("testdata", "samples.json"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	var samples samplesFile
 	if decodeError := json.Unmarshal(data, &samples); decodeError != nil {
@@ -85,18 +85,18 @@ func TestValidatorAgreesWithAjv(test *testing.T) {
 	}
 
 	corpusRows := 0
-	entries, err := os.ReadDir(corpusDirectory)
-	if err != nil {
-		test.Fatal(err)
+	entries, readDirectoryError := os.ReadDir(corpusDirectory)
+	if readDirectoryError != nil {
+		test.Fatal(readDirectoryError)
 	}
 	for _, entry := range entries {
 		ruleName, isRows := strings.CutSuffix(entry.Name(), ".json")
 		if !isRows || entry.Name() == "known-gaps.json" {
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join(corpusDirectory, entry.Name()))
-		if err != nil {
-			test.Fatal(err)
+		data, readError := os.ReadFile(filepath.Join(corpusDirectory, entry.Name()))
+		if readError != nil {
+			test.Fatal(readError)
 		}
 		var rows []struct {
 			Options []json.RawMessage `json:"options"`
@@ -104,9 +104,9 @@ func TestValidatorAgreesWithAjv(test *testing.T) {
 		if decodeError := json.Unmarshal(data, &rows); decodeError != nil {
 			test.Fatalf("%s: %v", entry.Name(), decodeError)
 		}
-		schema, found, err := For(ruleName)
-		if err != nil {
-			test.Fatalf("%s: %v", ruleName, err)
+		schema, found, optionSchemaForError := For(ruleName)
+		if optionSchemaForError != nil {
+			test.Fatalf("%s: %v", ruleName, optionSchemaForError)
 		}
 		for _, row := range rows {
 			if len(row.Options) == 0 {

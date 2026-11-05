@@ -356,14 +356,20 @@ func TestRequireDescriptionDecoderRefusesWhatTheSchemaRefuses(test *testing.T) {
 		}
 	}
 
-	options, err := DecodeRequireDescriptionOptions(nil)
-	if err != nil || len(options.Ignore) != 0 {
-		test.Errorf("a bare severity should decode to the zero options, got %#v, %v", options, err)
+	options, decodeRequireDescriptionOptionsError := DecodeRequireDescriptionOptions(nil)
+	if decodeRequireDescriptionOptionsError != nil || len(options.Ignore) != 0 {
+		test.Errorf(
+			"a bare severity should decode to the zero options, got %#v, %v",
+			options,
+			decodeRequireDescriptionOptionsError,
+		)
 	}
-	options, err = DecodeRequireDescriptionOptions(
+	options, decodeRequireDescriptionOptionsError = DecodeRequireDescriptionOptions(
 		[]byte(`{"ignore":["eslint-disable","eslint-enable"],"additionalDirectives":["c8"]}`),
 	)
-	if err != nil || len(options.Ignore) != 2 || len(options.AdditionalDirectives) != 1 {
-		test.Errorf("a valid object should decode whole, got %#v, %v", options, err)
+	if decodeRequireDescriptionOptionsError != nil ||
+		len(options.Ignore) != 2 ||
+		len(options.AdditionalDirectives) != 1 {
+		test.Errorf("a valid object should decode whole, got %#v, %v", options, decodeRequireDescriptionOptionsError)
 	}
 }

@@ -84,13 +84,13 @@ var NoUnknownClasses = rule.Rule[NoUnknownClassesOptions]{
 		// the others do, because a design system that failed to load would otherwise make every
 		// class in the tree read as unknown.
 		designSystem := DesignSystemForProgramAt(ruleContext.Program, configured.Location())
-		if designSystem.Err != nil {
+		if designSystem.Error != nil {
 			if ruleContext.Program == nil {
 				return nil
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if skipWithoutTailwind(ruleContext, designSystem.Err) {
+			if skipWithoutTailwind(ruleContext, designSystem.Error) {
 				return nil
 			}
 			return declineListeners(ruleContext, "no-unknown-classes", designSystem)

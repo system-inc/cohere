@@ -222,13 +222,13 @@ func TestCohereRunsFromAnywhere(test *testing.T) {
 		if output, code := runCohere(test, binary, root, "--types"); code != 0 {
 			test.Fatalf("exit %d:\n%s", code, output)
 		}
-		before, err := os.ReadFile(buildInfo)
-		if err != nil {
-			test.Fatalf("a writing run left no build info, so this fixture cannot tell writing from not: %v", err)
+		before, readError := os.ReadFile(buildInfo)
+		if readError != nil {
+			test.Fatalf("a writing run left no build info, so this fixture cannot tell writing from not: %v", readError)
 		}
-		information, err := os.Stat(buildInfo)
-		if err != nil {
-			test.Fatal(err)
+		information, statError := os.Stat(buildInfo)
+		if statError != nil {
+			test.Fatal(statError)
 		}
 		modified := information.ModTime()
 
@@ -243,9 +243,9 @@ func TestCohereRunsFromAnywhere(test *testing.T) {
 		if output, code := runCohere(test, binary, root, "--no-fix", "--types"); code != 0 {
 			test.Fatalf("exit %d:\n%s", code, output)
 		}
-		after, err := os.ReadFile(buildInfo)
-		if err != nil {
-			test.Fatal(err)
+		after, readError := os.ReadFile(buildInfo)
+		if readError != nil {
+			test.Fatal(readError)
 		}
 		if !bytes.Equal(before, after) {
 			test.Error("a --no-fix run rewrote the build info")
@@ -332,9 +332,9 @@ func TestTheTypePhaseReadsButDoesNotWriteWhenAskedNotTo(test *testing.T) {
 
 	graph = build()
 	collectTypeDiagnostics(context.Background(), graph, graph.ProjectFiles(), true, true)
-	before, err := os.ReadFile(buildInfo)
-	if err != nil {
-		test.Fatalf("persist=true wrote nothing, so the assertion above cannot distinguish the flag: %v", err)
+	before, readError := os.ReadFile(buildInfo)
+	if readError != nil {
+		test.Fatalf("persist=true wrote nothing, so the assertion above cannot distinguish the flag: %v", readError)
 	}
 
 	writeTree(test, root, map[string]string{"index.ts": "export const value: number = \"planted\";\n"})
@@ -343,9 +343,9 @@ func TestTheTypePhaseReadsButDoesNotWriteWhenAskedNotTo(test *testing.T) {
 	if len(diagnostics) == 0 {
 		test.Error("a planted type error was not found by a run that read a build info and did not write one")
 	}
-	after, err := os.ReadFile(buildInfo)
-	if err != nil {
-		test.Fatal(err)
+	after, readError := os.ReadFile(buildInfo)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if !bytes.Equal(before, after) {
 		test.Error("persist=false rewrote an existing build info")

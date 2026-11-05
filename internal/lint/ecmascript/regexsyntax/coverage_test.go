@@ -50,25 +50,25 @@ func TestParseRegexFlagsReadsBothModeFlags(test *testing.T) {
 // following is not a valid escape.
 func TestHexHelpers(test *testing.T) {
 	test.Parallel()
-	for _, b := range []byte{'0', '9', 'a', 'f', 'A', 'F'} {
-		if !IsHexDigit(b) {
-			test.Errorf("IsHexDigit(%q) = false, want true", b)
+	for _, character := range []byte{'0', '9', 'a', 'f', 'A', 'F'} {
+		if !IsHexDigit(character) {
+			test.Errorf("IsHexDigit(%q) = false, want true", character)
 		}
 	}
-	for _, b := range []byte{'g', 'G', 'z', ' ', '-', 0} {
-		if IsHexDigit(b) {
-			test.Errorf("IsHexDigit(%q) = true, want false", b)
+	for _, character := range []byte{'g', 'G', 'z', ' ', '-', 0} {
+		if IsHexDigit(character) {
+			test.Errorf("IsHexDigit(%q) = true, want false", character)
 		}
 	}
 
-	for _, s := range []string{"0", "ff", "FF", "1a2B3c"} {
-		if !AllHexDigits(s) {
-			test.Errorf("AllHexDigits(%q) = false, want true", s)
+	for _, text := range []string{"0", "ff", "FF", "1a2B3c"} {
+		if !AllHexDigits(text) {
+			test.Errorf("AllHexDigits(%q) = false, want true", text)
 		}
 	}
-	for _, s := range []string{"", "0g", "xyz", "1 2"} {
-		if AllHexDigits(s) {
-			test.Errorf("AllHexDigits(%q) = true, want false", s)
+	for _, text := range []string{"", "0g", "xyz", "1 2"} {
+		if AllHexDigits(text) {
+			test.Errorf("AllHexDigits(%q) = true, want false", text)
 		}
 	}
 

@@ -217,9 +217,9 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 	test.Parallel()
 
 	// A bare "error" arrives as empty input and must land on the documented defaults.
-	options, err := DecodeNoUnstableNestedComponentsOptions(nil)
-	if err != nil {
-		test.Fatalf("decoding empty input: %v", err)
+	options, decodeNoUnstableNestedComponentsOptionsError := DecodeNoUnstableNestedComponentsOptions(nil)
+	if decodeNoUnstableNestedComponentsOptionsError != nil {
+		test.Fatalf("decoding empty input: %v", decodeNoUnstableNestedComponentsOptionsError)
 	}
 	if options.PropNamePattern != "render*" {
 		test.Errorf("empty input gave pattern %q, want render*", options.PropNamePattern)
@@ -229,9 +229,11 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 	}
 
 	// An explicit pattern replaces the default.
-	options, err = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":"*Renderer"}`))
-	if err != nil {
-		test.Fatalf("decoding a pattern: %v", err)
+	options, decodeNoUnstableNestedComponentsOptionsError = DecodeNoUnstableNestedComponentsOptions(
+		[]byte(`{"propNamePattern":"*Renderer"}`),
+	)
+	if decodeNoUnstableNestedComponentsOptionsError != nil {
+		test.Fatalf("decoding a pattern: %v", decodeNoUnstableNestedComponentsOptionsError)
 	}
 	if options.PropNamePattern != "*Renderer" {
 		test.Errorf("pattern %q, want *Renderer", options.PropNamePattern)
@@ -239,9 +241,11 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 
 	// An explicit empty pattern folds back onto the default, matching upstream's `|| 'render*'`,
 	// where the empty string is falsy.
-	options, err = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":""}`))
-	if err != nil {
-		test.Fatalf("decoding an empty pattern: %v", err)
+	options, decodeNoUnstableNestedComponentsOptionsError = DecodeNoUnstableNestedComponentsOptions(
+		[]byte(`{"propNamePattern":""}`),
+	)
+	if decodeNoUnstableNestedComponentsOptionsError != nil {
+		test.Fatalf("decoding an empty pattern: %v", decodeNoUnstableNestedComponentsOptionsError)
 	}
 	if options.PropNamePattern != "render*" {
 		test.Errorf("empty pattern gave %q, want render*", options.PropNamePattern)

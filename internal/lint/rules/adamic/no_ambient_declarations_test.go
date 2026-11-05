@@ -15,9 +15,9 @@ func ambientFixture(test *testing.T, name string) map[string]string {
 	test.Helper()
 	files := map[string]string{}
 	root := filepath.Join("testdata/ambient", name)
-	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() {
 			return nil

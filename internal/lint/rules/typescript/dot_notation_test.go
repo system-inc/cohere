@@ -124,9 +124,9 @@ class Entity {
 const entity = new Entity();
 entity['clearChangedFields']();
 `
-	unconfigured, err := DecodeDotNotationOptions(nil)
-	if err != nil {
-		test.Fatal(err)
+	unconfigured, decodeDotNotationOptionsError := DecodeDotNotationOptions(nil)
+	if decodeDotNotationOptionsError != nil {
+		test.Fatal(decodeDotNotationOptionsError)
 	}
 	rule_testing.ExpectFindings(
 		test,
@@ -134,9 +134,11 @@ entity['clearChangedFields']();
 		"useDot",
 	)
 
-	allowed, err := DecodeDotNotationOptions([]byte(`{"allowProtectedClassPropertyAccess": true}`))
-	if err != nil {
-		test.Fatal(err)
+	allowed, decodeDotNotationOptionsError := DecodeDotNotationOptions(
+		[]byte(`{"allowProtectedClassPropertyAccess": true}`),
+	)
+	if decodeDotNotationOptionsError != nil {
+		test.Fatal(decodeDotNotationOptionsError)
 	}
 	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, DotNotation, "Case.ts", source, allowed))
 }

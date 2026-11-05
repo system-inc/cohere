@@ -38,9 +38,9 @@ func main() {
 		panic(createDirectoryError)
 	}
 
-	manifest, err := release.DispatcherManifest("0.1.0")
-	if err != nil {
-		panic(err)
+	manifest, dispatcherManifestError := release.DispatcherManifest("0.1.0")
+	if dispatcherManifestError != nil {
+		panic(dispatcherManifestError)
 	}
 	if writeError := os.WriteFile(filepath.Join(directory, "package.json"), manifest, 0o644); writeError != nil {
 		panic(writeError)
@@ -71,9 +71,9 @@ func main() {
 		)
 		os.Exit(1)
 	}
-	checksums, err := release.Checksums(os.Args[1], platformDirectories)
-	if err != nil {
-		panic(err)
+	checksums, checksumsError := release.Checksums(os.Args[1], platformDirectories)
+	if checksumsError != nil {
+		panic(checksumsError)
 	}
 	if writeError := os.WriteFile(
 		filepath.Join(directory, release.ChecksumsFileName),

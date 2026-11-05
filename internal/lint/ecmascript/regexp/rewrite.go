@@ -50,20 +50,21 @@ func wordBoundary(negated bool, options rewriteOptions) string {
 	return `(?:(?<!` + word + `)(?=` + word + `)|(?<=` + word + `)(?!` + word + `))`
 }
 
-// literalRune writes r so that regexp2 reads it as the character itself,
+// literalRune writes `character` so that regexp2 reads it as the character itself,
 // whatever meaning that character carries on its own. A letter or a digit is
 // written as it stands; everything else takes the `\uXXXX` form, which is what
 // regexp2 parses both inside a character class and out.
-func literalRune(r rune) string {
+func literalRune(character rune) string {
 	switch {
-	case r >= '0' && r <= '9', r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
-		return string(r)
-	case r > 0xFFFF:
+	case character >= '0' &&
+		character <= '9', character >= 'a' && character <= 'z', character >= 'A' && character <= 'Z':
+		return string(character)
+	case character > 0xFFFF:
 		// Past what `\uXXXX` names, and nothing up there carries a meaning of
 		// its own to escape.
-		return string(r)
+		return string(character)
 	}
-	return fmt.Sprintf(`\u%04x`, r)
+	return fmt.Sprintf(`\u%04x`, character)
 }
 
 // rewriteOptions says which of a JavaScript regexp's flags the rewrite has to
@@ -117,26 +118,26 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 		return escapeContext{unicode: current.unicode, groups: groupCount, named: named}
 	}
 
-	for i := 0; i < len(source); {
-		r, size := utf8.DecodeRuneInString(source[i:])
+	for index := 0; index < len(source); {
+		character, size := utf8.DecodeRuneInString(source[index:])
 
-		switch r {
+		switch character {
 		case '\\':
 			// `\k<name>` names a group. The name is not text to be matched,
 			// so widening the letters in it would rewrite the reference.
-			if name, nameSize, ok := namedBackreference(source[i:]); ok {
+			if name, nameSize, ok := namedBackreference(source[index:]); ok {
 				if current.ignoreCase {
 					exact = false
 				}
 				out.WriteString(name)
-				i += nameSize
+				index += nameSize
 				continue
 			}
-			escape, decodeEscapeError := decodeEscape(source, i+size, context())
+			escape, decodeEscapeError := decodeEscape(source, index+size, context())
 			if decodeEscapeError != nil {
 				return "", false, decodeEscapeError
 			}
-			end := i + size + escape.width
+			end := index + size + escape.width
 
 			switch escape.kind {
 			case escapeRune:
@@ -147,7 +148,7 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				if current.ignoreCase {
 					if class, widened := CaseClass(escape.r, current.unicode); widened {
 						out.WriteString(class)
-						i = end
+						index = end
 						continue
 					}
 				}
@@ -157,14 +158,14 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				if current.ignoreCase {
 					exact = false
 				}
-				out.WriteString(source[i:end])
+				out.WriteString(source[index:end])
 
 			case escapeAssertion:
 				// A pattern cannot repeat a position, and lowering the
 				// assertion first would leave regexp2 reading syntax
 				// JavaScript rejects as something it accepts.
 				if quantifierWidth(source[end:]) > 0 {
-					return "", false, errNothingToRepeat(source[end:])
+					return "", false, nothingToRepeatError(source[end:])
 				}
 				out.WriteString(wordBoundary(escape.negated, current))
 
@@ -179,41 +180,41 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				case escape.set == setNonWord && current.ignoreCase && current.unicode:
 					out.WriteString(writeClass(wordClassAtoms(current), true, rewriteOptions{}))
 				default:
-					out.WriteString(source[i:end])
+					out.WriteString(source[index:end])
 				}
 			}
-			i = end
+			index = end
 			continue
 
 		case '[':
-			body, negated, width, err := readClass(source[i:])
-			if err != nil {
-				return "", false, err
+			body, negated, width, readClassError := readClass(source[index:])
+			if readClassError != nil {
+				return "", false, readClassError
 			}
-			atoms, classExact, err := classAtoms(body, current, context())
-			if err != nil {
-				return "", false, err
+			atoms, classExact, classAtomsError := classAtoms(body, current, context())
+			if classAtomsError != nil {
+				return "", false, classAtomsError
 			}
 			if !classExact {
 				exact = false
 			}
 			out.WriteString(writeClass(atoms, negated, current))
-			i += width
+			index += width
 			continue
 
 		case '(':
 			// `(?<name>` opens a named group. Same as `\k<name>`: the name is
 			// not text, so it goes through untouched.
-			if opener, openerSize, ok := namedGroupOpener(source[i:]); ok {
+			if opener, openerSize, ok := namedGroupOpener(source[index:]); ok {
 				groups = append(groups, openGroup{options: current})
 				out.WriteString(opener)
-				i += openerSize
+				index += openerSize
 				continue
 			}
 			// `(?i-m:…)` turns a flag on or off over one group. The rewrite
 			// answers to the flags as they stand here, so the group opens as a
 			// plain one and the walk goes on under what it says.
-			if inside, openerSize, ok := modifierGroup(source[i:], current); ok {
+			if inside, openerSize, ok := modifierGroup(source[index:], current); ok {
 				groups = append(groups, openGroup{options: current})
 				current = inside
 				if options.ignoreCase && !inside.ignoreCase {
@@ -224,15 +225,15 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				} else {
 					out.WriteString(`(?:`)
 				}
-				i += openerSize
+				index += openerSize
 				continue
 			}
-			if checkGroupConstructError := checkGroupConstruct(source[i:]); checkGroupConstructError != nil {
+			if checkGroupConstructError := checkGroupConstruct(source[index:]); checkGroupConstructError != nil {
 				return "", false, checkGroupConstructError
 			}
-			groups = append(groups, openGroup{options: current, kind: groupKindOf(source[i:])})
+			groups = append(groups, openGroup{options: current, kind: groupKindOf(source[index:])})
 			out.WriteByte('(')
-			i += size
+			index += size
 			continue
 
 		case ')':
@@ -242,14 +243,14 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				current = group.options
 				if checkGroupQuantifierError := checkGroupQuantifier(
 					group.kind,
-					source[i+size:],
+					source[index+size:],
 					options,
 				); checkGroupQuantifierError != nil {
 					return "", false, checkGroupQuantifierError
 				}
 			}
 			out.WriteByte(')')
-			i += size
+			index += size
 			continue
 
 		case '.':
@@ -258,50 +259,50 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 			} else {
 				out.WriteString(nonTerminator)
 			}
-			i += size
+			index += size
 			continue
 
 		case '^':
-			if quantifierWidth(source[i+size:]) > 0 {
-				return "", false, errNothingToRepeat(source[i+size:])
+			if quantifierWidth(source[index+size:]) > 0 {
+				return "", false, nothingToRepeatError(source[index+size:])
 			}
 			if current.multiline {
 				out.WriteString(lineStart)
 			} else {
 				out.WriteString(inputStart)
 			}
-			i += size
+			index += size
 			continue
 
 		case '$':
-			if quantifierWidth(source[i+size:]) > 0 {
-				return "", false, errNothingToRepeat(source[i+size:])
+			if quantifierWidth(source[index+size:]) > 0 {
+				return "", false, nothingToRepeatError(source[index+size:])
 			}
 			if current.multiline {
 				out.WriteString(lineEnd)
 			} else {
 				out.WriteString(inputEnd)
 			}
-			i += size
+			index += size
 			continue
 
 		default:
 			if current.ignoreCase {
-				if class, widened := CaseClass(r, current.unicode); widened {
+				if class, widened := CaseClass(character, current.unicode); widened {
 					out.WriteString(class)
-					i += size
+					index += size
 					continue
 				}
 			}
-			out.WriteRune(r)
-			i += size
+			out.WriteRune(character)
+			index += size
 		}
 	}
 
 	return out.String(), exact, nil
 }
 
-func errNothingToRepeat(quantifier string) error {
+func nothingToRepeatError(quantifier string) error {
 	return fmt.Errorf("%w: %s repeats an assertion", ErrUnsupportedSyntax, quantifier[:quantifierWidth(quantifier)])
 }
 
@@ -331,22 +332,22 @@ func quantifierWidth(source string) int {
 
 // boundedQuantifierWidth reads `{m}`, `{m,}` or `{m,n}`.
 func boundedQuantifierWidth(source string) int {
-	i := len("{")
-	digits := i
-	for isDecimalDigit(source, i) {
-		i++
+	index := len("{")
+	digits := index
+	for isDecimalDigit(source, index) {
+		index++
 	}
-	if i == digits {
+	if index == digits {
 		return 0
 	}
-	if i < len(source) && source[i] == ',' {
-		i++
-		for isDecimalDigit(source, i) {
-			i++
+	if index < len(source) && source[index] == ',' {
+		index++
+		for isDecimalDigit(source, index) {
+			index++
 		}
 	}
-	if i < len(source) && source[i] == '}' {
-		return i + 1
+	if index < len(source) && source[index] == '}' {
+		return index + 1
 	}
 	return 0
 }
@@ -373,7 +374,7 @@ func checkGroupQuantifier(kind groupKind, rest string, options rewriteOptions) e
 	if kind == groupLookahead && !options.unicode {
 		return nil
 	}
-	return errNothingToRepeat(rest)
+	return nothingToRepeatError(rest)
 }
 
 // namedGroupOpener matches `(?<name>` at the start of source, returning it
@@ -425,8 +426,8 @@ func modifierGroup(source string, current rewriteOptions) (rewriteOptions, int, 
 	inside := current
 	named := map[byte]bool{}
 	enable := true
-	for i := range end {
-		flag := rest[i]
+	for index := range end {
+		flag := rest[index]
 		if flag == '-' {
 			if !enable {
 				return current, 0, false

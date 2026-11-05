@@ -181,13 +181,13 @@ func isGateSummaryLine(line string) bool {
 }
 
 func parsePosition(lineText string, columnText string) (int, int, error) {
-	line, err := strconv.Atoi(lineText)
-	if err != nil {
-		return 0, 0, fmt.Errorf("parsing line number %q: %w", lineText, err)
+	line, parseError := strconv.Atoi(lineText)
+	if parseError != nil {
+		return 0, 0, fmt.Errorf("parsing line number %q: %w", lineText, parseError)
 	}
-	column, err := strconv.Atoi(columnText)
-	if err != nil {
-		return 0, 0, fmt.Errorf("parsing column number %q: %w", columnText, err)
+	column, parseError := strconv.Atoi(columnText)
+	if parseError != nil {
+		return 0, 0, fmt.Errorf("parsing column number %q: %w", columnText, parseError)
 	}
 	return line, column, nil
 }

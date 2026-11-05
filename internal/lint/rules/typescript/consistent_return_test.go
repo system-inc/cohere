@@ -570,10 +570,10 @@ func TestConsistentReturnFires(test *testing.T) {
 func TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
-		name     string
-		raw      string
-		wantFlag bool
-		wantErr  bool
+		name      string
+		raw       string
+		wantFlag  bool
+		wantError bool
 	}{
 		{
 			name: "absent options, which is what a bare \"error\" delivers",
@@ -596,14 +596,14 @@ func TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers(test *tes
 			// A decoder answering "no options" to a shape it did not understand produces a rule
 			// that registers, reports, and enforces something other than what the config says.
 			// Refusing is the only answer that cannot ship silently.
-			name:    "a shape that is neither, which must error rather than decode to a default",
-			raw:     `"treatUndefinedAsUnspecified"`,
-			wantErr: true,
+			name:      "a shape that is neither, which must error rather than decode to a default",
+			raw:       `"treatUndefinedAsUnspecified"`,
+			wantError: true,
 		},
 		{
-			name:    "an array, which is upstream's variadic spelling and not one this layer delivers",
-			raw:     `[{"treatUndefinedAsUnspecified": true}]`,
-			wantErr: true,
+			name:      "an array, which is upstream's variadic spelling and not one this layer delivers",
+			raw:       `[{"treatUndefinedAsUnspecified": true}]`,
+			wantError: true,
 		},
 	}
 
@@ -611,7 +611,7 @@ func TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers(test *tes
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			decoded, decodeConsistentReturnOptionsError := DecodeConsistentReturnOptions(json.RawMessage(testCase.raw))
-			if testCase.wantErr {
+			if testCase.wantError {
 				if decodeConsistentReturnOptionsError == nil {
 					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
 				}

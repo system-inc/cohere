@@ -50,8 +50,8 @@ func (editMap *gfmTableEditMap) add(at int, remove int, add []Event) {
 // which the caller stores where the array lived.
 func (editMap *gfmTableEditMap) consume(events []Event) []Event {
 	// Upstream's sort is stable; `add` merges changes at one index, so the keys are unique anyway.
-	slices.SortStableFunc(editMap.changes, func(a gfmTableEditMapChange, b gfmTableEditMapChange) int {
-		return a.at - b.at
+	slices.SortStableFunc(editMap.changes, func(left gfmTableEditMapChange, right gfmTableEditMapChange) int {
+		return left.at - right.at
 	})
 
 	if len(editMap.changes) == 0 {

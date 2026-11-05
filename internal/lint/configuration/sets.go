@@ -52,8 +52,8 @@ func InOurTiers(sources []string) bool {
 }
 
 // InOurTiers reports whether this configuration's chain reaches one of our tier sets. See InOurTiers.
-func (c *Config) InOurTiers() bool {
-	return c != nil && InOurTiers(c.Sources)
+func (configuration *Config) InOurTiers() bool {
+	return configuration != nil && InOurTiers(configuration.Sources)
 }
 
 // SourceContents returns the bytes of one source in a configuration's chain: an embedded set's text,
@@ -91,9 +91,9 @@ func SourcesOnDisk(sources []string) []string {
 func SetNames() []string {
 	var names []string
 	// The walk reads only the embedded tree, which the build checked exists, so it cannot fail.
-	_ = fs.WalkDir(setFiles, "sets", func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".json") {
-			return err
+	_ = fs.WalkDir(setFiles, "sets", func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil || entry.IsDir() || !strings.HasSuffix(path, ".json") {
+			return pathError
 		}
 		names = append(names, SetPrefix+strings.TrimSuffix(strings.TrimPrefix(path, "sets/"), ".json"))
 		return nil

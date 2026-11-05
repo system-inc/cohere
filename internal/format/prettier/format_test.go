@@ -14,12 +14,12 @@ import (
 // that builds an engine serial, since a test that calls t.Setenv cannot run in parallel. The tests in
 // forkpath_test.go that set the variable do so with t.Setenv, serially, and go test finishes every serial
 // test, restoring what it set, before any parallel test runs.
-func TestMain(m *testing.M) {
+func TestMain(suite *testing.M) {
 	if unsetenvError := os.Unsetenv(ForkPathVariable); unsetenvError != nil {
 		fmt.Fprintf(os.Stderr, "clearing %s: %v\n", ForkPathVariable, unsetenvError)
 		os.Exit(1)
 	}
-	os.Exit(m.Run())
+	os.Exit(suite.Run())
 }
 
 // newTestEngine builds an engine, and no longer skips when a fork is absent.

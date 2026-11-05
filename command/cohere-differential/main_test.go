@@ -44,24 +44,35 @@ func TestAControlWhereItsRuleCannotFireIsRefused(test *testing.T) {
 
 	ignoredPath := lintable
 	ignoredPath.RelativePath = filepath.Join("ignored-here", "Planted.ts")
-	err := checkControlsAreLintable(lintConfiguration, []differential.Control{ignoredPath}, nil)
-	if err == nil {
+	checkControlsAreLintableError := checkControlsAreLintable(
+		lintConfiguration,
+		[]differential.Control{ignoredPath},
+		nil,
+	)
+	if checkControlsAreLintableError == nil {
 		test.Fatal("a control on an ignored path must be refused: it would miss for a reason unrelated to the harness")
 	}
 	// The message has to name the pattern. "Refused" alone sends the reader looking at the harness,
 	// which is the confusion this whole check exists to prevent.
-	if !strings.Contains(err.Error(), "ignored-here/**") {
-		test.Fatalf("the refusal must name the ignore pattern that would silence it, got %v", err)
+	if !strings.Contains(checkControlsAreLintableError.Error(), "ignored-here/**") {
+		test.Fatalf(
+			"the refusal must name the ignore pattern that would silence it, got %v",
+			checkControlsAreLintableError,
+		)
 	}
 
 	unconfiguredRule := lintable
 	unconfiguredRule.Rule = "import-require-path-alias"
-	err = checkControlsAreLintable(lintConfiguration, []differential.Control{unconfiguredRule}, nil)
-	if err == nil {
+	checkControlsAreLintableError = checkControlsAreLintable(
+		lintConfiguration,
+		[]differential.Control{unconfiguredRule},
+		nil,
+	)
+	if checkControlsAreLintableError == nil {
 		test.Fatal("a control naming a rule the config does not enable must be refused")
 	}
-	if !strings.Contains(err.Error(), "import-require-path-alias") {
-		test.Fatalf("the refusal must name the rule that would not fire, got %v", err)
+	if !strings.Contains(checkControlsAreLintableError.Error(), "import-require-path-alias") {
+		test.Fatalf("the refusal must name the rule that would not fire, got %v", checkControlsAreLintableError)
 	}
 }
 
@@ -152,17 +163,17 @@ func configFrom(test *testing.T, raw lintConfigFile) *configuration.Config {
 
 	directory := test.TempDir()
 	path := filepath.Join(directory, ".oxlintrc.json")
-	contents, err := json.Marshal(raw)
-	if err != nil {
-		test.Fatal(err)
+	contents, encodeError := json.Marshal(raw)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	if writeError := os.WriteFile(path, contents, 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
 
-	loaded, err := configuration.Load(path)
-	if err != nil {
-		test.Fatal(err)
+	loaded, loadError := configuration.Load(path)
+	if loadError != nil {
+		test.Fatal(loadError)
 	}
 	return loaded
 }

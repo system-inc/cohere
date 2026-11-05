@@ -307,16 +307,16 @@ func TestParseSCSSAgreesWithPostcssScss(test *testing.T) {
 		"tests",
 		"format",
 		"scss",
-	), func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	), func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() || filepath.Ext(path) != ".scss" {
 			return nil
 		}
-		source, err := os.ReadFile(path)
-		if err != nil {
-			return err
+		source, readError := os.ReadFile(path)
+		if readError != nil {
+			return readError
 		}
 		if !utf8.Valid(source) {
 			return fmt.Errorf("%s is not UTF-8, which the comparison cannot carry through JSON", path)

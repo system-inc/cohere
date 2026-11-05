@@ -39,9 +39,9 @@ func (message errorString) Error() string { return string(message) }
 // MergeKey, Date or Binary here) find only themselves.
 func containsSameValueZero(values []any, value any) bool {
 	for _, each := range values {
-		switch v := value.(type) {
+		switch typed := value.(type) {
 		case float64:
-			if e, isNumber := each.(float64); isNumber && (e == v || math.IsNaN(e) && math.IsNaN(v)) {
+			if e, isNumber := each.(float64); isNumber && (e == typed || math.IsNaN(e) && math.IsNaN(typed)) {
 				return true
 			}
 		case Date, Binary:
@@ -58,18 +58,18 @@ func containsSameValueZero(values []any, value any) bool {
 // javaScriptString is `${value}` for a primitive scalar value: null, a boolean, a number or a string.
 // Only those can be found again by containsSameValueZero, so only those reach it.
 func javaScriptString(value any) string {
-	switch v := value.(type) {
+	switch typed := value.(type) {
 	case nil:
 		return "null"
 	case bool:
-		if v {
+		if typed {
 			return "true"
 		}
 		return "false"
 	case float64:
-		return numberToString(v)
+		return numberToString(typed)
 	case string:
-		return v
+		return typed
 	}
 	panic("compose: no string conversion for this value")
 }

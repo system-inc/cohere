@@ -293,8 +293,8 @@ func noUnsafeEnumComparisonTypeViolates(leftTypeParts []*checker.Type, rightType
 // number-like only if every branch is, because any branch that is not gives the value a way to be
 // something else. An intersection is number-like if any constituent is, because an intersection is
 // all of its parts at once and `number & {}` is still a number.
-func noUnsafeEnumComparisonIsPrimitiveLike(t *checker.Type, flag checker.TypeFlags) bool {
-	unionParts := type_checking.UnionTypeParts(t)
+func noUnsafeEnumComparisonIsPrimitiveLike(subjectType *checker.Type, flag checker.TypeFlags) bool {
+	unionParts := type_checking.UnionTypeParts(subjectType)
 	if len(unionParts) == 0 {
 		return false
 	}
@@ -322,11 +322,11 @@ func noUnsafeEnumComparisonIsPrimitiveLike(t *checker.Type, flag checker.TypeFla
 // Upstream returns `ts.TypeFlags.Number` or `ts.TypeFlags.String` and uses them as set members,
 // which reads as a flag test and is really a three-valued answer. Named as one here, because
 // returning a flag that is never tested as a flag invites the next reader to mask against it.
-func noUnsafeEnumComparisonEnumValueKind(t *checker.Type) noUnsafeEnumValueKind {
-	if !type_checking.IsTypeFlagSet(t, checker.TypeFlagsEnumLike) {
+func noUnsafeEnumComparisonEnumValueKind(subjectType *checker.Type) noUnsafeEnumValueKind {
+	if !type_checking.IsTypeFlagSet(subjectType, checker.TypeFlagsEnumLike) {
 		return noUnsafeEnumValueNone
 	}
-	if type_checking.IsTypeFlagSet(t, checker.TypeFlagsNumberLiteral) {
+	if type_checking.IsTypeFlagSet(subjectType, checker.TypeFlagsNumberLiteral) {
 		return noUnsafeEnumValueNumber
 	}
 	return noUnsafeEnumValueString
@@ -359,9 +359,9 @@ func noUnsafeEnumComparisonEnumValueKind(t *checker.Type) noUnsafeEnumValueKind 
 //
 // So both sites agree with upstream for different reasons, and neither would if the helper were
 // swapped for the other reading. `TestNoUnsafeEnumComparisonReadsUnionsConstituentwise` pins it.
-func noUnsafeEnumComparisonEnumTypes(typeChecker *checker.Checker, t *checker.Type) []*checker.Type {
+func noUnsafeEnumComparisonEnumTypes(typeChecker *checker.Checker, subjectType *checker.Type) []*checker.Type {
 	var enumTypes []*checker.Type
-	for part := range type_checking.UnionTypePartsSeq(t) {
+	for part := range type_checking.UnionTypePartsSeq(subjectType) {
 		if !type_checking.IsTypeFlagSet(part, checker.TypeFlagsEnumLiteral) {
 			continue
 		}
@@ -376,17 +376,17 @@ func noUnsafeEnumComparisonEnumTypes(typeChecker *checker.Checker, t *checker.Ty
 // returns it unchanged. Upstream asserts the symbol is non-null with a `!`; here the nil is checked,
 // because the walk recovers per file rather than per rule and one nil dereference costs every rule
 // its verdict on that file.
-func noUnsafeEnumComparisonBaseEnumType(typeChecker *checker.Checker, t *checker.Type) *checker.Type {
-	symbol := checker.Type_symbol(t)
+func noUnsafeEnumComparisonBaseEnumType(typeChecker *checker.Checker, subjectType *checker.Type) *checker.Type {
+	symbol := checker.Type_symbol(subjectType)
 	if symbol == nil {
-		return t
+		return subjectType
 	}
 	if !type_checking.IsSymbolFlagSet(symbol, ast.SymbolFlagsEnumMember) {
-		return t
+		return subjectType
 	}
 	declaration := symbol.ValueDeclaration
 	if declaration == nil || declaration.Parent == nil {
-		return t
+		return subjectType
 	}
 	return typeChecker.GetTypeAtLocation(declaration.Parent)
 }

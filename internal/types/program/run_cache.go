@@ -173,17 +173,17 @@ type RunCacheKeyParts struct {
 
 // RunCacheKeyPartsOf hashes each part of a run's identity.
 func RunCacheKeyPartsOf(arguments []string, workingDirectory string, facts ...string) (RunCacheKeyParts, error) {
-	executable, err := os.Executable()
-	if err != nil {
-		return RunCacheKeyParts{}, fmt.Errorf("locating the running binary: %w", err)
+	executable, executableError := os.Executable()
+	if executableError != nil {
+		return RunCacheKeyParts{}, fmt.Errorf("locating the running binary: %w", executableError)
 	}
 	// Resolved, as the callers resolve the directory, so a binary reached through a link keys as itself (#547dhjz).
 	if resolved, resolveSymlinksError := filepath.EvalSymlinks(executable); resolveSymlinksError == nil {
 		executable = resolved
 	}
-	information, err := os.Stat(executable)
-	if err != nil {
-		return RunCacheKeyParts{}, fmt.Errorf("reading the running binary: %w", err)
+	information, statError := os.Stat(executable)
+	if statError != nil {
+		return RunCacheKeyParts{}, fmt.Errorf("reading the running binary: %w", statError)
 	}
 	part := func(values ...string) string {
 		hash := sha256.New()
@@ -281,9 +281,9 @@ func RecordRunCache(
 			present = append(present, file)
 		}
 	}
-	inputs, err := signaturesOf(present)
-	if err != nil {
-		return nil, err
+	inputs, signaturesOfError := signaturesOf(present)
+	if signaturesOfError != nil {
+		return nil, signaturesOfError
 	}
 
 	// The directory holding each file, so a file added beside one the run read is noticed. Only a file's:
@@ -308,9 +308,9 @@ func RecordRunCache(
 		}
 	}
 	sort.Strings(directories)
-	directoryInputs, err := signaturesOf(directories)
-	if err != nil {
-		return nil, err
+	directoryInputs, signaturesOfError := signaturesOf(directories)
+	if signaturesOfError != nil {
+		return nil, signaturesOfError
 	}
 	cache.Inputs = append(inputs, directoryInputs...)
 

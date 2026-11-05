@@ -68,9 +68,9 @@ type ImportRequirePathAliasOptions struct {
 // must be a directory that exists. A root that names nothing, or that this decoder has no base to
 // resolve, is refused by name, because refusing here is the only alternative to the silence.
 func decodeImportRequirePathAliasOptions(raw []byte, base rule.OptionsBase) (ImportRequirePathAliasOptions, error) {
-	settings, err := rule.DecodeOptionsInto[ImportRequirePathAliasOptions]()(raw)
-	if err != nil {
-		return ImportRequirePathAliasOptions{}, err
+	settings, decodeOptionsError := rule.DecodeOptionsInto[ImportRequirePathAliasOptions]()(raw)
+	if decodeOptionsError != nil {
+		return ImportRequirePathAliasOptions{}, decodeOptionsError
 	}
 
 	root := settings.RepositoryRoot

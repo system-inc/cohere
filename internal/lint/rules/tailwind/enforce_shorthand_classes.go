@@ -221,7 +221,7 @@ var EnforceShorthandClasses = rule.Rule[EnforceShorthandClassesOptions]{
 			if designSystem := DesignSystemForProgramAt(
 				ruleContext.Program,
 				configured.Location(),
-			); designSystem.Err == nil {
+			); designSystem.Error == nil {
 				system = designSystem.System
 			}
 		}

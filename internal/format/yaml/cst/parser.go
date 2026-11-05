@@ -16,8 +16,8 @@ import (
 )
 
 func includesToken(list []*Token, tokenType string) bool {
-	for i := 0; i < len(list); i++ {
-		if list[i].Type == tokenType {
+	for index := 0; index < len(list); index++ {
+		if list[index].Type == tokenType {
 			return true
 		}
 	}
@@ -25,11 +25,11 @@ func includesToken(list []*Token, tokenType string) bool {
 }
 
 func findNonEmptyIndex(list []*Token) int {
-	for i := 0; i < len(list); i++ {
-		switch list[i].Type {
+	for index := 0; index < len(list); index++ {
+		switch list[index].Type {
 		case "space", "comment", "newline":
 		default:
-			return i
+			return index
 		}
 	}
 	return -1
@@ -75,27 +75,27 @@ func getFirstKeyStartProps(previousField *[]*Token) []*Token {
 	if len(previous) == 0 {
 		return []*Token{}
 	}
-	i := len(previous)
+	index := len(previous)
 loop:
 	for {
-		i--
-		if i < 0 {
+		index--
+		if index < 0 {
 			break
 		}
-		switch previous[i].Type {
+		switch previous[index].Type {
 		case "doc-start", "explicit-key-ind", "map-value-ind", "seq-item-ind", "newline":
 			break loop
 		}
 	}
 	for {
 		// `while (prev[++i]?.type === 'space')`
-		i++
-		if !(i < len(previous) && previous[i].Type == "space") {
+		index++
+		if !(index < len(previous) && previous[index].Type == "space") {
 			break
 		}
 	}
 	// `prev.splice(i, prev.length)`
-	return spliceTail(previousField, i)
+	return spliceTail(previousField, index)
 }
 
 // spliceTail is `list.splice(start)`: it removes the elements from start on and returns them, as a
@@ -615,11 +615,11 @@ func (parser *Parser) blockMap(blockMap *Token) {
 		start := []*Token{}
 		if atNextItem && it.Sep != nil && it.Value == nil {
 			nl := []int{}
-			for i := 0; i < len(it.Sep); i++ {
-				st := it.Sep[i]
+			for index := 0; index < len(it.Sep); index++ {
+				st := it.Sep[index]
 				switch st.Type {
 				case "newline":
-					nl = append(nl, i)
+					nl = append(nl, index)
 				case "space":
 				case "comment":
 					if st.Indent > blockMap.Indent {

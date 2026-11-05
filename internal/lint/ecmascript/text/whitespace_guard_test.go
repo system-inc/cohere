@@ -129,9 +129,9 @@ func goWhitespaceSites(test *testing.T) []goWhitespaceSite {
 		walkError := filepath.WalkDir(filepath.Join(
 			moduleRoot,
 			directory,
-		), func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+		), func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 				return nil

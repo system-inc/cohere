@@ -12,7 +12,7 @@ import (
 // string phrase in place, and its object phrase an enum whose cases carry their own values.
 func TestSwiftMessagesTypeTheValuesAndTheOptions(test *testing.T) {
 	test.Parallel()
-	catalog, err := LoadMessages(fstest.MapFS{"consistency-no-thing.json": {Data: []byte(`{
+	catalog, loadMessagesError := LoadMessages(fstest.MapFS{"consistency-no-thing.json": {Data: []byte(`{
   "rules": { "TypeScript": "base/consistency-no-thing", "Swift": "cohere-swift/consistency-no-thing" },
   "phrases": {
     "reasoning": "A thing hides what it is.",
@@ -26,12 +26,12 @@ func TestSwiftMessagesTypeTheValuesAndTheOptions(test *testing.T) {
     "otherThing": { "text": "Another is {{name}}. <<reasoning>>" }
   }
 }`)}})
-	if err != nil {
-		test.Fatal(err)
+	if loadMessagesError != nil {
+		test.Fatal(loadMessagesError)
 	}
-	source, err := swiftMessagesSource(catalog, "digest")
-	if err != nil {
-		test.Fatal(err)
+	source, swiftMessagesSourceError := swiftMessagesSource(catalog, "digest")
+	if swiftMessagesSourceError != nil {
+		test.Fatal(swiftMessagesSourceError)
 	}
 	for _, want := range []string{
 		`static let sourceDigest = "digest"`,
@@ -98,7 +98,7 @@ func TestSwiftLiteralsOutrunTheText(test *testing.T) {
 func TestOneEditReachesBothEngines(test *testing.T) {
 	test.Parallel()
 	edited := fstest.MapFS{}
-	err := fs.WalkDir(MessageFiles(), ".", func(name string, entry fs.DirEntry, walkError error) error {
+	walkDirectoryError := fs.WalkDir(MessageFiles(), ".", func(name string, entry fs.DirEntry, walkError error) error {
 		if walkError != nil || entry.IsDir() {
 			return walkError
 		}
@@ -106,8 +106,8 @@ func TestOneEditReachesBothEngines(test *testing.T) {
 		edited[name] = &fstest.MapFile{Data: data}
 		return readFileError
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkDirectoryError != nil {
+		test.Fatal(walkDirectoryError)
 	}
 	const original = "which names no declared failure."
 	const changed = "which names no failure anyone declared."
@@ -116,9 +116,9 @@ func TestOneEditReachesBothEngines(test *testing.T) {
 		test.Fatalf("bare-throw's shared clause %q is not in its file, so the edit would not apply", original)
 	}
 	file.Data = []byte(strings.Replace(string(file.Data), original, changed, 1))
-	catalog, err := LoadMessages(edited)
-	if err != nil {
-		test.Fatal(err)
+	catalog, loadMessagesError := LoadMessages(edited)
+	if loadMessagesError != nil {
+		test.Fatal(loadMessagesError)
 	}
 
 	goText := catalog.Render(
@@ -129,9 +129,9 @@ func TestOneEditReachesBothEngines(test *testing.T) {
 		test.Errorf("the Go rule renders %q", goText)
 	}
 
-	source, err := swiftMessagesSource(catalog, "digest")
-	if err != nil {
-		test.Fatal(err)
+	source, swiftMessagesSourceError := swiftMessagesSource(catalog, "digest")
+	if swiftMessagesSourceError != nil {
+		test.Fatal(swiftMessagesSourceError)
 	}
 	function := string(source)[strings.Index(string(source), "static func bareThrow("):]
 	if !strings.Contains(function[:strings.Index(function, "\n        }")], changed) {
@@ -143,19 +143,19 @@ func TestOneEditReachesBothEngines(test *testing.T) {
 // as the format breaks it, so the formatter leaves the generated file as written.
 func TestALongSignatureTakesOneParameterToALine(test *testing.T) {
 	test.Parallel()
-	catalog, err := LoadMessages(fstest.MapFS{"consistency-no-thing.json": {Data: []byte(`{
+	catalog, loadMessagesError := LoadMessages(fstest.MapFS{"consistency-no-thing.json": {Data: []byte(`{
   "rules": { "Swift": "cohere-swift/consistency-no-thing" },
   "messages": {
     "thing": { "text": "{{target}} lacks {{features}}; add {{settings}} because {{reasons}}, {{explanation}}." },
     "short": { "text": "{{target}} is short." }
   }
 }`)}})
-	if err != nil {
-		test.Fatal(err)
+	if loadMessagesError != nil {
+		test.Fatal(loadMessagesError)
 	}
-	source, err := swiftMessagesSource(catalog, "digest")
-	if err != nil {
-		test.Fatal(err)
+	source, swiftMessagesSourceError := swiftMessagesSource(catalog, "digest")
+	if swiftMessagesSourceError != nil {
+		test.Fatal(swiftMessagesSourceError)
 	}
 	for _, want := range []string{
 		"        static func thing(\n            target: String,\n            features: String,\n            settings: String,\n            reasons: String,\n            explanation: String,\n        ) -> Message {",
@@ -171,16 +171,16 @@ func TestALongSignatureTakesOneParameterToALine(test *testing.T) {
 // rule, and generates nothing for it rather than an empty enum.
 func TestATwinWithNoSwiftMessageGetsNoType(test *testing.T) {
 	test.Parallel()
-	catalog, err := LoadMessages(fstest.MapFS{"consistency-no-thing.json": {Data: []byte(`{
+	catalog, loadMessagesError := LoadMessages(fstest.MapFS{"consistency-no-thing.json": {Data: []byte(`{
   "rules": { "TypeScript": "nexus/consistency-no-thing", "Swift": "cohere-swift/consistency-no-thing" },
   "messages": { "thing": { "text": "A thing.", "languages": ["TypeScript"] } }
 }`)}})
-	if err != nil {
-		test.Fatal(err)
+	if loadMessagesError != nil {
+		test.Fatal(loadMessagesError)
 	}
-	source, err := swiftMessagesSource(catalog, "digest")
-	if err != nil {
-		test.Fatal(err)
+	source, swiftMessagesSourceError := swiftMessagesSource(catalog, "digest")
+	if swiftMessagesSourceError != nil {
+		test.Fatal(swiftMessagesSourceError)
 	}
 	if strings.Contains(string(source), "ConsistencyNoThing") {
 		test.Errorf("a Swift rule with no Swift message got a type:\n%s", source)

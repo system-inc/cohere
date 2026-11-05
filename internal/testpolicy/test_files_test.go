@@ -13,12 +13,12 @@ import (
 // nothing would let every policy pass.
 func eachTestFile(test *testing.T, visit func(path string, source []byte) error) (string, int) {
 	test.Helper()
-	root, err := filepath.Abs(filepath.Join("..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	root, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	files := 0
-	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
 		if walkError != nil {
 			return walkError
 		}
@@ -46,8 +46,8 @@ func eachTestFile(test *testing.T, visit func(path string, source []byte) error)
 		files++
 		return visit(path, source)
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	if files < 100 {
 		test.Fatalf("read only %d test files under %s", files, root)

@@ -684,9 +684,9 @@ func (checker *unifiedSignaturesChecker) typesAreEqual(typeA *ast.Node, typeB *a
 }
 
 // parametersAreEqual is upstream's `parametersAreEqual`: same sigils, same type text.
-func (checker *unifiedSignaturesChecker) parametersAreEqual(a *ast.Node, b *ast.Node) bool {
-	return unifiedSignaturesHaveEqualSigils(a, b) &&
-		checker.typesAreEqual(unifiedSignaturesParameterType(a), unifiedSignaturesParameterType(b))
+func (checker *unifiedSignaturesChecker) parametersAreEqual(left *ast.Node, right *ast.Node) bool {
+	return unifiedSignaturesHaveEqualSigils(left, right) &&
+		checker.typesAreEqual(unifiedSignaturesParameterType(left), unifiedSignaturesParameterType(right))
 }
 
 // typeParametersAreEqual is upstream's `arraysAreEqual(aTypeParams, bTypeParams, ...)`.
@@ -803,9 +803,9 @@ func unifiedSignaturesMayBeMissing(parameter *ast.Node) bool {
 
 // unifiedSignaturesHaveEqualSigils is upstream's `parametersHaveEqualSigils`: two parameters agree
 // on rest-ness and on optional-ness. One of each cannot be unified with the other.
-func unifiedSignaturesHaveEqualSigils(a *ast.Node, b *ast.Node) bool {
-	return unifiedSignaturesIsRest(a) == unifiedSignaturesIsRest(b) &&
-		unifiedSignaturesIsOptional(a) == unifiedSignaturesIsOptional(b)
+func unifiedSignaturesHaveEqualSigils(left *ast.Node, right *ast.Node) bool {
+	return unifiedSignaturesIsRest(left) == unifiedSignaturesIsRest(right) &&
+		unifiedSignaturesIsOptional(left) == unifiedSignaturesIsOptional(right)
 }
 
 // unifiedSignaturesFailureStart is upstream's `failureStringStart`.

@@ -307,9 +307,9 @@ func TestArrayCallbackReturnOptionsDecode(test *testing.T) {
 
 	test.Run("allowImplicit accepts a bare return", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := decode(json.RawMessage(`{"allowImplicit": true}`))
-		if err != nil {
-			test.Fatalf("decode: %v", err)
+		decoded, decodeError := decode(json.RawMessage(`{"allowImplicit": true}`))
+		if decodeError != nil {
+			test.Fatalf("decode: %v", decodeError)
 		}
 		if !decoded.AllowImplicit {
 			test.Fatalf("decoded %#v", decoded)
@@ -328,9 +328,9 @@ func TestArrayCallbackReturnOptionsDecode(test *testing.T) {
 
 	test.Run("checkForEach turns the judgment around", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := decode(json.RawMessage(`{"checkForEach": true}`))
-		if err != nil {
-			test.Fatalf("decode: %v", err)
+		decoded, decodeError := decode(json.RawMessage(`{"checkForEach": true}`))
+		if decodeError != nil {
+			test.Fatalf("decode: %v", decodeError)
 		}
 		result := rule_testing.RunWithOptions(test, ArrayCallbackReturn, "o.ts",
 			`foo.forEach(x => x)`, decoded)
@@ -345,9 +345,9 @@ func TestArrayCallbackReturnOptionsDecode(test *testing.T) {
 
 	test.Run("allowVoid accepts void and adds a second suggestion", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := decode(json.RawMessage(`{"checkForEach": true, "allowVoid": true}`))
-		if err != nil {
-			test.Fatalf("decode: %v", err)
+		decoded, decodeError := decode(json.RawMessage(`{"checkForEach": true, "allowVoid": true}`))
+		if decodeError != nil {
+			test.Fatalf("decode: %v", decodeError)
 		}
 		clean := rule_testing.RunWithOptions(test, ArrayCallbackReturn, "o.ts",
 			`foo.forEach(x => void x)`, decoded)
@@ -378,9 +378,9 @@ func TestArrayCallbackReturnOptionsDecode(test *testing.T) {
 
 	test.Run("an empty object decodes to all three defaults off", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := decode(json.RawMessage(`{}`))
-		if err != nil {
-			test.Fatalf("decode: %v", err)
+		decoded, decodeError := decode(json.RawMessage(`{}`))
+		if decodeError != nil {
+			test.Fatalf("decode: %v", decodeError)
 		}
 		if decoded.AllowImplicit || decoded.CheckForEach || decoded.AllowVoid {
 			test.Fatalf("empty object did not default every option off: %#v", decoded)
@@ -592,9 +592,9 @@ func TestArrayCallbackReturnVoidParenthesization(test *testing.T) {
 	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[ArrayCallbackReturnOptions]()
-	options, err := decode(json.RawMessage(`{"checkForEach": true, "allowVoid": true}`))
-	if err != nil {
-		test.Fatalf("decode: %v", err)
+	options, decodeError := decode(json.RawMessage(`{"checkForEach": true, "allowVoid": true}`))
+	if decodeError != nil {
+		test.Fatalf("decode: %v", decodeError)
 	}
 
 	cases := []struct {

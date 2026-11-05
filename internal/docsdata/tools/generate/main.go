@@ -58,8 +58,8 @@ type sources struct {
 
 var moduleSources = sources{root: ".", help: binaryHelp, capture: captureLintTests}
 
-// errStale is a check that found stale files, which it has already named: exit 1 with nothing more to say.
-var errStale = errors.New("stale")
+// errorStale is a check that found stale files, which it has already named: exit 1 with nothing more to say.
+var errorStale = errors.New("stale")
 
 func main() {
 	check := flag.Bool(
@@ -80,7 +80,7 @@ func main() {
 	flag.Parse()
 
 	if runError := run(*check, *checkRendering, *recapture); runError != nil {
-		if !errors.Is(runError, errStale) {
+		if !errors.Is(runError, errorStale) {
 			// Ignored: the exit code below says the run failed even when standard error cannot.
 			fmt.Fprintln(os.Stderr, runError)
 		}
@@ -95,9 +95,9 @@ func run(check bool, checkRendering bool, recapture bool) error {
 	if checkRendering && recapture {
 		return fmt.Errorf("-check-rendering reads the committed examples back; to recapture them, run -check")
 	}
-	scratch, err := os.MkdirTemp("", "cohere-docsdata-")
-	if err != nil {
-		return err
+	scratch, temporaryDirectoryError := os.MkdirTemp("", "cohere-docsdata-")
+	if temporaryDirectoryError != nil {
+		return temporaryDirectoryError
 	}
 	defer removeScratch(scratch)
 
@@ -118,7 +118,7 @@ func run(check bool, checkRendering bool, recapture bool) error {
 		}
 		if len(stale) > 0 {
 			// Returned rather than exiting here, so the scratch directory is still removed.
-			return errStale
+			return errorStale
 		}
 		if check {
 			_, printError := fmt.Println("every file is current, the examples recaptured from the lint tests")
@@ -129,13 +129,13 @@ func run(check bool, checkRendering bool, recapture bool) error {
 		return nil
 	}
 
-	inputs, err := gather(moduleSources, scratch, recapture)
-	if err != nil {
-		return err
+	inputs, gatherError := gather(moduleSources, scratch, recapture)
+	if gatherError != nil {
+		return gatherError
 	}
-	files, err := docsdata.Build(inputs)
-	if err != nil {
-		return err
+	files, buildError := docsdata.Build(inputs)
+	if buildError != nil {
+		return buildError
 	}
 
 	paths := make([]string, 0, len(files))
@@ -159,9 +159,9 @@ func run(check bool, checkRendering bool, recapture bool) error {
 			return fmt.Errorf("saying %s was written: %w", path, printError)
 		}
 	}
-	orphans, err := docsdata.OrphanedExamples(".", files)
-	if err != nil {
-		return err
+	orphans, orphanedExamplesError := docsdata.OrphanedExamples(".", files)
+	if orphanedExamplesError != nil {
+		return orphanedExamplesError
 	}
 	for _, path := range orphans {
 		if removeError := os.Remove(path); removeError != nil {
@@ -184,13 +184,13 @@ func run(check bool, checkRendering bool, recapture bool) error {
 // committed example that no longer matches its rule's tests is stale; without it, they are the committed
 // files, and only what is rendered from them is checked.
 func staleFiles(source sources, scratch string, recapture bool) ([]string, error) {
-	inputs, err := gather(source, scratch, recapture)
-	if err != nil {
-		return nil, err
+	inputs, gatherError := gather(source, scratch, recapture)
+	if gatherError != nil {
+		return nil, gatherError
 	}
-	files, err := docsdata.Build(inputs)
-	if err != nil {
-		return nil, err
+	files, buildError := docsdata.Build(inputs)
+	if buildError != nil {
+		return nil, buildError
 	}
 	return docsdata.Stale(source.root, files)
 }
@@ -209,8 +209,8 @@ func gather(source sources, scratch string, recapture bool) (docsdata.Inputs, er
 	}
 
 	captured := filepath.Join(scratch, "captured")
-	if err := source.capture(captured); err != nil {
-		return inputs, err
+	if captureError := source.capture(captured); captureError != nil {
+		return inputs, captureError
 	}
 	records, err := docsdata.ReadCaptures(captured)
 	if err != nil {
@@ -260,14 +260,14 @@ func binaryHelp(scratch string) ([]byte, map[string][]byte, error) {
 		return nil, nil, fmt.Errorf("building ./command/cohere for its help: %w", runError)
 	}
 
-	help, err := helpOutput(binary, "-help")
-	if err != nil {
-		return nil, nil, err
+	help, helpOutputError := helpOutput(binary, "-help")
+	if helpOutputError != nil {
+		return nil, nil, helpOutputError
 	}
 	verbHelp := map[string][]byte{}
 	for _, verb := range verbs {
-		if verbHelp[verb], err = helpOutput(binary, verb, "-help"); err != nil {
-			return nil, nil, err
+		if verbHelp[verb], helpOutputError = helpOutput(binary, verb, "-help"); helpOutputError != nil {
+			return nil, nil, helpOutputError
 		}
 	}
 	return help, verbHelp, nil
@@ -302,8 +302,8 @@ func helpOutput(binary string, arguments ...string) ([]byte, error) {
 func removeScratch(scratch string) {
 	var directories []string
 	// Ignored: a temporary directory left behind costs disk, never a wrong file.
-	_ = filepath.WalkDir(scratch, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
+	_ = filepath.WalkDir(scratch, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil {
 			return nil
 		}
 		if entry.IsDir() {

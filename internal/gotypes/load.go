@@ -79,13 +79,13 @@ func (loaded *Loaded) ErrorsAnywhere() []error {
 // returns an error only when it cannot load at all; what the packages themselves get wrong is each
 // package's Errors.
 func Load(configuration Config, patterns ...string) (*Loaded, error) {
-	root, sourceModule, err := moduleAt(configuration.Directory)
-	if err != nil {
-		return nil, err
+	root, sourceModule, moduleAtError := moduleAt(configuration.Directory)
+	if moduleAtError != nil {
+		return nil, moduleAtError
 	}
-	listed, err := list(configuration.Directory, configuration.Environment, patterns)
-	if err != nil {
-		return nil, err
+	listed, listError := list(configuration.Directory, configuration.Environment, patterns)
+	if listError != nil {
+		return nil, listError
 	}
 	roots := map[string]bool{}
 	for _, listedPackage := range listed.packages {
@@ -119,14 +119,18 @@ func Load(configuration Config, patterns ...string) (*Loaded, error) {
 				extended = append(extended, imported)
 			}
 			sort.Strings(extended[len(patterns):])
-			if listed, err = list(configuration.Directory, configuration.Environment, extended); err != nil {
-				return nil, err
+			if listed, listError = list(
+				configuration.Directory,
+				configuration.Environment,
+				extended,
+			); listError != nil {
+				return nil, listError
 			}
 		}
 	}
-	environment, err := goEnvironmentValues(configuration.Directory, configuration.Environment)
-	if err != nil {
-		return nil, err
+	environment, goEnvironmentValuesError := goEnvironmentValues(configuration.Directory, configuration.Environment)
+	if goEnvironmentValuesError != nil {
+		return nil, goEnvironmentValuesError
 	}
 	sizes := types.SizesFor("gc", environment["GOARCH"])
 	if sizes == nil {
@@ -394,7 +398,7 @@ func (loader *loader) check(
 			func(path string) (*types.Package, error) { return loader.resolve(listedPackage, path, overrides) },
 		),
 		Sizes: loader.sizes,
-		Error: func(err error) { checked.Errors = append(checked.Errors, err) },
+		Error: func(typeCheckError error) { checked.Errors = append(checked.Errors, typeCheckError) },
 	}
 	if listedPackage.Module != nil && listedPackage.Module.GoVersion != "" {
 		configuration.GoVersion = "go" + listedPackage.Module.GoVersion

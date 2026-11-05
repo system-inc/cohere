@@ -105,19 +105,19 @@ libraries/structure/source/components/files/FileCarousel.tsx:36:8: error structu
 func TestTheTwoGatesAgreeOnOneFindingAfterParsing(test *testing.T) {
 	test.Parallel()
 	// Not a machine path: cohere's output copied verbatim, whose tree root the parser trims.
-	cohereResult, err := ParseCohere(
+	cohereResult, parseCohereError := ParseCohere(
 		`/Users/kirkouimet/Projects/ahra/app/Component.tsx:198:1 - File contains a component with 96 lines. [react-component-no-multiple-primary/tooMany]`,
 		ahraTreeRoot,
 	)
-	if err != nil {
-		test.Fatalf("parsing cohere side: %v", err)
+	if parseCohereError != nil {
+		test.Fatalf("parsing cohere side: %v", parseCohereError)
 	}
-	gateResult, err := ParseGate(
+	gateResult, parseGateError := ParseGate(
 		`app/Component.tsx:198:1: error structure(react-component-no-multiple-primary): File contains a component with 96 lines.`,
 		ahraTreeRoot,
 	)
-	if err != nil {
-		test.Fatalf("parsing gate side: %v", err)
+	if parseGateError != nil {
+		test.Fatalf("parsing gate side: %v", parseGateError)
 	}
 
 	if len(cohereResult.Findings) != 1 || len(gateResult.Findings) != 1 {

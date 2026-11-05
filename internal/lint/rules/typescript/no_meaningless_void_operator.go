@@ -36,9 +36,9 @@ type noMeaninglessVoidOperatorRawOptions struct {
 // cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what
 // arrives is the bare object rather than upstream's one-element array.
 func DecodeNoMeaninglessVoidOperatorOptions(raw []byte) (NoMeaninglessVoidOperatorOptions, error) {
-	decoded, err := rule.DecodeOptionsInto[noMeaninglessVoidOperatorRawOptions]()(raw)
-	if err != nil {
-		return DefaultNoMeaninglessVoidOperatorSettings(), err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noMeaninglessVoidOperatorRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultNoMeaninglessVoidOperatorSettings(), decodeOptionsError
 	}
 
 	options := DefaultNoMeaninglessVoidOperatorSettings()

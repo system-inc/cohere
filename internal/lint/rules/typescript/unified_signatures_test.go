@@ -1036,9 +1036,9 @@ func TestUnifiedSignaturesOptionsArriveThroughTheDecoder(test *testing.T) {
 
 			for _, value := range []string{"false", "true"} {
 				raw := `{"` + testCase.option + `": ` + value + `}`
-				bound, err := entry.Bind([]byte(raw), rule.OptionsBase{})
-				if err != nil {
-					test.Fatalf("decoding %s: %v", raw, err)
+				bound, bindError := entry.Bind([]byte(raw), rule.OptionsBase{})
+				if bindError != nil {
+					test.Fatalf("decoding %s: %v", raw, bindError)
 				}
 				result := rule_testing.RunBound(test, bound, "file.ts", testCase.sourceText)
 				if value == "false" {

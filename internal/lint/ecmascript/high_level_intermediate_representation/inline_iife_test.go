@@ -627,9 +627,9 @@ func TestMemoInclusiveInliningCallSitesAreReviewed(test *testing.T) {
 		if name == "inline_iife.go" || name == "inline_iife_test.go" {
 			continue
 		}
-		body, readErr := os.ReadFile(name)
-		if readErr != nil {
-			test.Fatalf("reading %s: %v", name, readErr)
+		body, readError := os.ReadFile(name)
+		if readError != nil {
+			test.Fatalf("reading %s: %v", name, readError)
 		}
 		text := string(body)
 		// The exported entry point by name, and the unexported one asked for the memo-inclusive

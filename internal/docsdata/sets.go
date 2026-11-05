@@ -44,17 +44,17 @@ type SetOverride struct {
 func buildSets(inputs Inputs) ([]RuleSet, error) {
 	sets := make([]RuleSet, 0, len(inputs.SetNames))
 	for _, name := range inputs.SetNames {
-		contents, err := inputs.SetContents(name)
-		if err != nil {
-			return nil, err
+		contents, setContentsError := inputs.SetContents(name)
+		if setContentsError != nil {
+			return nil, setContentsError
 		}
-		extends, err := ownExtends(contents)
-		if err != nil {
-			return nil, fmt.Errorf("docsdata: %s: %w", name, err)
+		extends, ownExtendsError := ownExtends(contents)
+		if ownExtendsError != nil {
+			return nil, fmt.Errorf("docsdata: %s: %w", name, ownExtendsError)
 		}
-		resolved, err := inputs.LoadSet(name)
-		if err != nil {
-			return nil, fmt.Errorf("docsdata: resolving %s: %w", name, err)
+		resolved, loadSetError := inputs.LoadSet(name)
+		if loadSetError != nil {
+			return nil, fmt.Errorf("docsdata: resolving %s: %w", name, loadSetError)
 		}
 
 		set := RuleSet{

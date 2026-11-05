@@ -151,7 +151,13 @@ func describeDeclaration(symbol *ast.Symbol, inProject map[string]bool) (string,
 // The walk is over identifier positions rather than over a list of reference forms, for the reason
 // `internal/unused` gives: a reference is a use wherever it appears, and enumerating the forms would
 // miss whichever one nobody thought of.
-func collectEdits(callerContext context.Context, graph *program.Graph, files []*ast.SourceFile, anchor *ast.Symbol, plan *Plan) {
+func collectEdits(
+	callerContext context.Context,
+	graph *program.Graph,
+	files []*ast.SourceFile,
+	anchor *ast.Symbol,
+	plan *Plan,
+) {
 	for _, file := range files {
 		fileChecker, release := graph.CheckerForFile(callerContext, file)
 		if fileChecker == nil {

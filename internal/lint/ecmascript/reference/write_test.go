@@ -230,7 +230,7 @@ func TestDefaultValuesInOtherPatterns(test *testing.T) {
 // TestIsUpdateOperator covers the two operators that write back and a sample of those that do not.
 func TestIsUpdateOperator(test *testing.T) {
 	test.Parallel()
-	for _, c := range []struct {
+	for _, testCase := range []struct {
 		operator ast.Kind
 		want     bool
 	}{
@@ -242,8 +242,8 @@ func TestIsUpdateOperator(test *testing.T) {
 		{ast.KindTildeToken, false},
 		{ast.KindTypeOfKeyword, false},
 	} {
-		if got := reference.IsUpdateOperator(c.operator); got != c.want {
-			test.Errorf("IsUpdateOperator(kind %d) = %v, want %v", int(c.operator), got, c.want)
+		if got := reference.IsUpdateOperator(testCase.operator); got != testCase.want {
+			test.Errorf("IsUpdateOperator(kind %d) = %v, want %v", int(testCase.operator), got, testCase.want)
 		}
 	}
 }

@@ -16,35 +16,35 @@ import (
 func TestDispatcherPackageShipsTheSettingsSchemas(test *testing.T) {
 	test.Parallel()
 
-	module, err := filepath.Abs(filepath.Join("..", "..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	module, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
-	staged, err := buildDispatcherPackage(
+	staged, buildDispatcherPackageError := buildDispatcherPackage(
 		Options{ModuleDirectory: module, OutputDirectory: test.TempDir(), Version: "1.0.0"},
 		placeholderChecksums,
 	)
-	if err != nil {
-		test.Fatal(err)
+	if buildDispatcherPackageError != nil {
+		test.Fatal(buildDispatcherPackageError)
 	}
 
 	for _, name := range SettingsSchemaFileNames {
-		committed, err := os.ReadFile(filepath.Join(module, SchemaDirectoryName, name))
-		if err != nil {
-			test.Fatal(err)
+		committed, readError := os.ReadFile(filepath.Join(module, SchemaDirectoryName, name))
+		if readError != nil {
+			test.Fatal(readError)
 		}
-		shipped, err := os.ReadFile(filepath.Join(staged.Directory, SchemaDirectoryName, name))
-		if err != nil {
-			test.Fatalf("the dispatcher package does not ship %s: %v", name, err)
+		shipped, readError := os.ReadFile(filepath.Join(staged.Directory, SchemaDirectoryName, name))
+		if readError != nil {
+			test.Fatalf("the dispatcher package does not ship %s: %v", name, readError)
 		}
 		if !bytes.Equal(shipped, committed) {
 			test.Fatalf("the dispatcher ships a %s that differs from the committed one", name)
 		}
 	}
 
-	manifestBytes, err := os.ReadFile(filepath.Join(staged.Directory, "package.json"))
-	if err != nil {
-		test.Fatal(err)
+	manifestBytes, readError := os.ReadFile(filepath.Join(staged.Directory, "package.json"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	var manifest struct {
 		Files []string `json:"files"`

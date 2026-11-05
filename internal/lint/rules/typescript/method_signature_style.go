@@ -597,9 +597,9 @@ func DefaultMethodSignatureStyleOptions() MethodSignatureStyleOptions {
 // zero value, so a generic decode would hand the rule an empty style that silences it while every
 // fixture stayed green.
 func DecodeMethodSignatureStyleOptions(raw []byte) (MethodSignatureStyleOptions, error) {
-	decoded, err := rule.DecodeOptionsInto[string]()(raw)
-	if err != nil {
-		return DefaultMethodSignatureStyleOptions(), err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[string]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultMethodSignatureStyleOptions(), decodeOptionsError
 	}
 
 	switch MethodSignatureStyleSetting(decoded) {

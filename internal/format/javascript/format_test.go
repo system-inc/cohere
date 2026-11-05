@@ -166,9 +166,9 @@ func TestFormatMatchesTheFork(test *testing.T) {
 			test.Fatal(newPrettierError)
 		}
 		for _, testCase := range formatCases {
-			expected, err := oracle.Format(testCase.fileName, testCase.source)
-			if err != nil {
-				test.Fatalf("%s: the oracle failed: %v", testCase.name, err)
+			expected, formatError := oracle.Format(testCase.fileName, testCase.source)
+			if formatError != nil {
+				test.Fatalf("%s: the oracle failed: %v", testCase.name, formatError)
 			}
 			if expected == testCase.source {
 				test.Fatalf(
@@ -181,9 +181,9 @@ func TestFormatMatchesTheFork(test *testing.T) {
 					test.Errorf("%s: the fork's output lacks %q:\n%s", testCase.name, substring, expected)
 				}
 			}
-			actual, err := formatFor(testCase.fileName)(testCase.fileName, testCase.source, options)
-			if err != nil {
-				test.Errorf("%s (bracketSameLine %v): %v", testCase.name, options.BracketSameLine, err)
+			actual, formatError := formatFor(testCase.fileName)(testCase.fileName, testCase.source, options)
+			if formatError != nil {
+				test.Errorf("%s (bracketSameLine %v): %v", testCase.name, options.BracketSameLine, formatError)
 				continue
 			}
 			if actual != expected {

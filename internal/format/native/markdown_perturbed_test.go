@@ -110,21 +110,21 @@ func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 
 		// Nested repositories regardless of root's own ignore lists, as the differential finds them
 		// (#k6vebep): a repository under a path root never formats is still a corpus.
-		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
-		if err != nil {
-			test.Fatalf("finding the repositories nested in %s: %v", root, err)
+		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(root)
+		if nestedRepositoriesBelowError != nil {
+			test.Fatalf("finding the repositories nested in %s: %v", root, nestedRepositoriesBelowError)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(root, nested))
 		}
 
-		enumeration, err := enumerator.Enumerate(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
-			test.Logf("skipping %s, not yet adopted: %v", root, err)
+		enumeration, enumerateError := enumerator.Enumerate(root)
+		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+			test.Logf("skipping %s, not yet adopted: %v", root, enumerateError)
 			continue
 		}
-		if err != nil {
-			test.Fatalf("enumerating %s: %v", root, err)
+		if enumerateError != nil {
+			test.Fatalf("enumerating %s: %v", root, enumerateError)
 		}
 		var files []string
 		for _, file := range enumeration.Files {
@@ -135,15 +135,15 @@ func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 				files = append(files, file)
 			}
 		}
-		resolution, err := formatoptions.Resolve(root)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
+		resolution, resolveError := formatoptions.Resolve(root)
+		if errors.Is(resolveError, formatoptions.ErrPrettierConfigRemains) {
 			// A repository still carrying Prettier config, pinned to its own adoption (www-ahra-ai). The
 			// differential's TestCorpora refuses this for a named corpus; here it is named and skipped.
-			test.Logf("skipping %s, not yet adopted: %v", root, err)
+			test.Logf("skipping %s, not yet adopted: %v", root, resolveError)
 			continue
 		}
-		if err != nil {
-			test.Fatalf("resolving the format options for %s: %v", root, err)
+		if resolveError != nil {
+			test.Fatalf("resolving the format options for %s: %v", root, resolveError)
 		}
 		corpora = append(corpora, markdownCorpus{root: root, files: files, options: resolution.Options})
 	}
@@ -168,7 +168,7 @@ func standInEmbeds(
 ) printing.TextToDoc {
 	native := TextToDoc(options, "markdown", nil)
 	return func(text string, parserOrFile string) (doc.Doc, error) {
-		if printed, err := native(text, parserOrFile); err == nil {
+		if printed, nativeError := native(text, parserOrFile); nativeError == nil {
 			return printed, nil
 		}
 		fileName := parserOrFile
@@ -228,32 +228,32 @@ func TestPerturbedMarkdownCorpus(test *testing.T) {
 			for job := range queue {
 				engine := engines[job.options]
 				if engine == nil {
-					var err error
-					if engine, err = prettier.New(job.options); err != nil {
-						outcomes <- outcome{job: job, detail: "engine: " + err.Error()}
+					var newPrettierError error
+					if engine, newPrettierError = prettier.New(job.options); newPrettierError != nil {
+						outcomes <- outcome{job: job, detail: "engine: " + newPrettierError.Error()}
 						continue
 					}
 					engines[job.options] = engine
 				}
-				source, err := os.ReadFile(job.path)
-				if err != nil {
-					outcomes <- outcome{job: job, detail: err.Error()}
+				source, readError := os.ReadFile(job.path)
+				if readError != nil {
+					outcomes <- outcome{job: job, detail: readError.Error()}
 					continue
 				}
 				input := perturbMarkdown(string(source))
-				expected, err := engine.Format(job.path, input)
-				if err != nil {
-					outcomes <- outcome{job: job, oracleFailed: true, detail: err.Error()}
+				expected, formatError := engine.Format(job.path, input)
+				if formatError != nil {
+					outcomes <- outcome{job: job, oracleFailed: true, detail: formatError.Error()}
 					continue
 				}
-				actual, err := (Formatter{Options: job.options}).Format(job.path, input)
-				if err == nil && actual == expected {
+				actual, formatError := (Formatter{Options: job.options}).Format(job.path, input)
+				if formatError == nil && actual == expected {
 					outcomes <- outcome{job: job, identical: true}
 					continue
 				}
 				result := outcome{job: job}
-				if err != nil {
-					result.detail = "error: " + err.Error()
+				if formatError != nil {
+					result.detail = "error: " + formatError.Error()
 				} else {
 					result.detail = differential.FirstDifference(expected, actual)
 				}

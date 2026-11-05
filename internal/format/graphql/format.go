@@ -43,16 +43,16 @@ func settingsOf(options *printerOptions) formatoptions.Options {
 
 // Format is Prettier's format for a GraphQL file: parse, attach comments, print to a doc, lay it out.
 // Byte order marks and line endings are normalized by the caller, native.Formatter, for every printer.
-func Format(text string, prettierOptions formatoptions.Options) (formatted string, err error) {
+func Format(text string, prettierOptions formatoptions.Options) (formatted string, formatError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			formatted, err = "", fmt.Errorf("graphql: %v", recovered)
+			formatted, formatError = "", fmt.Errorf("graphql: %v", recovered)
 		}
 	}()
 
-	document, err := printToDoc(text, prettierOptions)
-	if err != nil {
-		return "", err
+	document, formatError := printToDoc(text, prettierOptions)
+	if formatError != nil {
+		return "", formatError
 	}
 	return doc.Print(document, doc.Options{
 		PrintWidth:     prettierOptions.PrintWidth,
@@ -64,16 +64,16 @@ func Format(text string, prettierOptions formatoptions.Options) (formatted strin
 
 // PrintToDoc is upstream's textToDoc for GraphQL embedded in another language: the printed doc with its
 // trailing hardline stripped.
-func PrintToDoc(text string, prettierOptions formatoptions.Options) (document doc.Doc, err error) {
+func PrintToDoc(text string, prettierOptions formatoptions.Options) (document doc.Doc, printToDocError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			document, err = nil, fmt.Errorf("graphql: %v", recovered)
+			document, printToDocError = nil, fmt.Errorf("graphql: %v", recovered)
 		}
 	}()
 
-	document, err = printToDoc(text, prettierOptions)
-	if err != nil {
-		return nil, err
+	document, printToDocError = printToDoc(text, prettierOptions)
+	if printToDocError != nil {
+		return nil, printToDocError
 	}
 	return doc.StripTrailingHardline(document), nil
 }

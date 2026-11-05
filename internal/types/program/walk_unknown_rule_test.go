@@ -34,9 +34,9 @@ func TestWalkReportsADirectiveNamingAnUnknownRule(test *testing.T) {
 	}, "\n")
 	directory := writeProject(test, map[string]string{"tsconfig.json": minimalConfig, "main.ts": source})
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 	listening := rule.Rule[rule.NoOptions]{
 		Name: "no-console",
@@ -82,9 +82,9 @@ func TestWalkReportsADirectiveNamingAnUnknownRule(test *testing.T) {
 		test.Fatalf("unknown-rule findings\n got: %q\nwant: %q", got, want)
 	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, listening))
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, listening))
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 	for _, diagnostic := range result.Diagnostics {
 		if diagnostic.RuleName == "structure/consistency-no-enum" &&

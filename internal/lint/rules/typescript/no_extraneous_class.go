@@ -45,9 +45,9 @@ type noExtraneousClassRawOptions struct {
 // cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what arrives
 // is the bare object rather than upstream's one-element array.
 func DecodeNoExtraneousClassOptions(raw []byte) (NoExtraneousClassOptions, error) {
-	decoded, err := rule.DecodeOptionsInto[noExtraneousClassRawOptions]()(raw)
-	if err != nil {
-		return DefaultNoExtraneousClassSettings(), err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noExtraneousClassRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultNoExtraneousClassSettings(), decodeOptionsError
 	}
 
 	options := DefaultNoExtraneousClassSettings()

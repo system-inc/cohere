@@ -703,9 +703,9 @@ type noUnnecessaryBooleanLiteralCompareRawOptions struct {
 // Every fixture built from a struct rather than routed through this decoder would pass anyway,
 // which is the failure this project has shipped before.
 func DecodeNoUnnecessaryBooleanLiteralCompareOptions(raw []byte) (NoUnnecessaryBooleanLiteralCompareOptions, error) {
-	decoded, err := rule.DecodeOptionsInto[noUnnecessaryBooleanLiteralCompareRawOptions]()(raw)
-	if err != nil {
-		return DefaultNoUnnecessaryBooleanLiteralCompareOptions(), err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noUnnecessaryBooleanLiteralCompareRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultNoUnnecessaryBooleanLiteralCompareOptions(), decodeOptionsError
 	}
 
 	options := DefaultNoUnnecessaryBooleanLiteralCompareOptions()

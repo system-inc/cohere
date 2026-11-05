@@ -44,12 +44,12 @@ func applyConsistentTypeImportsFixes(test *testing.T, result rule_testing.Result
 // the source after the repair, normalised the way RunTyped writes it.
 func runConsistentTypeImportsFix(test *testing.T, options string, code string) (string, string, int) {
 	test.Helper()
-	settings, err := DecodeConsistentTypeImportsOptions([]byte(options))
+	settings, decodeConsistentTypeImportsOptionsError := DecodeConsistentTypeImportsOptions([]byte(options))
 	if options == "" {
-		settings, err = DefaultConsistentTypeImportsOptions(), nil
+		settings, decodeConsistentTypeImportsOptionsError = DefaultConsistentTypeImportsOptions(), nil
 	}
-	if err != nil {
-		test.Fatalf("decoding %s: %v", options, err)
+	if decodeConsistentTypeImportsOptionsError != nil {
+		test.Fatalf("decoding %s: %v", options, decodeConsistentTypeImportsOptionsError)
 	}
 	result := rule_testing.RunTypedWithOptions(
 		test,

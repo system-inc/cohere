@@ -987,9 +987,9 @@ func TestPreferConstDecodesItsOptions(test *testing.T) {
 		{`{"destructuring":"any"}`, PreferConstDestructuringAny},
 		{`{"destructuring":"all"}`, PreferConstDestructuringAll},
 	} {
-		decoded, err := decode([]byte(testCase.raw))
-		if err != nil {
-			test.Fatalf("decoding %s: %v", testCase.raw, err)
+		decoded, decodeError := decode([]byte(testCase.raw))
+		if decodeError != nil {
+			test.Fatalf("decoding %s: %v", testCase.raw, decodeError)
 		}
 		if decoded.Destructuring != testCase.want {
 			test.Fatalf("decoding %s gave destructuring %d, want %d", testCase.raw, decoded.Destructuring,
@@ -997,9 +997,9 @@ func TestPreferConstDecodesItsOptions(test *testing.T) {
 		}
 	}
 
-	decoded, err := decode([]byte(`{"ignoreReadBeforeAssign":true}`))
-	if err != nil {
-		test.Fatalf("decoding the boolean option: %v", err)
+	decoded, decodeError := decode([]byte(`{"ignoreReadBeforeAssign":true}`))
+	if decodeError != nil {
+		test.Fatalf("decoding the boolean option: %v", decodeError)
 	}
 	if !decoded.IgnoreReadBeforeAssign {
 		test.Fatal("ignoreReadBeforeAssign decoded as false")
@@ -1007,7 +1007,7 @@ func TestPreferConstDecodesItsOptions(test *testing.T) {
 
 	// A typo is an error rather than a silent fallback to the default, which is the whole reason
 	// the decoder exists.
-	if _, err := decode([]byte(`{"destructuring":"al"}`)); err == nil {
+	if _, decodeError := decode([]byte(`{"destructuring":"al"}`)); decodeError == nil {
 		test.Fatal("a misspelled destructuring value decoded without complaint")
 	}
 }

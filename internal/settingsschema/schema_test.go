@@ -91,7 +91,10 @@ var keyFixtures = map[string]map[string]string{
 	"output":         {"CohereSettings.json": `{"output": {"phases": true}}`},
 	"go":             {"CohereSettings.json": `{"go": ` + examples["go"] + `}`},
 	FormatKey:        {"CohereSettings.json": `{"format": {"tabWidth": 4}}`},
-	SwiftKey:         {"Package.swift": "// swift-tools-version:6.0\n", "CohereSettings.json": `{"swift": {"rules": {"cohere-swift/file-length": "error"}}}`},
+	SwiftKey: {
+		"Package.swift":       "// swift-tools-version:6.0\n",
+		"CohereSettings.json": `{"swift": {"rules": {"cohere-swift/file-length": "error"}}}`,
+	},
 }
 
 // TestTheSchemaHasExactlyTheKeysTheLoaderAccepts is the test the schema exists for, in both directions,
@@ -102,13 +105,13 @@ var keyFixtures = map[string]map[string]string{
 func TestTheSchemaHasExactlyTheKeysTheLoaderAccepts(test *testing.T) {
 	test.Parallel()
 	files := built(test)
-	nexusKeys, err := SchemaKeys(files[NexusSchemaPath])
-	if err != nil {
-		test.Fatal(err)
+	nexusKeys, schemaKeysError := SchemaKeys(files[NexusSchemaPath])
+	if schemaKeysError != nil {
+		test.Fatal(schemaKeysError)
 	}
-	projectKeys, err := SchemaKeys(files[ProjectSchemaPath])
-	if err != nil {
-		test.Fatal(err)
+	projectKeys, schemaKeysError := SchemaKeys(files[ProjectSchemaPath])
+	if schemaKeysError != nil {
+		test.Fatal(schemaKeysError)
 	}
 
 	for _, key := range nexusKeys {

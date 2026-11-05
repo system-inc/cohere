@@ -229,9 +229,9 @@ var NoThisAlias = rule.Rule[NoThisAliasOptions]{
 // need translating rather than binding: `allowDestructuring` is inverted, and `allowNames` is a
 // second spelling of `allowedNames`. Neither can be expressed as a struct tag.
 func DecodeNoThisAliasOptions(raw []byte) (NoThisAliasOptions, error) {
-	decoded, err := rule.DecodeOptionsInto[noThisAliasRawOptions]()(raw)
-	if err != nil {
-		return NoThisAliasOptions{}, err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noThisAliasRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return NoThisAliasOptions{}, decodeOptionsError
 	}
 
 	options := NoThisAliasOptions{}

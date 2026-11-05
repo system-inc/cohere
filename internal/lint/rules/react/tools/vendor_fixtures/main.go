@@ -101,9 +101,9 @@ func main() {
 		fail("-out is required unless -dry-run")
 	}
 
-	names, err := errorFixtureNames(*sha)
-	if err != nil {
-		fail("listing the tree: %v", err)
+	names, errorFixtureNamesError := errorFixtureNames(*sha)
+	if errorFixtureNamesError != nil {
+		fail("listing the tree: %v", errorFixtureNamesError)
 	}
 
 	topLevel, nested := 0, 0
@@ -142,9 +142,9 @@ func main() {
 		)
 	}
 
-	clean, err := cleanFixtureNames(*sha)
-	if err != nil {
-		fail("listing the clean fixtures: %v", err)
+	clean, cleanFixtureNamesError := cleanFixtureNames(*sha)
+	if cleanFixtureNamesError != nil {
+		fail("listing the clean fixtures: %v", cleanFixtureNamesError)
 	}
 	// Ignored: the counts are a report to the terminal, and a failed print changes nothing this tool writes.
 	fmt.Printf("clean fixtures   %d  (carry %s and expect no error)\n", len(clean), preserveMemoizationPragma)
@@ -164,9 +164,9 @@ func main() {
 		return
 	}
 
-	written, err := writeFixtures(*sha, append(append([]string(nil), names...), clean...), *out)
-	if err != nil {
-		fail("writing fixtures: %v", err)
+	written, writeFixturesError := writeFixtures(*sha, append(append([]string(nil), names...), clean...), *out)
+	if writeFixturesError != nil {
+		fail("writing fixtures: %v", writeFixturesError)
 	}
 	// Ignored: the counts are a report to the terminal, and a failed print changes nothing this tool writes.
 	fmt.Printf("wrote            %d files (%d pairs) into %s\n", written, written/2, *out)
@@ -267,16 +267,16 @@ func fixtureContents(sha string) (map[string][]byte, error) {
 		return fixtureContentsCache, nil
 	}
 
-	body, err := get(fmt.Sprintf("https://api.github.com/repos/facebook/react/tarball/%s", sha))
-	if err != nil {
-		return nil, err
+	body, getError := get(fmt.Sprintf("https://api.github.com/repos/facebook/react/tarball/%s", sha))
+	if getError != nil {
+		return nil, getError
 	}
 	// Ignored: the body was only read, so a failed close loses nothing.
 	defer body.Close()
 
-	gzipReader, err := gzip.NewReader(body)
-	if err != nil {
-		return nil, err
+	gzipReader, gzipError := gzip.NewReader(body)
+	if gzipError != nil {
+		return nil, gzipError
 	}
 	// Ignored: the gzip stream was only read, so a failed close loses nothing.
 	defer gzipReader.Close()
@@ -284,12 +284,12 @@ func fixtureContents(sha string) (map[string][]byte, error) {
 	contents := map[string][]byte{}
 	tarReader := tar.NewReader(gzipReader)
 	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
+		header, nextError := tarReader.Next()
+		if nextError == io.EOF {
 			break
 		}
-		if err != nil {
-			return nil, err
+		if nextError != nil {
+			return nil, nextError
 		}
 		if header.Typeflag != tar.TypeReg {
 			continue
@@ -305,9 +305,9 @@ func fixtureContents(sha string) (map[string][]byte, error) {
 		if !under {
 			continue
 		}
-		file, err := io.ReadAll(tarReader)
-		if err != nil {
-			return nil, err
+		file, readError := io.ReadAll(tarReader)
+		if readError != nil {
+			return nil, readError
 		}
 		contents[name] = file
 	}
@@ -368,9 +368,9 @@ func writeFixtures(sha string, names []string, out string) (int, error) {
 }
 
 func get(url string) (io.ReadCloser, error) {
-	request, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
+	request, newRequestError := http.NewRequest(http.MethodGet, url, nil)
+	if newRequestError != nil {
+		return nil, newRequestError
 	}
 	request.Header.Set("Accept", "application/vnd.github+json")
 	// Unauthenticated GitHub allows 60 requests an hour, which two runs of this tool can exhaust.
@@ -378,9 +378,9 @@ func get(url string) (io.ReadCloser, error) {
 		request.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return nil, err
+	response, requestError := http.DefaultClient.Do(request)
+	if requestError != nil {
+		return nil, requestError
 	}
 	if response.StatusCode != http.StatusOK {
 		// Ignored: the body is dropped unread for the status error below, so a failed close loses nothing.

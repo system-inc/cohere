@@ -37,29 +37,29 @@ func moduleCopy(test *testing.T) string {
 	for _, relative := range []string{"swift/HouseRuleVerdicts.json", "swift/Rules.json", "CHANGELOG.md"} {
 		copyFile(relative)
 	}
-	records, err := filepath.Glob(filepath.Join(moduleRoot, "bench", "results", "*.json"))
-	if err != nil {
-		test.Fatal(err)
+	records, globError := filepath.Glob(filepath.Join(moduleRoot, "bench", "results", "*.json"))
+	if globError != nil {
+		test.Fatal(globError)
 	}
 	for _, record := range records {
 		copyFile(filepath.Join("bench", "results", filepath.Base(record)))
 	}
-	err = filepath.WalkDir(filepath.Join(
+	walkError := filepath.WalkDir(filepath.Join(
 		moduleRoot,
 		docsdata.Directory,
-	), func(path string, entry os.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
-			return err
+	), func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil || entry.IsDir() {
+			return pathError
 		}
-		relative, err := filepath.Rel(moduleRoot, path)
-		if err != nil {
-			return err
+		relative, relativePathError := filepath.Rel(moduleRoot, path)
+		if relativePathError != nil {
+			return relativePathError
 		}
 		copyFile(relative)
 		return nil
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	return root
 }
@@ -148,9 +148,9 @@ func noHelp(string) ([]byte, map[string][]byte, error) { return nil, nil, nil }
 // rule's tests changed and nobody recaptured, and returns its path.
 func plantStaleExample(test *testing.T, root string) string {
 	test.Helper()
-	committed, err := docsdata.ReadCommittedExamples(root)
-	if err != nil {
-		test.Fatal(err)
+	committed, readCommittedExamplesError := docsdata.ReadCommittedExamples(root)
+	if readCommittedExamplesError != nil {
+		test.Fatal(readCommittedExamplesError)
 	}
 	var names []string
 	for name, examples := range committed {
@@ -163,9 +163,9 @@ func plantStaleExample(test *testing.T, root string) string {
 	firing := *planted.Firing
 	firing.Source += "// a case the rule's tests no longer assert\n"
 	planted.Firing = &firing
-	encoded, err := json.MarshalIndent(planted, "", "    ")
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.MarshalIndent(planted, "", "    ")
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	path := docsdata.ExamplePath(planted.Rule)
 	if writeError := os.WriteFile(filepath.Join(root, path), append(encoded, '\n'), 0o644); writeError != nil {

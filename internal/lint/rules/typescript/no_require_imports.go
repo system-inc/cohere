@@ -367,9 +367,9 @@ func matchesAnyAllowPattern(allow []*esregexp.RegExp, path string) bool {
 // remove. The dropped pattern simply permits nothing, so the rule stays strict rather than silently
 // going permissive.
 func DecodeNoRequireImportsOptions(raw []byte) (NoRequireImportsOptions, error) {
-	decoded, err := rule.DecodeOptionsInto[noRequireImportsRawOptions]()(raw)
-	if err != nil {
-		return NoRequireImportsOptions{}, err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noRequireImportsRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return NoRequireImportsOptions{}, decodeOptionsError
 	}
 
 	options := NoRequireImportsOptions{AllowAsImport: decoded.AllowAsImport}

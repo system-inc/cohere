@@ -27,15 +27,17 @@ type noRestrictedImportsCase struct {
 func runNoRestrictedImports(test *testing.T, testCase noRestrictedImportsCase) rule_testing.Result {
 	test.Helper()
 
-	encoded, err := json.Marshal(testCase.options)
-	if err != nil {
-		test.Fatalf("could not encode options: %v", err)
+	encoded, encodeError := json.Marshal(testCase.options)
+	if encodeError != nil {
+		test.Fatalf("could not encode options: %v", encodeError)
 	}
 	// The struct is upstream's `{paths, patterns}` object form, so the list the config layer hands a
 	// list rule is that object as its one element.
-	decoded, err := DecodeNoRestrictedImportsOptions([]byte("[" + string(encoded) + "]"))
-	if err != nil {
-		test.Fatalf("could not decode options for %q: %v", testCase.sourceText, err)
+	decoded, decodeNoRestrictedImportsOptionsError := DecodeNoRestrictedImportsOptions(
+		[]byte("[" + string(encoded) + "]"),
+	)
+	if decodeNoRestrictedImportsOptionsError != nil {
+		test.Fatalf("could not decode options for %q: %v", testCase.sourceText, decodeNoRestrictedImportsOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
 		testCase.sourceText, decoded)

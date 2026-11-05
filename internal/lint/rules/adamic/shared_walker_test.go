@@ -60,16 +60,20 @@ func TestTheRulesSharingAWalkerReportWhatEachReportsAlone(test *testing.T) {
 	}
 	walk := func(rules ...rule.Rule[rule.NoOptions]) []string {
 		test.Helper()
-		graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json")})
-		if err != nil {
-			test.Fatalf("building: %v", err)
+		graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json")})
+		if buildError != nil {
+			test.Fatalf("building: %v", buildError)
 		}
 		if diagnostics := graph.Program.GetSemanticDiagnostics(context.Background(), nil); len(diagnostics) > 0 {
 			test.Fatalf("the fixture has %d type errors, so it is not a program tsc accepts", len(diagnostics))
 		}
-		result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
-		if err != nil {
-			test.Fatalf("walking: %v", err)
+		result, walkError := graph.Walk(
+			context.Background(),
+			graph.ProjectFiles(),
+			rule_testing.EntriesOf(test, rules...),
+		)
+		if walkError != nil {
+			test.Fatalf("walking: %v", walkError)
 		}
 		findings := []string{}
 		for _, diagnostic := range result.Diagnostics {

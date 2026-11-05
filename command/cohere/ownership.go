@@ -346,13 +346,13 @@ func writeProjectYield(yield projectYield, directory string) (string, error) {
 	if len(yield.Files) == 0 && len(yield.Directories) == 0 {
 		return "", nil
 	}
-	encoded, err := json.Marshal(yield)
-	if err != nil {
-		return "", err
+	encoded, encodeError := json.Marshal(yield)
+	if encodeError != nil {
+		return "", encodeError
 	}
-	file, err := os.CreateTemp(directory, "yield-*.json")
-	if err != nil {
-		return "", err
+	file, temporaryFileError := os.CreateTemp(directory, "yield-*.json")
+	if temporaryFileError != nil {
+		return "", temporaryFileError
 	}
 	if _, writeError := file.Write(encoded); writeError != nil {
 		_ = file.Close() // Ignored: the write's error is the one returned.
@@ -406,8 +406,8 @@ const nestedProjectsLayer = "nearer projects"
 // withoutYieldedDirectories is a format walk less the files under the directories this run yields, each the
 // run of the project there formats. A walk the run yields nothing from is returned as it is.
 func withoutYieldedDirectories(enumeration formatfiles.Enumeration) formatfiles.Enumeration {
-	yield, err := activeProjectYield()
-	if err != nil || len(yield.Directories) == 0 {
+	yield, activeProjectYieldError := activeProjectYield()
+	if activeProjectYieldError != nil || len(yield.Directories) == 0 {
 		return enumeration
 	}
 	kept := enumeration.Files[:0:0]
@@ -445,8 +445,8 @@ func yieldsFile(directories []string, fileName string) bool {
 // activeProjectYieldFingerprint names what this run yields, for the run cache's key: empty when it yields
 // nothing, so a run that is not one of several keeps the key it had.
 func activeProjectYieldFingerprint() string {
-	yield, err := activeProjectYield()
-	if err != nil || (len(yield.Files) == 0 && len(yield.Directories) == 0) {
+	yield, activeProjectYieldError := activeProjectYield()
+	if activeProjectYieldError != nil || (len(yield.Files) == 0 && len(yield.Directories) == 0) {
 		return ""
 	}
 	// Ignored: a projectYield is two lists of strings, which always encode.

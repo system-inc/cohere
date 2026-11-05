@@ -53,7 +53,7 @@ func expectName(test *testing.T, source string, accept property.Kinds, want stri
 // TestStaticAcceptsEverySettledSpelling covers the union set.
 func TestStaticAcceptsEverySettledSpelling(test *testing.T) {
 	test.Parallel()
-	for _, c := range []struct{ source, want string }{
+	for _, testCase := range []struct{ source, want string }{
 		{"({ plain: 1 });", "plain"},
 		{"({ 'quoted': 1 });", "quoted"},
 		{`({ "double": 1 });`, "double"},
@@ -69,7 +69,7 @@ func TestStaticAcceptsEverySettledSpelling(test *testing.T) {
 		{"({ method() {} });", "method"},
 		{"({ get accessor() { return 1; } });", "accessor"},
 	} {
-		expectName(test, c.source, property.Static, c.want, true)
+		expectName(test, testCase.source, property.Static, testCase.want, true)
 	}
 }
 
@@ -122,7 +122,7 @@ func TestComputedPropertyNameDoesNotPanic(test *testing.T) {
 // neither the source spelling nor the cooked text answers alone.
 func TestNameTaggedSeparatesNumbersFromStrings(test *testing.T) {
 	test.Parallel()
-	for _, c := range []struct{ source, want string }{
+	for _, testCase := range []struct{ source, want string }{
 		{"({ plain: 1 });", "string:plain"},
 		{"({ 'quoted': 1 });", "string:quoted"},
 		{"({ 42: 1 });", "number:42"},
@@ -131,18 +131,18 @@ func TestNameTaggedSeparatesNumbersFromStrings(test *testing.T) {
 		{"({ 1e1: 1 });", "number:10"},
 		{"({ [`tpl`]: 1 });", "string:tpl"},
 	} {
-		firstKey(test, c.source, func(key *ast.Node) {
+		firstKey(test, testCase.source, func(key *ast.Node) {
 			got, ok := property.NameTagged(key, property.Static)
-			if !ok || got != c.want {
-				test.Errorf("%q: NameTagged = (%q, %v), want (%q, true)", c.source, got, ok, c.want)
+			if !ok || got != testCase.want {
+				test.Errorf("%q: NameTagged = (%q, %v), want (%q, true)", testCase.source, got, ok, testCase.want)
 			}
 		})
 	}
 	// The number and string spellings of one text must not collide.
 	var numeric string
 	var quoted string
-	firstKey(test, "({ 1.0: 1 });", func(k *ast.Node) { numeric, _ = property.NameTagged(k, property.Static) })
-	firstKey(test, "({ '1.0': 1 });", func(k *ast.Node) { quoted, _ = property.NameTagged(k, property.Static) })
+	firstKey(test, "({ 1.0: 1 });", func(node *ast.Node) { numeric, _ = property.NameTagged(node, property.Static) })
+	firstKey(test, "({ '1.0': 1 });", func(node *ast.Node) { quoted, _ = property.NameTagged(node, property.Static) })
 	if numeric == quoted {
 		test.Errorf("a numeric key and a string key with the same text tagged alike: %q", numeric)
 	}
@@ -167,7 +167,7 @@ func TestNilIsNotAName(test *testing.T) {
 // compare as one reference and a variable subscript must not.
 func TestAccessedName(test *testing.T) {
 	test.Parallel()
-	for _, c := range []struct {
+	for _, testCase := range []struct {
 		source string
 		want   string
 		wantOk bool
@@ -181,8 +181,8 @@ func TestAccessedName(test *testing.T) {
 		{"a[variable];", "", false},
 		{"a();", "", false},
 	} {
-		source := c.source
-		want, wantOk := c.want, c.wantOk
+		source := testCase.source
+		want, wantOk := testCase.want, testCase.wantOk
 		found := false
 		rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 			Name: "access-probe",

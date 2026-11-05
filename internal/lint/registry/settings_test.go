@@ -113,20 +113,20 @@ func TestSettingsReachARuleThroughTheRunsOptions(test *testing.T) {
 	}
 
 	control := optionsWith(`{"order": "desc", "callees": ["mergeClassNames"]}`)
-	if _, err := control.Decode(ruleName, nil); err != nil {
-		test.Fatalf("well-typed settings were refused on a bare severity: %v", err)
+	if _, decodeError := control.Decode(ruleName, nil); decodeError != nil {
+		test.Fatalf("well-typed settings were refused on a bare severity: %v", decodeError)
 	}
-	if _, err := control.Decode(ruleName, ownOrder); err != nil {
-		test.Fatalf("well-typed settings were refused beside an options element: %v", err)
+	if _, decodeError := control.Decode(ruleName, ownOrder); decodeError != nil {
+		test.Fatalf("well-typed settings were refused beside an options element: %v", decodeError)
 	}
 
 	misordered := optionsWith(`{"order": 7, "callees": ["mergeClassNames"]}`)
-	if _, err := misordered.Decode(ruleName, ownOrder); err != nil {
-		test.Errorf("an options element's order did not override settings' order of 7: %v", err)
+	if _, decodeError := misordered.Decode(ruleName, ownOrder); decodeError != nil {
+		test.Errorf("an options element's order did not override settings' order of 7: %v", decodeError)
 	}
 
 	miscalled := optionsWith(`{"order": "desc", "callees": 7}`)
-	if _, err := miscalled.Decode(ruleName, ownOrder); err == nil {
+	if _, decodeError := miscalled.Decode(ruleName, ownOrder); decodeError == nil {
 		test.Error("an options element decoded beside settings' callees of 7, so settings' callees were not kept")
 	}
 }

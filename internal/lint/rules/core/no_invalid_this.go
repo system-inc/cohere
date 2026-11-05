@@ -257,9 +257,9 @@ type noInvalidThisRawOptions struct {
 func DecodeNoInvalidThisOptions(raw []byte) (noInvalidThisSettings, error) {
 	settings := DefaultNoInvalidThisSettings()
 
-	decoded, err := rule.DecodeOptionsInto[noInvalidThisRawOptions]()(raw)
-	if err != nil {
-		return settings, err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noInvalidThisRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return settings, decodeOptionsError
 	}
 
 	if decoded.CapIsConstructor != nil {

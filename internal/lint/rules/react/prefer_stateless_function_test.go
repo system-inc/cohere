@@ -25,14 +25,16 @@ const preferStatelessFunctionFile = "/repository/source/Pure.tsx"
 func runPreferStatelessFunction(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
 	test.Helper()
 	var decoded PreferStatelessFunctionOptions
-	var err error
+	var decodePreferStatelessFunctionOptionsError error
 	if rawOptions == "" {
-		decoded, err = DecodePreferStatelessFunctionOptions(nil)
+		decoded, decodePreferStatelessFunctionOptionsError = DecodePreferStatelessFunctionOptions(nil)
 	} else {
-		decoded, err = DecodePreferStatelessFunctionOptions(json.RawMessage(rawOptions))
+		decoded, decodePreferStatelessFunctionOptionsError = DecodePreferStatelessFunctionOptions(
+			json.RawMessage(rawOptions),
+		)
 	}
-	if err != nil {
-		test.Fatalf("decoding %q: %v", rawOptions, err)
+	if decodePreferStatelessFunctionOptionsError != nil {
+		test.Fatalf("decoding %q: %v", rawOptions, decodePreferStatelessFunctionOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, PreferStatelessFunction, preferStatelessFunctionFile, sourceText, decoded)
 }

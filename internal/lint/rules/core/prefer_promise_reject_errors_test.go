@@ -118,9 +118,9 @@ func TestPreferPromiseRejectErrorsFires(test *testing.T) {
 func decodePreferPromiseRejectErrorsOptions(test *testing.T, wire string) core.PreferPromiseRejectErrorsOptions {
 	test.Helper()
 	decode := rule.DecodeOptionsInto[core.PreferPromiseRejectErrorsOptions]()
-	decoded, err := decode(json.RawMessage(wire))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", wire, err)
+	decoded, decodeError := decode(json.RawMessage(wire))
+	if decodeError != nil {
+		test.Fatalf("decoding %s: %v", wire, decodeError)
 	}
 	return decoded
 }

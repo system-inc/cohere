@@ -37,8 +37,8 @@ func parseValueNode(valueNode *estree.Node, walk valueRootWalk, options *parseOp
 	commaGroup := newCommaGroup()
 	commaGroupStack := []*estree.Node{commaGroup}
 
-	for i := 0; i < len(nodes); i++ {
-		node := nodes[i]
+	for index := 0; index < len(nodes); index++ {
+		node := nodes[index]
 
 		if options.parser == "scss" &&
 			node.Is("number") &&
@@ -123,9 +123,9 @@ func parseValueNode(valueNode *estree.Node, walk valueRootWalk, options *parseOp
 			parenGroup = parenGroupStack[len(parenGroupStack)-1]
 		} else if node.Is("comma") {
 			// Trialing comma
-			if i == len(nodes)-3 &&
-				nodes[i+1].Is("comment") &&
-				isClosingParenthesis(nodes[i+2]) {
+			if index == len(nodes)-3 &&
+				nodes[index+1].Is("comment") &&
+				isClosingParenthesis(nodes[index+2]) {
 				continue
 			}
 

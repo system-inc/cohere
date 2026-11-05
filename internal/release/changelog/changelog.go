@@ -110,22 +110,22 @@ var severityNames = []string{"off", "warn", "error"}
 // DiffSet compares one set's text before and after. Either may be nil, for a set added or removed.
 func DiffSet(before []byte, after []byte) (SetChanges, error) {
 	changes := SetChanges{Added: before == nil && after != nil, Removed: before != nil && after == nil}
-	old, err := decodeSet(before)
-	if err != nil {
-		return SetChanges{}, fmt.Errorf("reading the set before: %w", err)
+	old, decodeSetError := decodeSet(before)
+	if decodeSetError != nil {
+		return SetChanges{}, fmt.Errorf("reading the set before: %w", decodeSetError)
 	}
-	updated, err := decodeSet(after)
-	if err != nil {
-		return SetChanges{}, fmt.Errorf("reading the set after: %w", err)
+	updated, decodeSetError := decodeSet(after)
+	if decodeSetError != nil {
+		return SetChanges{}, fmt.Errorf("reading the set after: %w", decodeSetError)
 	}
 
 	oldRules, _ := old["rules"].(map[string]any)
 	newRules, _ := updated["rules"].(map[string]any)
 	for _, name := range slices.Sorted(maps.Keys(unionKeys(oldRules, newRules))) {
-		was, wasErr := severityOf(oldRules, name)
-		now, nowErr := severityOf(newRules, name)
-		if wasErr != nil || nowErr != nil {
-			return SetChanges{}, fmt.Errorf("rule %s: %v", name, firstError(wasErr, nowErr))
+		was, wasError := severityOf(oldRules, name)
+		now, nowError := severityOf(newRules, name)
+		if wasError != nil || nowError != nil {
+			return SetChanges{}, fmt.Errorf("rule %s: %v", name, firstError(wasError, nowError))
 		}
 		switch {
 		case was == 0 && now > 0:
@@ -237,13 +237,13 @@ func SetsAt(moduleDirectory string, reference string) (map[string][]byte, error)
 	sets := map[string][]byte{}
 	if reference == "" {
 		root := filepath.Join(moduleDirectory, SetDirectory)
-		walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-			if err != nil || entry.IsDir() || filepath.Ext(path) != ".json" {
-				return err
+		walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+			if pathError != nil || entry.IsDir() || filepath.Ext(path) != ".json" {
+				return pathError
 			}
-			contents, err := os.ReadFile(path)
-			if err != nil {
-				return err
+			contents, readError := os.ReadFile(path)
+			if readError != nil {
+				return readError
 			}
 			relative, _ := filepath.Rel(root, path)
 			sets[strings.TrimSuffix(filepath.ToSlash(relative), ".json")] = contents
@@ -341,13 +341,13 @@ func Render(version string, date string, changed map[string]SetChanges, first ma
 // Below 1.0.0 the minor is semver's breaking slot, so a Major change moves the minor rather than the
 // major: 0.3.0 may remove a set that 0.2.x carried. Leaving 0.x for 1.0.0 is always allowed.
 func RequireBump(previous string, next string, bump Bump) error {
-	from, err := parseVersion(previous)
-	if err != nil {
-		return err
+	from, parseVersionError := parseVersion(previous)
+	if parseVersionError != nil {
+		return parseVersionError
 	}
-	to, err := parseVersion(next)
-	if err != nil {
-		return err
+	to, parseVersionError := parseVersion(next)
+	if parseVersionError != nil {
+		return parseVersionError
 	}
 	switch {
 	case to[0] != from[0]:

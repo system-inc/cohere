@@ -266,8 +266,13 @@ func noInferrableTypesAnnotationSpan(ruleContext rule.Context, annotation *ast.N
 }
 
 // noInferrableTypesIsSpaceByte answers whether a byte is ASCII whitespace.
-func noInferrableTypesIsSpaceByte(b byte) bool {
-	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\v' || b == '\f'
+func noInferrableTypesIsSpaceByte(character byte) bool {
+	return character == ' ' ||
+		character == '\t' ||
+		character == '\n' ||
+		character == '\r' ||
+		character == '\v' ||
+		character == '\f'
 }
 
 // noInferrableTypesAnnotationName answers upstream's `isInferrable`, and the type name to report.

@@ -125,8 +125,13 @@ var NoMisusedSpread = rule.Rule[NoMisusedSpreadOptions]{
 
 		settings, _ := options.Read()
 
-		allowed := func(t *checker.Type) bool {
-			return type_checking.TypeMatchesSomeSpecifier(t, settings.Allow, settings.AllowInline, ruleContext.Program)
+		allowed := func(subjectType *checker.Type) bool {
+			return type_checking.TypeMatchesSomeSpecifier(
+				subjectType,
+				settings.Allow,
+				settings.AllowInline,
+				ruleContext.Program,
+			)
 		}
 
 		// checkObjectSpread is the cascade. Every arm returns, so the first match wins.
@@ -136,8 +141,8 @@ var NoMisusedSpread = rule.Rule[NoMisusedSpreadOptions]{
 				return
 			}
 
-			if noMisusedSpreadIsTypeRecurser(argumentType, func(t *checker.Type) bool {
-				return type_checking.IsPromiseLike(ruleContext.Program, ruleContext.TypeChecker, t)
+			if noMisusedSpreadIsTypeRecurser(argumentType, func(subjectType *checker.Type) bool {
+				return type_checking.IsPromiseLike(ruleContext.Program, ruleContext.TypeChecker, subjectType)
 			}) {
 				ruleContext.ReportNodeWithSuggestions(spread, buildNoPromiseSpreadInObjectMessage(),
 					noMisusedSpreadAwaitSuggestion(ruleContext, argument))
@@ -219,26 +224,26 @@ var NoMisusedSpread = rule.Rule[NoMisusedSpreadOptions]{
 // Every type question in this rule goes through it, so a `Map<string, number> | number[]` is judged
 // by whichever arm its first matching constituent belongs to rather than being declined for not
 // being uniformly one thing.
-func noMisusedSpreadIsTypeRecurser(t *checker.Type, predicate func(*checker.Type) bool) bool {
-	if type_checking.IsUnionType(t) || type_checking.IsIntersectionType(t) {
-		for _, part := range t.Types() {
+func noMisusedSpreadIsTypeRecurser(subjectType *checker.Type, predicate func(*checker.Type) bool) bool {
+	if type_checking.IsUnionType(subjectType) || type_checking.IsIntersectionType(subjectType) {
+		for _, part := range subjectType.Types() {
 			if noMisusedSpreadIsTypeRecurser(part, predicate) {
 				return true
 			}
 		}
 		return false
 	}
-	return predicate(t)
+	return predicate(subjectType)
 }
 
-func noMisusedSpreadIsString(t *checker.Type) bool {
-	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
+func noMisusedSpreadIsString(subjectType *checker.Type) bool {
+	return noMisusedSpreadIsTypeRecurser(subjectType, func(part *checker.Type) bool {
 		return type_checking.IsTypeFlagSet(part, checker.TypeFlagsStringLike)
 	})
 }
 
-func noMisusedSpreadIsArray(typeChecker *checker.Checker, t *checker.Type) bool {
-	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
+func noMisusedSpreadIsArray(typeChecker *checker.Checker, subjectType *checker.Type) bool {
+	return noMisusedSpreadIsTypeRecurser(subjectType, func(part *checker.Type) bool {
 		return checker.Checker_isArrayType(typeChecker, part) || checker.IsTupleType(part)
 	})
 }
@@ -248,21 +253,21 @@ func noMisusedSpreadIsArray(typeChecker *checker.Checker, t *checker.Type) bool 
 // The property count is what makes it narrow: a plain function spread into an object contributes
 // nothing, which is almost certainly a forgotten call, while a function with properties attached is
 // a namespace object and spreading it is meaningful. Upstream reports only the former.
-func noMisusedSpreadIsFunctionWithoutProperties(typeChecker *checker.Checker, t *checker.Type) bool {
-	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
+func noMisusedSpreadIsFunctionWithoutProperties(typeChecker *checker.Checker, subjectType *checker.Type) bool {
+	return noMisusedSpreadIsTypeRecurser(subjectType, func(part *checker.Type) bool {
 		return len(type_checking.GetCallSignatures(typeChecker, part)) > 0 &&
 			len(checker.Checker_getPropertiesOfType(typeChecker, part)) == 0
 	})
 }
 
-func noMisusedSpreadIsIterable(typeChecker *checker.Checker, t *checker.Type) bool {
-	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
+func noMisusedSpreadIsIterable(typeChecker *checker.Checker, subjectType *checker.Type) bool {
+	return noMisusedSpreadIsTypeRecurser(subjectType, func(part *checker.Type) bool {
 		return type_checking.GetWellKnownSymbolPropertyOfType(part, "iterator", typeChecker) != nil
 	})
 }
 
-func noMisusedSpreadIsMap(ruleContext rule.Context, t *checker.Type) bool {
-	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
+func noMisusedSpreadIsMap(ruleContext rule.Context, subjectType *checker.Type) bool {
+	return noMisusedSpreadIsTypeRecurser(subjectType, func(part *checker.Type) bool {
 		return type_checking.IsBuiltinSymbolLike(
 			ruleContext.Program,
 			ruleContext.TypeChecker,
@@ -280,8 +285,8 @@ func noMisusedSpreadIsMap(ruleContext rule.Context, t *checker.Type) bool {
 // construct signature is the class, not an instance, so it is declined here and picked up by the
 // class-declaration arm below. A type whose symbol resolves, at one of its declarations, to
 // something with a construct signature is an instance of that class.
-func noMisusedSpreadIsClassInstance(typeChecker *checker.Checker, t *checker.Type) bool {
-	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
+func noMisusedSpreadIsClassInstance(typeChecker *checker.Checker, subjectType *checker.Type) bool {
+	return noMisusedSpreadIsTypeRecurser(subjectType, func(part *checker.Type) bool {
 		if len(type_checking.GetConstructSignatures(typeChecker, part)) > 0 {
 			return false
 		}
@@ -326,8 +331,8 @@ func noMisusedSpreadIsClassInstance(typeChecker *checker.Checker, t *checker.Typ
 // Two ways to be one. An instantiation expression type, which is what `Foo<string>` produces when
 // `Foo` is a generic class referenced without `new`, carries an object flag saying so. Otherwise the
 // symbol's value declaration is literally a class declaration or a class expression.
-func noMisusedSpreadIsClassDeclaration(t *checker.Type) bool {
-	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
+func noMisusedSpreadIsClassDeclaration(subjectType *checker.Type) bool {
+	return noMisusedSpreadIsTypeRecurser(subjectType, func(part *checker.Type) bool {
 		if type_checking.IsObjectType(part) &&
 			checker.Type_objectFlags(part)&checker.ObjectFlagsInstantiationExpressionType != 0 {
 			return true
@@ -368,8 +373,8 @@ func noMisusedSpreadIsClassDeclaration(t *checker.Type) bool {
 //
 // A union exempts only when every class instance in it is exempt, because the caller's recurser
 // reports on the first constituent that is not.
-func noMisusedSpreadCopiesCompletely(ruleContext rule.Context, t *checker.Type) bool {
-	symbol := checker.Type_symbol(t)
+func noMisusedSpreadCopiesCompletely(ruleContext rule.Context, subjectType *checker.Type) bool {
+	symbol := checker.Type_symbol(subjectType)
 	if symbol == nil {
 		return false
 	}
@@ -691,9 +696,9 @@ type noMisusedSpreadRawOptions struct {
 // operands there is no default to restore on nil: a rule handed nil options allows nothing, which is
 // exactly upstream's `defaultOptions`.
 func DecodeNoMisusedSpreadOptions(raw []byte) (NoMisusedSpreadOptions, error) {
-	decoded, err := rule.DecodeOptionsInto[noMisusedSpreadRawOptions]()(raw)
-	if err != nil {
-		return NoMisusedSpreadOptions{}, err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noMisusedSpreadRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return NoMisusedSpreadOptions{}, decodeOptionsError
 	}
 
 	var options NoMisusedSpreadOptions

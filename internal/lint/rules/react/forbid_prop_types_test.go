@@ -54,13 +54,13 @@ func runForbidPropTypes(test *testing.T, sourceText string, options *ForbidPropT
 	if options == nil {
 		return rule_testing.RunTyped(test, ForbidPropTypes, forbidPropTypesFile, sourceText)
 	}
-	encoded, err := json.Marshal(options)
-	if err != nil {
-		test.Fatalf("encoding options: %v", err)
+	encoded, encodeError := json.Marshal(options)
+	if encodeError != nil {
+		test.Fatalf("encoding options: %v", encodeError)
 	}
-	decoded, err := DecodeForbidPropTypesOptions(encoded)
-	if err != nil {
-		test.Fatalf("decoding options: %v", err)
+	decoded, decodeForbidPropertyTypesOptionsError := DecodeForbidPropTypesOptions(encoded)
+	if decodeForbidPropertyTypesOptionsError != nil {
+		test.Fatalf("decoding options: %v", decodeForbidPropertyTypesOptionsError)
 	}
 	return rule_testing.RunTypedWithOptions(test, ForbidPropTypes, forbidPropTypesFile, sourceText, decoded)
 }

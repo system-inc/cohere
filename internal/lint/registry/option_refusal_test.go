@@ -51,30 +51,30 @@ func TestEveryDecoderRefusesAnUnknownTopLevelKey(test *testing.T) {
 		if decode == nil {
 			continue
 		}
-		if _, err := decode(baseline); err != nil {
+		if _, decodeError := decode(baseline); decodeError != nil {
 			skipped = append(skipped, name)
 			continue
 		}
-		_, err := decode(probe)
+		_, decodeError := decode(probe)
 		if lenientOptionRules[name] {
 			lenient++
-			if err != nil {
+			if decodeError != nil {
 				test.Errorf(
 					"%s: upstream's schema leaves its options object open, and %s was refused: %v",
 					name,
 					probe,
-					err,
+					decodeError,
 				)
 			}
 			continue
 		}
 		probed++
-		if err == nil {
+		if decodeError == nil {
 			test.Errorf("%s: %s decoded, and the unknown key was dropped without a word", name, probe)
 			continue
 		}
-		if !strings.Contains(err.Error(), unknownOptionKey) {
-			test.Errorf("%s: %s was refused, but not for the key: %v", name, probe, err)
+		if !strings.Contains(decodeError.Error(), unknownOptionKey) {
+			test.Errorf("%s: %s was refused, but not for the key: %v", name, probe, decodeError)
 		}
 	}
 	test.Logf("%d decoders refused the unknown key, %d accepted it as upstream does, %d have no baseline here: %v",
@@ -103,11 +103,11 @@ func topLevelProbe(registration rule.Entry) (baseline []byte, probe []byte, deco
 	case rule.OptionArityOne:
 		return []byte(object), []byte(probeObject), decode
 	case rule.OptionArityList:
-		if _, err := decode([]byte(`[` + object + `]`)); err == nil {
+		if _, decodeError := decode([]byte(`[` + object + `]`)); decodeError == nil {
 			return []byte(`[` + object + `]`), []byte(`[` + probeObject + `]`), decode
 		}
 		for _, mode := range optionListModes {
-			if _, err := decode([]byte(`[` + mode + `, ` + object + `]`)); err == nil {
+			if _, decodeError := decode([]byte(`[` + mode + `, ` + object + `]`)); decodeError == nil {
 				return []byte(
 					`[` + mode + `, ` + object + `]`,
 				), []byte(`[` + mode + `, ` + probeObject + `]`), decode
@@ -295,19 +295,24 @@ func TestEveryNestedOptionObjectRefusesAnUnknownKey(test *testing.T) {
 			if decode == nil {
 				test.Fatalf("%s registers neither Decode nor DecodeOptionList", testCase.rule)
 			}
-			if _, err := decode([]byte(testCase.baseline)); err != nil {
+			if _, decodeError := decode([]byte(testCase.baseline)); decodeError != nil {
 				test.Fatalf(
 					"baseline %s was refused, so the probe could be refused for that instead: %v",
 					testCase.baseline,
-					err,
+					decodeError,
 				)
 			}
-			_, err := decode([]byte(testCase.probe))
-			if err == nil {
+			_, decodeError := decode([]byte(testCase.probe))
+			if decodeError == nil {
 				test.Fatalf("%s decoded, and %q did nothing", testCase.probe, testCase.refusal)
 			}
-			if !strings.Contains(err.Error(), testCase.refusal) {
-				test.Fatalf("%s was refused, but the error does not name %q: %v", testCase.probe, testCase.refusal, err)
+			if !strings.Contains(decodeError.Error(), testCase.refusal) {
+				test.Fatalf(
+					"%s was refused, but the error does not name %q: %v",
+					testCase.probe,
+					testCase.refusal,
+					decodeError,
+				)
 			}
 		})
 	}

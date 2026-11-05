@@ -882,23 +882,23 @@ func TestDecodeNoMultiCompOptions(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
-		name    string
-		raw     string
-		want    bool
-		wantErr bool
+		name      string
+		raw       string
+		want      bool
+		wantError bool
 	}{
 		{name: "empty input is the bare error configuration", raw: "", want: false},
 		{name: "explicit false", raw: `{"ignoreStateless": false}`, want: false},
 		{name: "explicit true", raw: `{"ignoreStateless": true}`, want: true},
 		{name: "absent key falls back to the default", raw: `{}`, want: false},
-		{name: "wrong type is an error", raw: `{"ignoreStateless": "yes"}`, wantErr: true},
+		{name: "wrong type is an error", raw: `{"ignoreStateless": "yes"}`, wantError: true},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			decoded, decodeNoMultiCompOptionsError := DecodeNoMultiCompOptions([]byte(testCase.raw))
-			if testCase.wantErr {
+			if testCase.wantError {
 				if decodeNoMultiCompOptionsError == nil {
 					test.Fatalf("want an error, got %#v", decoded)
 				}

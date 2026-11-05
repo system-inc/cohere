@@ -136,9 +136,9 @@ func (context *context) transformDocumentHead(
 		for _, token := range tokens(cstNode.Start) {
 			betweenTokens = append(betweenTokens, token)
 			if docStart == nil && token.Type == "doc-start" {
-				for _, t := range betweenTokens {
-					if t.Type == "comment" {
-						comment := context.transformComment(t)
+				for _, betweenToken := range betweenTokens {
+					if betweenToken.Type == "comment" {
+						comment := context.transformComment(betweenToken)
 						endCommentCandidates = append(endCommentCandidates, comment)
 					}
 				}
