@@ -32,8 +32,12 @@ func runNoRestrictedProperties(
 		return rule_testing.Run(test, NoRestrictedProperties, noRestrictedPropertiesFile,
 			testCase.sourceText)
 	}
+	options, ok := testCase.options.(NoRestrictedPropertiesOptions)
+	if !ok {
+		test.Fatalf("the case carries %T options, not NoRestrictedPropertiesOptions", testCase.options)
+	}
 	// Written the way upstream's config writes it: each restriction its own element.
-	encoded, err := json.Marshal(testCase.options.(NoRestrictedPropertiesOptions).Restrictions)
+	encoded, err := json.Marshal(options.Restrictions)
 	if err != nil {
 		test.Fatalf("could not encode options: %v", err)
 	}
@@ -467,7 +471,11 @@ func TestDecodeNoRestrictedPropertiesOptions(test *testing.T) {
 		if decodeNoRestrictedPropertiesOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeNoRestrictedPropertiesOptionsError)
 		}
-		if len(decoded.(NoRestrictedPropertiesOptions).Restrictions) != 0 {
+		options, ok := decoded.(NoRestrictedPropertiesOptions)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not NoRestrictedPropertiesOptions", decoded)
+		}
+		if len(options.Restrictions) != 0 {
 			test.Error("nil input produced restrictions")
 		}
 	})
@@ -503,7 +511,11 @@ func TestDecodeNoRestrictedPropertiesOptions(test *testing.T) {
 		if decodeNoRestrictedPropertiesOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeNoRestrictedPropertiesOptionsError)
 		}
-		restrictions := decoded.(NoRestrictedPropertiesOptions).Restrictions
+		options, ok := decoded.(NoRestrictedPropertiesOptions)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not NoRestrictedPropertiesOptions", decoded)
+		}
+		restrictions := options.Restrictions
 		if len(restrictions) != 2 || restrictions[1].Property != "__proto__" || restrictions[1].Message != "No." {
 			test.Errorf("the second element was not read as a restriction: %+v", restrictions)
 		}

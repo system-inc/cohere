@@ -142,10 +142,10 @@ func (parser *parser) combinator() {
 	for parser.position < len(parser.tokens) && parser.currToken() != nil && (parser.currToken().kind == "space" || parser.currToken().kind == "combinator") {
 		if parser.nextToken() != nil && parser.nextToken().kind == "combinator" {
 			spacesOf(node)["before"] = parser.parseSpace(parser.currToken().value, "")
-			sourceOf(node)["start"].(map[string]any)["line"] = parser.nextToken().at(2)
-			sourceOf(node)["start"].(map[string]any)["column"] = parser.nextToken().at(3)
-			sourceOf(node)["end"].(map[string]any)["column"] = parser.nextToken().at(3)
-			sourceOf(node)["end"].(map[string]any)["line"] = parser.nextToken().at(2)
+			sourceEdgeOf(node, "start")["line"] = parser.nextToken().at(2)
+			sourceEdgeOf(node, "start")["column"] = parser.nextToken().at(3)
+			sourceEdgeOf(node, "end")["column"] = parser.nextToken().at(3)
+			sourceEdgeOf(node, "end")["line"] = parser.nextToken().at(2)
 			node.Set("sourceIndex", parser.nextToken().at(4))
 		} else if parser.prevToken() != nil && parser.prevToken().kind == "combinator" {
 			spacesOf(node)["after"] = parser.parseSpace(parser.currToken().value, "")
@@ -247,7 +247,7 @@ func (parser *parser) parentheses() {
 			if balanced != 0 {
 				parser.parse(false)
 			} else {
-				end := sourceOf(parser.parents[selector])["end"].(map[string]any)
+				end := sourceEdgeOf(parser.parents[selector], "end")
 				end["line"] = parser.currToken().at(2)
 				end["column"] = parser.currToken().at(3)
 				parser.position++
@@ -506,6 +506,17 @@ func (parser *parser) newNode(node *estree.Node, namespace any) *estree.Node {
 		parser.spaces = ""
 	}
 	return parser.append(parser.current, node)
+}
+
+// sourceEdgeOf is node.source.start or node.source.end, the {line, column} object the parser moves.
+func sourceEdgeOf(node *estree.Node, edge string) map[string]any {
+	position, isMap := sourceOf(node)[edge].(map[string]any)
+	if !isMap {
+		// Invariant: the parser moves an edge only on a combinator or pseudo it built with source(),
+		// which sets both edges to a map; Parse recovers the panic into an error.
+		panic("css selector parser: node.source." + edge + " is not a {line, column} object")
+	}
+	return position
 }
 
 // currToken, nextToken and prevToken are upstream's getters, nil past either end of the tokens.

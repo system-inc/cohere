@@ -500,7 +500,11 @@ func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(test *testin
 				if decodeNoUselessComputedKeyOptionsError != nil {
 					test.Fatalf("decoding %q: %v", testCase.optionsJson, decodeNoUselessComputedKeyOptionsError)
 				}
-				settings = decoded.(NoUselessComputedKeySettings)
+				decodedSettings, ok := decoded.(NoUselessComputedKeySettings)
+				if !ok {
+					test.Fatalf("the decoder returned %T, not NoUselessComputedKeySettings", decoded)
+				}
+				settings = decodedSettings
 			}
 			if settings.EnforceForClassMembers != testCase.want {
 				test.Errorf("enforceForClassMembers should be %v, got %v",

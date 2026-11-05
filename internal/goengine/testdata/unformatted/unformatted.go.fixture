@@ -10,8 +10,8 @@ func Triple(value int) int {
 }
 
 
-// Report prints a count with the wrong verb, which the directive withholds before and after gofmt moves it.
+// Report formats a count with the wrong verb, which the directive withholds before and after gofmt moves it.
 func Report() {
-	//cohere:ignore printf the wrong verb is the fixture's point, and the directive must cover it on either side of gofmt
-	fmt.Printf("%d\n", "three")
+	//cohere:ignore printf the wrong verb is the fixture's point, on either side of gofmt
+	_ = fmt.Sprintf("%d\n", "three")
 }

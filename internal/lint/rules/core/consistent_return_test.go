@@ -429,7 +429,11 @@ func TestConsistentReturnDecoderRoundTrip(test *testing.T) {
 			if decodeConsistentReturnOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.optionsJson, decodeConsistentReturnOptionsError)
 			}
-			if got := decoded.(ConsistentReturnSettings).TreatUndefinedAsUnspecified; got != testCase.want {
+			settings, ok := decoded.(ConsistentReturnSettings)
+			if !ok {
+				test.Fatalf("the decoder returned %T, not ConsistentReturnSettings", decoded)
+			}
+			if got := settings.TreatUndefinedAsUnspecified; got != testCase.want {
 				test.Errorf("treatUndefinedAsUnspecified should be %v, got %v", testCase.want, got)
 			}
 		})

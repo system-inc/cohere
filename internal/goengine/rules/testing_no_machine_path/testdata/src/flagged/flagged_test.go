@@ -6,7 +6,7 @@ package flagged
 import "testing"
 
 // A macOS home path.
-const macRoot = "/Users/someone/Projects/ahra" // want `^This test names a home directory, so it reads a path that exists on one developer's machine`
+const macRoot = "/Users/someone/Projects/ahra" // want `^This test names a home directory, so it reads a path`
 
 // A Linux home path, in a raw string.
 const linuxRoot = `/home/someone/checkouts/ahra` // want `This test names a home directory`
@@ -20,6 +20,20 @@ var other = "/Users/c/z" // want `This test names a home directory`
 
 // Not a machine path:
 const bare = "/Users/someone/x" // want `^This home directory is marked as not a machine path and gives no reason\.`
+
+// Not a machine path:
+// a reason on the group's next line is no reason, since the reason is what follows the marker on its own line.
+const reasonOnTheNextLine = "/Users/someone/x" // want `^This home directory is marked`
+
+// not a machine path: the marker is spelled as written, so a lowercase one excuses nothing.
+const lowerCaseMarker = "/Users/someone/x" // want `This test names a home directory`
+
+// A sentence that says Not a machine path: mid-line only mentions the marker, which excuses nothing.
+const markerInASentence = "/Users/someone/x" // want `This test names a home directory`
+
+// A marker trailing the code on the line above speaks for that line, not for the declaration below it.
+var aboveTheTrailed = "/repo"         // Not a machine path: this speaks for its own line.
+var trailedAbove = "/Users/someone/x" // want `This test names a home directory`
 
 // A blank line between the marker and the declaration leaves the marker above nothing.
 // Not a machine path: planted with a gap.

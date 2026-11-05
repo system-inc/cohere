@@ -59,11 +59,16 @@ func TestJSONSummary(test *testing.T) {
 			test.Errorf("summary %s = %v, want %v", key, decoded[key], want)
 		}
 	}
-	if gaps := decoded["gaps"].(map[string]any); gaps["crashedFiles"] != float64(1) {
-		test.Errorf("the summary's gaps dropped the crashed file: %v", gaps)
+	if gaps, isObject := decoded["gaps"].(map[string]any); !isObject || gaps["crashedFiles"] != float64(1) {
+		test.Errorf("the summary's gaps dropped the crashed file: %v", decoded["gaps"])
 	}
-	if phases := decoded["phases"].([]any); len(phases) != 3 || phases[0].(map[string]any)["name"] != "fix" {
-		test.Errorf("phases: %v", phases)
+	// A nil first phase reads no name, so a missing or misshapen phase list fails the comparison below.
+	var firstPhase map[string]any
+	if phases, isList := decoded["phases"].([]any); isList && len(phases) == 3 {
+		firstPhase, _ = phases[0].(map[string]any)
+	}
+	if firstPhase["name"] != "fix" {
+		test.Errorf("phases: %v", decoded["phases"])
 	}
 	if replay := summaryAsJSON(runSummary{Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}}); !replay.Cache.Replayed || replay.Verdict != "pass" {
 		test.Errorf("a replay's summary: %+v", replay)

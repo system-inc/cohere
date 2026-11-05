@@ -10,8 +10,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// arrayCallbackReturnCorpusProvenance records where the imported cases came from and how they were
-// checked, because a fixture table is only worth what its provenance is.
+// The corpus's provenance: where the imported cases came from and how they were checked, because a
+// fixture table is only worth what its provenance is.
 //
 // Source: ESLint's own tests at `tests/lib/rules/array-callback-return.js`, extracted by hooking its
 // `RuleTester` and capturing the case objects rather than by parsing the file, so no case was
@@ -29,7 +29,6 @@ import (
 // Ten upstream errors carry only rendered message text rather than a `messageId`. Those were mapped
 // back to their id by the sentence upstream's own `meta.messages` associates with it, which is a
 // one-to-one mapping across the four ids this rule can report.
-const arrayCallbackReturnCorpusProvenance = "eslint/tests/lib/rules/array-callback-return.js"
 
 // TestArrayCallbackReturnStaysSilent runs every clean case upstream ships.
 //
@@ -311,7 +310,11 @@ func TestArrayCallbackReturnOptionsDecode(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decode: %v", err)
 		}
-		if !decoded.(ArrayCallbackReturnOptions).AllowImplicit {
+		options, ok := decoded.(ArrayCallbackReturnOptions)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not ArrayCallbackReturnOptions", decoded)
+		}
+		if !options.AllowImplicit {
 			test.Fatalf("decoded %#v", decoded)
 		}
 		result := rule_testing.RunWithOptions(test, ArrayCallbackReturn, "o.ts",
@@ -382,7 +385,10 @@ func TestArrayCallbackReturnOptionsDecode(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decode: %v", err)
 		}
-		settings := decoded.(ArrayCallbackReturnOptions)
+		settings, ok := decoded.(ArrayCallbackReturnOptions)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not ArrayCallbackReturnOptions", decoded)
+		}
 		if settings.AllowImplicit || settings.CheckForEach || settings.AllowVoid {
 			test.Fatalf("empty object did not default every option off: %#v", settings)
 		}

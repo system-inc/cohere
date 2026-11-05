@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "Go": "cohere-go/consistency-no-parameter-reassignment"
+  },
+  "messages": {
+    "parameterReassigned": {
+      "text": "`{{name}}` came in from the caller, and this line gives it a new value, so every later use of it means something other than what was passed, with nothing at the place of use to say so. Put the new value in a variable of its own, named for what it has become, and leave `{{name}}` holding what the caller gave."
+    },
+    "parameterAddressTaken": {
+      "text": "This takes the address of `{{name}}`, which came in from the caller, and whatever holds the pointer can give `{{name}}` a new value that nothing in this function shows. Copy it into a variable of its own, named for what it is for, and take the address of that, so `{{name}}` keeps what the caller gave."
+    }
+  }
+}

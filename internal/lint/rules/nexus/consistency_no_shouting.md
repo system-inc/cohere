@@ -15,6 +15,9 @@ plus the `ISO` 4217 currency codes), carries a digit or an underscore, is a two-
 or has no vowel. Code is masked first: fenced blocks, backticks, double-quoted strings, single-quoted
 tokens, single-quoted capital phrases, `@example` blocks, and command lines.
 
+The safe list and the masks live in `internal/shouting/shouting.go`, which the Go engine's
+`cohere-go/consistency-no-shouting` reads too, so both engines agree on what an acronym is.
+
 Kirk's ruling on the 2026-10-01 review: all caps belongs in backticks, single quotes or double quotes
 unless it is on the safe list. The safe list is the authority for what an acronym is.
 
@@ -51,7 +54,7 @@ Go port afterwards and belongs in the original's list too.
   requires a word boundary outside both quotes, which is what keeps a possessive or a leading
   apostrophe (`the '90s were LOUD and the users' data`) from pairing into a mask. Zero ahra sites
   differ today, so `internal/differential/acknowledged.go` carries no entry. The same change belongs
-  in `Shouting.ts` (`maskCodeAndCommands`), after the single-quoted token replace.
+  in `Shouting.ts` (`maskCodeAndCommands`, `MaskCodeAndCommands` here), after the single-quoted token replace.
 - **A double-quoted phrase that wraps onto the next comment line is masked.** Kirk's ruling: a quoted
   all-caps phrase is a literal. The original's double-quote pattern stops at a newline, so a block
   comment that reflowed `"the caller's job and you must NOT"` across two lines read the `NOT` as

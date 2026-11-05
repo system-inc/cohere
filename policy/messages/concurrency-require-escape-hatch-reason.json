@@ -1,10 +1,23 @@
 {
   "rules": {
-    "Swift": "cohere-swift/concurrency-require-escape-hatch-reason"
+    "Swift": "cohere-swift/concurrency-require-escape-hatch-reason",
+    "Go": "cohere-go/concurrency-require-escape-hatch-reason"
   },
   "messages": {
     "escapeHatchWithoutReason": {
-      "text": "{{spelling}} tells the compiler to trust this code instead of checking it. Say why that is safe in a comment directly above the declaration, so the next reader can check the reasoning the compiler no longer does."
+      "text": "{{spelling}} tells the compiler to trust this code instead of checking it. Say why that is safe in [[where]], so the next reader can check the reasoning the compiler no longer does.",
+      "terms": {
+        "where": {
+          "Swift": "a comment directly above the declaration",
+          "Go": "a `// Unsafe: <reason>` comment directly above it"
+        }
+      }
+    },
+    "unsafeMarkerWithoutReason": {
+      "text": "{{spelling}} is marked `Unsafe:` and gives no reason. Say why it is safe after the colon, such as what keeps the memory alive or what the linked symbol promises, because a marker with nothing after it tells the next reader nothing and excuses nothing.",
+      "languages": [
+        "Go"
+      ]
     }
   }
 }

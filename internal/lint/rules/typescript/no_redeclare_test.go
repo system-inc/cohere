@@ -216,18 +216,26 @@ func TestNoRedeclareRequiresTheTypedHarness(test *testing.T) {
 func TestNoRedeclareDefaultsToIgnoringDeclarationMerge(test *testing.T) {
 	test.Parallel()
 
+	asOptions := func(decoded any) NoRedeclareOptions {
+		options, isType := decoded.(NoRedeclareOptions)
+		if !isType {
+			test.Fatalf("decoding the options gave %T, expected NoRedeclareOptions", decoded)
+		}
+		return options
+	}
+
 	decoded, err := DecodeNoRedeclareOptions(nil)
 	if err != nil {
 		test.Fatalf("DecodeNoRedeclareOptions(nil) errored: %v", err)
 	}
-	if got := decoded.(NoRedeclareOptions); !got.IgnoreDeclarationMerge || !got.BuiltinGlobals {
+	if got := asOptions(decoded); !got.IgnoreDeclarationMerge || !got.BuiltinGlobals {
 		test.Errorf("absent options: %+v, want both true", got)
 	}
 	builtinsOff, err := DecodeNoRedeclareOptions(json.RawMessage(`{"builtinGlobals":false}`))
 	if err != nil {
 		test.Fatalf("DecodeNoRedeclareOptions errored: %v", err)
 	}
-	if got := builtinsOff.(NoRedeclareOptions); got.BuiltinGlobals || !got.IgnoreDeclarationMerge {
+	if got := asOptions(builtinsOff); got.BuiltinGlobals || !got.IgnoreDeclarationMerge {
 		test.Errorf("builtinGlobals false: %+v, want it off and the merge exemption still on", got)
 	}
 
@@ -235,7 +243,7 @@ func TestNoRedeclareDefaultsToIgnoringDeclarationMerge(test *testing.T) {
 	if err != nil {
 		test.Fatalf("DecodeNoRedeclareOptions errored: %v", err)
 	}
-	if got := explicit.(NoRedeclareOptions); got.IgnoreDeclarationMerge {
+	if got := asOptions(explicit); got.IgnoreDeclarationMerge {
 		test.Errorf("explicit false: IgnoreDeclarationMerge = true, want false")
 	}
 

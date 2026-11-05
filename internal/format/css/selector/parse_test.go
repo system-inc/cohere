@@ -126,7 +126,10 @@ func TestParsePseudoWithSelectors(test *testing.T) {
 	if strings.Join(types, " ") != want {
 		test.Errorf("inner nodes\n got %s\nwant %s", strings.Join(types, " "), want)
 	}
-	end := sourceOf(pseudo)["end"].(map[string]any)
+	end, isMap := sourceOf(pseudo)["end"].(map[string]any)
+	if !isMap {
+		test.Fatalf("pseudo source end %v, want a {line, column} object", sourceOf(pseudo)["end"])
+	}
 	if end["line"] != 1 || end["column"] != 24 {
 		test.Errorf("pseudo end %v, want the closing parenthesis at 1:24 (columns are 1-based)", end)
 	}
@@ -141,7 +144,11 @@ func TestParseOffsetsAreBytes(test *testing.T) {
 	if second.Get("sourceIndex") != 6 {
 		test.Errorf("sourceIndex %v, want byte 6", second.Get("sourceIndex"))
 	}
-	if column := sourceOf(second)["start"].(map[string]any)["column"]; column != 6 {
+	start, isMap := sourceOf(second)["start"].(map[string]any)
+	if !isMap {
+		test.Fatalf("class source start %v, want a {line, column} object", sourceOf(second)["start"])
+	}
+	if column := start["column"]; column != 6 {
 		test.Errorf("column %v, want UTF-16 column 6", column)
 	}
 	// An emoji is two UTF-16 units and four bytes; splitWord's sourceIndex past the end stays past it.

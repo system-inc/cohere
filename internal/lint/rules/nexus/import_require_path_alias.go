@@ -72,7 +72,10 @@ func decodeImportRequirePathAliasOptions(raw []byte, base rule.OptionsBase) (any
 	if err != nil {
 		return nil, err
 	}
-	settings := decoded.(ImportRequirePathAliasOptions)
+	settings, isSettings := decoded.(ImportRequirePathAliasOptions)
+	if !isSettings {
+		return nil, fmt.Errorf("the options decoded to a %T, not ImportRequirePathAliasOptions", decoded)
+	}
 
 	root := settings.RepositoryRoot
 	switch {

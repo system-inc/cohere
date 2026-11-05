@@ -1,6 +1,7 @@
 package javascript
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"unicode"
@@ -213,8 +214,13 @@ func isKeySafeToQuote(node Node, options *Options) bool {
 		return false
 	}
 	printedNumber := printNumber(getRaw(key))
+	value, isNumber := key.Get("value").(float64)
+	if !isNumber {
+		// Invariant: isNumericLiteral just held, and estree builds every numeric literal with a float64 value.
+		panic(fmt.Sprintf("javascript: a numeric literal key's value is a %T, not a float64", key.Get("value")))
+	}
 	// Avoid converting 999999999999999999999 to 1e+21, 0.99999999999999999 to 1 and 1.0 to 1.
-	return javaScriptNumberString(key.Get("value").(float64)) == printedNumber && isSimpleNumber(printedNumber)
+	return javaScriptNumberString(value) == printedNumber && isSimpleNumber(printedNumber)
 }
 
 // isKeySafeToUnquote is upstream's isKeySafeToUnquote. Of its parsers, ours are "typescript", "babel"
@@ -281,7 +287,13 @@ func printKey(path *Path, options *Options, print PrintFunc) Doc {
 		key := getKey(current)
 		name := key.String("name")
 		if !key.Is("Identifier") {
-			name = javaScriptNumberString(key.Get("value").(float64))
+			value, isNumber := key.Get("value").(float64)
+			if !isNumber {
+				// Invariant: shouldQuoteKey held, so isKeySafeToQuote found the key an Identifier or a numeric
+				// literal, and estree builds every numeric literal with a float64 value.
+				panic(fmt.Sprintf("javascript: a quoted key's value is a %T, not a float64", key.Get("value")))
+			}
+			name = javaScriptNumberString(value)
 		}
 		printed := printString(jsonStringify(name), options)
 		return call(path, func(path *Path) Doc { return printing.PrintComments(path, concatIn(path, printed), options, nil) }, property)

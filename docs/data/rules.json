@@ -14,7 +14,7 @@
         "typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
         "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json); for Go, the analyzer or check a ported rule names (internal/goengine/rules)"
     },
-    "count": 733,
+    "count": 781,
     "rules": [
         {
             "name": "@eslint-community/eslint-comments/require-description",
@@ -6668,14 +6668,6 @@
             "typeAware": true
         },
         {
-            "name": "cohere-go/ST1015",
-            "language": "Go",
-            "namespace": "cohere-go",
-            "origin": "staticcheck",
-            "upstreamName": "ST1015",
-            "typeAware": false
-        },
-        {
             "name": "cohere-go/ST1016",
             "language": "Go",
             "namespace": "cohere-go",
@@ -6780,6 +6772,286 @@
             "typeAware": true
         },
         {
+            "name": "cohere-go/concurrency-no-buffered-wait-delay",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "concurrency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/concurrency-no-kill-by-name",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "concurrency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/concurrency-require-escape-hatch-reason",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "concurrency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-abbreviated-identifier",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-ambiguous-identifier",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-any",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-boolean-outcome",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-console",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-dash-punctuation",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-else-return",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-empty-function",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-grouped-var",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-label",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-lone-block",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-lonely-if",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-long-file",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-long-line",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-parameter-reassignment",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-property-alias",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-redundant-import-alias",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-screaming-snake-case",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-shouting",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-stuttering-name",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-undefined-initializer",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-uppercase-initialism",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-use-before-define",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-no-useless-concatenation",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-utils-folder",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-no-warning-comment",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-require-default-last",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-require-error-clause",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-require-matching-file-name",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-require-octal-prefix",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
+            "name": "cohere-go/consistency-require-one-type-per-file",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/consistency-require-operator-assignment",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true
+        },
+        {
             "name": "cohere-go/copylocks",
             "language": "Go",
             "namespace": "cohere-go",
@@ -6788,7 +7060,79 @@
             "typeAware": true
         },
         {
+            "name": "cohere-go/correctness-no-caller-data-mutation",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-no-identical-branches",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-no-process-exit-after-output",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-no-write-only-collection",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
             "name": "cohere-go/correctness-require-checked-assertion",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-require-declared-walk",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-require-handled-error",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-require-invariant-reason",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-require-response-status-check",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "correctness",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/correctness-require-wrapped-error",
             "language": "Go",
             "namespace": "cohere-go",
             "origin": "house",
@@ -6900,6 +7244,22 @@
             "typeAware": true
         },
         {
+            "name": "cohere-go/security-no-interpolated-shell-command",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "security",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/security-no-interpolated-sql-string",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "security",
+            "typeAware": true
+        },
+        {
             "name": "cohere-go/shift",
             "language": "Go",
             "namespace": "cohere-go",
@@ -6970,6 +7330,30 @@
             "origin": "house",
             "category": "testing",
             "typeAware": false
+        },
+        {
+            "name": "cohere-go/testing-no-timing-assertion",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "testing",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/testing-no-uncached-run",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "testing",
+            "typeAware": true
+        },
+        {
+            "name": "cohere-go/testing-require-failure-path",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "testing",
+            "typeAware": true
         },
         {
             "name": "cohere-go/testing-require-parallel",

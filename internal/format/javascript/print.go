@@ -255,7 +255,12 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 	case "ClassProperty", "PropertyDefinition", "ClassPrivateProperty", "ClassAccessorProperty", "AccessorProperty":
 		return printClassProperty(path, options, print)
 	case "TemplateElement":
-		return doc.ReplaceEndOfLine(doc.Text(current.Get("value").(*estree.TemplateValue).Raw), nil)
+		value, isTemplateValue := current.Get("value").(*estree.TemplateValue)
+		if !isTemplateValue || value == nil {
+			// Invariant: estree builds every TemplateElement with an *estree.TemplateValue for its value.
+			panic(fmt.Sprintf("javascript: a TemplateElement's value is a %T, not an *estree.TemplateValue", current.Get("value")))
+		}
+		return doc.ReplaceEndOfLine(doc.Text(value.Raw), nil)
 	case "TemplateLiteral":
 		return printTemplateLiteral(path, options, print)
 	case "TaggedTemplateExpression":

@@ -1,0 +1,96 @@
+// Package flagged holds typed vars whose initializer restates their type's zero value, each of which the rule must
+// report and offer to drop.
+package flagged
+
+import (
+	"time"
+	"unsafe"
+)
+
+// The five shapes the rule is named for, at package level.
+var count int // want "`count` starts at `0`, the zero value Go already gives every `int`"
+
+var name string // want "`name` starts at `\"\"`"
+
+var done bool // want "`done` starts at `false`"
+
+var readError error // want "`readError` starts at `nil`.*`error`"
+
+var pointer *int // want "`pointer` starts at `nil`"
+
+// A grouped declaration judges each spec on its own.
+var (
+	total    int     // want "`total` starts at `0`"
+	label    string  // want "`label` starts at"
+	measured float64 = 1.5
+)
+
+// Other spellings of a basic zero: every base, a float, an exponent, an imaginary part, a raw string and a rune.
+var (
+	hexadecimal int        // want "`hexadecimal` starts at `0x0`"
+	octal       int        // want "`octal` starts at `0o0`"
+	binary      int        // want "`binary` starts at `0b0`"
+	ratio       float64    // want "`ratio` starts at `0.0`"
+	scaled      float64    // want "`scaled` starts at `0e5`"
+	imaginary   complex128 // want "`imaginary` starts at `0i`"
+	raw         string     // want "`raw` starts at"
+	terminator  rune       // want "`terminator` starts at"
+	small       byte       // want "`small` starts at `0x00`"
+)
+
+// Celsius is a named number, whose zero is the zero of the float beneath it.
+type Celsius float64
+
+// Count is an alias, whose zero is int's.
+type Count = int
+
+// Reader is an interface declared here, whose zero is nil.
+type Reader interface{ Read() string }
+
+// A named basic type, an alias, a type from another package, and each kind of type whose zero is nil.
+var (
+	freezing Celsius        // want "`freezing` starts at `0`.*`Celsius`"
+	tally    Count          // want "`tally` starts at `0`.*`Count`"
+	timeout  time.Duration  // want "`timeout` starts at `0`.*`time.Duration`"
+	items    []int          // want "`items` starts at `nil`"
+	index    map[string]int // want "`index` starts at `nil`"
+	signals  chan int       // want "`signals` starts at `nil`"
+	callback func()         // want "`callback` starts at `nil`"
+	boxed    any            // want "`boxed` starts at `nil`.*`any`"
+	source   Reader         // want "`source` starts at `nil`.*`Reader`"
+	address  unsafe.Pointer // want "`address` starts at `nil`"
+)
+
+// Parentheses do not hide the zero.
+var wrapped int // want "`wrapped` starts at `\\(0\\)`"
+
+var wrappedNil error // want "`wrappedNil` starts at `\\(nil\\)`"
+
+// Several names, every one of them initialized to zero, lose the initializer together.
+var first, second int // want "`first, second` starts at `0, 0`"
+
+// A comment after the value stays where it is.
+var kept int // want "`kept` starts at `0`"
+
+// A comment inside the initializer would be lost with it, so this is reported and left for the writer to fix.
+var noted int = /* why */ 0 // want "`noted` starts at `0`"
+
+// Locals in a function, a function literal, and a generic function are judged the same way.
+func locals() (int, string, error) {
+	var sum int        // want "`sum` starts at `0`"
+	var message string // want "`message` starts at"
+	var failure error  // want "`failure` starts at `nil`"
+	run := func() bool {
+		var finished bool // want "`finished` starts at `false`"
+		return finished
+	}
+	run()
+	return sum, message, failure
+}
+
+// A type parameter whose every type accepts nil has nil for its zero, so nil is a restated zero there too.
+func emptyOf[Element any, Pointer ~*Element]() (Pointer, *Element) {
+	var typed Pointer  // want "`typed` starts at `nil`.*`Pointer`"
+	var plain *Element // want "`plain` starts at `nil`"
+	return typed, plain
+}

@@ -19,14 +19,12 @@ import (
  */
 
 var (
-	line                       = doc.LineDoc
-	softline                   = doc.Softline
-	hardline                   = doc.Hardline
-	literalline                = doc.Literalline
-	hardlineWithoutBreakParent = doc.HardlineWithoutBreakParent
-	breakParent                = doc.BreakParent
-	lineSuffixBoundary         = doc.LineSuffixBoundary
-	trim                       = doc.Trim
+	line               = doc.LineDoc
+	softline           = doc.Softline
+	hardline           = doc.Hardline
+	literalline        = doc.Literalline
+	breakParent        = doc.BreakParent
+	lineSuffixBoundary = doc.LineSuffixBoundary
 )
 
 // emptyDoc is upstream's "".
@@ -122,7 +120,14 @@ var docMemories = sync.Pool{New: func() any {
 var poisonedDoc Doc = doc.Text("CoherePoisonedDoc")
 
 // acquireDocMemory is a docMemory for one format, from the pool. Release it once the doc is laid out.
-func acquireDocMemory() *docMemory { return docMemories.Get().(*docMemory) }
+func acquireDocMemory() *docMemory {
+	memory, isDocMemory := docMemories.Get().(*docMemory)
+	if !isDocMemory {
+		// Invariant: docMemories only ever holds a *docMemory, from its New and from release.
+		panic("javascript: the doc memory pool held something other than a *docMemory")
+	}
+	return memory
+}
 
 // release resets the memory and returns it to the pool. Every doc it handed out is gone.
 func (memory *docMemory) release() {
@@ -199,20 +204,6 @@ func indentIn(path *Path, contents any) Doc {
 	return memory.indents.New(doc.Indent{Contents: toDoc(contents)})
 }
 
-// docs converts a list of doc values, for the builders that take arrays.
-func docs(parts ...any) []Doc {
-	result := make([]Doc, len(parts))
-	for index, part := range parts {
-		result[index] = toDoc(part)
-	}
-	return result
-}
-
-// group is upstream's group(contents).
-func group(contents any) Doc {
-	return doc.NewGroup(toDoc(contents), doc.GroupOptions{})
-}
-
 // groupWith is upstream's group(contents, options).
 func groupWith(contents any, options doc.GroupOptions) Doc {
 	return doc.NewGroup(toDoc(contents), options)
@@ -228,11 +219,6 @@ func indent(contents any) Doc { return doc.NewIndent(toDoc(contents)) }
 
 // align is upstream's align(width, contents) for a numeric width.
 func align(width int, contents any) Doc { return doc.NewAlign(width, toDoc(contents)) }
-
-// alignString is upstream's align(string, contents).
-func alignString(prefix string, contents any) Doc {
-	return doc.AlignWithString(prefix, toDoc(contents))
-}
 
 // dedent is upstream's dedent(contents).
 func dedent(contents any) Doc { return doc.Dedent(toDoc(contents)) }
@@ -260,9 +246,6 @@ func ifBreakWithGroup(breakContents any, flatContents any, groupID *doc.GroupID)
 func indentIfBreak(contents any, groupID *doc.GroupID, negate bool) Doc {
 	return doc.NewIndentIfBreak(toDoc(contents), groupID, negate)
 }
-
-// lineSuffix is upstream's lineSuffix(contents).
-func lineSuffix(contents any) Doc { return doc.NewLineSuffix(toDoc(contents)) }
 
 // label is upstream's label(name, contents).
 func label(name string, contents any) Doc { return doc.NewLabel(name, toDoc(contents)) }

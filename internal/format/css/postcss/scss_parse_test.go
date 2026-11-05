@@ -23,7 +23,7 @@ func TestParseSCSSTree(test *testing.T) {
 	}
 
 	comment := nodes[0]
-	commentRaws := comment.Get("raws").(map[string]any)
+	commentRaws := objectOf(test, comment.Get("raws"), "comment raws")
 	if comment.Type() != "comment" || comment.String("text") != "a *//* b" || commentRaws["inline"] != true || commentRaws["text"] != "a /* b" || commentRaws["left"] != " " || commentRaws["right"] != "" {
 		test.Errorf("comment %q %v", comment.String("text"), commentRaws)
 	}
@@ -38,7 +38,7 @@ func TestParseSCSSTree(test *testing.T) {
 	if keys := nested.Keys(); !reflect.DeepEqual(keys, []string{"raws", "isNested", "nodes", "source", "prop", "value"}) {
 		test.Errorf("nested declaration keys %v", keys)
 	}
-	value := nested.Get("raws").(map[string]any)["value"]
+	value := objectOf(test, nested.Get("raws"), "nested declaration raws")["value"]
 	if want := map[string]any{"value": "0 ", "raw": "0 /* c*/\n ", "scss": "0 // c\n "}; !reflect.DeepEqual(value, want) {
 		test.Errorf("raws.value %#v", value)
 	}

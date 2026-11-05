@@ -154,7 +154,11 @@ const defaultProgramCacheCapacity = 16
 func evictBeyondCapacity() {
 	for len(programCache) > programCacheCapacity {
 		oldest := programCacheRecency.Back()
-		evicted := oldest.Value.(*programCacheEntry)
+		evicted, isEntry := oldest.Value.(*programCacheEntry)
+		if !isEntry {
+			// Invariant: the one push onto programCacheRecency is an entry, so every element holds one
+			panic(fmt.Sprintf("the program cache's recency list holds a %T", oldest.Value))
+		}
 		programCacheRecency.Remove(oldest)
 		delete(programCache, evicted.key)
 	}
