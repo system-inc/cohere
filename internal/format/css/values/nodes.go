@@ -78,13 +78,25 @@ func newString(value string, nodeSource map[string]any, sourceIndex int, quoted 
 
 // raws is node.raws.
 func raws(node *estree.Node) map[string]any {
-	return node.Get("raws").(map[string]any)
+	nodeRaws, isMap := node.Get("raws").(map[string]any)
+	if !isMap {
+		// Invariant: every constructor above sets raws to newRaws(); Parse recovers the panic into an
+		// error.
+		panic("css values: node.raws is not an object")
+	}
+	return nodeRaws
 }
 
 // appendRaw is node.raws[key] += text.
 func appendRaw(node *estree.Node, key string, text string) {
 	nodeRaws := raws(node)
-	nodeRaws[key] = nodeRaws[key].(string) + text
+	raw, isString := nodeRaws[key].(string)
+	if !isString {
+		// Invariant: the parser appends only to before and after, which newRaws() sets to "" and every
+		// append keeps a string; Parse recovers the panic into an error.
+		panic("css values: node.raws." + key + " is not a string")
+	}
+	nodeRaws[key] = raw + text
 }
 
 // appendNode is Container's append: node.parent = this; this.nodes.push(node).
