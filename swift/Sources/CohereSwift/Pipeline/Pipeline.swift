@@ -466,19 +466,9 @@ public struct Pipeline {
                 layouts: Self.symbolLayouts(package: package, scratch: runScratch(for: root)),
                 runner: runner,
             )
-            symbolProvider.ownedModules = Self.ownedModules(of: package)
-            /*
-             An Xcode target's module is named for its product, not the target (CapturePhone's is `Capture`), so the
-             modules are also taken from the compiles that list our files, the names the index records declarations under.
-             */
-            if package.projectKind != .swiftPackage {
-                let ownedFiles = fileSet.owned.map(\.url)
-                for layout in symbolProvider.layouts {
-                    if let table = try? CompileCommands.read(layout: layout) {
-                        symbolProvider.ownedModules.formUnion(table.modules(compiling: ownedFiles))
-                    }
-                }
-            }
+            symbolProvider.ownedModules = Self.ownedModules(of: package).union(
+                Self.compiledModules(of: package, fileSet: fileSet, layouts: symbolProvider.layouts)
+            )
             linter.symbols = symbolProvider.symbols(for: typedCandidates)
             if let lintBuildFailure {
                 linter.symbols.unavailable = linter.symbols.unavailable.mapValues {
@@ -521,10 +511,7 @@ public struct Pipeline {
             }
         }
 
-        if options.unused && package.projectKind != .swiftPackage {
-            try writer.write(PhaseRecord(name: .unused, outcome: .notReached, detail: Self.xcodeIndexNotRead))
-        }
-        else if options.unused {
+        if options.unused {
             try await runUnused(package: package, root: root, fileSet: fileSet, parsed: parsed.files)
         }
         else {
@@ -534,10 +521,6 @@ public struct Pipeline {
     }
 
     static let unusedNotRequested = "not requested — this is a report, ask for it with --unused"
-
-    /* Why an Xcode project's unused report does not run yet, in the words the phase line prints. */
-    static let xcodeIndexNotRead =
-        "an Xcode project's index is not read yet, so nothing judges what is unused (block C, #9ktapz2, reads it)"
 
     /*
      The run's project: SwiftPM's answer for a package, or an Xcode project read into the same model, with the
@@ -578,7 +561,8 @@ public struct Pipeline {
      used or not by its file alone but the index that answers is the whole build's. It reads the index the types phase just refreshed,
      or the last build's, and a file that index does not describe as it stands is counted as not checked
      rather than guessed at. Its records are a report, not findings: the writer does not count them, so they
-     never fail a run, the way the TypeScript unused report never does.
+     never fail a run, the way the TypeScript unused report never does. An Xcode root's index is its xcodebuild's,
+     in the derived data `symbolLayouts` names.
      */
     private func runUnused(package: PackageModel, root: URL, fileSet: FileSet, parsed: [ParsedFile]) async throws {
         let start = Date()
@@ -628,7 +612,15 @@ public struct Pipeline {
             since: start,
         )
         let declarationsStart = Date()
-        let declarations = UnusedDeclarations(stores: stores, package: package).run(files: files)
+        var unusedDeclarations = UnusedDeclarations(stores: stores, package: package)
+        unusedDeclarations.ownedModules.formUnion(
+            Self.compiledModules(
+                of: package,
+                fileSet: fileSet,
+                layouts: Self.symbolLayouts(package: package, scratch: runScratch(for: root)),
+            )
+        )
+        let declarations = unusedDeclarations.run(files: files)
         try writeReport(
             rule: UnusedDeclarations.ruleName,
             findings: declarations.findings,
@@ -753,6 +745,23 @@ public struct Pipeline {
                 String(target.name.map { $0.isLetter || $0.isNumber || $0 == "_" ? $0 : "_" })
             }
         )
+    }
+
+    /*
+     At an Xcode root, the modules the build compiled our files into, which `ownedModules(of:)` cannot name: a
+     target's module is named for its product, not the target (CapturePhone's is `Capture`), and these are the
+     names the index records declarations under. Empty for a package, whose modules are its targets' names.
+     */
+    static func compiledModules(of package: PackageModel, fileSet: FileSet, layouts: [BuildLayout]) -> Set<String> {
+        guard package.projectKind != .swiftPackage else { return [] }
+        let ownedFiles = fileSet.owned.map(\.url)
+        var modules: Set<String> = []
+        for layout in layouts {
+            if let table = try? CompileCommands.read(layout: layout) {
+                modules.formUnion(table.modules(compiling: ownedFiles))
+            }
+        }
+        return modules
     }
 
     /*

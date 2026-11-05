@@ -147,6 +147,18 @@ struct XcodeProjectPipelineTests {
             of("summary").first?["complete"] as? Bool
         }
 
+        /* Each unused record as `<file name>:<line> <subject>`. */
+        var unused: [String] {
+            of("unused").map {
+                "\(URL(fileURLWithPath: $0["file"] as? String ?? "").lastPathComponent):\($0["line"] as? Int ?? 0) \($0["subject"] as? String ?? "")"
+            }
+        }
+
+        /* One unused rule's coverage record. */
+        func unusedCoverage(_ rule: String) -> [String: Any] {
+            of("unusedCoverage").first { $0["rule"] as? String == rule } ?? [:]
+        }
+
         /* Each lint crash as `<file name>: <error>`. */
         var lintCrashes: [String] {
             (of("lint").first?["crashes"] as? [[String: Any]] ?? []).map {
@@ -155,10 +167,81 @@ struct XcodeProjectPipelineTests {
         }
     }
 
+    /* An entry point that uses both of the fixture's types, so nothing the unused report judges is unused by default. */
+    static let usingEntrySource = """
+        @main
+        struct FixtureApp {
+            static func main() {
+                _ = Greeter(name: "fixture").greeting()
+                _ = Counter().doubled(2)
+            }
+        }
+
+        """
+
+    /* Line 1 imports a module nothing in the file uses, and line 8 declares a private function nothing calls. */
+    static let unusedSource = """
+        import Foundation
+
+        struct Counter {
+            func doubled(_ value: Int) -> Int {
+                value * 2
+            }
+
+            private func neverCalled() -> Int {
+                3
+            }
+        }
+
+        """
+
+    /* The same file with every import and declaration used: Foundation for `Date`, and the private function by `doubled`. */
+    static let usedSource = """
+        import Foundation
+
+        struct Counter {
+            func doubled(_ value: Int) -> Int {
+                twice(value) + seconds(since: Date())
+            }
+
+            private func twice(_ value: Int) -> Int {
+                value * 2
+            }
+
+            private func seconds(since start: Date) -> Int {
+                Int(Date().timeIntervalSince(start))
+            }
+        }
+
+        """
+
+    /* A framework target beside the app, which the app never links, so nothing in the build names its public function. */
+    static let frameworkTarget = """
+          Kit:
+            type: framework
+            platform: iOS
+            deploymentTarget: "18.0"
+            sources:
+              - Kit
+            settings:
+              base:
+                SWIFT_VERSION: "6.0"
+                GENERATE_INFOPLIST_FILE: YES
+
+        """
+
+    static let frameworkSource = """
+        public func kitGreeting() -> String {
+            "kit"
+        }
+
+        """
+
     /* A repository holding the app's folder; the returned URL is the app's folder, the run's root. */
     static func fixture(
         counter: String = dirtySource,
         specification: String = specification,
+        entry: String = entrySource,
     ) throws -> (repository: URL, root: URL) {
         let repository = FileManager.default.temporaryDirectory.appendingPathComponent(
             "cohere-swift-xcode-\(UUID().uuidString)",
@@ -169,7 +252,7 @@ struct XcodeProjectPipelineTests {
             "project.yml": specification,
             "Sources/Greeter.swift": cleanSource,
             "Sources/Counter.swift": counter,
-            "Sources/FixtureApp.swift": entrySource,
+            "Sources/FixtureApp.swift": entry,
             "Tools/Script.swift": "print(\"a script no target compiles\")\n",
             ".gitignore": "Info.plist\n*.xcodeproj\n",
         ]
@@ -395,6 +478,73 @@ struct XcodeProjectPipelineTests {
         #expect(edited.fromIndex == 2)
         #expect(edited.fromSourcekitd == 1, "\(edited.unavailable)")
         #expect(edited.unavailable.isEmpty)
+    }
+
+    /* `--unused` at an Xcode root reads the xcodebuild's index: the import nothing uses and the private function nothing calls. */
+    @Test func theUnusedReportFindsAnUnusedImportAndAPrivateDeclarationAtAnXcodeRoot() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixture(counter: Self.unusedSource, entry: Self.usingEntrySource)
+        defer { Self.remove(fixture.repository) }
+
+        let run = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache", "--unused"])
+
+        #expect(run.phase("unused")?.outcome == "ran", "\(String(describing: run.phase("unused")))")
+        #expect(run.unused == ["Counter.swift:1 import Foundation", "Counter.swift:8 func neverCalled()"])
+        #expect(run.unusedCoverage(UnusedImports.ruleName)["filesChecked"] as? Int == 3)
+        #expect(run.unusedCoverage(UnusedDeclarations.ruleName)["filesChecked"] as? Int == 3)
+    }
+
+    /* Every import and declaration used, so the report checks every file and finds nothing. */
+    @Test func theUnusedReportFindsNothingWhereEverythingIsUsedAtAnXcodeRoot() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixture(counter: Self.usedSource, entry: Self.usingEntrySource)
+        defer { Self.remove(fixture.repository) }
+
+        let run = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache", "--unused"])
+
+        #expect(run.phase("unused")?.outcome == "ran")
+        #expect(run.unused.isEmpty, "\(run.unused)")
+        #expect(run.unusedCoverage(UnusedImports.ruleName)["filesChecked"] as? Int == 3)
+        #expect(run.unusedCoverage(UnusedDeclarations.ruleName)["filesChecked"] as? Int == 3)
+        #expect(run.unusedCoverage(UnusedDeclarations.ruleName)["checked"] as? Int ?? 0 > 0)
+    }
+
+    /*
+     A framework target's public function is API for whoever links the framework, though nothing in this build names
+     it (`XcodeProject.isAPI`), so it is kept and counted as public API, never reported.
+     */
+    @Test func aFrameworkTargetsPublicDeclarationIsAPIAtAnXcodeRoot() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixture(
+            counter: Self.usedSource,
+            specification: Self.specification + Self.frameworkTarget,
+            entry: Self.usingEntrySource,
+        )
+        defer { Self.remove(fixture.repository) }
+        let kit = fixture.root.appendingPathComponent("Kit/Kit.swift")
+        try FileManager.default.createDirectory(at: kit.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Self.frameworkSource.write(to: kit, atomically: true, encoding: .utf8)
+
+        let run = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache", "--unused"])
+
+        #expect(run.filesWithoutRecord.isEmpty, "\(run.typesBuild)")
+        #expect(run.phase("unused")?.outcome == "ran")
+        #expect(run.unused.isEmpty, "\(run.unused)")
+        let skipped = run.unusedCoverage(UnusedDeclarations.ruleName)["skipped"] as? [String: Int] ?? [:]
+        #expect(skipped[UnusedDeclarations.publicAPI] == 1, "\(skipped)")
+    }
+
+    /* Which product types are API: run, never linked, is not; linked is; one this engine does not know fails closed. */
+    @Test(arguments: [
+        ("com.apple.product-type.application", false), ("com.apple.product-type.app-extension", false),
+        ("com.apple.product-type.extensionkit-extension", false), ("com.apple.product-type.bundle.unit-test", false),
+        ("com.apple.product-type.bundle.ui-testing", false), ("com.apple.product-type.tool", false),
+        ("com.apple.product-type.framework", true), ("com.apple.product-type.framework.static", true),
+        ("com.apple.product-type.library.static", true), ("com.apple.product-type.library.dynamic", true),
+        ("com.apple.product-type.bundle", true), ("com.apple.product-type.xpc-service", true),
+    ])
+    func aProductTypeIsAPIWhenSomethingOutsideTheBuildLinksIt(productType: String, isAPI: Bool) {
+        #expect(XcodeProject.isAPI(kind: XcodeProject.kind(of: productType)) == isAPI)
     }
 
     /*

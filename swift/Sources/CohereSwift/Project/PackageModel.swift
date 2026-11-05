@@ -87,6 +87,8 @@ public struct PackageModel: Equatable, Sendable {
     public var productTargets: [String: String] = [:]
     /* The targets a library product is built from: the package's API to whoever depends on it, so what they declare public is used by someone this build never sees. */
     public var libraryProductTargets: Set<String> = []
+    /* An Xcode project's targets whose product type this engine does not know, to the type: among the library product targets, so their public declarations are kept, and named so the report says why. */
+    public var unknownProductTypes: [String: String] = [:]
 
     public init(
         name: String,

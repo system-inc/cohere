@@ -14,7 +14,7 @@ import Foundation
  for what a source path includes are xcodegen's, and a second reading of them would drift from the first.
 
  What the run takes from each native target: its name, its product type spelled as SwiftPM's kinds, its Swift
- files and its `SWIFT_VERSION`. The settings the package rules judge (upcoming features, strict memory safety,
+ files and its `SWIFT_VERSION`, and from the product type whether its public declarations are API (`isAPI`). The settings the package rules judge (upcoming features, strict memory safety,
  the language mode as Xcode resolves it through configuration files) are block D's (#6vjs9n7). Until then those
  rules are not run against an Xcode project (`Linter`), because a judgment made from half the settings would be
  a guess.
@@ -104,7 +104,27 @@ public enum XcodeProject {
             },
         )
         model.projectKind = kind
+        for target in projectFile.targets {
+            let targetKind = Self.kind(of: target.productType)
+            guard Self.isAPI(kind: targetKind) else { continue }
+            model.libraryProductTargets.insert(target.name)
+            if targetKind != "library" {
+                model.unknownProductTypes[target.name] = target.productType
+            }
+        }
         return Loaded(model: model, bundle: bundle, projectFile: projectFile, definition: definition)
+    }
+
+    /*
+     Whether a target's public declarations are API, used by code this build never sees, as a library product's are
+     for a package (`libraryProductTargets`). An application, an app extension, a test bundle or a command-line tool
+     is run, never linked, so nothing outside it can name what it declares, and its `public` is only a word. A
+     framework or library is linked by whoever embeds it, so its `public` and `open` declarations are API. A product
+     type this engine does not know (a plain bundle, an XPC service) may be loaded and named from outside, so it
+     fails closed and is taken as API, with its type in the report's words.
+     */
+    static func isAPI(kind: String) -> Bool {
+        !["application", "test", "executable"].contains(kind)
     }
 
     /*
