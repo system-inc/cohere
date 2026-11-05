@@ -34,16 +34,17 @@ func (report *openReport) add(path string) {
 	if path == "" {
 		return
 	}
+	resolvedPath := path
 	if absolute, absolutePathError := filepath.Abs(path); absolutePathError == nil {
-		path = absolute
+		resolvedPath = absolute
 	}
-	path = filepath.Clean(path)
+	cleanPath := filepath.Clean(resolvedPath)
 	if report.seen == nil {
 		report.seen = map[string]bool{}
 	}
-	if !report.seen[path] {
-		report.seen[path] = true
-		report.Paths = append(report.Paths, path)
+	if !report.seen[cleanPath] {
+		report.seen[cleanPath] = true
+		report.Paths = append(report.Paths, cleanPath)
 	}
 }
 

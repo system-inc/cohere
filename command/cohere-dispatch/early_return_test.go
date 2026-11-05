@@ -74,15 +74,15 @@ func TestReturningEarlyChangesNothingTheCallerSees(test *testing.T) {
 					code = exitError.ExitCode()
 				}
 				normalize := func(text string) string {
-					text = invocationLines.ReplaceAllString(text, "")
-					text = bytes.NewBufferString(text).String()
+					normalized := invocationLines.ReplaceAllString(text, "")
+					normalized = bytes.NewBufferString(normalized).String()
 					resolved, resolveSymlinksError := filepath.EvalSymlinks(root)
 					if resolveSymlinksError != nil {
 						test.Fatalf("resolving the project's root: %v", resolveSymlinksError)
 					}
-					text = regexp.MustCompile(regexp.QuoteMeta(resolved)).ReplaceAllString(text, "ROOT")
-					text = regexp.MustCompile(regexp.QuoteMeta(root)).ReplaceAllString(text, "ROOT")
-					return clock.ReplaceAllString(durations.ReplaceAllString(text, "D"), "T")
+					normalized = regexp.MustCompile(regexp.QuoteMeta(resolved)).ReplaceAllString(normalized, "ROOT")
+					normalized = regexp.MustCompile(regexp.QuoteMeta(root)).ReplaceAllString(normalized, "ROOT")
+					return clock.ReplaceAllString(durations.ReplaceAllString(normalized, "D"), "T")
 				}
 				return outcome{normalize(stdout.String()), normalize(stderr.String()), code, root}
 			}

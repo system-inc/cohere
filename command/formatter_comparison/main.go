@@ -196,11 +196,11 @@ func collapse(line string) string {
 }
 
 func trim(line string) string {
-	line = strings.TrimSpace(line)
-	if len(line) > 72 {
-		return line[:72] + "..."
+	trimmed := strings.TrimSpace(line)
+	if len(trimmed) > 72 {
+		return trimmed[:72] + "..."
 	}
-	return line
+	return trimmed
 }
 
 func rel(root string, file string) string {

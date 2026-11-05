@@ -930,10 +930,11 @@ func printProvenance(out *bufio.Writer, format string, arguments ...any) {
 // printTagged prints text, tagged when a recording is in progress. The text is whole before it is tagged, so every
 // line of it starts with the tag however the stream later splits its writes.
 func printTagged(out *bufio.Writer, tag []byte, text string) {
+	printed := text
 	if activeRunCache != nil {
-		text = tagLines(text, tag)
+		printed = tagLines(text, tag)
 	}
-	fmt.Fprint(out, text)
+	fmt.Fprint(out, printed)
 }
 
 // tagLines is text with tag at the start of every line. A text that ends without a newline ends on a tagged
@@ -978,13 +979,14 @@ var rootTag = []byte("\x1ecohere-root\x1e")
 // target, replaced by rootTag. Only a whole path component is replaced: a root of /work/app leaves
 // /work/application alone.
 func recordedOutput(output []byte, anchor program.PathAnchor) []byte {
+	recorded := output
 	for _, root := range []string{anchor.Root(), anchor.Resolved()} {
 		if root == "" {
 			continue
 		}
-		output = replaceRoot(output, []byte(root), rootTag)
+		recorded = replaceRoot(recorded, []byte(root), rootTag)
 	}
-	return output
+	return recorded
 }
 
 // spelledOutput is a recording's output with rootTag replaced by the root as this run spells it.
@@ -998,23 +1000,24 @@ func spelledOutput(output []byte, anchor program.PathAnchor) []byte {
 // colon or a comma.
 func replaceRoot(output []byte, root []byte, replacement []byte) []byte {
 	var replaced bytes.Buffer
+	remaining := output
 	for {
-		position := bytes.Index(output, root)
+		position := bytes.Index(remaining, root)
 		if position < 0 {
-			replaced.Write(output)
+			replaced.Write(remaining)
 			return replaced.Bytes()
 		}
 		end := position + len(root)
-		if position > 0 && !endsEscape(output[:position]) &&
-			(output[position-1] == '/' || output[position-1] == '\\' || continuesName(output[position-1])) ||
-			end < len(output) && continuesName(output[end]) {
-			replaced.Write(output[:end])
-			output = output[end:]
+		if position > 0 && !endsEscape(remaining[:position]) &&
+			(remaining[position-1] == '/' || remaining[position-1] == '\\' || continuesName(remaining[position-1])) ||
+			end < len(remaining) && continuesName(remaining[end]) {
+			replaced.Write(remaining[:end])
+			remaining = remaining[end:]
 			continue
 		}
-		replaced.Write(output[:position])
+		replaced.Write(remaining[:position])
 		replaced.Write(replacement)
-		output = output[end:]
+		remaining = remaining[end:]
 	}
 }
 
@@ -1023,12 +1026,12 @@ func replaceRoot(output []byte, root []byte, replacement []byte) []byte {
 func endsEscape(text []byte) bool {
 	// A color sequence is a few bytes, so only the tail is searched: a report with thousands of paths and no
 	// color would otherwise be scanned back to its start for each one.
-	text = text[max(0, len(text)-16):]
-	start := bytes.LastIndexByte(text, 0x1b)
-	if start < 0 || len(text)-start < 3 || text[start+1] != '[' || text[len(text)-1] != 'm' {
+	tail := text[max(0, len(text)-16):]
+	start := bytes.LastIndexByte(tail, 0x1b)
+	if start < 0 || len(tail)-start < 3 || tail[start+1] != '[' || tail[len(tail)-1] != 'm' {
 		return false
 	}
-	for _, character := range text[start+2 : len(text)-1] {
+	for _, character := range tail[start+2 : len(tail)-1] {
 		if character != ';' && (character < '0' || character > '9') {
 			return false
 		}
