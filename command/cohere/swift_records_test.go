@@ -453,9 +453,13 @@ func TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap(t *testing.T) {
 				"  not checked: "+engineRoot+"/Vendor/Kit/Kit.swift (vendored under Vendor/)\n",
 				"  not checked: "+engineRoot+"/Scratch.swift (ignored by git)\n",
 			)
-			if activeSummary.Gaps.UncheckedSwift != 2 {
-				t.Errorf("counted %d Swift files not checked, want 2: build.swift and odd.swift, and none of the three expected reasons",
-					activeSummary.Gaps.UncheckedSwift)
+			wantGap := []uncheckedSwiftFile{
+				{engineRoot + "/Scripts/build.swift", "no target of this package compiles it"},
+				{engineRoot + "/Scripts/odd.swift", "a reason no engine has given yet"},
+			}
+			if !reflect.DeepEqual(activeSummary.Gaps.UncheckedSwift, wantGap) {
+				t.Errorf("the gap is %v, want %v: build.swift and odd.swift, and none of the three expected reasons",
+					activeSummary.Gaps.UncheckedSwift, wantGap)
 			}
 			if markers := uncheckedMarkers(activeSummary); !slices.Contains(markers, "⚠ 2 Swift files not checked") {
 				t.Errorf("the footer's markers are %q, want the gap among them", markers)
@@ -472,8 +476,8 @@ func TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap(t *testing.T) {
 				"  not checked: "+engineRoot+"/CapturePhone/App/App.swift (no target of this package compiles it)\n",
 				"  not checked: "+engineRoot+"/Tools/Sim/Package.swift (a package manifest)\n",
 			)
-			if activeSummary.Gaps.UncheckedSwift != 3 {
-				t.Errorf("yielding nothing counted %d Swift files not checked, want 3", activeSummary.Gaps.UncheckedSwift)
+			if len(activeSummary.Gaps.UncheckedSwift) != 3 {
+				t.Errorf("yielding nothing listed %v as not checked, want 3 files", activeSummary.Gaps.UncheckedSwift)
 			}
 
 			// A file the engine could not read under a yielded directory is still named, and the run is
@@ -501,8 +505,67 @@ func TestSwiftRunCountsAnUnknownExclusionReasonAsAGap(t *testing.T) {
 	if err != nil || exitCode != 0 {
 		t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
 	}
-	if activeSummary.Gaps.UncheckedSwift != 1 {
-		t.Errorf("counted %d, want the one file marked // @generated", activeSummary.Gaps.UncheckedSwift)
+	want := []uncheckedSwiftFile{{"/project/Sources/Example/Generated.swift", "marked // @generated"}}
+	if !reflect.DeepEqual(activeSummary.Gaps.UncheckedSwift, want) {
+		t.Errorf("the gap is %v, want %v", activeSummary.Gaps.UncheckedSwift, want)
+	}
+}
+
+// A gap is named file by file, however many files share its reason, in the account `--verbose` prints and in
+// the list `--json` writes, while a reason nobody expects checked still collapses to a count past the limit. A
+// file of the gap's reason under a yielded directory is in neither, since the run there accounts for it.
+// Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level
+// activeSummary, which it reads back
+func TestSwiftRunNamesEveryFileOfTheGap(t *testing.T) {
+	excluded := []excludedFile{{"/project/App/Main.swift", "no target of this package compiles it"}}
+	wantGap := []uncheckedSwiftFile{}
+	for index := range excludedNamedLimit + 1 {
+		letter := string(rune('a' + index))
+		excluded = append(excluded,
+			excludedFile{"/project/Scripts/S" + letter + ".swift", "no target of this package compiles it"},
+			excludedFile{"/project/Vendor/V" + letter + ".swift", "vendored under Vendor/"},
+		)
+		wantGap = append(wantGap, uncheckedSwiftFile{"/project/Scripts/S" + letter + ".swift", "no target of this package compiles it"})
+	}
+	clean := contractFixture(t, "Clean.jsonl")
+	clean[1] = projectRecordAt(t, clean[1], "/project", excluded)
+
+	activeSummary = runSummary{}
+	output, exitCode, err := renderRecordsYielding(t, swiftModeCheck, clean, 0, []string{"/project/App"})
+	if err != nil || exitCode != 0 {
+		t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
+	}
+	for _, file := range wantGap {
+		requireLines(t, output, "  not checked: "+file.File+" ("+file.Reason+")\n")
+	}
+	requireLines(t, output, "  not checked: 6 files (vendored under Vendor/)\n")
+	forbidLines(t, output, "files (no target of this package compiles it)", "/project/Vendor/Va.swift", "/project/App/Main.swift")
+	if !reflect.DeepEqual(activeSummary.Gaps.UncheckedSwift, wantGap) {
+		t.Errorf("the gap is %v, want %v", activeSummary.Gaps.UncheckedSwift, wantGap)
+	}
+	if markers := uncheckedMarkers(activeSummary); !slices.Contains(markers, "⚠ 6 Swift files not checked") {
+		t.Errorf("the footer's markers are %q, want the six files of the gap counted", markers)
+	}
+
+	// The list as `--json` writes it: each file with its reason, under the key the schema names.
+	encoded, err := json.Marshal(summaryAsJSON(activeSummary))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded struct {
+		Gaps struct {
+			UncheckedSwift []map[string]string `json:"uncheckedSwift"`
+		} `json:"gaps"`
+	}
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	wantJSON := []map[string]string{}
+	for _, file := range wantGap {
+		wantJSON = append(wantJSON, map[string]string{"file": file.File, "reason": file.Reason})
+	}
+	if !reflect.DeepEqual(decoded.Gaps.UncheckedSwift, wantJSON) {
+		t.Errorf("under --json the gap is %v, want %v:\n%s", decoded.Gaps.UncheckedSwift, wantJSON, encoded)
 	}
 }
 

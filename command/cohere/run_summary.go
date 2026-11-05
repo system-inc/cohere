@@ -228,7 +228,15 @@ type runGaps struct {
 	// UncheckedSwift is the Swift files a Swift run's engine listed as not checked for a reason other than
 	// git ignoring them, Vendor/ or being a manifest, which today means no target of the package compiles
 	// them, less those the runs of the Swift projects below it account for (#ybspptb). A gap, not a failure.
-	UncheckedSwift int `json:"uncheckedSwift,omitempty"`
+	// Each is named, never only counted: a gap nobody can find is half a gap.
+	UncheckedSwift []uncheckedSwiftFile `json:"uncheckedSwift,omitempty"`
+}
+
+// uncheckedSwiftFile is one Swift file of a run's gap: the file as the engine names it, and the engine's reason
+// for leaving it out.
+type uncheckedSwiftFile struct {
+	File   string `json:"file"`
+	Reason string `json:"reason"`
 }
 
 // failed is whether errors, required rewrites, crashes or a missing generated file fail the run. Warnings

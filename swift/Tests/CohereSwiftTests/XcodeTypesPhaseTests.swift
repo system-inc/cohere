@@ -5,8 +5,8 @@ import Testing
 
 /*
  The parts of the Xcode types phase that need no xcodebuild: which targets it builds and how, what it says when a
- build fails, the package pins it keeps for a generated bundle, and the local packages it reads from a build's
- package state. The builds themselves are `XcodeProjectPipelineTests`'.
+ build fails, which package pins it builds from and keeps, and the local packages it reads from a build's package
+ state. The builds themselves are `XcodeProjectPipelineTests`'.
  */
 @Suite
 struct XcodeTypesPhaseTests {
@@ -38,15 +38,21 @@ struct XcodeTypesPhaseTests {
         )
     }
 
-    /* A phase over these targets, each owning one file, with its bundle and scratch under `folder`. */
+    /*
+     A phase over these targets, each owning one file, with its scratch under `folder`. A generated project's bundle
+     is in the scratch, as `XcodeGeneration` makes it; a committed one stands in `folder`.
+     */
     static func phase(
         _ targets: [XcodeProjectFile.Target],
         in folder: URL,
         resolutionAllowed: Bool = true,
+        kind: PackageModel.ProjectKind = .xcodeGen,
     ) -> XcodeTypesPhase {
-        let bundle = folder.appendingPathComponent("Fixture.xcodeproj", isDirectory: true)
+        let bundle = (kind == .xcodeGen ? folder.appendingPathComponent("scratch/xcode") : folder)
+            .appendingPathComponent("Fixture.xcodeproj", isDirectory: true)
         let projectFile = XcodeProjectFile(sourceRoot: folder, targets: targets, localPackages: [])
-        let model = PackageModel(name: "Fixture", root: folder, toolsVersion: "", targets: [])
+        var model = PackageModel(name: "Fixture", root: folder, toolsVersion: "", targets: [])
+        model.projectKind = kind
         return XcodeTypesPhase(
             package: model,
             project: XcodeProject.Loaded(
@@ -102,27 +108,113 @@ struct XcodeTypesPhaseTests {
         }
     }
 
-    /* Every write in the scratch, nothing signed, run scripts held to their declared files, and no resolution under `--no-fix`. */
-    @Test func buildsIntoTheScratchWithoutSigningOrResolving() throws {
+    /* Every write in the scratch, nothing signed, and run scripts held to their declared files. */
+    @Test func buildsIntoTheScratchWithoutSigning() throws {
         try Self.withFolder { folder in
             let phase = Self.phase([Self.target("App", "application", sdkRoot: "iphoneos")], in: folder)
             let build = try #require(phase.buildPlan.builds.first)
-            let arguments = phase.arguments(for: build)
             let scratch = folder.appendingPathComponent("scratch").path
             #expect(
-                arguments == [
-                    "-project", folder.appendingPathComponent("Fixture.xcodeproj").path, "-scheme", "App",
-                    "-destination", "generic/platform=iOS", "-derivedDataPath", scratch + "/xcode-build",
-                    "-clonedSourcePackagesDirPath", scratch + "/xcode-packages", "-configuration", "Debug",
-                    "CODE_SIGNING_ALLOWED=NO", "ENABLE_USER_SCRIPT_SANDBOXING=YES", "build",
+                phase.arguments(for: build) == [
+                    "-project", scratch + "/xcode/Fixture.xcodeproj", "-scheme", "App", "-destination",
+                    "generic/platform=iOS", "-derivedDataPath", scratch + "/xcode-build",
+                    "-clonedSourcePackagesDirPath",
+                    scratch + "/xcode-packages", "-configuration", "Debug", "CODE_SIGNING_ALLOWED=NO",
+                    "ENABLE_USER_SCRIPT_SANDBOXING=YES", "build",
                 ]
             )
-            let checking = Self.phase(
-                [Self.target("App", "application", sdkRoot: "iphoneos")],
-                in: folder,
-                resolutionAllowed: false,
+        }
+    }
+
+    /*
+     `--no-fix` resolves into the scratch (#s8p20fe): a generated bundle is built as it is, since it is in the
+     scratch, and a committed one through the scratch's workspace, so its pins land there. Only a resolution the
+     repository commits holds the build to it. A plain run builds a committed bundle where it stands.
+     */
+    @Test func noFixResolvesIntoTheScratchUnlessTheRepositoryCommitsPins() throws {
+        try Self.withFolder { folder in
+            let app = [Self.target("App", "application", sdkRoot: "iphoneos")]
+            let generated = Self.phase(app, in: folder, resolutionAllowed: false)
+            let build = try #require(generated.buildPlan.builds.first)
+            #expect(generated.arguments(for: build).prefix(2) == ["-project", generated.project.bundle.path])
+            #expect(!generated.arguments(for: build).contains("-disableAutomaticPackageResolution"))
+
+            let committed = Self.phase(app, in: folder, resolutionAllowed: false, kind: .xcodeProject)
+            let workspace = folder.appendingPathComponent("scratch/xcode-workspace/Fixture.xcworkspace").path
+            #expect(committed.arguments(for: build).prefix(2) == ["-workspace", workspace])
+            #expect(!committed.arguments(for: build).contains("-disableAutomaticPackageResolution"))
+            #expect(committed.resolvedInBuild.path == workspace + "/xcshareddata/swiftpm/Package.resolved")
+
+            let fixing = Self.phase(app, in: folder, kind: .xcodeProject)
+            #expect(fixing.arguments(for: build).prefix(2) == ["-project", folder.path + "/Fixture.xcodeproj"])
+            #expect(fixing.resolvedInBuild == fixing.resolvedInBundle)
+
+            try Self.write("{}", to: committed.resolvedInBundle)
+            #expect(
+                committed.committedResolved == committed.resolvedInBundle,
+                "outside a repository a bundle's pins are its own",
             )
-            #expect(checking.arguments(for: build).contains("-disableAutomaticPackageResolution"))
+            #expect(committed.arguments(for: build).contains("-disableAutomaticPackageResolution"))
+            #expect(!fixing.arguments(for: build).contains("-disableAutomaticPackageResolution"))
+        }
+    }
+
+    static func write(_ text: String, to file: URL) throws {
+        try FileManager.default.createDirectory(
+            at: file.deletingLastPathComponent(),
+            withIntermediateDirectories: true,
+        )
+        try text.write(to: file, atomically: true, encoding: .utf8)
+    }
+
+    /*
+     Committed means git would list it. The pins in the bundle beside a spec are read only from a repository that
+     does not ignore them, never from a folder with no repository, where that bundle is the last generation's output.
+     A committed bundle's pins an ignore rule covers are a developer's own, and are not read either.
+     */
+    @Test func readsOnlyTheResolutionARepositoryCommits() throws {
+        try Self.withFolder { folder in
+            let generated = Self.phase([], in: folder, resolutionAllowed: false)
+            let besideSpec = folder.appendingPathComponent(
+                "Fixture.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+            )
+            try Self.write("{}", to: besideSpec)
+            #expect(generated.committedResolved == nil, "no repository")
+
+            try FileManager.default.createDirectory(
+                at: folder.appendingPathComponent(".git"),
+                withIntermediateDirectories: true,
+            )
+            try Self.write("*.xcodeproj/\n", to: folder.appendingPathComponent(".gitignore"))
+            #expect(generated.committedResolved == nil, "ignored")
+
+            try Self.write(
+                "*.xcodeproj/*\n!*.xcodeproj/project.xcworkspace/\n",
+                to: folder.appendingPathComponent(".gitignore"),
+            )
+            #expect(generated.committedResolved?.path == besideSpec.path)
+
+            let committed = Self.phase([], in: folder, resolutionAllowed: false, kind: .xcodeProject)
+            #expect(committed.committedResolved?.path == besideSpec.path)
+            try Self.write("Package.resolved\n", to: folder.appendingPathComponent(".gitignore"))
+            #expect(committed.committedResolved == nil, "a developer's own pins")
+        }
+    }
+
+    /* The workspace names the committed bundle by its absolute path, escaped for XML. */
+    @Test func writesAWorkspaceNamingTheCommittedBundle() throws {
+        try Self.withFolder { folder in
+            let odd = folder.appendingPathComponent("R&D \"one\"", isDirectory: true)
+            try FileManager.default.createDirectory(at: odd, withIntermediateDirectories: true)
+            let phase = Self.phase([], in: odd, resolutionAllowed: false, kind: .xcodeProject)
+            try phase.writeWorkspace()
+            let contents = try String(
+                contentsOf: phase.workspace.appendingPathComponent("contents.xcworkspacedata"),
+                encoding: .utf8,
+            )
+            #expect(
+                contents.contains("location = \"absolute:\(folder.path)/R&amp;D &quot;one&quot;/Fixture.xcodeproj\"")
+            )
         }
     }
 
@@ -185,29 +277,37 @@ struct XcodeTypesPhaseTests {
         }
     }
 
-    /* Under `--no-fix` a resolution the scratch cannot answer is named as the one a plain run repairs. */
-    @Test func aResolutionNoFixRefusesIsNamed() throws {
+    /*
+     A resolve that fails is said in xcodebuild's words. Under `--no-fix`, held to a resolution the repository
+     commits, the words name that file, since the build was held to it.
+     */
+    @Test func aResolutionThatFailsIsNamed() throws {
         try Self.withFolder { folder in
-            let unresolved = Self.result(
+            let stale = Self.result(
                 """
                 xcodebuild: error: Could not resolve package dependencies:
-                  a resolved file is required when automatic dependency resolution is disabled
+                  an out-of-date resolved file was detected at /scratch/Package.resolved, which is not allowed when automatic dependency resolution is disabled
 
                 """,
                 exitCode: 74,
             )
-            let checking = Self.phase([], in: folder, resolutionAllowed: false)
+            let checking = Self.phase([], in: folder, resolutionAllowed: false, kind: .xcodeProject)
+            let said =
+                "xcodebuild: error: Could not resolve package dependencies: an out-of-date resolved file was detected at /scratch/Package.resolved, which is not allowed when automatic dependency resolution is disabled"
+            #expect(checking.failedStep(of: stale) == said)
+            try Self.write("{}", to: checking.resolvedInBundle)
             #expect(
-                checking.failedStep(of: unresolved)
-                    == "xcodebuild: error: Could not resolve package dependencies: a resolved file is required when automatic dependency resolution is disabled (under --no-fix packages are never resolved, and this scratch holds no resolution to build from; a run without --no-fix resolves them once)"
+                checking.failedStep(of: stale)
+                    == "\(said) (under --no-fix the build is held to the resolution the repository commits, \(checking.resolvedInBundle.path), and a check never moves it)"
             )
-            #expect(!Self.phase([], in: folder).failedStep(of: unresolved).contains("--no-fix"))
+            #expect(Self.phase([], in: folder, kind: .xcodeProject).failedStep(of: stale) == said)
         }
     }
 
     /*
      A generated bundle is made afresh each run, so the pins a build wrote are kept in the scratch and put back into
-     the next bundle. A bundle that has pins of its own keeps them.
+     the next bundle. A bundle that has pins of its own keeps them, unless the repository commits pins, which replace
+     whatever the bundle holds.
      */
     @Test func keepsAGeneratedBundlesPinsAcrossGeneration() throws {
         try Self.withFolder { folder in
@@ -227,6 +327,19 @@ struct XcodeTypesPhaseTests {
             try "pins two".write(to: phase.resolvedInBundle, atomically: true, encoding: .utf8)
             phase.restoreResolved()
             #expect(try String(contentsOf: phase.resolvedInBundle, encoding: .utf8) == "pins two")
+
+            try FileManager.default.createDirectory(
+                at: folder.appendingPathComponent(".git"),
+                withIntermediateDirectories: true,
+            )
+            try Self.write(
+                "committed pins",
+                to: folder.appendingPathComponent(
+                    "Fixture.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+                ),
+            )
+            phase.restoreResolved()
+            #expect(try String(contentsOf: phase.resolvedInBundle, encoding: .utf8) == "committed pins")
         }
     }
 

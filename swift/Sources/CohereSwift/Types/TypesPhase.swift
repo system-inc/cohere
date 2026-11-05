@@ -144,7 +144,7 @@ struct TypesPhase {
                 if !result.succeeded {
                     throw TypesFailure(
                         description:
-                            "swift build of \(build.root.path) failed before compiling anything, so the compiler never ran: \(Self.tail(of: result))"
+                            "swift build of \(build.root.path) failed before compiling anything, so the compiler never ran: \(Self.tail(of: result))\(unresolvableWords(result))"
                     )
                 }
                 throw TypesFailure(
@@ -347,6 +347,23 @@ struct TypesPhase {
      */
     static func buildSystemArguments(help: String) -> [String]? {
         help.contains("--build-system") && help.contains("swiftbuild") ? swiftBuildArguments : nil
+    }
+
+    /*
+     Why `--no-fix` cannot resolve what a package without a Package.resolved needs, said after SwiftPM's words.
+     The Xcode phase resolves into the scratch (#s8p20fe), but SwiftPM keeps a package's pins only beside its
+     Package.swift and offers no flag to keep them elsewhere (6.4.2's `swift build --help` and `swift package
+     --help`, 2026-11-05), so resolving there would write into the tree. Measured on a fresh scratch: with the
+     file present the pinned revisions clone into the scratch and the build succeeds, so only its absence is a gap.
+     */
+    private func unresolvableWords(_ result: ProcessRunner.Result) -> String {
+        guard !resolutionAllowed,
+            Self.tail(of: result).contains(
+                "a resolved file is required when automatic dependency resolution is disabled"
+            )
+        else { return "" }
+        return
+            ". Under --no-fix nothing is written into the tree, and SwiftPM keeps a package's resolution only in the Package.resolved beside its Package.swift, so a check cannot resolve this package: commit its Package.resolved, or run without --no-fix once"
     }
 
     /* The build could not be read at all. */
