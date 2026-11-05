@@ -1,78 +1,34 @@
-// Copyright 2020 The Go Authors. All rights reserved.
+// cohere:copied golang.org/x/tools@v0.50.0 internal/analysis/driverutil/validatefix.go
+// cohere:until the copy of go/analysis/checker beside this package goes away,
+// since it is the only caller (see checker.go's cohere:until).
+//
+// cohere: an internal package of x/tools cannot be imported from this module,
+// so the copy of checker.go carries its own copy of the driverutil helpers it
+// calls, one file to each upstream file. The code is unchanged.
+//
+// ValidateFixes is the largest of them and is kept whole because it guards our
+// byte offsets: check turns each suggested fix's edits into 0-based offsets
+// into a file, and an edit that runs backwards, spans two files or ends past
+// the end of its file would become offsets that cut the wrong bytes. Upstream
+// panics on such a fix, the recover in check turns that into a crash naming
+// the analyzer, and no wrong offset reaches a finding.
+
+// Copyright 2025 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package checker
+package driverutil
 
-// This file is copied from golang.org/x/tools@v0.50.0's internal/analysis/driverutil, the parts checker.go
-// calls: readfile.go (Copyright 2020), url.go (Copyright 2023) and validatefix.go (Copyright 2025), each
-// The Go Authors, under the same BSD-style license. An internal package of x/tools cannot be imported from
-// this module, so the copy of checker.go carries its own. The code is unchanged.
-//
-// ValidateFixes is the largest of them and is kept whole because it guards our byte offsets: check turns each
-// suggested fix's edits into 0-based offsets into a file, and an edit that runs backwards, spans two files or
-// ends past the end of its file would become offsets that cut the wrong bytes. Upstream panics on such a fix, the
-// recover in check turns that into a crash naming the analyzer, and no wrong offset reaches a finding.
+// This file defines the validation of SuggestedFixes.
 
 import (
 	"cmp"
 	"fmt"
 	"go/token"
-	"net/url"
 	"slices"
 
 	"golang.org/x/tools/go/analysis"
 )
-
-// A ReadFileFunc is a function that returns the
-// contents of a file, such as [os.ReadFile].
-type ReadFileFunc = func(filename string) ([]byte, error)
-
-// CheckedReadFile returns a wrapper around a Pass.ReadFile
-// function that performs the appropriate checks.
-func CheckedReadFile(pass *analysis.Pass, readFile ReadFileFunc) ReadFileFunc {
-	return func(filename string) ([]byte, error) {
-		if checkReadableError := CheckReadable(pass, filename); checkReadableError != nil {
-			return nil, checkReadableError
-		}
-		return readFile(filename)
-	}
-}
-
-// CheckReadable enforces the access policy defined by the ReadFile field of [analysis.Pass].
-func CheckReadable(pass *analysis.Pass, filename string) error {
-	if slices.Contains(pass.OtherFiles, filename) ||
-		slices.Contains(pass.IgnoredFiles, filename) {
-		return nil
-	}
-	for _, f := range pass.Files {
-		if pass.Fset.File(f.FileStart).Name() == filename {
-			return nil
-		}
-	}
-	return fmt.Errorf("Pass.ReadFile: %s is not among OtherFiles, IgnoredFiles, or names of Files", filename)
-}
-
-// ResolveURL resolves the URL field for a Diagnostic from an Analyzer
-// and returns the URL. See Diagnostic.URL for details.
-func ResolveURL(a *analysis.Analyzer, d analysis.Diagnostic) (string, error) {
-	if d.URL == "" && d.Category == "" && a.URL == "" {
-		return "", nil // do nothing
-	}
-	raw := d.URL
-	if d.URL == "" && d.Category != "" {
-		raw = "#" + d.Category
-	}
-	u, err := url.Parse(raw)
-	if err != nil {
-		return "", fmt.Errorf("invalid Diagnostic.URL %q: %s", raw, err)
-	}
-	base, err := url.Parse(a.URL)
-	if err != nil {
-		return "", fmt.Errorf("invalid Analyzer.URL %q: %s", a.URL, err)
-	}
-	return base.ResolveReference(u).String(), nil
-}
 
 // ValidateFixes validates the set of fixes for a single diagnostic.
 // Any error indicates a bug in the originating analyzer.
@@ -88,8 +44,8 @@ func ValidateFixes(fset *token.FileSet, a *analysis.Analyzer, fixes []analysis.S
 			return fmt.Errorf("analyzer %q suggests two fixes with same Message (%s)", a.Name, fix.Message)
 		}
 		fixMessages[fix.Message] = true
-		if validateFixError := validateFix(fset, fix); validateFixError != nil {
-			return fmt.Errorf("analyzer %q suggests invalid fix (%s): %v", a.Name, fix.Message, validateFixError)
+		if err := validateFix(fset, fix); err != nil {
+			return fmt.Errorf("analyzer %q suggests invalid fix (%s): %v", a.Name, fix.Message, err)
 		}
 	}
 	return nil

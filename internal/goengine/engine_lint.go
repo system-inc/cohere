@@ -110,6 +110,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error) {
 	record := engine.lintCoverage(result, findings, turnedOff, notConfigured(enabled))
 	record.WithheldBySuppression = outcome.withheldByRule
 	record.WithheldAsGenerated = result.WithheldAsGenerated
+	record.WithheldAsCopied = result.WithheldAsCopied
 	if len(record.Crashes) > 0 {
 		engine.incomplete = true
 	}
