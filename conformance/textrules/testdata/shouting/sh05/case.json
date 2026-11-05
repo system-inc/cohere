@@ -1,0 +1,11 @@
+{
+    "why": "sh05: a run of `//` lines is one text, so a fence across them masks what it holds",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

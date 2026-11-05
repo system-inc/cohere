@@ -1,0 +1,16 @@
+{
+    "why": "sh11: multibyte text before the shouted word, so a span counted in characters misses it",
+    "expect": [
+        {
+            "covers": "NEVER",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

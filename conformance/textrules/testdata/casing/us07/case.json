@@ -1,0 +1,11 @@
+{
+    "why": "us07: `DATABASE_URL` read from the environment key `DATABASE_URL` mirrors an external grammar exactly, so it is exempt",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

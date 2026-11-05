@@ -1,0 +1,11 @@
+{
+    "why": "am02: the bare `_` is a discard and is judged in no engine",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

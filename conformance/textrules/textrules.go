@@ -30,9 +30,17 @@
 // the engine reports what should be clean, is silent where it should report, or reports a different number of
 // findings; and `span`, where the findings are the right ones but one covers the wrong bytes or has no end.
 //
-// A case marked as its family's control can carry a span row and never a verdict row. Its count of findings,
-// and the line each one starts on, are checked in every engine and can never be ledgered, because a control
-// whose silence was ledgered would hide an adapter that measures nothing.
+// A case marked as its family's control proves the adapter and the rule are live in an engine, so part of its
+// check can never be ledgered, because a control whose silence was ledgered would hide an adapter that
+// measures nothing. Its count of findings is always checked. Where a span covers text, the line each finding
+// starts on is checked too, since the text is the defect's identity. Where a span is the file's start or its
+// lines from one on, the defect is the whole file, and where the finding sits is placement, a span question.
+// Past that, a control can carry a span row and never a verdict row.
+//
+// A row with no case is a family-level row: the engine has no rule for the family yet, where the verdict says
+// it should, and families.json names it `{"missing": true}`. Its cases are written in that language anyway and
+// none of them runs. The row goes stale the moment families.json names a rule there, which the loader refuses,
+// so deleting the row is what lets the cases run.
 package textrules
 
 import (
@@ -94,17 +102,26 @@ const (
 	KindSpan Kind = "span"
 )
 
-// EngineRule is one engine's entry for a family in families.json: the rule's registered name, written as a
-// string, or the reason the language has no such idea, written `{"none": "<reason>"}`.
+// EngineRule is one engine's entry for a family in families.json, one of three: the rule's registered name,
+// written as a string; `{"none": "<reason>"}`, where the language has no such idea; or `{"missing": true}`,
+// where the verdict says the engine should have the rule and it does not yet, which a family-level ledger row
+// names the task for.
 type EngineRule struct {
-	// Rule is the rule's registered name in its engine, or empty when None says why there is none.
+	// Rule is the rule's registered name in its engine, or empty when None or Missing says why there is none.
 	Rule string
-	// None is why the language has no form of the family, or empty when Rule names the rule.
+	// None is why the language has no form of the family, or empty.
 	None string
+	// Missing is an engine that should have the family's rule and does not yet.
+	Missing bool
 }
 
-// UnmarshalJSON reads a rule name or `{"none": "<reason>"}`, and refuses anything else, an empty name or
-// reason included.
+// Runs reports whether the engine has a rule for the family, so its cases there are compared.
+func (entry EngineRule) Runs() bool {
+	return entry.Rule != ""
+}
+
+// UnmarshalJSON reads a rule name, `{"none": "<reason>"}` or `{"missing": true}`, and refuses anything else,
+// an empty name or reason and a `missing` that is not true included.
 func (entry *EngineRule) UnmarshalJSON(raw []byte) error {
 	var name string
 	if err := json.Unmarshal(raw, &name); err == nil {
@@ -114,16 +131,26 @@ func (entry *EngineRule) UnmarshalJSON(raw []byte) error {
 		entry.Rule = name
 		return nil
 	}
-	var none struct {
-		None *string `json:"none"`
+	var written struct {
+		None    *string `json:"none"`
+		Missing *bool   `json:"missing"`
 	}
-	if err := decodeStrictly(raw, &none); err != nil {
-		return fmt.Errorf(`an engine's entry is a rule name or {"none": "<reason>"}: %w`, err)
+	if err := decodeStrictly(raw, &written); err != nil {
+		return fmt.Errorf(`an engine's entry is a rule name, {"none": "<reason>"} or {"missing": true}: %w`, err)
 	}
-	if none.None == nil || strings.TrimSpace(*none.None) == "" {
+	switch {
+	case written.None != nil && written.Missing != nil:
+		return errors.New(`an engine's entry is {"none": ...} or {"missing": true}, never both`)
+	case written.Missing != nil:
+		if !*written.Missing {
+			return errors.New(`{"missing": false} says nothing; name the rule instead`)
+		}
+		entry.Missing = true
+	case written.None == nil || strings.TrimSpace(*written.None) == "":
 		return errors.New(`{"none": ...} needs the reason the language has no such rule`)
+	default:
+		entry.None = *written.None
 	}
-	entry.None = *none.None
 	return nil
 }
 
@@ -132,20 +159,60 @@ func (entry *EngineRule) UnmarshalJSON(raw []byte) error {
 // forms is written.
 type Span struct {
 	// Covers is the text the finding covers, and Occurrence which occurrence of it in the source, from 1.
-	Covers     *string `json:"covers,omitempty"`
-	Occurrence int     `json:"occurrence,omitempty"`
+	Covers     *string
+	Occurrence int
+
+	// OccurrenceIn is the occurrence in each language, written as an object in place of Occurrence's number,
+	// where one number can't name the same text in every language: a one-letter name's declaration is the
+	// fifth `n` in TypeScript's form and the third in Go's, because `function` holds two.
+	OccurrenceIn map[Engine]int
 
 	// FileStart is a point at the start of the file, for a rule about the file's path.
-	FileStart bool `json:"fileStart,omitempty"`
+	FileStart bool
 
 	// LinesFrom runs from the start of this 1-based line to the end of the file, for a rule about the file's
 	// length. A line is the language's own: each engine's terminators are a fact of its grammar.
-	LinesFrom int `json:"linesFrom,omitempty"`
+	LinesFrom int
+}
+
+// UnmarshalJSON reads a span, whose occurrence is a number or an object naming one per language, and refuses
+// an unknown key.
+func (span *Span) UnmarshalJSON(raw []byte) error {
+	var written struct {
+		Covers     *string         `json:"covers"`
+		Occurrence json.RawMessage `json:"occurrence"`
+		FileStart  bool            `json:"fileStart"`
+		LinesFrom  int             `json:"linesFrom"`
+	}
+	if err := decodeStrictly(raw, &written); err != nil {
+		return err
+	}
+	*span = Span{Covers: written.Covers, FileStart: written.FileStart, LinesFrom: written.LinesFrom}
+	if len(written.Occurrence) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(written.Occurrence, &span.Occurrence); err == nil {
+		return nil
+	}
+	if err := decodeStrictly(written.Occurrence, &span.OccurrenceIn); err != nil {
+		return fmt.Errorf("occurrence is a number, or an object naming one per language: %w", err)
+	}
+	return nil
+}
+
+// occurrenceFor is which occurrence of Covers the span names in an engine's language, or 0 where it names none.
+func (span Span) occurrenceFor(engine Engine) int {
+	if span.OccurrenceIn != nil {
+		return span.OccurrenceIn[engine]
+	}
+	return span.Occurrence
 }
 
 // String names the span as a case writes it.
 func (span Span) String() string {
 	switch {
+	case span.Covers != nil && span.OccurrenceIn != nil:
+		return fmt.Sprintf("%q (occurrences %v)", *span.Covers, span.OccurrenceIn)
 	case span.Covers != nil:
 		return fmt.Sprintf("%q (occurrence %d)", *span.Covers, span.Occurrence)
 	case span.FileStart:
@@ -163,10 +230,20 @@ func (span Span) check() error {
 		if *span.Covers == "" {
 			return errors.New("covers is empty")
 		}
-		if span.Occurrence < 1 {
+		switch {
+		case span.OccurrenceIn != nil && span.Occurrence != 0:
+			return fmt.Errorf("covers %q gives its occurrence as a number and per language", *span.Covers)
+		case span.OccurrenceIn != nil:
+			for engine, occurrence := range span.OccurrenceIn {
+				if _, known := extensionOf[engine]; !known || occurrence < 1 {
+					return fmt.Errorf("covers %q gives %s occurrence %d, and each is a language's, from 1",
+						*span.Covers, engine, occurrence)
+				}
+			}
+		case span.Occurrence < 1:
 			return fmt.Errorf("covers %q needs an occurrence of 1 or more", *span.Covers)
 		}
-	} else if span.Occurrence != 0 {
+	} else if span.Occurrence != 0 || span.OccurrenceIn != nil {
 		return errors.New("occurrence is written without covers")
 	}
 	if span.FileStart {
@@ -202,9 +279,15 @@ type Case struct {
 	// own form over the options the house sets give the rule.
 	Options map[string]json.RawMessage
 
-	// Path is the project-relative directory the case's source sits in, for a rule about paths, or empty for
-	// the project's root. A directory rather than a file name, since a case has one source per language.
+	// Path is the case source's project-relative file name without its extension, which each language adds:
+	// `case` unless the case says otherwise, `utils/case` for a rule about folders, `lf02.generated` for one
+	// about names.
 	Path string
+
+	// Root is the absolute directory the project is checked out at: `/project` unless the case says otherwise,
+	// for a rule that could mistake a directory above the project for one inside it. Nothing is written there;
+	// an adapter only names the file by it.
+	Root string
 
 	Languages []Engine
 	Sources   map[Engine]string
@@ -222,9 +305,14 @@ func (testCase Case) Has(engine Engine) bool {
 }
 
 // FileName is the case source's project-relative file name for an engine: `case.ts`, or `utils/case.ts`
-// under a Path.
+// under the Path `utils/case`.
 func (testCase Case) FileName(engine Engine) string {
-	return path.Join(testCase.Path, engine.SourceName())
+	return testCase.Path + "." + extensionOf[engine]
+}
+
+// AbsoluteFileName is the case source's file name for an engine under the project's Root.
+func (testCase Case) AbsoluteFileName(engine Engine) string {
+	return path.Join(testCase.Root, testCase.FileName(engine))
 }
 
 // Family is one family of twins, with its cases sorted by name.
@@ -234,12 +322,12 @@ type Family struct {
 	Cases []Case
 }
 
-// LedgerRow is one case an engine fails today.
+// LedgerRow is one case an engine fails today, or with no Case and no Kind, one family it has no rule for yet.
 type LedgerRow struct {
 	Engine Engine `json:"engine"`
 	Family string `json:"family"`
-	Case   string `json:"case"`
-	Kind   Kind   `json:"kind"`
+	Case   string `json:"case,omitempty"`
+	Kind   Kind   `json:"kind,omitempty"`
 	// Task is the task whose fix makes the case pass, and must delete this row.
 	Task string `json:"task"`
 	// Reason is what the engine does instead, in one line.
@@ -253,10 +341,14 @@ type Corpus struct {
 	Ledger   []LedgerRow
 }
 
-// CasesFor is every case with a form in an engine's language, across every family, in order.
+// CasesFor is every case an engine compares: each with a form in its language, in a family it has a rule for,
+// across every family, in order.
 func (corpus *Corpus) CasesFor(engine Engine) []Case {
 	cases := []Case{}
 	for _, family := range corpus.Families {
+		if !family.Rules[engine].Runs() {
+			continue
+		}
 		for _, testCase := range family.Cases {
 			if testCase.Has(engine) {
 				cases = append(cases, testCase)
@@ -324,6 +416,10 @@ const (
 	caseFileName     = "case.json"
 	// casesDirectory holds a directory per family, and in each a directory per case.
 	casesDirectory = "testdata"
+	// defaultPath and defaultRoot are a case's file name, without its extension, and the project it sits in,
+	// where the case names neither.
+	defaultPath = "case"
+	defaultRoot = "/project"
 )
 
 // caseFile is case.json as written.
@@ -333,14 +429,16 @@ type caseFile struct {
 	Expect    []Span                     `json:"expect"`
 	Options   map[string]json.RawMessage `json:"options"`
 	Path      *string                    `json:"path"`
+	Root      *string                    `json:"root"`
 	Languages []Engine                   `json:"languages"`
 }
 
 // LoadFrom reads a corpus from a file tree laid out as the embedded one is, and refuses: an unknown key in
-// any file; a family where an engine is missing; a family directory families.json does not name, or a named
+// any file; a family where an engine has no entry; a family directory families.json does not name, or a named
 // family with no cases; a case whose sources differ from the languages it lists; an expectation that is not
 // in a source; a ledger row naming a case that does not exist, or a language the case has no form in; a
-// verdict row on a control; and a second row for one case in one engine.
+// verdict row on a control; a second row for one case in one engine; a `missing` engine with no family-level
+// row, a family-level row for any other entry, and a case-level row for a `missing` engine.
 func LoadFrom(files fs.FS) (*Corpus, error) {
 	familyRules, err := readFamilies(files)
 	if err != nil {
@@ -478,16 +576,24 @@ func readCase(files fs.FS, family Family, name string) (Case, error) {
 		Control: written.Control,
 		Expect:  written.Expect,
 		Options: written.Options,
+		Path:    defaultPath,
+		Root:    defaultRoot,
 		Sources: map[Engine]string{},
 	}
 	if written.Path != nil {
 		cleaned := path.Clean(*written.Path)
 		if *written.Path == "" || cleaned != *written.Path || path.IsAbs(cleaned) || cleaned == "." ||
-			cleaned == ".." || strings.HasPrefix(cleaned, "../") {
-			return Case{}, fmt.Errorf("%s: path %q is not a clean project-relative directory", caseFileName,
-				*written.Path)
+			cleaned == ".." || strings.HasPrefix(cleaned, "../") || path.Base(cleaned) == ".." {
+			return Case{}, fmt.Errorf("%s: path %q is not a clean project-relative file name without its "+
+				"extension", caseFileName, *written.Path)
 		}
 		testCase.Path = cleaned
+	}
+	if written.Root != nil {
+		if !path.IsAbs(*written.Root) || path.Clean(*written.Root) != *written.Root || *written.Root == "/" {
+			return Case{}, fmt.Errorf("%s: root %q is not a clean absolute directory", caseFileName, *written.Root)
+		}
+		testCase.Root = *written.Root
 	}
 
 	if len(written.Languages) == 0 {
@@ -535,6 +641,14 @@ func readCase(files fs.FS, family Family, name string) (Case, error) {
 		}
 	}
 
+	// A per-language occurrence names exactly the languages the case lists, so none is guessed or left over.
+	for index, span := range testCase.Expect {
+		if span.OccurrenceIn != nil && len(span.OccurrenceIn) != len(testCase.Languages) {
+			return Case{}, fmt.Errorf("expect %d gives occurrences for %d languages, and the case lists %d", index,
+				len(span.OccurrenceIn), len(testCase.Languages))
+		}
+	}
+
 	// Each expectation has to be in each source, so a case can't expect a finding over text it does not hold.
 	for _, language := range testCase.Languages {
 		for index, span := range testCase.Expect {
@@ -562,11 +676,30 @@ func readLedger(files fs.FS, corpus *Corpus) ([]LedgerRow, error) {
 		if _, known := extensionOf[row.Engine]; !known {
 			return nil, fmt.Errorf("%s: %q is not an engine (the engines are %v)", label, row.Engine, Engines)
 		}
-		if row.Kind != KindVerdict && row.Kind != KindSpan {
-			return nil, fmt.Errorf("%s: kind is %q, and a row is %q or %q", label, row.Kind, KindVerdict, KindSpan)
-		}
 		if strings.TrimSpace(row.Task) == "" || strings.TrimSpace(row.Reason) == "" {
 			return nil, fmt.Errorf("%s needs both the task that fixes it and the reason it fails", label)
+		}
+		entry, familyFound := corpus.RuleFor(row.Family, row.Engine)
+		if !familyFound {
+			return nil, fmt.Errorf("%s names a family that does not exist", label)
+		}
+		if row.Case == "" {
+			if err := checkFamilyRow(label, row, entry); err != nil {
+				return nil, err
+			}
+			key := string(row.Engine) + "\x00" + row.Family
+			if seen[key] {
+				return nil, fmt.Errorf("%s is the second family-level row for that family in that engine", label)
+			}
+			seen[key] = true
+			continue
+		}
+		if entry.Missing {
+			return nil, fmt.Errorf("%s is a case-level row where %s has no rule for the family, so none of its "+
+				"cases runs; the family-level row covers them", label, row.Engine)
+		}
+		if row.Kind != KindVerdict && row.Kind != KindSpan {
+			return nil, fmt.Errorf("%s: kind is %q, and a row is %q or %q", label, row.Kind, KindVerdict, KindSpan)
 		}
 		var named *Case
 		for familyIndex := range corpus.Families {
@@ -595,7 +728,33 @@ func readLedger(files fs.FS, corpus *Corpus) ([]LedgerRow, error) {
 		}
 		seen[key] = true
 	}
+	for _, family := range corpus.Families {
+		for _, engine := range Engines {
+			if family.Rules[engine].Missing && !seen[string(engine)+"\x00"+family.Name] {
+				return nil, fmt.Errorf("%s names %s as missing in family %s, and %s has no family-level row naming "+
+					"the task that adds the rule", familiesFileName, engine, family.Name, ledgerFileName)
+			}
+		}
+	}
 	return rows, nil
+}
+
+// checkFamilyRow refuses a family-level row, one with no case, unless families.json names its engine as
+// missing there, and refuses a kind on one, since a family-level row judges no case.
+func checkFamilyRow(label string, row LedgerRow, entry EngineRule) error {
+	if row.Kind != "" {
+		return fmt.Errorf("%s is a family-level row with a kind, and a family-level row judges no case, so it "+
+			"has none", label)
+	}
+	switch {
+	case entry.Runs():
+		return fmt.Errorf("%s is a family-level row, and %s names the rule %s there now, so the row is stale: "+
+			"delete it and let the cases run", label, familiesFileName, entry.Rule)
+	case entry.None != "":
+		return fmt.Errorf("%s is a family-level row where the language has no such idea (%s), so there is no "+
+			"rule to add", label, entry.None)
+	}
+	return nil
 }
 
 // decodeStrictly decodes one JSON value, refusing an unknown key and anything after the value.
@@ -626,8 +785,9 @@ type Result struct {
 	// Failure is the kind of failure, or empty when the findings meet the expectation.
 	Failure Kind
 
-	// ControlHeld is whether the findings are as many as expected and each starts on the line its expected
-	// span starts on: the check a control must always pass.
+	// ControlHeld is whether the findings are as many as expected and each one whose span covers text starts
+	// on the line that text starts on: the check a control must always pass. A span over the whole file
+	// (fileStart, linesFrom) holds its count alone, since where its finding sits is placement.
 	ControlHeld bool
 
 	// Detail says what differed, or what matched, in a line a reader can check.
@@ -646,15 +806,19 @@ func Resolve(span Span, source string, engine Engine) (Range, error) {
 	}
 	switch {
 	case span.Covers != nil:
+		wanted := span.occurrenceFor(engine)
+		if wanted == 0 {
+			return Range{}, fmt.Errorf("%q names no occurrence in %s", *span.Covers, engine)
+		}
 		from := 0
 		for occurrence := 1; ; occurrence++ {
 			index := strings.Index(source[from:], *span.Covers)
 			if index < 0 {
 				return Range{}, fmt.Errorf("%q occurs %d times, so it has no occurrence %d", *span.Covers,
-					occurrence-1, span.Occurrence)
+					occurrence-1, wanted)
 			}
 			start := from + index
-			if occurrence == span.Occurrence {
+			if occurrence == wanted {
 				return Range{Start: start, End: start + len(*span.Covers)}, nil
 			}
 			from = start + 1
@@ -707,15 +871,30 @@ func Compare(testCase Case, engine Engine, found []Range) Result {
 	}
 	starts := LineStarts(source, engine)
 
+	// coversText is each expected range's span kind, aligned with it through the sort: a span that covers text
+	// holds a control to its line, and one over the whole file does not.
 	expected := make([]Range, 0, len(testCase.Expect))
+	coversText := make([]bool, 0, len(testCase.Expect))
 	for index, span := range testCase.Expect {
 		resolved, err := Resolve(span, source, engine)
 		if err != nil {
 			return Result{Failure: KindVerdict, Detail: fmt.Sprintf("expect %d does not resolve: %v", index, err)}
 		}
 		expected = append(expected, resolved)
+		coversText = append(coversText, span.Covers != nil)
 	}
-	sort.SliceStable(expected, func(left int, right int) bool { return expected[left].Start < expected[right].Start })
+	order := make([]int, len(expected))
+	for index := range order {
+		order[index] = index
+	}
+	sort.SliceStable(order, func(left int, right int) bool { return expected[order[left]].Start < expected[order[right]].Start })
+	sortedExpected := make([]Range, 0, len(expected))
+	sortedCoversText := make([]bool, 0, len(expected))
+	for _, index := range order {
+		sortedExpected = append(sortedExpected, expected[index])
+		sortedCoversText = append(sortedCoversText, coversText[index])
+	}
+	expected, coversText = sortedExpected, sortedCoversText
 	sorted := append([]Range(nil), found...)
 	sort.SliceStable(sorted, func(left int, right int) bool {
 		if sorted[left].Start != sorted[right].Start {
@@ -732,7 +911,7 @@ func Compare(testCase Case, engine Engine, found []Range) Result {
 
 	result := Result{ControlHeld: true, Detail: detail}
 	for index := range sorted {
-		if lineOf(starts, sorted[index].Start) != lineOf(starts, expected[index].Start) {
+		if coversText[index] && lineOf(starts, sorted[index].Start) != lineOf(starts, expected[index].Start) {
 			result.ControlHeld = false
 		}
 		if sorted[index].NoEnd || sorted[index].Start != expected[index].Start ||

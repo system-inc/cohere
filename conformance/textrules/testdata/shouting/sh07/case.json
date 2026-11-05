@@ -1,0 +1,15 @@
+{
+    "why": "sh07: `BUG(who):` is prose in TypeScript and Swift, so `BUG` is shouting there. Go has no form: go/doc reads it as a marker, which Go masks as its own notation, a different verdict",
+    "expect": [
+        {
+            "covers": "BUG",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

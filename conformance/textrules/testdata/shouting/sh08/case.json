@@ -1,0 +1,18 @@
+{
+    "why": "sh08: `//go:generate` is a Go directive, and in a TypeScript file it is prose, so the shouted words report. TypeScript form only: in Go the directive is masked as Go's own notation",
+    "expect": [
+        {
+            "covers": "HELLO",
+            "occurrence": 1
+        },
+        {
+            "covers": "WORLD",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript"
+    ]
+}

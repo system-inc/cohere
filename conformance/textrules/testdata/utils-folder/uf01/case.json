@@ -1,0 +1,16 @@
+{
+    "why": "uf01: the control, a file in a `utils` folder is reported once, at the file's start",
+    "control": true,
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "utils/uf01",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}
