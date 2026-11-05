@@ -202,15 +202,15 @@ func withWorkspaceModules(arguments []string) ([]string, error) {
 	if _, err := os.Stat(filepath.Join(root, "go.work")); err != nil {
 		return arguments, nil
 	}
-	covered, err := readWorkspace(root)
+	covered, err := readGatedWorkspace(root)
 	if err != nil {
 		return nil, err
 	}
-	covered.report(os.Stderr)
-	expanded := make([]string, 0, len(arguments)+len(covered.gated))
+	reportWorkspace(covered, os.Stderr)
+	expanded := make([]string, 0, len(arguments)+len(covered.Modules))
 	for _, argument := range arguments {
 		if argument == "./..." {
-			expanded = append(expanded, covered.patterns()...)
+			expanded = append(expanded, covered.Patterns()...)
 			continue
 		}
 		expanded = append(expanded, argument)
