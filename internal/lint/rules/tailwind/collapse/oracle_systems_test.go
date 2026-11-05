@@ -80,7 +80,7 @@ func oracleSystem(test *testing.T, entryPoint string) *LoadedDesignSystem {
 	}
 	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{
 		EntryPoint:          corpus.Resolve(test, entryPoint),
-		TailwindPackageRoot: vendored.TailwindPackageRoot(),
+		TailwindPackageRoot: vendored.TailwindPackageRootForTest(test),
 	})
 	if loadDesignSystemError != nil {
 		test.Fatalf("%s resolves, but its design system does not load: %v", entryPoint, loadDesignSystemError)

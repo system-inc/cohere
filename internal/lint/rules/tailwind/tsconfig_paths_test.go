@@ -53,7 +53,7 @@ func TestTsconfigPathsResolveStylesheetImports(test *testing.T) {
 					test.Fatalf("creating node_modules: %v", createDirectoryError)
 				}
 				if symlinkError := os.Symlink(
-					unknownFixturePackageRoot(),
+					unknownFixturePackageRoot(test),
 					filepath.Join(modules, "tailwindcss"),
 				); symlinkError != nil {
 					test.Fatalf("linking tailwindcss: %v", symlinkError)

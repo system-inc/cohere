@@ -68,8 +68,9 @@ const unknownFixtureStylesheet = `@import "tailwindcss";
 // unknownFixturePackageRoot is the installed tailwindcss the fixture stylesheet imports: the vendored
 // snapshot, so the fixtures run on any machine (#sycrdr6). It used to be found by walking up from ahra's
 // checkout, which only one laptop has.
-func unknownFixturePackageRoot() string {
-	return vendored.TailwindPackageRoot()
+func unknownFixturePackageRoot(test *testing.T) string {
+	test.Helper()
+	return vendored.TailwindPackageRootForTest(test)
 }
 
 // runUnknownFixture runs the rule against a one-file program that has a real design system.
@@ -92,7 +93,7 @@ func runUnknownFixtureWithOptions(
 ) rule_testing.Result {
 	test.Helper()
 
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
 			"built and these fixtures would measure a decline rather than an existence check")
@@ -583,12 +584,12 @@ func TestRepositoryNamesAreNoLongerVouchedForByTheFramework(test *testing.T) {
 // first; a rule that had stopped answering would fail the second.
 func TestUnknownClassFixturesActuallyRan(test *testing.T) {
 	test.Parallel()
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Fatalf(
 			"the vendored tailwindcss at %s is missing, so every fixture in this file would skip and the "+
 				"package still report ok; restore it (internal/lint/rules/tailwind/vendored)",
-			vendored.TailwindPackageRoot(),
+			vendored.TailwindPackageRootForTest(test),
 		)
 	}
 
@@ -611,7 +612,7 @@ func unknownFixtureLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSyste
 	if _, statError := os.Stat(entryPoint); statError != nil {
 		test.Fatalf("the ahra corpus has no stylesheet at %s, so there is no live design system to ask", entryPoint)
 	}
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 
 	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
@@ -640,7 +641,7 @@ func independentLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSystem {
 		test.Fatalf("reading the independent theme: %v", err)
 	}
 
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Skip("no installed tailwindcss on this machine")
 	}

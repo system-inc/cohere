@@ -193,7 +193,7 @@ func TestEnforceShorthandClassesReportsEachFamilySeparately(test *testing.T) {
 // reported, and nested literals put two `w-screen h-screen` findings on ahra.
 func TestEnforceShorthandClassesSuggestsOnlyClassesThatExist(test *testing.T) {
 	test.Parallel()
-	packageRoot := classOrderFixturePackageRoot()
+	packageRoot := classOrderFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Skip("no installed tailwindcss on this machine, so there is no design system to ask")
 	}
