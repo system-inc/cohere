@@ -301,10 +301,11 @@ func checkDocsData(worktree string, environment func() []string) int {
 	return 0
 }
 
-// gateEnvironment is the budget's environment with GOFLAGS reduced to the pool's own -p and -buildvcs=false,
-// so every landing is gated the same way, whatever its caller's shell has set. A caller's -trimpath failed
-// tests that find their fixtures from their own source path, and the gate read that as the landing's fault
-// (2026-10-05).
+// gateEnvironment is the budget's environment with GOFLAGS reduced to the pool's own -p, -buildvcs=false and
+// -trimpath, so every landing is gated the same way, whatever its caller's shell has set. A caller's -tags or
+// the like once changed what a gate tested. -trimpath is the pool's own (budgetEnvironment): it once failed
+// tests that found their fixtures from their own source path (2026-10-05), and since they find them from
+// the module instead, it lets every gate share compiles with every other worktree.
 //
 // -buildvcs=false because most worktrees are made with TypeScript a symlink to another checkout's, and git
 // status refuses that tree, so every go build a test runs failed "error obtaining VCS status": cache's land
@@ -324,7 +325,7 @@ func gateEnvironment(budget []string) []string {
 				kept = append(kept, flag)
 			}
 		}
-		environment = append(environment, "GOFLAGS="+strings.Join(append(kept, "-buildvcs=false"), " "))
+		environment = append(environment, "GOFLAGS="+strings.Join(append(kept, "-buildvcs=false", trimpathFlag), " "))
 	}
 	return environment
 }

@@ -8,11 +8,13 @@
 //	go run ./command/cohere-dev land                  merge main, gate and fast-forward main, one landing at a time
 //	go run ./command/cohere-dev status                the pool: its tokens, their holders, the line, the cache
 //	go run ./command/cohere-dev quiet on|off          a quiet window: the cache trim holds off until off (quiet.go)
+//	go run ./command/cohere-dev worktree <name>       a hand's worktree, made or moved to main by git (worktree.go)
+//	go run ./command/cohere-dev worktree remove <x>   retire one, refusing as a move does
 //
-// Every one of them takes a token from the machine's pool, in arrival order, and runs with Go held to the
-// token's share of the cores (pool.go). A dozen members each running go on all sixteen cores held the machine
-// at load 110 to 180, and made every run slower, not only later. When a token's run ends, the Go build
-// cache is looked at, and trimmed under its cap with the pool held (cache.go).
+// Every one of them but status, quiet and worktree takes a token from the machine's pool, in arrival order,
+// and runs with Go held to the token's share of the cores (pool.go). A dozen members each running go on all
+// sixteen cores held the machine at load 110 to 180, and made every run slower, not only later. When a
+// token's run ends, the Go build cache is looked at, and trimmed under its cap with the pool held (cache.go).
 //
 // A whole-module run never passes -count=1. Go's test cache skips every package whose inputs did not
 // change, which on a one-file change is most of the module, and -count=1 throws that away. A flaky test
@@ -28,6 +30,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -44,6 +47,8 @@ func main() {
 		os.Exit(trimCache())
 	case "quiet":
 		os.Exit(quiet(os.Args[2:]))
+	case "worktree":
+		os.Exit(namedWorktree(os.Args[2:]))
 	case "test", "build", "vet", "exec", "land":
 		os.Exit(run(os.Args[1], os.Args[2:]))
 	}
@@ -56,7 +61,9 @@ func usage() {
 		"       cohere-dev exec [--full-priority] -- <command> [arguments]\n"+
 		"       cohere-dev land\n"+
 		"       cohere-dev status\n"+
-		"       cohere-dev quiet [on [--for <duration>] [why] | off]")
+		"       cohere-dev quiet [on [--for <duration>] [why] | off]\n"+
+		"       cohere-dev worktree <name> [--branch <branch>]   a name per hand, not per member: system_cohere_tools_1\n"+
+		"       cohere-dev worktree remove <name>")
 	os.Exit(2)
 }
 
@@ -114,9 +121,13 @@ func run(verb string, arguments []string) int {
 		return withToken(strings.Join(arguments, " "), func(environment []string) int {
 			return runCommand(environment, arguments[0], arguments[1:])
 		})
-	case "build", "vet":
-		return withToken("go "+verb+" "+strings.Join(arguments, " "), func(environment []string) int {
-			return runCommand(environment, "go", append([]string{verb}, arguments...))
+	case "build":
+		return withToken("go build "+strings.Join(arguments, " "), func(environment []string) int {
+			return runCommand(environment, "go", append([]string{"build"}, arguments...))
+		})
+	case "vet":
+		return withToken("go vet "+strings.Join(arguments, " "), func(environment []string) int {
+			return runCommand(withoutVCSStamping(environment), "go", append([]string{"vet"}, arguments...))
 		})
 	}
 
@@ -133,7 +144,7 @@ func run(verb string, arguments []string) int {
 			return 2
 		}
 		return withToken("go test --fast "+strings.Join(arguments, " "), func(environment []string) int {
-			return fastTest(environment, arguments)
+			return fastTest(withoutVCSStamping(environment), arguments)
 		})
 	}
 	if wholeModule(arguments) && countsOnce(arguments) {
@@ -151,8 +162,42 @@ func run(verb string, arguments []string) int {
 		arguments = expanded
 	}
 	return withToken("go test "+strings.Join(arguments, " "), func(environment []string) int {
-		return goTest(environment, arguments)
+		return goTest(withoutVCSStamping(environment), arguments)
 	})
+}
+
+// withoutVCSStamping adds -buildvcs=false to a test or vet run's GOFLAGS, unless the caller chose a -buildvcs
+// of their own. Most worktrees are made with TypeScript a symlink to another checkout's, git status refuses
+// that tree, and so every go build a test runs failed "error obtaining VCS status": four of
+// @system_cohere_go's Circles set it by hand on 2026-11-05. The landing gate has run with it since
+// 2026-10-06 (gateEnvironment), so no test needs the stamp.
+//
+// Not for build or exec: a binary someone keeps is read for its stamp. packaging's version.go prints its
+// commit and whether its tree was modified, and the bench record marks a run dirty from it, so a build
+// without the stamp would read as clean.
+func withoutVCSStamping(environment []string) []string {
+	stamped := make([]string, 0, len(environment)+1)
+	hasFlags := false
+	for _, variable := range environment {
+		value, isFlags := strings.CutPrefix(variable, "GOFLAGS=")
+		if !isFlags {
+			stamped = append(stamped, variable)
+			continue
+		}
+		hasFlags = true
+		chosen := slices.ContainsFunc(strings.Fields(value), func(flag string) bool {
+			return flag == "-buildvcs" || strings.HasPrefix(flag, "-buildvcs=")
+		})
+		if chosen {
+			stamped = append(stamped, variable)
+			continue
+		}
+		stamped = append(stamped, "GOFLAGS="+strings.TrimSpace(value+" -buildvcs=false"))
+	}
+	if !hasFlags {
+		stamped = append(stamped, "GOFLAGS=-buildvcs=false")
+	}
+	return stamped
 }
 
 // withEveryVetCheck runs every check go vet runs, the landing gate's set, in a test run's vet, unless the caller
