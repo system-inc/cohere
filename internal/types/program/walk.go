@@ -316,7 +316,11 @@ func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []r
 			defer waitGroup.Done()
 
 			localDiagnostics := []rule.Diagnostic{}
-			localReplayed, localTypeAwareRerun, localShapeKeyedRerun, localDesignSystemRerun, localDerivedRerun := 0, 0, 0, 0, 0
+			localReplayed := 0
+			localTypeAwareRerun := 0
+			localShapeKeyedRerun := 0
+			localDesignSystemRerun := 0
+			localDerivedRerun := 0
 			localListening := make(map[string]int, len(rules))
 			localReporting := make(map[string]int, len(rules))
 			localOffered := make(map[string]int, len(rules))
@@ -1438,7 +1442,8 @@ func (dispatcher *fileDispatcher) endFile(slots []*ruleSlot) {
 		dispatcher.listeners[kind] = dispatcher.listeners[kind][:0]
 	}
 	dispatcher.used = dispatcher.used[:0]
-	dispatcher.sourceFile, dispatcher.directives, dispatcher.notes, dispatcher.report, dispatcher.readiness = nil, nil, nil, nil, nil
+	dispatcher.sourceFile, dispatcher.directives, dispatcher.notes = nil, nil, nil
+	dispatcher.report, dispatcher.readiness = nil, nil
 	dispatcher.withheld, dispatcher.replayed = nil, nil
 }
 
