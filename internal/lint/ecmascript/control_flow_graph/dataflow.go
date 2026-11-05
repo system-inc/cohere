@@ -58,9 +58,9 @@ const maximumRounds = 10000
 // must be monotone: a higher input never produces a lower output. Together those are what make the
 // fixed point exist and be unique, and `Solve` cannot check any of them.
 //
-// What it can check is termination, and it does. A lattice whose values keep changing forever — the
+// What it can check is termination, and it does. A lattice whose values keep changing forever (the
 // usual causes are a Meet that is not idempotent, or an Equal comparing pointers where it should
-// compare contents — would make `Solve` iterate without end, so `Solve` bounds its rounds and
+// compare contents) would make `Solve` iterate without end, so `Solve` bounds its rounds and
 // panics instead. A linter that stops and says why is debuggable; one that spins on one file in a
 // build is not. The bound is stated at `maximumRounds`.
 type LatticeOf[V any, E any] interface {
@@ -72,7 +72,7 @@ type LatticeOf[V any, E any] interface {
 
 	// Entry is the value at the boundary the analysis starts from: the graph entry for a Forward
 	// analysis, each exit block for a Backward one. It is where the analysis's assumptions about the
-	// world outside this code path root live — a liveness pass says nothing is live at an exit, a
+	// world outside this code path root live: a liveness pass says nothing is live at an exit, a
 	// reaching-definitions pass says the parameters are already defined.
 	Entry() V
 
@@ -83,7 +83,7 @@ type LatticeOf[V any, E any] interface {
 
 	// Transfer computes the value leaving a block from the value entering it. The block is handed
 	// over whole rather than event by event, so the implementation reads its Events in whatever
-	// order its own direction wants — forward for a Forward analysis, backward for a Backward one.
+	// order its own direction wants: forward for a Forward analysis, backward for a Backward one.
 	//
 	// It must not mutate the incoming value. `Solve` holds that as the block's settled boundary and
 	// compares against it to decide whether anything moved.
@@ -109,8 +109,8 @@ type LatticeOf[V any, E any] interface {
 // Descending index is not reverse postorder. It happens to be close for a graph laid out in
 // construction order and it is not the same thing: a `finally` block is laid out twice, and a loop's
 // incrementor is laid out after its body, so the index order crosses back edges in places the
-// postorder does not. It still converges — a fixed point does not care what order it is reached in
-// — but it takes more rounds, and the number of extra rounds is the loop nesting depth.
+// postorder does not. It still converges (a fixed point does not care what order it is reached in),
+// but it takes more rounds, and the number of extra rounds is the loop nesting depth.
 //
 // # Unreachable blocks
 //
@@ -121,7 +121,7 @@ type LatticeOf[V any, E any] interface {
 //
 // A Backward analysis seeds from FinalBlocks and ThrownBlocks both. Measured on this substrate,
 // those two sets cover every reachable terminal block, including the `finally` duplicate laid out on
-// the abrupt path — the shape that looks like it would escape them. The measurement is recorded at
+// the abrupt path, the shape that looks like it would escape them. The measurement is recorded at
 // the seeding code below, because it is a property of the builder rather than of this file.
 func Solve[V any, E any](graph *Graph[E], direction Direction, lattice LatticeOf[V, E]) *Solution[V, E] {
 	solution := &Solution[V, E]{rounds: 0}
@@ -190,7 +190,9 @@ func Solve[V any, E any](graph *Graph[E], direction Direction, lattice LatticeOf
 		solution.rounds++
 		if solution.rounds > maximumRounds {
 			panic(
-				"controlflow: dataflow did not converge — the lattice's Meet is probably not idempotent, or Equal disagrees with it",
+				// The dash is written as its escape, the same bytes, so the message reads as it always has.
+				"controlflow: dataflow did not converge \u2014 the lattice's Meet is probably not idempotent, " +
+					"or Equal disagrees with it",
 			)
 		}
 		for _, block := range order {

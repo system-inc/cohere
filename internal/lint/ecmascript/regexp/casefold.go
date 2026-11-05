@@ -34,8 +34,8 @@ func CaseClass(r rune, unicode bool) (string, bool) {
 }
 
 // CaseCloseClass widens a character class to cover every character a `/i`
-// comparison accepts for one it already covers. It takes the body of a class —
-// what sits between the brackets, leading `^` included — and returns the body
+// comparison accepts for one it already covers. It takes the body of a class
+// (what sits between the brackets, leading `^` included) and returns the body
 // to write instead.
 //
 // What the class already names is left alone and the rest is appended, so a

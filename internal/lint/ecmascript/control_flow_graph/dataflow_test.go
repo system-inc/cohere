@@ -323,7 +323,7 @@ func TestSolveExcludesUnreachableBlocks(test *testing.T) {
 //
 // Measured: it is in an exit set, on this shape and on five others probed alongside it, so the
 // seeding is complete without a third clause. This asserts that rather than assuming it, because it
-// is a property of the builder — if `markFinal`/`markThrown` ever stop being called on the abrupt
+// is a property of the builder: if `markFinal`/`markThrown` ever stop being called on the abrupt
 // copy, the gap opens silently in `Solve` and is named here instead.
 func TestSolveSeedsEveryTerminalBlockBackward(test *testing.T) {
 	test.Parallel()
@@ -428,7 +428,7 @@ func TestSolveConvergesInFewRoundsOnAcyclicGraphs(test *testing.T) {
 // diverge most, which is where a future change to the ordering would show up first.
 //
 // The values are asserted alongside the counts, so this fails loudly in the one direction that would
-// matter — an ordering change that also moved an answer — rather than only in the cheap one.
+// matter (an ordering change that also moved an answer) rather than only in the cheap one.
 func TestSolveBackwardOrderIsReversed(test *testing.T) {
 	test.Parallel()
 	for _, testCase := range []struct {

@@ -9,8 +9,8 @@ import (
 // from the graph and asking whether B is still reachable.
 //
 // This is the whole point of the file. Cooper-Harvey-Kennedy is an optimization of this definition,
-// and an implementation of it can be subtly wrong — a bad reverse-postorder numbering, an intersect
-// that walks the wrong side, an initialization that lets an undefined predecessor win — in ways that
+// and an implementation of it can be subtly wrong (a bad reverse-postorder numbering, an intersect
+// that walks the wrong side, an initialization that lets an undefined predecessor win) in ways that
 // still produce a plausible-looking tree. Checking the tree against the definition is the only test
 // that cannot share a bug with the thing it is testing, because it shares no code with it.
 //
@@ -146,9 +146,9 @@ func TestDominatorsMatchTheDefinition(test *testing.T) {
 // TestDominatorsRejectABrokenTree is the failure-detection half of the pair above.
 //
 // A test that only ever sees a correct implementation says nothing about whether it could see an
-// incorrect one. This mutates the settled dominator array — reparenting one node to the entry, which
+// incorrect one. This mutates the settled dominator array (reparenting one node to the entry, which
 // is the single most plausible real bug, since it is what a wrong initialization or a too-early
-// convergence produces — and asserts that the definition check goes red.
+// convergence produces) and asserts that the definition check goes red.
 //
 // Without this, `TestDominatorsMatchTheDefinition` passing would be consistent with
 // `bruteForceDominators` and `Dominates` both answering true for everything.
@@ -301,8 +301,8 @@ func TestDominatorsOnKnownShapes(test *testing.T) {
 // TestDominatorsAgreeWithFinalPathDominators pins this file's tree against the one
 // `findFinalPathDominators` already computes in paths.go.
 //
-// The two are deliberately different computations over different graphs — that one adds a synthetic
-// exit and excludes thrown edges — so they are not expected to agree in general. Where they must
+// The two are deliberately different computations over different graphs (that one adds a synthetic
+// exit and excludes thrown edges), so they are not expected to agree in general. Where they must
 // agree is on the entry's own dominance and on a graph with no thrown paths and one exit, where the
 // synthetic exit changes nothing: there, a block on every final path is exactly a block that
 // dominates the exit block.

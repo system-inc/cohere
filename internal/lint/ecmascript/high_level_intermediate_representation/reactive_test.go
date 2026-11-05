@@ -269,8 +269,8 @@ func phiResultIsReactive(test *testing.T, source string, binding string) bool {
 // first asserted through `reactiveNames` and stayed green under the mutation for the reason
 // `phiResultIsReactive` documents: the operands carry the binding's name themselves.
 //
-// The branch test is a local constant, so the block is not reactive-controlled — checked directly,
-// the controlled set is empty for this input — which means the operand join is the only rule that
+// The branch test is a local constant, so the block is not reactive-controlled (checked directly,
+// the controlled set is empty for this input), which means the operand join is the only rule that
 // can mark this phi. That isolates the two phi rules from each other, which mutating them
 // separately proved was necessary.
 func TestReactivePhiResultIsMarkedByOperandJoin(test *testing.T) {
