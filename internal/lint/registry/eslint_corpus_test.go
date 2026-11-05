@@ -52,7 +52,30 @@ type eslintCorpusRow struct {
 	Options     []json.RawMessage `json:"options"`
 	UsesGlobals bool              `json:"usesGlobals"`
 	Skipped     string            `json:"skipped"`
-	EsLint      [][3]any          `json:"eslint"`
+	EsLint      []eslintFinding   `json:"eslint"`
+}
+
+// eslintFinding is one of ESLint's findings on a row, vendored as the array `[messageId, start, end]`, its
+// offsets in UTF-16 code units. The verdict compares places, not message ids, so only the offsets are kept.
+type eslintFinding struct {
+	start int
+	end   int
+}
+
+// UnmarshalJSON reads the vendored three-element array, refusing any other shape so a re-extract gone wrong
+// fails here rather than reading as a finding at offset zero.
+func (finding *eslintFinding) UnmarshalJSON(data []byte) error {
+	var elements [3]json.RawMessage
+	if decodeError := json.Unmarshal(data, &elements); decodeError != nil {
+		return fmt.Errorf("reading ESLint's finding %s as [messageId, start, end]: %w", data, decodeError)
+	}
+	if decodeError := json.Unmarshal(elements[1], &finding.start); decodeError != nil {
+		return fmt.Errorf("reading the start offset of ESLint's finding %s: %w", data, decodeError)
+	}
+	if decodeError := json.Unmarshal(elements[2], &finding.end); decodeError != nil {
+		return fmt.Errorf("reading the end offset of ESLint's finding %s: %w", data, decodeError)
+	}
+	return nil
 }
 
 // key names a row by its code and options, so the gaps list survives a re-extract that reorders rows
@@ -161,13 +184,7 @@ func corpusVerdict(test *testing.T, registration rule.Entry, row eslintCorpusRow
 	byteOffset := utf16ToByteOffsets(code)
 	expected := make([]string, 0, len(row.EsLint))
 	for _, finding := range row.EsLint {
-		// JSON decodes every number into an any as a float64, so anything else is a vendored file gone wrong
-		startOffset, startIsNumber := finding[1].(float64)
-		endOffset, endIsNumber := finding[2].(float64)
-		if !startIsNumber || !endIsNumber {
-			test.Fatalf("row %s: ESLint's finding %v does not hold two numeric offsets", row.key(), finding)
-		}
-		start, end := int(startOffset), int(endOffset)
+		start, end := finding.start, finding.end
 		if firstLineEnd >= 0 {
 			if start >= firstLineEnd {
 				start--
@@ -389,7 +406,7 @@ func TestCorpusVerdictComparesPlaces(test *testing.T) {
 		name       string
 		code       string
 		occurrence int
-		start      float64
+		start      int
 		want       string
 	}{
 		{"same text, another place", "let x; x = 0;", 1, 7, "span"},
@@ -402,7 +419,10 @@ func TestCorpusVerdictComparesPlaces(test *testing.T) {
 		{"behind a mark, a later line, another place", "\ufefflet x;\nx = 0;", 1, 8, "span"},
 	}
 	for _, testCase := range cases {
-		row := eslintCorpusRow{Code: testCase.code, EsLint: [][3]any{{"probe", testCase.start, testCase.start + 1}}}
+		row := eslintCorpusRow{
+			Code:   testCase.code,
+			EsLint: []eslintFinding{{start: testCase.start, end: testCase.start + 1}},
+		}
 		if verdict := corpusVerdict(test, probe(testCase.occurrence), row); verdict != testCase.want {
 			test.Errorf("%s: the verdict is %q, want %q", testCase.name, verdict, testCase.want)
 		}
