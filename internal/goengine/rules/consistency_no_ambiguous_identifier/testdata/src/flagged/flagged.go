@@ -8,37 +8,20 @@ const c = 1 // want `^Single-letter identifier "c" is not descriptive enough\. T
 
 var v = c + 1 // want `"v"`
 
-// An exported letter is judged too: constants, functions and types are in the rule's list, and Go exports them in
-// capitals.
-const N = 3 // want `"N"`
-
 type t struct { // want `"t"`
 	n int // want `"n"`
 }
 
-// The coordinates keep their letters in lower case only, as the rule's exemption spells them, so an exported
-// coordinate field is judged.
-type Point struct {
-	X, Y int // want `"X"` `"Y"`
-}
-
-type List[T any] struct { // want `"T"`
+type list[T any] struct {
 	items []T
 }
 
-// Every method declares its receiver's type parameter anew, so each one is judged where it is written.
-func (l *List[T]) Push(item T) { // want `"l"` `"T"`
+// The receiver is judged; its type parameter, an uppercase letter, is not.
+func (l *list[T]) push(item T) { // want `"l"`
 	l.items = append(l.items, item)
 }
 
-func Map[T, U any](items []T, convert func(T) U) []U { // want `"T"` `"U"`
-	results := make([]U, 0, len(items))
-	for _, item := range items {
-		results = append(results, convert(item))
-	}
-	return results
-}
-
+// A lowercase type parameter is judged like any other lowercase letter.
 func generic[q any](value q) q { // want `"q"`
 	return value
 }
@@ -80,7 +63,7 @@ func sorted(numbers []int) {
 
 // An interface we declare names its methods and their parameters.
 type reader interface {
-	R()                               // want `"R"`
+	r()                               // want `"r"`
 	Read(p []byte) (n int, err error) // want `"p"` `"n"`
 }
 

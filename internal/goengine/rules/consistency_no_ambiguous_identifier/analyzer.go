@@ -3,8 +3,9 @@
 // A name is read everywhere it is used and declared only once, so the keystrokes a single letter saves are saved at
 // the declaration and paid for at every read. The repair is the word the letter stands for: `count`, `rowIndex`,
 // `readError`. The Go form of `nexus/consistency-no-ambiguous-identifier`, with its judgment carried over where Go
-// keeps it: the coordinates x, y and z keep their letters, and `e` gets its own message saying what the rule thinks
-// it holds. Go has no events, so the guess is between an error and something unclear, and it is made from the type.
+// keeps it: only a lowercase letter is judged, the coordinates x, y and z keep theirs, and `e` gets its own message
+// saying what the rule thinks it holds. Go has no events, so the guess is between an error and something unclear, and
+// it is made from the type.
 package consistency_no_ambiguous_identifier
 
 import (
@@ -12,7 +13,6 @@ import (
 	"go/token"
 	"go/types"
 	"unicode"
-	"unicode/utf8"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
@@ -27,10 +27,10 @@ const Name = "cohere-go/consistency-no-ambiguous-identifier"
 // Analyzer runs the rule over one package.
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_ambiguous_identifier",
-	Doc: "Flags a single-letter name where it is declared: a variable, constant, parameter, result, receiver, type " +
-		"parameter, function, method, type or struct field, apart from the coordinates x, y and z and the blank " +
-		"identifier, because a letter makes every reader find the declaration to learn what it holds. Generated " +
-		"files are not judged.",
+	Doc: "Flags a single lowercase letter as a name where it is declared: a variable, constant, parameter, result, " +
+		"receiver, type parameter, function, method, type or struct field, apart from the coordinates x, y and z, " +
+		"because a letter makes every reader find the declaration to learn what it holds. An uppercase letter, a " +
+		"type parameter by convention, and generated files are not judged.",
 	Run: run,
 }
 
@@ -125,10 +125,13 @@ func judgeTypeSwitchGuard(pass *analysis.Pass, statement *ast.TypeSwitchStmt, st
 // judge reports identifier when it is a single letter other than a coordinate. declaredTypes is every type the name
 // holds, one except in a type switch, and stack is the nodes enclosing identifier, its parent last.
 func judge(pass *analysis.Pass, identifier *ast.Ident, declaredTypes []types.Type, stack []ast.Node) {
-	letter, size := utf8.DecodeRuneInString(identifier.Name)
-	// A Go identifier opens with a letter or an underscore, so one letter is one rune that is a letter, which leaves
-	// the blank identifier out: it is Go's grammar for no name, not a name.
-	if size != len(identifier.Name) || !unicode.IsLetter(letter) || coordinateLetters[identifier.Name] {
+	// One lowercase ASCII letter, the line both twins draw: an uppercase letter is a type parameter by convention, so
+	// the TypeScript and Swift rules leave it alone and the three engines judge the same names. The blank identifier is
+	// out too: it is Go's grammar for no name, not a name.
+	if len(identifier.Name) != 1 || identifier.Name[0] < 'a' || identifier.Name[0] > 'z' {
+		return
+	}
+	if coordinateLetters[identifier.Name] {
 		return
 	}
 	if identifier.Name != "e" {
@@ -169,8 +172,9 @@ func suggestionFor(
 	}
 	if call := producingCall(identifier, stack[len(stack)-1]); call != nil {
 		// The callee's object, so a method, a qualified function and a function held in a variable all give their own
-		// name, and a call of a literal, which has none, falls through.
-		if callee := typeutil.Callee(pass.TypesInfo, call); callee != nil {
+		// name, and a call of a literal, which has none, falls through. So does an error constructor, whose name says
+		// only that an error was made, never what failed.
+		if callee := typeutil.Callee(pass.TypesInfo, call); callee != nil && !isErrorConstructor(callee) {
 			return asCode(lowerCamel(callee.Name()) + "Error"), errorContext
 		}
 	}
@@ -224,6 +228,23 @@ func producingCall(identifier *ast.Ident, parent ast.Node) *ast.CallExpr {
 		}
 	}
 	return nil
+}
+
+// errorConstructors are the standard library functions that build an error from their arguments, by package path and
+// name. Named for the call, `e := fmt.Errorf(...)` would suggest `errorfError`.
+var errorConstructors = map[string]map[string]bool{
+	"errors": {"New": true, "Join": true},
+	"fmt":    {"Errorf": true},
+}
+
+// isErrorConstructor is whether callee is one of errorConstructors, a package-level function of that package, so a
+// method or a function of ours spelled the same is never mistaken for it.
+func isErrorConstructor(callee types.Object) bool {
+	function, isFunction := callee.(*types.Func)
+	if !isFunction || function.Pkg() == nil || function.Signature().Recv() != nil {
+		return false
+	}
+	return errorConstructors[function.Pkg().Path()][function.Name()]
 }
 
 // receiverTypeName is the name of the type a receiver of declaredType is a value or pointer of, or empty when it is

@@ -1,9 +1,30 @@
 package flagged
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"strconv"
 )
+
+// An error constructor's name says only that an error was made, so the function the e is declared in names it.
+func parseHeader(text string) error {
+	e := fmt.Errorf("reading %q", text) // want `\(appears to be an error\)\. .* Rename it to .parseHeaderError.\.$`
+	return e
+}
+
+func openArchive() error {
+	var e = errors.New("closed") // want `\(appears to be an error\)\. .* Rename it to .openArchiveError.\.$`
+	return e
+}
+
+type batch struct{ failures []error }
+
+// Inside a method's body the e is not its receiver, so the method's name names it.
+func (current batch) combine() error {
+	e := errors.Join(current.failures...) // want `\(appears to be an error\)\. .* Rename it to .combineError.\.$`
+	return e
+}
 
 // An e an error-returning call produced is named for the call. The first three wants overlap to read the whole text
 // between them, each a part that fits on its line.

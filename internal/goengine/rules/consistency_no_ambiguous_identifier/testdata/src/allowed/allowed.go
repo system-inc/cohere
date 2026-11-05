@@ -55,6 +55,36 @@ func lengths(words []string) int {
 	return total
 }
 
+// An uppercase letter is a type parameter by convention, and both twins leave it alone, nexus's
+// consistency_no_ambiguous_identifier.go and Swift's ConsistencyNoAmbiguousIdentifier.swift, which says it follows
+// this line, so the three engines judge the same names: type parameters, receivers' type parameters, constants,
+// types, functions and exported coordinate fields all keep an uppercase letter.
+const N = 3
+
+type Point struct {
+	X, Y, Z int
+}
+
+type List[T any] struct {
+	items []T
+}
+
+func (list *List[T]) Push(item T) {
+	list.items = append(list.items, item)
+}
+
+func Map[T, U any](items []T, convert func(T) U) []U {
+	results := make([]U, 0, len(items))
+	for _, item := range items {
+		results = append(results, convert(item))
+	}
+	return results
+}
+
+type E struct{}
+
+func F() {}
+
 // A letter another package declared is used here, not declared, and is not ours to rename.
 func corner(rectangle image.Rectangle) image.Point {
 	return image.Point{X: rectangle.Min.X, Y: rectangle.Max.Y}
