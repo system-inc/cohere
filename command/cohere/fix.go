@@ -23,6 +23,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/suppression"
+	"github.com/system-inc/cohere/internal/sentence"
 	"github.com/system-inc/cohere/internal/types/program"
 	"github.com/system-inc/cohere/internal/types/sourcename"
 )
@@ -321,7 +322,7 @@ func applyProposedFixes(
 		if err != nil {
 			// One file failing must not abandon the rest. The failure is reported rather than
 			// swallowed, and the tree is left in a state where every other fix still landed.
-			fmt.Fprintf(os.Stderr, "cohere: %v\n", err)
+			fmt.Fprintf(os.Stderr, "cohere: %s\n", sentence.FromError(err))
 
 			// A failure is its own category rather than a flavor of "did not converge". The two send a
 			// reader somewhere different: not-converged means the pass budget ran out with work still

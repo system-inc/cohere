@@ -13,7 +13,7 @@ import (
 func renderRequested(t *testing.T, lines []string, requested map[phaseName]bool, engineExit int) (string, int, error) {
 	t.Helper()
 	var out bytes.Buffer
-	run := newSwiftRun(&out, swiftModeCheck, "", time.Now())
+	run := newEngineRun(&out, engineModeCheck, swiftLanguage, "", time.Now())
 	run.requested = requested
 	for index, line := range lines {
 		if err := run.accept([]byte(line)); err != nil {
@@ -24,7 +24,7 @@ func renderRequested(t *testing.T, lines []string, requested map[phaseName]bool,
 	return out.String(), exitCode, err
 }
 
-// flagsOf states a command line's boolean flags for swiftRequestedPhases.
+// flagsOf states a command line's boolean flags for engineRequestedPhases.
 func flagsOf(names ...string) (map[string]bool, func(string) string) {
 	given := map[string]bool{}
 	for _, name := range names {
@@ -75,7 +75,7 @@ func TestSwiftRequestedPhasesReadTheFlagsAsTheTypeScriptRunDoes(t *testing.T) {
 		{[]string{"unused"}, "fix types lint unused"},
 		{[]string{"lint", "unused-deep"}, "lint unused"},
 	} {
-		requested := swiftRequestedPhases(flagsOf(testCase.flags...))
+		requested := engineRequestedPhases(flagsOf(testCase.flags...))
 		names := []string{}
 		for _, name := range phaseOrder {
 			if requested[name] {
@@ -90,9 +90,9 @@ func TestSwiftRequestedPhasesReadTheFlagsAsTheTypeScriptRunDoes(t *testing.T) {
 
 // `cohere --lint` on a Swift package: the engine skips fix and types as not requested and calls the run
 // complete, which it is (swift/Contract.md, `complete`). LintOnly.jsonl is a real stream of that run.
-// Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level activeSummary
+// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
 func TestALintRunThatSkipsWhatItWasNotAskedForIsComplete(t *testing.T) {
-	lint := swiftRequestedPhases(flagsOf("lint"))
+	lint := engineRequestedPhases(flagsOf("lint"))
 
 	output, exitCode, err := renderRequested(t, contractFixture(t, "LintOnly.jsonl"), lint, 1)
 	if err != nil || exitCode != 1 {
@@ -123,11 +123,11 @@ func TestALintRunThatSkipsWhatItWasNotAskedForIsComplete(t *testing.T) {
 }
 
 // A phase the caller asked for that comes back skipped still fails, whatever the engine calls it.
-// Not parallel: it renders a check run through swiftRun, whose record acceptors set the package-level activeSummary
+// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
 func TestARequestedPhaseThatComesBackSkippedStillFails(t *testing.T) {
 	// Skipped as not requested when it was requested: a bare run reported as though it were --lint. The
 	// engine is refused rather than believed.
-	_, _, err := renderRequested(t, contractFixture(t, "LintOnly.jsonl"), swiftRequestedPhases(flagsOf()), 1)
+	_, _, err := renderRequested(t, contractFixture(t, "LintOnly.jsonl"), engineRequestedPhases(flagsOf()), 1)
 	if err == nil || !strings.Contains(err.Error(), "the fix phase was asked for, and the engine skipped it as \"not requested\"") {
 		t.Fatalf("a bare run whose fix came back not requested was accepted: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestARequestedPhaseThatComesBackSkippedStillFails(t *testing.T) {
 			return true
 		})
 	}
-	lint := swiftRequestedPhases(flagsOf("lint"))
+	lint := engineRequestedPhases(flagsOf("lint"))
 	_, _, err = renderRequested(t, otherSkip(true), lint, 1)
 	if err == nil || !strings.Contains(err.Error(), "calls the run complete") {
 		t.Fatalf("a requested lint skipped for another reason, called complete, was accepted: %v", err)
@@ -165,7 +165,7 @@ func TestARequestedPhaseThatComesBackSkippedStillFails(t *testing.T) {
 func TestFormatOnlyAsksForTheFixPhaseAlone(t *testing.T) {
 	t.Parallel()
 	given, value := flagsOf("no-fix", "format-only")
-	requested := swiftRequestedPhases(given, value)
+	requested := engineRequestedPhases(given, value)
 	if !requested[phaseFix] || requested[phaseTypes] || requested[phaseLint] || requested[phaseUnused] {
 		t.Fatalf("--format-only requested %v, want fix alone", requested)
 	}
@@ -176,7 +176,7 @@ func TestFormatOnlyAsksForTheFixPhaseAlone(t *testing.T) {
 	if exitCode != 1 {
 		t.Errorf("the format finding exited %d, want 1:\n%s", exitCode, output)
 	}
-	everything := swiftRequestedPhases(flagsOf("no-fix"))
+	everything := engineRequestedPhases(flagsOf("no-fix"))
 	if _, _, err := renderRequested(t, contractFixture(t, "FormatOnly.jsonl"), everything, 1); err == nil {
 		t.Errorf("a stream skipping types and lint as not requested was accepted for a run that asked for them")
 	}

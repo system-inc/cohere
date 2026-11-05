@@ -138,6 +138,11 @@ type entry struct {
 
 	// Note is written in place of Text when a project publishes no license text.
 	Note string
+
+	// ThirdPartyFile and ThirdPartyText are a module's own credit for code it includes, a file it ships
+	// beside its license, written after the license so the projects it credits are credited here too.
+	ThirdPartyFile string
+	ThirdPartyText string
 }
 
 func writeEntry(builder *strings.Builder, entry entry) {
@@ -152,9 +157,19 @@ func writeEntry(builder *strings.Builder, entry entry) {
 		builder.WriteString(entry.Note + "\n\n")
 		return
 	}
+	writeLicenseBlock(builder, entry.Text)
+	if entry.ThirdPartyFile != "" {
+		builder.WriteString("The module's own credit for code it includes, from its " + entry.ThirdPartyFile + ":\n\n")
+		writeLicenseBlock(builder, entry.ThirdPartyText)
+	}
+}
+
+// writeLicenseBlock writes a license text as it was published, but for its line endings and the blank
+// space after it.
+func writeLicenseBlock(builder *strings.Builder, text string) {
 	// Four backticks, so a license that quotes code in three can't close the block early.
 	builder.WriteString("````text\n")
-	builder.WriteString(strings.TrimRight(strings.ReplaceAll(entry.Text, "\r\n", "\n"), "\n \t") + "\n")
+	builder.WriteString(strings.TrimRight(strings.ReplaceAll(text, "\r\n", "\n"), "\n \t") + "\n")
 	builder.WriteString("````\n\n")
 }
 
@@ -167,12 +182,16 @@ func writeModule(builder *strings.Builder, module Module, carries string) error 
 	if err != nil {
 		return err
 	}
+	thirdPartyFile, thirdPartyText, readError := readModuleThirdPartyCredit(module)
+	if readError != nil {
+		return readError
+	}
 	// A module only some platforms link says which, since the rest ship without it.
 	if len(module.Targets) > 0 {
 		carries += " Linked on " + strings.Join(module.Targets, ", ") + " only."
 	}
 	writeEntry(builder, entry{Name: module.Path, URL: "https://pkg.go.dev/" + module.Path + "@" + module.Version, Version: module.Version,
-		License: license, Carries: carries, Text: text})
+		License: license, Carries: carries, Text: text, ThirdPartyFile: thirdPartyFile, ThirdPartyText: thirdPartyText})
 	return nil
 }
 

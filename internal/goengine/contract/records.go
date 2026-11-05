@@ -206,6 +206,14 @@ type LintRecord struct {
 	RulesNotConfigured   []string       `json:"rulesNotConfigured"`
 	// ConfigNote is the line saying which defaults ran when no config was read, empty when one was.
 	ConfigNote string `json:"configNote"`
+
+	// WithheldBySuppression and WithheldAsGenerated are additive within contract 3, which the front door
+	// ignores until it reads them, as it ignores any field the contract does not list. Each counts by rule the
+	// findings a run found and did not write: those a //cohere:ignore comment withheld, and those of a house
+	// rule in a generated file. Without them a run that hid everything reads like a run that found nothing.
+	// Both are always written as objects, `{}` when empty (see MarshalJSON).
+	WithheldBySuppression map[string]int `json:"withheldBySuppression"`
+	WithheldAsGenerated   map[string]int `json:"withheldAsGenerated"`
 }
 
 // Crash is a rule that failed on a file, which makes the run incomplete.
@@ -279,6 +287,21 @@ func (LintRecord) kind() Kind       { return KindLint }
 func (PhaseRecord) kind() Kind      { return KindPhase }
 func (RuleRecord) kind() Kind       { return KindRule }
 func (SummaryRecord) kind() Kind    { return KindSummary }
+
+// MarshalJSON writes the withheld counts as `{}` when there are none, never `null`, so a reader of the field
+// never has to tell "none withheld" from "not counted".
+func (record LintRecord) MarshalJSON() ([]byte, error) {
+	// withoutMarshaler has LintRecord's fields and not its methods, so encoding it does not recurse here.
+	type withoutMarshaler LintRecord
+	counted := withoutMarshaler(record)
+	if counted.WithheldBySuppression == nil {
+		counted.WithheldBySuppression = map[string]int{}
+	}
+	if counted.WithheldAsGenerated == nil {
+		counted.WithheldAsGenerated = map[string]int{}
+	}
+	return encodeWithoutHTMLEscaping(counted)
+}
 
 // MarshalJSON writes an empty ChangedFiles as `[]`, never `null`. The front door decodes the list into a
 // pointer and reads null as "not listed", which would make a run that wrote nothing look like a run that

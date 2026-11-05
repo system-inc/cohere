@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/system-inc/cohere/internal/sentence"
 )
 
 // openReport keeps only findings that actually reached the report, after fixes. Children return
@@ -64,7 +66,7 @@ func (report *openReport) open(out io.Writer, launch func([]string) error) {
 		return
 	}
 	if err := launch(report.Paths); err != nil {
-		fmt.Fprintf(out, "cohere: could not open editor: %s\n", singleLineDescription(err.Error()))
+		fmt.Fprintf(out, "cohere: %s\n", sentence.Of("could not open editor: "+singleLineDescription(err.Error())))
 	}
 }
 
@@ -81,7 +83,7 @@ func finishOpen() {
 			err = os.WriteFile(path, contents, 0600)
 		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "cohere: returning files to open: %v\n", err)
+			fmt.Fprintf(os.Stderr, "cohere: %s\n", sentence.FromError(fmt.Errorf("returning files to open: %w", err)))
 		}
 		return
 	}

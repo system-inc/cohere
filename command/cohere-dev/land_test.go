@@ -247,8 +247,8 @@ func TestTheLandGateIgnoresTheCallersGoFlags(t *testing.T) {
 		t.Fatalf("the landing failed: %v", err)
 	}
 	gates := fixture.gates()
-	if len(gates) != 2 || !strings.HasSuffix(gates[0], "flags=-p=2 -buildvcs=false") {
-		t.Errorf("the gate ran with %q, want GOFLAGS of the pool's -p and -buildvcs=false alone", gates)
+	if len(gates) != 2 || !strings.HasSuffix(gates[0], "flags=-p=2 -buildvcs=false -trimpath") {
+		t.Errorf("the gate ran with %q, want GOFLAGS of the pool's -p, -buildvcs=false and -trimpath alone", gates)
 	}
 }
 

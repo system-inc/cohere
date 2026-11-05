@@ -13,10 +13,12 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-// Discovery is how one cohere checks a repository that holds more than one project: TypeScript programs
-// and Swift packages side by side, or nested below one another (#f9nftxz). From the root it walks every
-// directory the repository keeps, and each tsconfig.json or Package.swift it meets is a project, run by
-// its own engine.
+// Discovery is how one cohere checks a repository that holds more than one project: TypeScript programs,
+// Swift packages and Go workspaces and modules side by side, or nested below one another (#f9nftxz). From
+// the root it walks every directory the repository keeps, and each tsconfig.json, Package.swift, go.work or
+// go.mod it meets is a project, run by its own engine. A directory holding a go.work and a go.mod is one Go
+// project, the workspace, and a go.mod whose directory a workspace's go.work uses is not a project of its
+// own: the workspace's run builds it, as go does.
 //
 // What the walk never enters is the whole of its correctness, since the markers are everywhere a
 // repository keeps other people's code:
@@ -59,12 +61,20 @@ type discovery struct {
 	// Root is the absolute directory the walk started from.
 	Root string
 
-	// Projects are in walk order, the root's first, and a directory holding both markers is two projects,
-	// TypeScript's first.
+	// Projects are in walk order, the root's first, and a directory holding more than one engine's marker is
+	// a project for each, TypeScript's first, then Swift's, then Go's.
 	Projects []discoveredProject
 
 	// Refused are markers the root's ignorePatterns match, relative to Root.
 	Refused []string
+
+	// UnusedModules are Go modules below a discovered workspace whose go.work does not use them, each run as
+	// a module of its own, for the notes to say why.
+	UnusedModules []unusedModule
+
+	// BrokenWorkspaces are Go workspaces whose go.work does not parse. Each still runs, and fails on it, while
+	// the modules below it run on their own, so one bad file fails its own project and nothing else.
+	BrokenWorkspaces []brokenWorkspace
 
 	// NestedRepositories are directories holding an independent repository of their own, relative to Root,
 	// not entered, and Submodules counts the submodules, part of the program above them, not entered either.
@@ -82,6 +92,22 @@ type discovery struct {
 	// Listings are every directory listing the walk read, for the build to serve its tsconfig's include
 	// enumeration from rather than listing the same directories again (#bjv0tg4).
 	Listings *program.DirectoryListings
+}
+
+// unusedModule is a Go module that runs on its own though a workspace sits above it, which a reader who
+// expected the workspace to build it would want named.
+type unusedModule struct {
+	// Directory is the module's, and Workspace the nearest discovered workspace's above it, both relative to
+	// the discovery root and slash-separated.
+	Directory string
+	Workspace string
+}
+
+// brokenWorkspace is a Go workspace whose go.work discovery could not read, and why.
+type brokenWorkspace struct {
+	// Directory is the workspace's, relative to the discovery root and slash-separated.
+	Directory string
+	Reason    string
 }
 
 // ignoreScope is what discovery asks of the gitignore matcher for one directory: internal/gitignore's
@@ -210,6 +236,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		group      sync.WaitGroup
 		reading    = make(chan struct{}, discoveryParallelism)
 		firstError error
+		workspaces []string
 	)
 	fail := func(err error) {
 		lock.Lock()
@@ -258,11 +285,18 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 			}
 		}
 		lock.Lock()
+		// A go.work found here makes the directory's go.mod part of its project rather than one of its own.
+		workspaceHere := false
 		for _, marker := range []struct {
 			name   string
 			engine projectEngine
-		}{{projectMarker, engineTypeScript}, {swiftProjectMarker, engineSwift}} {
-			if !names[marker.name] {
+		}{
+			{projectMarker, engineTypeScript},
+			{swiftProjectMarker, engineSwift},
+			{goWorkspaceMarker, engineGo},
+			{goModuleMarker, engineGo},
+		} {
+			if !names[marker.name] || (marker.name == goModuleMarker && workspaceHere) {
 				continue
 			}
 			markerPath := path.Join(relative, marker.name)
@@ -271,6 +305,10 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 				continue
 			}
 			found.Projects = append(found.Projects, discoveredProject{Directory: relative, Engine: marker.engine})
+			if marker.name == goWorkspaceMarker {
+				workspaceHere = true
+				workspaces = append(workspaces, relative)
+			}
 		}
 		candidates := []string{}
 		for _, entry := range entries {
@@ -309,12 +347,81 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	found.sortProjects()
 	sort.Strings(found.Refused)
 	sort.Strings(found.NestedRepositories)
+	found.claimWorkspaceModules(workspaces)
 	return found, nil
 }
 
-// sortProjects puts parents before children, TypeScript before Swift in one directory, and a directory's
-// tsconfig.json before its other tsconfigs, whatever order the reads finished in, so the report reads the
-// same on every run.
+// claimWorkspaceModules removes from Projects each Go module a discovered workspace's go.work uses, since the
+// workspace's run builds it, and keeps, for the notes, each module left below a workspace that does not use
+// it. workspaces are the Go workspace projects' directories, relative to Root.
+//
+// Each use resolves against its workspace's directory. One outside the root names nothing discovery found,
+// and so does one inside a submodule or a nested repository, since the walk never enters them, so neither
+// claims anything. A use naming another workspace claims nothing either: go builds that one by its own go.work.
+// A go.work that does not parse claims nothing and is kept in BrokenWorkspaces, so it fails its own project's
+// run rather than the discovery every other project depends on.
+func (found *discovery) claimWorkspaceModules(workspaces []string) {
+	if len(workspaces) == 0 {
+		return
+	}
+	isWorkspace := map[string]bool{}
+	claimed := map[string]bool{}
+	broken := map[string]bool{}
+	for _, workspace := range workspaces {
+		isWorkspace[workspace] = true
+		uses, readError := workspaceUses(filepath.Join(found.Root, filepath.FromSlash(workspace)))
+		if readError != nil {
+			// Not a failure of discovery: a TypeScript or Swift project beside it has nothing to do with it. The
+			// workspace's own run fails on the file, and it claims nothing, so its modules are still checked.
+			found.BrokenWorkspaces = append(found.BrokenWorkspaces,
+				brokenWorkspace{Directory: workspace, Reason: readError.Error()})
+			broken[workspace] = true
+			continue
+		}
+		for _, use := range uses {
+			module := path.Join(workspace, use)
+			if module == ".." || strings.HasPrefix(module, "../") {
+				continue
+			}
+			claimed[module] = true
+		}
+	}
+	running := found.Projects[:0:0]
+	for _, project := range found.Projects {
+		if project.Engine == engineGo && !isWorkspace[project.Directory] {
+			// Any workspace that uses a module claims it, the nearest or not: that workspace's run builds the
+			// module through the use, so running the module alone as well would check its files twice. The walk
+			// up from inside such a module can still stop at the module (goModuleRoot), because go standing
+			// there reads the nearer go.work, which does not use it; both builds are ones go itself would run.
+			if claimed[project.Directory] {
+				continue
+			}
+			// A module below a workspace that could not be read is named by that workspace's note instead.
+			if workspace, below := nearestWorkspace(project.Directory, workspaces); below && !broken[workspace] {
+				found.UnusedModules = append(found.UnusedModules,
+					unusedModule{Directory: project.Directory, Workspace: workspace})
+			}
+		}
+		running = append(running, project)
+	}
+	found.Projects = running
+}
+
+// nearestWorkspace is the deepest of the workspaces' directories that holds a directory, and whether there is
+// one: the go.work go would read there.
+func nearestWorkspace(directory string, workspaces []string) (string, bool) {
+	nearest, below := "", false
+	for _, workspace := range workspaces {
+		if isBelow(directory, workspace) && (!below || isBelow(workspace, nearest)) {
+			nearest, below = workspace, true
+		}
+	}
+	return nearest, below
+}
+
+// sortProjects puts parents before children, TypeScript, then Swift, then Go in one directory, and a
+// directory's tsconfig.json before its other tsconfigs, whatever order the reads finished in, so the report
+// reads the same on every run.
 func (found *discovery) sortProjects() {
 	sort.SliceStable(found.Projects, func(left, right int) bool {
 		leftProject, rightProject := found.Projects[left], found.Projects[right]
@@ -322,10 +429,25 @@ func (found *discovery) sortProjects() {
 			return pathBefore(leftProject.Directory, rightProject.Directory)
 		}
 		if leftProject.Engine != rightProject.Engine {
-			return leftProject.Engine == engineTypeScript
+			return engineRank(leftProject.Engine) < engineRank(rightProject.Engine)
 		}
 		return leftProject.ConfigFile < rightProject.ConfigFile
 	})
+}
+
+// engineRank is where an engine's project comes among the projects of one directory, the order engineAt
+// reads the markers in, so the report lists them the way a single run would choose between them.
+func engineRank(engine projectEngine) int {
+	switch engine {
+	case engineTypeScript:
+		return 0
+	case engineSwift:
+		return 1
+	case engineGo:
+		return 2
+	default:
+		return 3
+	}
 }
 
 // discoveryParallelism is how many directories discovery reads at once.

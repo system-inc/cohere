@@ -148,7 +148,7 @@ func TestAReleasedCohereRunsTheEngineShippedBesideIt(t *testing.T) {
 	// engine that will not speak it, so the line is held here in the shape it parses.
 	version, exitCode := runInstalled(t, binary, t.TempDir(), "--version")
 	if exitCode != 0 || !strings.HasPrefix(version, "cohere 1.0.0\n") ||
-		!strings.Contains(version, "\n  swift contract: "+strconv.Itoa(swiftContractVersion)+"\n") {
+		!strings.Contains(version, "\n  swift contract: "+strconv.Itoa(engineContractVersion)+"\n") {
 		t.Fatalf("a released cohere's --version does not state its Swift contract (exit %d):\n%s", exitCode, version)
 	}
 }
@@ -180,7 +180,7 @@ func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(t *testing.T) {
 		t.Fatal(err)
 	}
 	expected := filepath.Join(installed, release.SwiftEngineFileName)
-	if !strings.Contains(output, "this cohere 1.0.0 install has no Swift engine: expected "+expected) ||
+	if !strings.Contains(output, "This cohere 1.0.0 install has no Swift engine: expected "+expected) ||
 		!strings.Contains(output, "reinstall cohere") {
 		t.Fatalf("the missing engine was not named with the way out:\n%s", output)
 	}

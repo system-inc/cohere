@@ -34,3 +34,30 @@ func TestTheSnapshotIsWholeAndTheVersionItSays(t *testing.T) {
 			manifest.License, TailwindVersion)
 	}
 }
+
+// The source directory is found whether runtime.Caller names a path on disk or, built with -trimpath as
+// cohere-dev builds everything, an import path, which is resolved under cohere's module root. A runtime.Caller
+// path used as it came made the snapshot unavailable to every Tailwind test under -trimpath.
+func TestTheSourceDirectoryIsFoundUnderEitherBuild(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module "+modulePath+"\n\ngo 1.27\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	working := filepath.Join(root, "internal", "lint", "rules", "tailwind")
+	if err := os.MkdirAll(working, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(root, "internal", "lint", "rules", "tailwind", "vendored")
+	for _, file := range []string{filepath.Join(want, "vendored.go"), modulePath + "/internal/lint/rules/tailwind/vendored/vendored.go"} {
+		if got, err := sourceDirectory(file, working); err != nil || got != want {
+			t.Errorf("%s gave %q (%v), want %q", file, got, err, want)
+		}
+	}
+	if _, err := sourceDirectory("example.com/other/vendored.go", working); err == nil {
+		t.Error("a file outside cohere's module was resolved")
+	}
+	if _, err := sourceDirectory(modulePath+"/internal/x.go", t.TempDir()); err == nil {
+		t.Error("a module path was resolved with no go.mod above the working directory")
+	}
+}

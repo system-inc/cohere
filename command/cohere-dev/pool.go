@@ -6,6 +6,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -37,6 +38,10 @@ import (
 // GOMAXPROCS are fixed when a process starts, so a borrower keeps what it took until its command ends: a run of
 // several commands, the landing gate's, rebalances between them (tokenRun), widening when the pool went idle
 // and giving tokens back to anyone who arrived.
+
+// trimpathFlag is in every go command cohere-dev runs (budgetEnvironment), so a compile is keyed on its
+// source and never on the directory it sits in.
+const trimpathFlag = "-trimpath"
 
 // tokensVariable sets how many tokens the machine has.
 const tokensVariable = "COHERE_DEV_TOKENS"
@@ -380,8 +385,14 @@ func waitInLine(directory string, slots int, what string, noun string, explain f
 }
 
 // budgetEnvironment is the environment a token's run starts its commands in: Go held to the token's packages
-// and threads, the caller's other GOFLAGS kept, and the token named, so a command started beneath it runs in
-// this share rather than taking another.
+// and threads, the caller's other GOFLAGS kept, -trimpath always, and the token named, so a command started
+// beneath it runs in this share rather than taking another.
+//
+// -trimpath because without it Go keys every compile on the source's directory, so each member's worktree,
+// and each land gate's, compiled cohere from nothing: a fresh worktree's first fast tier took 211s and 1,630s
+// of CPU at a commit the gate had just tested, and 52 to 63s with -trimpath, every package from the shared
+// cache (2026-11-05). The machine's go env sets it, but setting GOFLAGS here overrides that file, so this
+// run dropped it until it was written in (#system_cohere_tools).
 func budgetEnvironment(base []string, token int, shape poolShape) []string {
 	environment := make([]string, 0, len(base)+3)
 	flags := []string{}
@@ -399,6 +410,9 @@ func budgetEnvironment(base []string, token int, shape poolShape) []string {
 			continue
 		}
 		environment = append(environment, variable)
+	}
+	if !slices.Contains(flags, trimpathFlag) {
+		flags = append(flags, trimpathFlag)
 	}
 	flags = append(flags, "-p="+strconv.Itoa(shape.packages))
 	return append(environment, "GOFLAGS="+strings.Join(flags, " "), "GOMAXPROCS="+strconv.Itoa(shape.threads),
