@@ -24,17 +24,6 @@ import (
 // Every exclusion upstream makes is a question about every ancestor up to the file, not up to the
 // selector's root: a string in `cn('p-2') === x` is in a comparison, and is never read.
 
-// compiledMatcher is one matcher, its path compiled.
-type compiledMatcher struct {
-	matcherType MatcherType
-	// path is nil when the matcher filters nothing, and also when its pattern does not compile, which
-	// then matches no path rather than refusing the run, as an uncompilable name does (newNamePatterns).
-	path    *esregexp.RegExp
-	hasPath bool
-	// inner is an anonymousFunctionReturn matcher's own matchers, run on what the function returns.
-	inner []compiledMatcher
-}
-
 func compileMatchers(matchers []SelectorMatcher) []compiledMatcher {
 	if matchers == nil {
 		return nil
@@ -54,31 +43,6 @@ func compileMatchers(matchers []SelectorMatcher) []compiledMatcher {
 		compiled = append(compiled, entry)
 	}
 	return compiled
-}
-
-// matchesPath is upstream's check after a key or value is found: no path, or no path filter, is a
-// match, and otherwise the filter must be found somewhere in the path.
-func (matcher compiledMatcher) matchesPath(path string) bool {
-	if path == "" || !matcher.hasPath {
-		return true
-	}
-	if matcher.path == nil {
-		return false
-	}
-	return matcher.path.Test(path)
-}
-
-// matchedNodes collects what a walk matched: a string literal, or a template literal whose text was
-// matched, either as itself or as its runs.
-type matchedNodes []*ast.Node
-
-func (matched *matchedNodes) add(node *ast.Node) {
-	for _, existing := range *matched {
-		if existing == node {
-			return
-		}
-	}
-	*matched = append(*matched, node)
 }
 
 // matchNodes is upstream's getLiteralNodesByMatchers: the root asked first, then everything under it
@@ -101,71 +65,6 @@ func matchNodes(root *ast.Node, matchers []compiledMatcher, matched *matchedNode
 	walker.visitChild = walker.visit
 	walker.live = uint64(1)<<len(matchers) - 1
 	walker.visit(root)
-}
-
-// matcherWalker is one walk's state. Its one visitor is made once per walk, since a closure per node
-// would be an allocation for every node under every class surface in the file.
-type matcherWalker struct {
-	matchers   []compiledMatcher
-	matched    *matchedNodes
-	live       uint64
-	visitChild func(*ast.Node) bool
-}
-
-// visit is upstream's findMatchingNestedNodes for the three matchers that never nest: a node is asked
-// by every matcher still live, kept when one matches, and entered by those not stopped at it.
-func (walker *matcherWalker) visit(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	isMatch, survivors := evaluateMatchers(node, walker.live, walker.matchers)
-	if isMatch {
-		walker.matched.add(node)
-	}
-	if survivors == 0 {
-		return false
-	}
-	live := walker.live
-	walker.live = survivors
-	walker.descend(node)
-	walker.live = live
-	return false
-}
-
-// descend enters a node's children as ESTree has them.
-func (walker *matcherWalker) descend(node *ast.Node) {
-	switch node.Kind {
-	// ESTree's method is a key beside a function expression, and every matcher stops at a function
-	// expression, so only the key is entered.
-	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-		walker.visit(node.Name())
-		return
-	case ast.KindConstructor:
-		return
-
-	// A template's runs are asked as quasis, all at once since they share every ancestor, and its holes
-	// are entered as any expression is.
-	case ast.KindTemplateExpression:
-		if isMatch, _ := evaluateQuasi(node, walker.live, walker.matchers); isMatch {
-			walker.matched.add(node)
-		}
-		template := node.AsTemplateExpression()
-		if template.TemplateSpans != nil {
-			for _, span := range template.TemplateSpans.Nodes {
-				walker.visit(span.AsTemplateSpan().Expression)
-			}
-		}
-		return
-
-	// A template with no holes is one quasi in ESTree, a child of the literal.
-	case ast.KindNoSubstitutionTemplateLiteral:
-		if isMatch, _ := evaluateQuasi(node, walker.live, walker.matchers); isMatch {
-			walker.matched.add(node)
-		}
-		return
-	}
-
-	node.ForEachChild(walker.visitChild)
 }
 
 // evaluateMatchers asks every live matcher about one node, and returns whether any matched and which
@@ -235,16 +134,6 @@ func evaluateQuasi(template *ast.Node, live uint64, matchers []compiledMatcher) 
 	return isMatch, live
 }
 
-// liveMatcher is one matcher alive in a walk that nests: one of the selector's own, or one an
-// anonymousFunctionReturn matcher made, upstream's closures in getESMatcherFunctions.
-type liveMatcher struct {
-	kind liveMatcherKind
-	// matcher is a selector's own matcher, for liveMatcherSelector.
-	matcher *compiledMatcher
-	// inner is what a made matcher hands on once it finds the returned value.
-	inner []compiledMatcher
-}
-
 type liveMatcherKind int
 
 const (
@@ -305,170 +194,6 @@ func matchNodesNesting(root *ast.Node, matchers []compiledMatcher, matched *matc
 		matched.add(root)
 	}
 	walker.descend(esNode{node: root}, below)
-}
-
-// nestingWalker is upstream's findMatchingNestedNodes where matchers can make matchers.
-type nestingWalker struct {
-	matched *matchedNodes
-}
-
-// visit asks one node. Upstream asks it until no matcher makes another: the matchers made are asked of
-// the same node in place of every matcher that was there, and only the last round's survivors go below.
-func (walker *nestingWalker) visit(node esNode, live []liveMatcher) {
-	if node.node == nil {
-		return
-	}
-	isMatch := false
-	current := live
-	for len(current) > 0 {
-		var next []liveMatcher
-		var nested []liveMatcher
-		for _, matcher := range current {
-			result, made := matcher.evaluate(node)
-			switch result {
-			case matcherMatch:
-				isMatch = true
-				next = append(next, matcher)
-			case matcherNoMatch:
-				next = append(next, matcher)
-			case matcherNested:
-				nested = append(nested, made...)
-			}
-		}
-		if len(nested) > 0 {
-			current = nested
-			continue
-		}
-		current = next
-		break
-	}
-	if isMatch {
-		walker.matched.add(node.node)
-	}
-	if len(current) > 0 {
-		walker.descend(node, current)
-	}
-}
-
-// descend enters a node's children as ESTree has them.
-func (walker *nestingWalker) descend(node esNode, live []liveMatcher) {
-	if node.asQuasi {
-		return
-	}
-	if node.asFunction {
-		for _, parameter := range node.node.Parameters() {
-			walker.visit(esNode{node: parameter}, live)
-		}
-		walker.visit(esNode{node: node.node.Type()}, live)
-		walker.visit(esNode{node: node.node.Body()}, live)
-		return
-	}
-	switch node.node.Kind {
-	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-		walker.visit(esNode{node: node.node.Name()}, live)
-		walker.visit(esNode{node: node.node, asFunction: true}, live)
-		return
-	case ast.KindConstructor:
-		walker.visit(esNode{node: node.node, asFunction: true}, live)
-		return
-	case ast.KindTemplateExpression:
-		walker.visit(esNode{node: node.node, asQuasi: true}, live)
-		if spans := node.node.AsTemplateExpression().TemplateSpans; spans != nil {
-			for _, span := range spans.Nodes {
-				walker.visit(esNode{node: span.AsTemplateSpan().Expression}, live)
-			}
-		}
-		return
-	case ast.KindNoSubstitutionTemplateLiteral:
-		walker.visit(esNode{node: node.node, asQuasi: true}, live)
-		return
-	}
-	node.node.ForEachChild(func(child *ast.Node) bool {
-		walker.visit(esNode{node: child}, live)
-		return false
-	})
-}
-
-// evaluate is one matcher's answer about one node, and the matchers it makes when it nests.
-func (matcher liveMatcher) evaluate(node esNode) (matcherResult, []liveMatcher) {
-	switch matcher.kind {
-	case liveMatcherArrowBody:
-		// The returned value is the body of an arrow with no braces.
-		if node.asFunction || node.asQuasi {
-			return matcherNoMatch, nil
-		}
-		parent := esParent(node.node)
-		if parent != nil && parent.Kind == ast.KindArrowFunction && parent.Body().Kind != ast.KindBlock &&
-			skipOuter(parent.Body()) == node.node {
-			return matcherNested, selectorMatchers(matcher.inner)
-		}
-		return matcherNoMatch, nil
-
-	case liveMatcherReturnStatement:
-		if node.asFunction {
-			return matcherUncrossable, nil
-		}
-		if node.asQuasi {
-			return matcherNoMatch, nil
-		}
-		switch node.node.Kind {
-		case ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindFunctionDeclaration,
-			ast.KindVariableDeclaration:
-			return matcherUncrossable, nil
-		case ast.KindCallExpression:
-			if isUncrossable(node.node) {
-				return matcherUncrossable, nil
-			}
-		case ast.KindReturnStatement:
-			return matcherNested, selectorMatchers(matcher.inner)
-		}
-		return matcherNoMatch, nil
-	}
-
-	selector := matcher.matcher
-	if selector.matcherType == MatcherTypeAnonymousFunctionReturn {
-		if !node.asFunction && !node.asQuasi &&
-			(node.node.Kind == ast.KindVariableDeclaration ||
-				node.node.Kind == ast.KindCallExpression && isUncrossable(node.node)) {
-			return matcherUncrossable, nil
-		}
-		switch {
-		case node.asFunction:
-			return matcherNested, []liveMatcher{{kind: liveMatcherReturnStatement, inner: selector.inner}}
-		case node.asQuasi:
-			return matcherNoMatch, nil
-		case node.node.Kind == ast.KindArrowFunction:
-			if node.node.Body().Kind != ast.KindBlock {
-				return matcherNested, []liveMatcher{{kind: liveMatcherArrowBody, inner: selector.inner}}
-			}
-			return matcherNested, []liveMatcher{{kind: liveMatcherReturnStatement, inner: selector.inner}}
-		case node.node.Kind == ast.KindFunctionExpression && node.node.Name() == nil:
-			return matcherNested, []liveMatcher{{kind: liveMatcherReturnStatement, inner: selector.inner}}
-		}
-		return matcherNoMatch, nil
-	}
-
-	// The three matchers that never nest stop at the same four kinds, a method's function among them.
-	if node.asFunction || (!node.asQuasi && isUncrossable(node.node)) {
-		return matcherUncrossable, nil
-	}
-	if node.asQuasi {
-		switch selector.matcherType {
-		case MatcherTypeStrings:
-			if stringsMatcherReads(node.node, nil) {
-				return matcherMatch, nil
-			}
-		case MatcherTypeObjectValues:
-			if objectValuesMatcherReads(node.node, nil) && selector.matchesPath(objectPath(node.node, true)) {
-				return matcherMatch, nil
-			}
-		}
-		return matcherNoMatch, nil
-	}
-	if isMatch, _ := evaluateMatchers(node.node, 1, []compiledMatcher{*selector}); isMatch {
-		return matcherMatch, nil
-	}
-	return matcherNoMatch, nil
 }
 
 // selectorMatchers is matchers a selector wrote, alive in a nesting walk.

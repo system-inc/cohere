@@ -157,17 +157,6 @@ func tsconfigPrefixLength(pattern string) int {
 	return star
 }
 
-// tsconfigFile is one tsconfig read as JSON, its top-level keys kept raw.
-type tsconfigFile map[string]json.RawMessage
-
-func (file tsconfigFile) compilerOptions() map[string]json.RawMessage {
-	options := map[string]json.RawMessage{}
-	// Ignored: an absent compilerOptions has no options, and one that is not an object is dropped whole, as
-	// tsoptions' convertOptionsFromJson drops it (TypeScript/tsc/internal/tsoptions/tsconfigparsing.go).
-	_ = json.Unmarshal(file["compilerOptions"], &options)
-	return options
-}
-
 // loadTsconfig is tsconfig-paths' loadTsconfig: the file, with whatever it extends merged under it.
 //
 // Mutates: visiting the file is marked while its extends chain loads and unmarked on return, so the caller's

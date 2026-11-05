@@ -257,7 +257,7 @@ func TestPreserveManualMemoizationAgainstGoldens(test *testing.T) {
 	// technically a false positive, but source is already breaking `exhaustive-deps`". Two real
 	// detections for two upstream calls a mistake.
 	//
-	// 27 once a ref's stability is decided the way upstream decides it, in `reactive.go`. The two
+	// 27 once a ref's stability is decided the way upstream decides it, in `reactivity.go`. The two
 	// that close are `error.ref-like-name-not-a-ref.js` and `error.ref-like-name-not-Ref.js`, and
 	// they are a matched pair with two clean fixtures that differ only in the variable's name.
 	// False positives are unmoved at 11, `under` holds at 0 fixtures / 0 scopes, and the dependency

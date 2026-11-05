@@ -10,21 +10,16 @@
 package program
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
-	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
@@ -32,133 +27,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 )
-
-// Graph is a built type graph: the program, and the checkers that answer questions about it.
-//
-// A Graph is never returned half-built. Build either hands back a Graph whose program resolved, or
-// an error. There is no state in between, because the failure this package exists to make
-// impossible is a program that silently contains nothing. An empty file list is indistinguishable
-// from a clean tree, and that exact confusion let the gate this tool replaces print green over zero
-// files for days.
-type Graph struct {
-	// Program is the compiler's own program handle. Exposed because a rule context carries it and
-	// some type questions are asked of the program rather than of a checker.
-	Program *compiler.Program
-
-	// Config is the resolved tsconfig this graph was built from, kept so a later snapshot can hash
-	// what it was built against rather than guess.
-	Config *tsoptions.ParsedCommandLine
-
-	// ConfigFileName is the absolute path of the tsconfig that produced this graph.
-	ConfigFileName string
-
-	// Anchor is the directory the graph was built in, which every fingerprint names paths relative to, so
-	// that two spellings of one directory fingerprint every file alike (#547dhjz). See PathAnchor.
-	Anchor PathAnchor
-
-	// CompilerHost is the filesystem view the program was built through, kept because the
-	// incremental machinery needs the same one.
-	//
-	// ReadBuildInfoProgram takes a host and a ParsedCommandLine, and it has to be the host the
-	// program was built with rather than a fresh one: the build info's file paths are resolved
-	// relative to it, and a second host with a different current directory or a cold cache
-	// would resolve them somewhere else and report every file as changed. Silently, and in the
-	// direction that looks like a cold cache rather than like a bug.
-	CompilerHost compiler.CompilerHost
-
-	// contentPack is the pack the program read its files through, and readIdentities the stats it read them
-	// under when there was none. See ReadUnchanged.
-	contentPack    *ContentPack
-	readIdentities *readIdentities
-
-	// LintConfig decides which rules apply to which files, and which files are not linted at all.
-	//
-	// Nil means every rule applies to every file, which is what the tests and any caller predating
-	// this layer expect. The command always loads a real one and fails loudly if it cannot, so the
-	// permissive default is reachable only from a caller that chose it deliberately.
-	LintConfig *configuration.Config
-
-	// RuleOptions says how to decode each rule's configuration, and which rules cannot run without
-	// it. Empty means no rule takes options, which is what a test that did not set one expects.
-	RuleOptions configuration.OptionsRegistry
-
-	// RegisteredRuleNames is every rule the registry holds, whether or not this run selected it.
-	//
-	// The walk reads it to tell a suppression naming an unknown rule from one naming a real rule that
-	// is merely not running here. Nil turns that check off, which is what a test that did not set it
-	// expects: without a registry every name would read as unknown.
-	RegisteredRuleNames []string
-
-	// CollectTimings turns on per-rule cost measurement for the next Walk.
-	//
-	// Off by default and guarded at every timing site, so an ordinary run reads no clocks and
-	// allocates no accumulators. The instrument should cost nothing when nobody asked for it.
-	CollectTimings bool
-
-	// FindingsReuse, when set, lets Walk serve unchanged files' cacheable findings from the last run
-	// and records this run's for the next. Nil walks everything, exactly as before it existed.
-	FindingsReuse *FindingsReuse
-
-	// Readiness, when set, measures every walked file against cohere:adamic for the run's readiness, whatever
-	// the project's chain enables. Nil measures nothing and the walk is exactly as before. See Readiness.
-	Readiness *Readiness
-
-	// Shapes is every project file's shape for this run (Graph.Signatures), when the caller computed them.
-	// Walk keys shape-keyed rules on them; without them it keys those rules on the type fingerprint.
-	Shapes map[string]SignatureEntry
-
-	// projectFiles is the program's files that the tsconfig named, matched once by Build and verified
-	// complete there. ProjectFiles returns it rather than recomputing, so the check that every named
-	// file made it into the program happens where a failure can be returned instead of panicked.
-	projectFiles []*ast.SourceFile
-
-	// YieldedFiles is how many files the tsconfig named that a nearer one owns, left out of ProjectFiles.
-	// See Options.Yielded.
-	YieldedFiles int
-
-	// typeGraphOnce and typeGraphParts hold typeGraph's answer, computed once: the type and the shape
-	// fingerprints both read it, and the program it describes never changes after Build.
-	typeGraphOnce  sync.Once
-	typeGraphParts typeGraphParts
-
-	// WalkOnForeignCheckers walks every file on a checker other than its own: a test instrument, for holding a
-	// stolen file's findings and type diagnostics to its home checker's. See walkQueue.
-	WalkOnForeignCheckers bool
-
-	// ContentKeyedShapes is how many project files Signatures keyed on their content, with no recorded
-	// declaration signature to compute theirs from. See Signatures.
-	ContentKeyedShapes int
-
-	// signatureEmits is how many files Signatures emitted declarations for, read by tests that prove when
-	// it does and does not.
-	signatureEmits int
-
-	// FusedCheck, when set, has the next Walk type-check each file it visits, just before the file's rules run,
-	// and the types phase read the result rather than check the program itself. Nil walks without checking.
-	FusedCheck *FusedCheck
-
-	// retired is set when the graph has been replaced, by Retire. See there.
-	retired atomic.Bool
-}
-
-// Retire marks a graph replaced: the fix phase rewrote files and a new graph was built from the new bytes.
-//
-// A check still running on this graph is left to finish rather than cancelled, and what it finds is never
-// recorded into the run cache's types section, since it describes bytes that no longer exist. It is not
-// cancelled because the compiler's whole-program check cannot be: a checker that sees its context end
-// marks itself cancelled, the compiler then hands it the next file in its group, and GetGlobalDiagnostics
-// panics on a compiler goroutine nothing here can recover. The gate itself died that way, a bare `cohere`
-// in 5 of 6 runs once its fix phase rewrote a file before the early check finished (#sm79kfv).
-func (graph *Graph) Retire() {
-	graph.retired.Store(true)
-}
-
-// Retired reports whether Retire was called.
-func (graph *Graph) Retired() bool {
-	return graph.retired.Load()
-}
 
 // Options controls how a graph is built.
 type Options struct {
@@ -306,44 +175,6 @@ func Build(options Options) (*Graph, error) {
 	return graph, nil
 }
 
-// yield takes the files a nearer tsconfig owns out of ProjectFiles, and counts them.
-func (graph *Graph) yield(yielded map[string]struct{}) {
-	if len(yielded) == 0 {
-		return
-	}
-	kept := graph.projectFiles[:0:0]
-	for _, sourceFile := range graph.projectFiles {
-		if _, isYielded := yielded[filepath.Clean(filepath.FromSlash(sourceFile.FileName().AsString()))]; isYielded {
-			graph.YieldedFiles++
-			continue
-		}
-		kept = append(kept, sourceFile)
-	}
-	graph.projectFiles = kept
-}
-
-// timedVerify is verifyProjectFiles against the disk, timed when the build is. A build over another
-// filesystem asks that one, since the real disk knows nothing of its files.
-func (graph *Graph) timedVerify(options Options) (rootsVerdict, []string) {
-	inspect := inspectRootOnDisk
-	if options.FileSystem != nil {
-		inspect = func(fileName string) rootState {
-			if options.FileSystem.FileExists(tspath.RootedFilePath(fileName)) {
-				return rootReadable
-			}
-			return rootAbsent
-		}
-	}
-	timing := options.Timing
-	if timing == nil {
-		return graph.verifyProjectFiles(inspect)
-	}
-	started := time.Now()
-	verdict, missing := graph.verifyProjectFiles(inspect)
-	timing.Verify += time.Since(started)
-	return verdict, missing
-}
-
 // classifyMissingRoots decides what a set of named-but-unloaded roots means.
 //
 // A pure function of what the disk says, so every verdict is tested directly. The order is the order
@@ -363,38 +194,6 @@ func classifyMissingRoots(missing []string, inspect func(string) rootState) root
 		}
 	}
 	return verdict
-}
-
-// verifyProjectFiles matches the config's files to the program's, keeps the matches for ProjectFiles,
-// and says what any missing ones mean.
-func (graph *Graph) verifyProjectFiles(inspect func(string) rootState) (rootsVerdict, []string) {
-	rootPaths := make(map[tspath.PathKey]string, len(graph.Config.FileNames()))
-	for _, fileName := range graph.Config.FileNames() {
-		rootPaths[toPath(
-			fileName.AsString(),
-			graph.Anchor.Root(),
-			graph.Config.CaseSensitivity(),
-		)] = fileName.AsString()
-	}
-
-	files := make([]*ast.SourceFile, 0, len(rootPaths))
-	loaded := make(map[tspath.PathKey]struct{}, len(rootPaths))
-	for _, sourceFile := range graph.Program.GetSourceFiles() {
-		if _, isRoot := rootPaths[sourceFile.PathKey()]; isRoot {
-			files = append(files, sourceFile)
-			loaded[sourceFile.PathKey()] = struct{}{}
-		}
-	}
-	graph.projectFiles = files
-
-	missing := []string{}
-	for path, fileName := range rootPaths {
-		if _, isLoaded := loaded[path]; !isLoaded {
-			missing = append(missing, fileName)
-		}
-	}
-	sort.Strings(missing)
-	return classifyMissingRoots(missing, inspect), missing
 }
 
 // inspectRootOnDisk asks the real disk, past every cache, what is at a path now.
@@ -633,62 +432,6 @@ func buildOnce(options Options) (*Graph, error) {
 	}, nil
 }
 
-/*
- * ReadUnchanged reports whether text, the program's copy of a file, is the file's bytes now, so a reader can
- * use it instead of reading the file again (#q6dey77). Exact, by three checks:
- *   - the program read the file under a stat, its content pack's or its own, and a stat taken now matches it,
- *     so the file holds the bytes the program read;
- *   - those bytes were the program's copy exactly. The program reads through typescript-go's decodeBytes,
- *     which drops a UTF-8 byte order mark and decodes UTF-16 behind its mark, and returns every other file
- *     byte for byte. So the file must not start with a mark (#hkv1hgp). The recorded size must also be the
- *     copy's length, which no dropped mark leaves true and which costs no read, so a marked file is turned
- *     away before it is opened. The length alone isn't enough: UTF-16 heavy in characters that take three
- *     bytes in UTF-8 can decode to exactly its own size.
- * False on any doubt, so the reader reads the disk, as it would have.
- */
-func (graph *Graph) ReadUnchanged(path string, text string) bool {
-	if graph == nil {
-		return false
-	}
-	var identity fileIdentity
-	var known bool
-	if graph.contentPack != nil {
-		identity, known = graph.contentPack.readIdentity(path)
-	} else {
-		identity, known = graph.readIdentities.identity(path)
-	}
-	if !known || identity.size != int64(len(text)) {
-		return false
-	}
-	if current, statted := statIdentity(path); !statted || current != identity {
-		return false
-	}
-	return !startsWithByteOrderMark(path)
-}
-
-// SourceFiles is every file in the program, third-party declarations included.
-//
-// This is the program's population, not the set a phase should lint. Use ProjectFiles for that.
-func (graph *Graph) SourceFiles() []*ast.SourceFile {
-	return graph.Program.GetSourceFiles()
-}
-
-// ProjectFiles is the subset of the program that the tsconfig actually named: our code, without
-// the declarations it pulled in.
-//
-// On the ahra tree that is roughly 3,400 files out of 9,530. The other 6,100 are `node_modules`
-// `.d.ts` that the checker needs in order to answer questions and that no rule should visit: a rule
-// walking them would cost most of the run to report findings against code nobody here can edit.
-func (graph *Graph) ProjectFiles() []*ast.SourceFile {
-	// Matched and verified once, by Build. A lookup that misses reports the same empty result as a
-	// config that named nothing, and this one has missed twice: the compiler lowercases Path() on a
-	// case-insensitive filesystem while the config keeps its casing (matched zero of 3,407), and a file
-	// can be deleted between the config's glob and the program's read (matched 3,789 of 3,790, with many
-	// writers sharing the tree). Build tells the two apart and fails on the first, so nothing here can
-	// return a silently partial list.
-	return graph.projectFiles
-}
-
 // projectFilesMismatchMessage says what went wrong and where to look.
 //
 // Split out so a test can assert the wording. A panic reading only "mismatch" sends the next reader
@@ -701,112 +444,6 @@ func projectFilesMismatchMessage(named int, matched int) string {
 			"Linting the %d that matched would silently skip the other %d.",
 		named, matched, matched, named-matched,
 	)
-}
-
-// CheckerForFile returns the checker that owns a file, and a function to release it.
-//
-// There are several checkers, one per worker, and a file belongs to exactly one of them. That
-// ownership is not an optimization detail a caller may ignore: types obtained from two different
-// checkers cannot be compared or mixed, so a rule must ask the checker that owns the file it is
-// looking at. Asking for the wrong one produces answers that are individually plausible and jointly
-// meaningless, which is the worst failure shape available here.
-//
-// The release function must be called, conventionally by defer.
-func (graph *Graph) CheckerForFile(
-	callerContext context.Context,
-	sourceFile *ast.SourceFile,
-) (*checker.Checker, func()) {
-	return graph.Program.GetTypeCheckerForFileExclusive(callerContext, sourceFile)
-}
-
-// Diagnostics returns TypeScript's own findings for one file: syntax, then binding, then semantics.
-//
-// The order is the one `tsc` reports in and it matters. A file that does not parse produces
-// cascading nonsense from the later phases, so when syntax fails we stop rather than bury the real
-// error under fifty invented ones.
-//
-// Prefer AllDiagnostics for a whole-program check. Calling this in a loop over every file is more
-// than three times slower for a reason that is invisible at the call site. See the note there.
-func (graph *Graph) Diagnostics(callerContext context.Context, sourceFile *ast.SourceFile) []*ast.Diagnostic {
-	syntactic := graph.Program.GetSyntacticDiagnostics(callerContext, sourceFile)
-	if len(syntactic) > 0 {
-		return syntactic
-	}
-
-	diagnostics := graph.Program.GetBindDiagnostics(callerContext, sourceFile)
-	return append(diagnostics, graph.Program.GetSemanticDiagnostics(callerContext, sourceFile)...)
-}
-
-// AllDiagnostics returns TypeScript's findings for the whole program.
-//
-// This is not a convenience wrapper around Diagnostics in a loop, and the difference is a measured
-// 3.7s versus 1.1s on a 3,408-file tree. The compiler's diagnostic entry points branch on whether a
-// file was named: pass one and it checks that file lazily, on whichever single checker owns it; pass
-// nil and it first runs CheckSourceFiles, which fans every checker out across all four workers at
-// once. So a loop that asks file by file quietly serializes the most expensive phase in the tool
-// onto one core, and it does it without any call looking wrong.
-//
-// The findings are identical either way. Only the wall clock differs, which is exactly what makes
-// this the kind of mistake that survives review.
-func (graph *Graph) AllDiagnostics(callerContext context.Context) []*ast.Diagnostic {
-	return graph.AllDiagnosticParts(callerContext).All()
-}
-
-// AllDiagnosticParts is AllDiagnostics with its parts kept apart. See TypeDiagnosticParts.
-func (graph *Graph) AllDiagnosticParts(callerContext context.Context) TypeDiagnosticParts {
-	syntactic := graph.Program.GetSyntacticDiagnostics(callerContext, nil)
-	if len(syntactic) > 0 {
-		return TypeDiagnosticParts{Syntactic: syntactic}
-	}
-	return TypeDiagnosticParts{
-		Bind:     graph.Program.GetBindDiagnostics(callerContext, nil),
-		Semantic: graph.Program.GetSemanticDiagnostics(callerContext, nil),
-	}
-}
-
-// ConfigDiagnostics returns findings about the configuration itself rather than about any file:
-// contradictory options, an unreachable lib, a target that does not exist.
-func (graph *Graph) ConfigDiagnostics(callerContext context.Context) []*ast.Diagnostic {
-	// GetOptionsDiagnostics was folded into GetProgramDiagnostics upstream: an option that contradicts
-	// another is now reported with the rest of the program's own findings rather than through its own
-	// accessor. The set is the same; only the door changed.
-	diagnostics := graph.Program.GetConfigFileParsingDiagnostics()
-	diagnostics = append(diagnostics, graph.Program.GetProgramDiagnostics()...)
-	diagnostics = append(diagnostics, graph.Program.GetGlobalDiagnostics(callerContext)...)
-	return diagnostics
-}
-
-// Workers is how many files can be checked at once.
-//
-// It matches the checker count the program built, because a file must be visited by the checker that
-// owns it and there is no benefit to more goroutines than there are checkers to serve them.
-//
-// This asks the program rather than remembering what we requested. Until the move to
-// `microsoft/TypeScript`, `Program.SingleThreaded()` was unexported and the checker count was a
-// private constant, so this had to mirror the compiler's own arithmetic and hope the two stayed in
-// step. Both are reachable now, so the mirror is gone: a count that disagreed with the compiler's
-// would hand files to a worker whose checker does not own them, and types from two checkers cannot
-// be mixed.
-func (graph *Graph) Workers() int {
-	if graph.Program.SingleThreaded() {
-		return 1
-	}
-
-	checkerCount := defaultCheckerCount()
-	if requested := graph.Program.Options().Checkers; requested != nil {
-		checkerCount = *requested
-	}
-
-	// The clamp is upstream's, reproduced rather than approximated, because agreeing with the
-	// compiler is the entire point of this function. It caps at the file count for the obvious reason
-	// that a fifth checker on a four-file program has nothing to check, and at 256 as a ceiling.
-	//
-	// Without it a config asking for 100 checkers on a 64-file program gets 64 checkers upstream and
-	// 100 workers here, and the 36 extra stride over files whose owning checker is a different
-	// instance than the one they would be handed. Types from two checkers cannot be mixed, so that is
-	// wrong answers rather than wasted goroutines. Measured: Workers() returned 100 against
-	// upstream's 64 before this.
-	return max(min(checkerCount, len(graph.Program.GetSourceFiles()), 256), 1)
 }
 
 // defaultCheckerCount is how many checkers we ask for when nobody says otherwise.

@@ -299,7 +299,7 @@ func TestDominatorsOnKnownShapes(test *testing.T) {
 }
 
 // TestDominatorsAgreeWithFinalPathDominators pins this file's tree against the one
-// `findFinalPathDominators` already computes in paths.go.
+// `findFinalPathDominators` already computes in path_analysis.go.
 //
 // The two are deliberately different computations over different graphs (that one adds a synthetic
 // exit and excludes thrown edges), so they are not expected to agree in general. Where they must

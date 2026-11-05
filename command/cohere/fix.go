@@ -12,11 +12,9 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -734,23 +732,6 @@ func walkNode(node *ast.Node, listeners rule.Listeners) {
 	})
 }
 
-// formatSpeculation is the format pass begun before the walk: one attempt per format candidate, computed as
-// formatInParallel computes a file with no proposals, and kept or discarded once the walk is over.
-type formatSpeculation struct {
-	done     chan struct{}
-	attempts map[string]formatAttempt
-	// read is the text each attempt was computed from, so a result is kept only for those exact bytes.
-	read map[string]string
-
-	// stopped, once closed, has the workers take no more files: what they have not begun is left to
-	// formatInParallel, which has every core. See stop.
-	stopped  chan struct{}
-	stopOnce sync.Once
-
-	// limit is how many of the workers may take another file. See narrow.
-	limit atomic.Int32
-}
-
 // speculateFormat starts formatting every candidate at once, on its own workers, and returns at once.
 //
 // The walk leaves cores idle: its workers wait on their checker's lock about half the time (#zqsdzbq), and
@@ -880,61 +861,6 @@ func speculateFormatOn(
 	return speculation
 }
 
-// programOffer is where a speculation finds the program once it is built. Its zero value has none, and so does
-// a nil one.
-type programOffer struct {
-	program atomic.Pointer[compiler.Program]
-	// graph is the graph the program was built in, set before the program, so a speculation that sees the
-	// program can ask the graph whether its copy of a file is still the file's.
-	graph atomic.Pointer[program.Graph]
-}
-
-// offer hands the speculation the graph's program, once it is built.
-func (programs *programOffer) offer(graph *program.Graph) {
-	if programs != nil && graph != nil && graph.Program != nil {
-		programs.graph.Store(graph)
-		programs.program.Store(graph.Program)
-	}
-}
-
-// unchangedTreeOf is boundTreeOf's tree when the program's copy of the file is the file's bytes, by the stat it
-// was read under and a file that starts with no byte order mark (Graph.ReadUnchanged): the speculation then formats the
-// tree's own text and reads nothing (#q6dey77). Rereading every file to compare it with the tree was 51 MB on a cold
-// ahra run. A file changed on disk since the program read it has another stat, so it is read as before, its bytes
-// differ from the program's, and keepable discards the attempt: an edit made after the walk read the file is still
-// noticed.
-func (programs *programOffer) unchangedTreeOf(fileName string) *ast.SourceFile {
-	tree := programs.boundTreeOf(fileName)
-	if tree == nil || !programs.graph.Load().ReadUnchanged(fileName, tree.Text()) {
-		return nil
-	}
-	return tree
-}
-
-// boundTreeOf is the program's tree of fileName if the program is in and has bound that file, or nil.
-//
-// Bound, because the binder writes node flags the formatter's converter reads (binder.go sets
-// NodeFlagsThisNodeOrAnySubNodesHasError and NodeFlagsExportContext on nodes, and estree reads Let, Const,
-// Using and Reparsed off the same word), and the checkers bind on their own goroutines while this pass runs.
-// isBound is an atomic stored once the binder is done with the file, so a file that reads bound here has had
-// every flag written before any is read. A file not yet bound is not waited for: it is parsed, as before.
-//
-// The tree is not yet known to be of the bytes the speculation reads; edit.CheckFileSeeded compares them.
-func (programs *programOffer) boundTreeOf(fileName string) *ast.SourceFile {
-	if programs == nil {
-		return nil
-	}
-	program := programs.program.Load()
-	if program == nil {
-		return nil
-	}
-	sourceFile := program.GetSourceFile(tspath.RootedFilePath(fileName))
-	if sourceFile == nil || !sourceFile.IsBound() {
-		return nil
-	}
-	return sourceFile
-}
-
 // speculationWorkers is how many files speculateFormat formats at once: a quarter of the cores, and none
 // when the parallel pass is off. The walk and the type check have every core besides, and the type check is
 // what a cold run waits on once formatting has left the critical path. Measured on ahra (#679s763), load 7 to
@@ -945,48 +871,4 @@ func speculationWorkers() int {
 		return 0
 	}
 	return max(runtime.GOMAXPROCS(0)/4, 1)
-}
-
-// stop has the workers finish the files they are on and begin no more. Called once the walk is over on a run
-// whose walk also did the type check (program.FusedCheck): nothing else then wants the cores, and a quarter of
-// them formatting the rest would set the run's end (#679s763).
-// narrow has all but the first workers finish the file they are on and take no more. The files left go to the
-// workers that remain, and what they have not begun when the walk ends goes to formatInParallel.
-func (speculation *formatSpeculation) narrow(workers int) {
-	speculation.limit.Store(int32(workers))
-}
-
-func (speculation *formatSpeculation) stop() {
-	speculation.stopOnce.Do(func() { close(speculation.stopped) })
-}
-
-// wait returns once every attempt is in.
-func (speculation *formatSpeculation) wait() {
-	<-speculation.done
-}
-
-// keepable waits for the speculation and returns the attempts that stand: a file no rule proposed a fix for,
-// whose bytes, where the walk read the file, are the bytes the attempt read. A result whose file has a
-// proposal describes text the fixes will replace, and one read from other bytes than the walk's would pair
-// the walk's findings with formatting of a different file.
-func (speculation *formatSpeculation) keepable(
-	byFileName map[string][]edit.Proposal,
-	graph *program.Graph,
-) map[string]formatAttempt {
-	speculation.wait()
-	kept := make(map[string]formatAttempt, len(speculation.attempts))
-	for fileName, attempt := range speculation.attempts {
-		if len(byFileName[fileName]) != 0 {
-			continue
-		}
-		if attempt.err == nil && graph != nil && graph.Program != nil {
-			if sourceFile := graph.Program.GetSourceFile(
-				tspath.RootedFilePath(fileName),
-			); sourceFile != nil && sourceFile.Text() != speculation.read[fileName] {
-				continue
-			}
-		}
-		kept[fileName] = attempt
-	}
-	return kept
 }

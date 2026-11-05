@@ -20,7 +20,3 @@ func IsSyntax(candidateError error) bool {
 	var marked syntaxError
 	return errors.As(candidateError, &marked)
 }
-
-type syntaxError struct{ error }
-
-func (marked syntaxError) Unwrap() error { return marked.error }

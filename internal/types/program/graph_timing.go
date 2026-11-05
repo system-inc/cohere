@@ -1,14 +1,6 @@
 package program
 
-import (
-	"sync/atomic"
-	"time"
-
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/compiler"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs"
-)
+import "time"
 
 // GraphTiming is what building the graph cost, by part, collected when Options.Timing is set.
 //
@@ -66,26 +58,10 @@ type GraphTiming struct {
 	CheckedAnswers int64
 }
 
-// DiskTiming is filesystem calls by kind, each a count and the time summed across every goroutine
-// that made one.
-type DiskTiming struct {
-	Reads     DiskCalls // ReadFile
-	Existence DiskCalls // FileExists and DirectoryExists
-	Stats     DiskCalls // Stat
-	Listings  DiskCalls // GetAccessibleEntries, a directory listing
-	Realpaths DiskCalls // Realpath
-}
-
 // DiskCalls is a count of one kind of call and their summed duration.
 type DiskCalls struct {
 	Count  int64
 	Summed time.Duration
-}
-
-// Summed is every call's duration, added up.
-func (timing DiskTiming) Summed() time.Duration {
-	return timing.Reads.Summed + timing.Existence.Summed + timing.Stats.Summed + timing.Listings.Summed +
-		timing.Realpaths.Summed
 }
 
 const (
@@ -96,111 +72,3 @@ const (
 	diskRealpath
 	diskCallKinds
 )
-
-// diskCounters accumulates calls from many goroutines at once. Atomic rather than locked, because a
-// lock here would serialize the loaders and measure itself.
-type diskCounters struct {
-	counts    [diskCallKinds]atomic.Int64
-	durations [diskCallKinds]atomic.Int64
-}
-
-func (counters *diskCounters) add(kind int, started time.Time) {
-	counters.counts[kind].Add(1)
-	counters.durations[kind].Add(int64(time.Since(started)))
-}
-
-func (counters *diskCounters) snapshot() DiskTiming {
-	calls := func(kind int) DiskCalls {
-		return DiskCalls{Count: counters.counts[kind].Load(), Summed: time.Duration(counters.durations[kind].Load())}
-	}
-	return DiskTiming{
-		Reads:     calls(diskRead),
-		Existence: calls(diskExistence),
-		Stats:     calls(diskStat),
-		Listings:  calls(diskListing),
-		Realpaths: calls(diskRealpath),
-	}
-}
-
-func (timing DiskTiming) plus(other DiskTiming) DiskTiming {
-	sum := func(left DiskCalls, right DiskCalls) DiskCalls {
-		return DiskCalls{Count: left.Count + right.Count, Summed: left.Summed + right.Summed}
-	}
-	return DiskTiming{
-		Reads:     sum(timing.Reads, other.Reads),
-		Existence: sum(timing.Existence, other.Existence),
-		Stats:     sum(timing.Stats, other.Stats),
-		Listings:  sum(timing.Listings, other.Listings),
-		Realpaths: sum(timing.Realpaths, other.Realpaths),
-	}
-}
-
-// timingFileSystem times the calls beneath it into whichever counters are current. The build switches them
-// from the config's to the program's between the two, which is safe because both run on the build's
-// own goroutine in order: no config call is still in flight when the program starts.
-type timingFileSystem struct {
-	vfs.FS
-	current atomic.Pointer[diskCounters]
-}
-
-func (fileSystem *timingFileSystem) start() (*diskCounters, time.Time) {
-	return fileSystem.current.Load(), time.Now()
-}
-
-func (fileSystem *timingFileSystem) ReadFile(path tspath.RootedFilePath) (string, bool) {
-	counters, started := fileSystem.start()
-	contents, ok := fileSystem.FS.ReadFile(path)
-	counters.add(diskRead, started)
-	return contents, ok
-}
-
-func (fileSystem *timingFileSystem) FileExists(path tspath.RootedFilePath) bool {
-	counters, started := fileSystem.start()
-	exists := fileSystem.FS.FileExists(path)
-	counters.add(diskExistence, started)
-	return exists
-}
-
-func (fileSystem *timingFileSystem) DirectoryExists(path tspath.RootedDirectoryPath) bool {
-	counters, started := fileSystem.start()
-	exists := fileSystem.FS.DirectoryExists(path)
-	counters.add(diskExistence, started)
-	return exists
-}
-
-func (fileSystem *timingFileSystem) Stat(path tspath.RootedPath) vfs.FileInfo {
-	counters, started := fileSystem.start()
-	information := fileSystem.FS.Stat(path)
-	counters.add(diskStat, started)
-	return information
-}
-
-func (fileSystem *timingFileSystem) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
-	counters, started := fileSystem.start()
-	entries := fileSystem.FS.GetAccessibleEntries(path)
-	counters.add(diskListing, started)
-	return entries
-}
-
-func (fileSystem *timingFileSystem) Realpath(path tspath.RootedPath) tspath.RootedPath {
-	counters, started := fileSystem.start()
-	resolved := fileSystem.FS.Realpath(path)
-	counters.add(diskRealpath, started)
-	return resolved
-}
-
-// timingHost times the compiler host's GetSourceFile, which is how the program loads every file: a
-// read and a parse. Everything else passes through.
-type timingHost struct {
-	compiler.CompilerHost
-	loads  atomic.Int64
-	summed atomic.Int64
-}
-
-func (host *timingHost) GetSourceFile(options ast.SourceFileParseOptions) *ast.SourceFile {
-	started := time.Now()
-	sourceFile := host.CompilerHost.GetSourceFile(options)
-	host.loads.Add(1)
-	host.summed.Add(int64(time.Since(started)))
-	return sourceFile
-}

@@ -5,16 +5,6 @@ package compose
 
 import "github.com/system-inc/cohere/internal/format/yaml/cst"
 
-// composeContext is upstream's ComposeContext, one object shared and mutated down the whole document:
-// atKey and atRoot are switched as composing descends.
-type composeContext struct {
-	atKey      bool
-	atRoot     bool
-	directives *Directives
-	options    *Options
-	schema     *Schema
-}
-
 func composeDoc(options Options, directives *Directives, token *cst.Token, onError onErrorFunc) *Document {
 	offset, start, value, end := token.Offset, token.Start, token.Value, token.End
 	doc := newDocument(directives, options)

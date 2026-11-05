@@ -170,22 +170,6 @@ type LintCacheWithheld struct {
 	Directive int32
 }
 
-// AdamicRecord is one file's Adamic readiness measurement, kept per rule so an entry whose type-aware rules
-// ran again can be merged rule by rule (refreshClasses), as its findings are.
-//
-// Measure-only findings are counts, never LintCacheFindings: they cannot be printed, cannot fail a run and
-// carry no fixes, so nothing about them needs replaying beyond how many there were.
-type AdamicRecord struct {
-	// Counts is every cacheable cohere:adamic rule that ran on the file with how many findings it had at the
-	// set's own options, before suppression, sorted by rule. A rule that found nothing has a zero pair, so a
-	// rule that ran clean and one that did not run can be told apart.
-	Counts []AdamicCount
-
-	// Skipped is the cacheable cohere:adamic rules that skipped the file, sorted. A skip leaves the file
-	// unmeasured, not ready.
-	Skipped []string
-}
-
 // AdamicCount is one rule's measure-only finding count on one file.
 type AdamicCount struct {
 	Rule     string
@@ -234,56 +218,6 @@ func mergeAdamic(first *AdamicRecord, second *AdamicRecord) *AdamicRecord {
 		merged.Skipped = nil
 	}
 	return merged
-}
-
-// LintCacheFinding is one finding, flattened.
-//
-// rule.Diagnostic carries a *ast.SourceFile belonging to a program that no longer exists by
-// the time this is read back, so the file is implied by the entry rather than stored per
-// finding.
-//
-// MessageDescription holds the rendered text. An earlier version of this comment said text was
-// "derived from the id when a finding is rendered" and therefore safe to omit. That was untrue,
-// and the field was absent because of it. Nothing in this tree derives text from an id: there is
-// no id-to-text table, and `printRuleDiagnostic` prints `Message.Description` directly. Measured
-// 2026-08-25 over `internal/rules`: 340 message ids, of which 11 build their description with
-// `fmt.Sprintf` from runtime values, so for those one id maps to many strings and no table could
-// exist. A cached finding replaying only the id would print an empty or wrong sentence beside a
-// correct file, range and rule: the right metadata carrying the wrong message, which is the one
-// failure here that looks exactly like success.
-//
-// The text is stored rather than the 11 being refused because refusing them buys bytes with a
-// standing per-rule obligation, and this format already depends on `ProgramReads` carrying one.
-// The size scales the right way: the artifact grows with a dirty tree, which is the run where
-// this cache saves least, because changed files are recomputed anyway.
-//
-// Message ids are not unique on their own, which is a second reason the id could never have been
-// the key. `unexpected` carries five distinct descriptions across six core rules, colliding across
-// rules and never within one, so the honest identity of a message is the pair (RuleName,
-// MessageId). Lookups key on the pair even though the text is now stored, so nobody later assumes
-// ids are unique.
-//
-// Fixes and suggestions are counted rather than stored, and leaving them out is sound: a fix is a
-// replacement over a byte range, and replaying one computed against different bytes would corrupt
-// the file it claims to repair. A cached finding is a report, never an edit.
-type LintCacheFinding struct {
-	RuleName string
-	Start    int32
-	End      int32
-
-	// MessageId identifies the message within its rule. Not unique across rules; see above.
-	MessageId string
-
-	// MessageDescription is the rendered sentence, stored because nothing can rebuild it.
-	MessageDescription string
-
-	FixCount        int32
-	SuggestionCount int32
-}
-
-// MessageKey is the honest identity of a message: the pair, never the id alone.
-func (finding LintCacheFinding) MessageKey() (string, string) {
-	return finding.RuleName, finding.MessageId
 }
 
 // HashContent is the key a cached entry is stored under.
@@ -501,4 +435,66 @@ func CacheClasses(rules []rule.Entry) (pure []rule.Entry, typeAware []rule.Entry
 func CacheableRules(rules []rule.Entry) (cacheable []rule.Entry, uncacheable []rule.Entry) {
 	pure, typeAware, design, derived, never := CacheClasses(rules)
 	return pure, append(append(append(typeAware, design...), derived...), never...)
+}
+
+// wire interns the findings cache's rule lists. It is stamped with this build's lintCacheVersion: a cache in
+// memory always means what this build means.
+func (cache *LintCache) wire() *lintCacheWire {
+	wire := &lintCacheWire{
+		Version:      lintCacheVersion,
+		Key:          cache.Key,
+		KeyParts:     cache.KeyParts,
+		DesignSystem: cache.DesignSystem,
+	}
+	// Interned by a cheap key, the length and the two ends, and confirmed by comparing names, never by joining
+	// a list into one string: ahra's entries hold about 18,000 lists of up to ~250 names, and joining each cost
+	// about 25ms of every recording run to find 31 distinct ones (#a66sfmh).
+	type listKey struct {
+		length      int
+		first, last string
+	}
+	positions := map[listKey][]int{}
+	intern := func(list []string) int {
+		key := listKey{length: len(list)}
+		if len(list) > 0 {
+			key.first, key.last = list[0], list[len(list)-1]
+		}
+		for _, position := range positions[key] {
+			if equalStrings(wire.Lists[position], list) {
+				return position
+			}
+		}
+		positions[key] = append(positions[key], len(wire.Lists))
+		wire.Lists = append(wire.Lists, append([]string{}, list...))
+		return len(wire.Lists) - 1
+	}
+	for _, entry := range cache.Entries {
+		wire.Entries = append(wire.Entries, lintCacheWireEntry{
+			Path:            entry.Path,
+			ContentHash:     entry.ContentHash,
+			Rules:           intern(entry.Rules),
+			TypedRules:      intern(entry.TypedRules),
+			TypeFingerprint: entry.TypeFingerprint,
+			Listening:       intern(entry.Listening),
+			VisitedNodes:    entry.VisitedNodes,
+			Findings:        entry.Findings,
+
+			ShapedRules:      intern(entry.ShapedRules),
+			ShapeFingerprint: entry.ShapeFingerprint,
+
+			DesignRules:       intern(entry.DesignRules),
+			DesignFingerprint: entry.DesignFingerprint,
+
+			DerivedRules:       intern(entry.DerivedRules),
+			DerivedFingerprint: entry.DerivedFingerprint,
+
+			Notes: wireNotes(entry.Notes),
+
+			Directives: entry.Directives,
+			Withheld:   entry.Withheld,
+
+			Adamic: entry.Adamic,
+		})
+	}
+	return wire
 }

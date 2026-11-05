@@ -34,20 +34,6 @@ package static_single_assignment
 
 import "fmt"
 
-// SSAViolation is one broken invariant.
-type SSAViolation struct {
-	// Kind is which invariant broke.
-	Kind SSAViolationKind
-	// Identifier is the value involved.
-	Identifier IdentifierId
-	// Block is where the violating use or duplicate definition sits.
-	Block BlockId
-	// Detail is a human-readable explanation naming both ends.
-	Detail string
-}
-
-func (violation SSAViolation) String() string { return violation.Detail }
-
 // SSAViolationKind is which invariant a violation breaks: one of the two single assignment states, or
 // the precondition Construct rests on.
 type SSAViolationKind uint8
@@ -285,16 +271,6 @@ func CollectSSAStats[G Graph[F, B, P], F any, B comparable, P any](graph G, func
 	return stats
 }
 
-// Dominance is the immediate-dominator array over a function's block slice, by position in it.
-type Dominance struct {
-	// position maps a block id to its index in the order ComputeDominance made: a reverse postorder of
-	// the real edges from the entry, then the blocks they don't reach.
-	position map[BlockId]int
-	// immediate[i] is the index of block i's immediate dominator; the entry is its own, and a block the
-	// real edges don't reach has none (-1), dominated by nothing but itself.
-	immediate []int
-}
-
 // ComputeDominance runs Cooper-Harvey-Kennedy over the function's blocks.
 //
 // # Why it orders the blocks itself rather than reading the block slice
@@ -431,27 +407,4 @@ func entryPredecessors[G Graph[F, B, P], F any, B comparable, P any](graph G, fu
 	}
 	predecessors := graph.Predecessors(block)
 	return entry, predecessors, len(predecessors) > 0
-}
-
-// Dominates reports whether every path from the entry to block passes through dominator.
-//
-// A block dominates itself, the standard convention.
-func (dominance *Dominance) Dominates(dominator, block BlockId) bool {
-	target, ok := dominance.position[dominator]
-	if !ok {
-		return false
-	}
-	index, ok := dominance.position[block]
-	if !ok {
-		return false
-	}
-	for {
-		if index == target {
-			return true
-		}
-		if index == 0 || dominance.immediate[index] == -1 {
-			return false
-		}
-		index = dominance.immediate[index]
-	}
 }

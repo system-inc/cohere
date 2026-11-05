@@ -2,7 +2,6 @@ package reference
 
 import (
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -72,13 +71,6 @@ type TraceMap struct {
 	Call      bool
 	Construct bool
 	Members   map[string]*TraceMap
-}
-
-// Tracked is one use the tracker found: the node to report, the global path it holds, and the use.
-type Tracked struct {
-	Node  *ast.Node
-	Path  []string
-	Usage Usage
 }
 
 // DefaultGlobalObjectNames are the names eslint-utils treats as the global object itself, so that
@@ -516,10 +508,4 @@ func extend(path []string, key string) []string {
 // add records one use the trace map asked for.
 func (tracker *Tracker) add(node *ast.Node, path []string, usage Usage) {
 	tracker.found = append(tracker.found, Tracked{Node: node, Path: path, Usage: usage})
-}
-
-// String renders a use for test failures and debugging: the path and how it is used.
-func (tracked Tracked) String() string {
-	usage := map[Usage]string{Read: "Read", Call: "Call", Construct: "Construct"}[tracked.Usage]
-	return usage + " " + strings.Join(tracked.Path, ".") + " at " + strconv.Itoa(tracked.Node.Pos())
 }

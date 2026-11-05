@@ -9,7 +9,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -40,18 +39,6 @@ import (
 // projectYieldVariable names the file that tells a project's run what it yields. See projectYield.
 const projectYieldVariable = "COHERE_PROJECT_YIELD"
 
-// projectYield is what one project's run leaves to others, as its parent wrote it.
-type projectYield struct {
-	// Files are files the tsconfig includes that a nearer one owns, absolute.
-	Files []string `json:"files"`
-
-	// Directories are directories the run's format walk leaves out, absolute, each formatted by the run
-	// of the project there. The project's own directory means the walk formats nothing: another tsconfig
-	// in the same directory formats it. A Swift run's are the Swift projects below it, whose files its
-	// not-checked notes leave out (see discovery.swiftYield).
-	Directories []string `json:"directories"`
-}
-
 // ownership is what reading the TypeScript projects decided, for the report and for each child.
 type ownership struct {
 	// Solutions are the solution roots, by label: found, and not run.
@@ -68,15 +55,6 @@ type ownership struct {
 	// label. They run with the cache off: one cache table per directory, and two programs over one table
 	// would replay each other's records.
 	SharedDirectory map[string]bool
-}
-
-// configPath is the absolute path of a TypeScript project's tsconfig.
-func (found discovery) configPath(project discoveredProject) string {
-	name := project.ConfigFile
-	if name == "" {
-		name = projectMarker
-	}
-	return filepath.Join(found.Root, filepath.FromSlash(project.Directory), name)
 }
 
 // resolveOwnership reads every TypeScript project's tsconfig, follows references, drops solution roots and
@@ -260,38 +238,6 @@ func readProjectConfigs(found discovery, projects []discoveredProject) map[strin
 	return reads
 }
 
-// projectAt is the project a referenced tsconfig defines, and whether it lies in the repository discovery
-// walked and outside what it never enters: a dependency, build or cache directory, a repository of its
-// own, or a marker the root's ignorePatterns refused.
-func (found discovery) projectAt(configurationFile string) (discoveredProject, bool) {
-	relative, relativePathError := filepath.Rel(found.Root, configurationFile)
-	if relativePathError != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return discoveredProject{}, false
-	}
-	relative = filepath.ToSlash(relative)
-	for _, segment := range strings.Split(path.Dir(relative), "/") {
-		if neverDescended[segment] {
-			return discoveredProject{}, false
-		}
-	}
-	for _, repository := range found.NestedRepositories {
-		if isBelow(path.Dir(relative), repository) || path.Dir(relative) == repository {
-			return discoveredProject{}, false
-		}
-	}
-	if slices.Contains(found.Refused, relative) {
-		return discoveredProject{}, false
-	}
-	if !isRegularFile(configurationFile) {
-		return discoveredProject{}, false
-	}
-	project := discoveredProject{Directory: path.Dir(relative), Engine: engineTypeScript}
-	if name := path.Base(relative); name != projectMarker {
-		project.ConfigFile = name
-	}
-	return project, true
-}
-
 // nearestIncluder is which of the projects that include a file owns it. See Ownership.
 func nearestIncluder(found discovery, fileName string, indexes []int) int {
 	relative, relativePathError := filepath.Rel(found.Root, fileName)
@@ -387,18 +333,6 @@ var activeProjectYield = sync.OnceValues(func() (projectYield, error) {
 	}
 	return yield, nil
 })
-
-// yieldedFiles is the run's yielded files as the set program.Options.Yielded takes, nil when it yields none.
-func (yield projectYield) yieldedFiles() map[string]struct{} {
-	if len(yield.Files) == 0 {
-		return nil
-	}
-	files := make(map[string]struct{}, len(yield.Files))
-	for _, fileName := range yield.Files {
-		files[filepath.Clean(fileName)] = struct{}{}
-	}
-	return files
-}
 
 // nestedProjectsLayer is the format walk's count of files it left to the projects below it.
 const nestedProjectsLayer = "nearer projects"

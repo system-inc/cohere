@@ -1,15 +1,10 @@
 package program
 
 import (
-	"context"
 	"crypto/sha256"
-	"reflect"
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/microsoft/TypeScript/tsc/shim/compiler"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
 // The types phase's cache: each project file's semantic diagnostics, replayed while the file's shape
@@ -66,25 +61,6 @@ type TypesSection struct {
 type TypesEntry struct {
 	Fingerprint [sha256.Size]byte
 	Diagnostics []StoredDiagnostic
-}
-
-// StoredDiagnostic is a compiler diagnostic in the file it belongs to, as the compiler's own build info
-// stores one: location, code, category, message key and arguments or external text, chain and related
-// information. NoFile marks a part the compiler gave no file.
-type StoredDiagnostic struct {
-	Pos, End           int
-	Code               int32
-	Category           int64
-	MessageKey         string
-	MessageArgs        []string
-	Source             string
-	MessageText        string
-	ReportsUnnecessary bool
-	ReportsDeprecated  bool
-	SkippedOnNoEmit    bool
-	NoFile             bool
-	Chain              []StoredDiagnostic
-	Related            []StoredDiagnostic
 }
 
 // TypeDiagnosticsReuse is one run's use of the section: what was stored, and what this run records.
@@ -158,152 +134,6 @@ func (reuse *TypeDiagnosticsReuse) FinishGlobals(clean bool) {
 	}
 }
 
-// TypeDiagnosticParts is a check's syntactic, bind and semantic diagnostics, kept apart so the semantic
-// ones can be recorded per file. With any syntactic diagnostic the check stops there, as the compiler's own
-// does, and the other two are empty.
-type TypeDiagnosticParts struct {
-	Syntactic []*ast.Diagnostic
-	Bind      []*ast.Diagnostic
-	Semantic  []*ast.Diagnostic
-}
-
-// All is the parts in the order AllDiagnostics returns them.
-func (parts TypeDiagnosticParts) All() []*ast.Diagnostic {
-	if len(parts.Syntactic) > 0 {
-		return parts.Syntactic
-	}
-	return append(append([]*ast.Diagnostic{}, parts.Bind...), parts.Semantic...)
-}
-
-// CheckReusing checks the project files whose shape fingerprint moved since the section was recorded and
-// replays the rest. It reports false when it cannot, and the caller runs the full check and hands its parts
-// to RecordFull: no section, a section under other compiler options or from a run that saw global
-// diagnostics, no shapes this run, or so
-// much changed that the full check, which spreads every checker over every file, is the faster way.
-//
-// Mutates: reuse records what was replayed and the section to save for the next run, unless the graph was retired
-func (graph *Graph) CheckReusing(
-	callerContext context.Context,
-	reuse *TypeDiagnosticsReuse,
-) (TypeDiagnosticParts, bool) {
-	stored := reuse.stored
-	if stored == nil ||
-		stored.Version != typesSectionVersion ||
-		stored.Key != reuse.key ||
-		!stored.GlobalsClean ||
-		graph.Shapes == nil {
-		return TypeDiagnosticParts{}, false
-	}
-	syntactic := graph.Program.GetSyntacticDiagnostics(callerContext, nil)
-	if len(syntactic) > 0 {
-		return TypeDiagnosticParts{Syntactic: syntactic}, true
-	}
-
-	fingerprints := graph.SignatureFingerprints(graph.Shapes)
-	projectFiles := graph.ProjectFiles()
-	var replayed []*ast.Diagnostic
-	var toCheck []*ast.SourceFile
-	entries := make(map[string]TypesEntry, len(projectFiles))
-	replayedFiles := map[string]struct{}{}
-	for _, sourceFile := range projectFiles {
-		entry, found := stored.Entries[sourceFile.FileName().AsString()]
-		if found && entry.Fingerprint == fingerprints[sourceFile.PathKey()] {
-			for _, diagnostic := range entry.Diagnostics {
-				replayed = append(replayed, diagnostic.diagnostic(sourceFile))
-			}
-			entries[sourceFile.FileName().AsString()] = entry
-			replayedFiles[sourceFile.FileName().AsString()] = struct{}{}
-			continue
-		}
-		toCheck = append(toCheck, sourceFile)
-	}
-	if len(toCheck) > len(projectFiles)/2 {
-		return TypeDiagnosticParts{}, false
-	}
-
-	bind := graph.Program.GetBindDiagnostics(callerContext, nil)
-	checked := graph.semanticDiagnosticsOf(callerContext, toCheck)
-	semantic := replayed
-	for index, sourceFile := range toCheck {
-		semantic = append(semantic, checked[index]...)
-		if entry, keepable := typesEntryFor(sourceFile, fingerprints[sourceFile.PathKey()], checked[index]); keepable {
-			entries[sourceFile.FileName().AsString()] = entry
-		}
-	}
-
-	// A check cancelled part way can hand back a partial list, which recorded as a file's whole verdict would
-	// replay a file as clean. Whatever finished before the cancel is still exactly the list for its key. A
-	// retired graph's check describes bytes the fixer replaced, and its graph's successor records instead;
-	// asked under the mutex, so a retired check finishing late can never overwrite what the successor
-	// recorded.
-	//
-	// The replayed files too: a retired check finishing after its successor would otherwise leave the old
-	// graph's count on the types line.
-	reuse.mutex.Lock()
-	if !graph.Retired() {
-		reuse.replayed, reuse.replayedFiles = len(replayedFiles), replayedFiles
-	}
-	if callerContext.Err() == nil && !graph.Retired() {
-		reuse.recorded = &TypesSection{Version: typesSectionVersion, Key: reuse.key, Entries: entries}
-	}
-	reuse.mutex.Unlock()
-	return TypeDiagnosticParts{Bind: bind, Semantic: compiler.SortAndDeduplicateDiagnostics(semantic)}, true
-}
-
-// RecordFull records a full check's semantic diagnostics per project file, for the next run to replay.
-//
-// Mutates: reuse records the section to save for the next run, unless the graph was retired
-func (graph *Graph) RecordFull(callerContext context.Context, reuse *TypeDiagnosticsReuse, parts TypeDiagnosticParts) {
-	if len(parts.Syntactic) > 0 || graph.Shapes == nil || callerContext.Err() != nil {
-		return
-	}
-	fingerprints := graph.SignatureFingerprints(graph.Shapes)
-	byFile := map[*ast.SourceFile][]*ast.Diagnostic{}
-	for _, diagnostic := range parts.Semantic {
-		byFile[diagnostic.File()] = append(byFile[diagnostic.File()], diagnostic)
-	}
-	entries := make(map[string]TypesEntry, len(graph.ProjectFiles()))
-	for _, sourceFile := range graph.ProjectFiles() {
-		if entry, keepable := typesEntryFor(
-			sourceFile,
-			fingerprints[sourceFile.PathKey()],
-			byFile[sourceFile],
-		); keepable {
-			entries[sourceFile.FileName().AsString()] = entry
-		}
-	}
-	reuse.mutex.Lock()
-	// Asked here, under the mutex, for the reason CheckReusing gives: a retired graph never records.
-	if !graph.Retired() {
-		reuse.recorded = &TypesSection{Version: typesSectionVersion, Key: reuse.key, Entries: entries}
-	}
-	reuse.mutex.Unlock()
-}
-
-// semanticDiagnosticsOf checks each file on the checker that owns it, a goroutine per checker, so a handful
-// of files costs a handful of checks and many files still spread across every checker.
-func (graph *Graph) semanticDiagnosticsOf(callerContext context.Context, files []*ast.SourceFile) [][]*ast.Diagnostic {
-	results := make([][]*ast.Diagnostic, len(files))
-	groups := map[*checker.Checker][]int{}
-	for index, sourceFile := range files {
-		owner, release := graph.Program.GetTypeCheckerForFile(callerContext, sourceFile)
-		release()
-		groups[owner] = append(groups[owner], index)
-	}
-	var waitGroup sync.WaitGroup
-	for _, indices := range groups {
-		waitGroup.Add(1)
-		go func() {
-			defer waitGroup.Done()
-			for _, index := range indices {
-				results[index] = graph.Program.GetSemanticDiagnostics(callerContext, files[index])
-			}
-		}()
-	}
-	waitGroup.Wait()
-	return results
-}
-
 // typesEntryFor stores a file's semantic diagnostics, or reports false when any of them cannot be replayed
 // faithfully: located in another file, or repopulated from program state.
 func typesEntryFor(
@@ -359,43 +189,4 @@ func storeDiagnostic(diagnostic *ast.Diagnostic, sourceFile *ast.SourceFile) (St
 		stored.Related = append(stored.Related, related)
 	}
 	return stored, true
-}
-
-// diagnostic rebuilds the compiler diagnostic, the way the compiler rebuilds one from its build info.
-func (stored StoredDiagnostic) diagnostic(sourceFile *ast.SourceFile) *ast.Diagnostic {
-	file := sourceFile
-	if stored.NoFile {
-		file = nil
-	}
-	var chain []*ast.Diagnostic
-	var related []*ast.Diagnostic
-	for _, part := range stored.Chain {
-		chain = append(chain, part.diagnostic(sourceFile))
-	}
-	for _, part := range stored.Related {
-		related = append(related, part.diagnostic(sourceFile))
-	}
-	// The shim does not name the compiler's key and category types, so each is set through a value of its
-	// own type, taken from a diagnostic's accessor.
-	var zero ast.Diagnostic
-	key, category := zero.MessageKey(), zero.Category()
-	reflect.ValueOf(&key).Elem().SetString(stored.MessageKey)
-	reflect.ValueOf(&category).Elem().SetInt(stored.Category)
-	diagnostic := ast.NewDiagnosticFromSerialized(
-		file,
-		core.NewTextRange(stored.Pos, stored.End),
-		stored.Code,
-		category,
-		key,
-		stored.MessageArgs,
-		chain,
-		related,
-		stored.ReportsUnnecessary,
-		stored.ReportsDeprecated,
-		stored.SkippedOnNoEmit,
-	)
-	if stored.Source != "" || stored.MessageText != "" {
-		diagnostic.SetExternalData(stored.Source, stored.MessageText)
-	}
-	return diagnostic
 }

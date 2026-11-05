@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 )
@@ -89,36 +88,6 @@ type RunCache struct {
 	Summary []byte
 }
 
-// RunCacheInput is one input's signature.
-type RunCacheInput struct {
-	Path string
-
-	// Directory is true for an entry recorded to catch files added beneath it. Kept explicit
-	// rather than inferred, because a path that was a directory and is now a file is a change.
-	Directory bool
-
-	// Exists is false for an input that was absent when recorded and must stay absent. A config the
-	// run looked for and did not find is still an input: creating it changes the run.
-	Exists bool
-
-	Size                int64
-	ModifiedNanoseconds int64
-
-	// ChangedNanoseconds and Inode catch what the modification time cannot: different bytes of the same
-	// size under a restored modification time, as cp -p, rsync -t and touch -r leave a file. Nothing in
-	// userland can set a change time, and a file replaced by a rename has a new inode. Zero where the
-	// platform's stat does not give them.
-	ChangedNanoseconds int64
-	Inode              uint64
-
-	// ExistenceOnly is set on a directory the run only asked whether it exists (see InputRecorder.Inputs),
-	// which matches while it is still the same directory, by inode, whatever was added to it since. Module
-	// resolution asks it of every directory from the project up to the root, and on a busy machine /tmp and
-	// the like change many times a second: checked at full signature, they cost a replay on a tree nothing
-	// had touched (#q51f02a). A package.json or node_modules appearing in one is its own absent input.
-	ExistenceOnly bool
-}
-
 // runCacheVersion is bumped whenever the manifest's meaning changes, not only its shape.
 //
 // 2: Output no longer carries the lines that describe the recorded invocation (graph built in, types and
@@ -150,27 +119,6 @@ func RunCacheKey(arguments []string, workingDirectory string, facts ...string) (
 	return parts.Key(), nil
 }
 
-// RunCacheKeyParts is what identifies a run apart from its files, in four parts hashed apart, so a run that
-// misses can say which one moved rather than that something did (#547dhjz).
-type RunCacheKeyParts struct {
-	// Binary is the running binary: its resolved path, size and modification time, and the format and
-	// platform it reads. Keyed by path, size and time rather than by hashing its bytes: it is about 70 MB,
-	// reading it every run would spend the budget this cache exists to save, and a rebuilt binary has a
-	// new modification time, which is all this needs.
-	Binary string
-
-	// Directory is the working directory the caller resolved, the project root's target.
-	Directory string
-
-	// Arguments is the command line.
-	Arguments string
-
-	// Facts is anything else the run's output depends on that is not a file the build reads: config paths
-	// the command resolved, and results it computes from sources the build never sees. Order matters, and
-	// an empty fact still counts.
-	Facts string
-}
-
 // RunCacheKeyPartsOf hashes each part of a run's identity.
 func RunCacheKeyPartsOf(arguments []string, workingDirectory string, facts ...string) (RunCacheKeyParts, error) {
 	executable, executableError := os.Executable()
@@ -200,42 +148,6 @@ func RunCacheKeyPartsOf(arguments []string, workingDirectory string, facts ...st
 		Arguments: part(append([]string{fmt.Sprintf("%d", len(arguments))}, arguments...)...),
 		Facts:     part(append([]string{fmt.Sprintf("%d facts", len(facts))}, facts...)...),
 	}, nil
-}
-
-// Key is the parts as one key.
-func (parts RunCacheKeyParts) Key() string {
-	sum := sha256.Sum256(
-		[]byte(parts.Binary + "\x00" + parts.Directory + "\x00" + parts.Arguments + "\x00" + parts.Facts),
-	)
-	return fmt.Sprintf("%x", sum)
-}
-
-// Changed says which parts differ from recorded, in words, or that the record kept no parts to compare, as
-// one written before they were kept.
-func (parts RunCacheKeyParts) Changed(recorded RunCacheKeyParts) string {
-	if recorded == (RunCacheKeyParts{}) {
-		return "it was recorded without its key's parts, so which one moved cannot be said"
-	}
-	var changed []string
-	if parts.Binary != recorded.Binary {
-		changed = append(changed, "the cohere binary")
-	}
-	if parts.Directory != recorded.Directory {
-		changed = append(changed, "the project root")
-	}
-	if parts.Arguments != recorded.Arguments {
-		changed = append(changed, "the arguments")
-	}
-	if parts.Facts != recorded.Facts {
-		changed = append(
-			changed,
-			"the configuration (the tsconfig or lint config, their extends chains, the rules, or the output's color)",
-		)
-	}
-	if len(changed) == 0 {
-		return "no part changed, though the key did"
-	}
-	return strings.Join(changed, " and ") + " changed"
 }
 
 // RecordRunCache captures a run that just finished.
@@ -479,51 +391,4 @@ func (cache *RunCache) changedInput(snapshot *StatSnapshot) error {
 	waitGroup.Wait()
 
 	return mismatch
-}
-
-// stillMatches compares one input against the filesystem now, noting what the stat found in snapshot, matching or
-// not: the stat is current either way.
-func (input RunCacheInput) stillMatches(snapshot *StatSnapshot) error {
-	information, statError := os.Stat(input.Path)
-	if snapshot != nil {
-		snapshot.note(input.Path, information, statError)
-	}
-	if !input.Exists {
-		if statError == nil {
-			return fmt.Errorf("%w: %s now exists", ErrRunCacheMiss, input.Path)
-		}
-		if errors.Is(statError, os.ErrNotExist) {
-			return nil
-		}
-		// Neither present nor provably absent, for example a permission error. Doubt is a miss.
-		return fmt.Errorf("%w: %s cannot be checked: %w", ErrRunCacheMiss, input.Path, statError)
-	}
-	if statError != nil {
-		return fmt.Errorf("%w: %s: %w", ErrRunCacheMiss, input.Path, statError)
-	}
-	if information.IsDir() != input.Directory {
-		return fmt.Errorf("%w: %s changed between file and directory", ErrRunCacheMiss, input.Path)
-	}
-	if input.ExistenceOnly {
-		// Still there and still the same directory, which is all the run asked of it.
-		if _, inode := changeTimeAndInode(input.Path, information); inode != input.Inode {
-			return fmt.Errorf("%w: %s was replaced", ErrRunCacheMiss, input.Path)
-		}
-		return nil
-	}
-	// A directory's size is filesystem bookkeeping and moves with its entries on some filesystems,
-	// so only its modification time decides. A file needs both.
-	if !input.Directory && information.Size() != input.Size {
-		return fmt.Errorf("%w: %s changed size", ErrRunCacheMiss, input.Path)
-	}
-	if information.ModTime().UnixNano() != input.ModifiedNanoseconds {
-		return fmt.Errorf("%w: %s was modified", ErrRunCacheMiss, input.Path)
-	}
-	if changed, inode := changeTimeAndInode(
-		input.Path,
-		information,
-	); changed != input.ChangedNanoseconds || inode != input.Inode {
-		return fmt.Errorf("%w: %s was changed or replaced under its modification time", ErrRunCacheMiss, input.Path)
-	}
-	return nil
 }

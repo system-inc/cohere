@@ -48,46 +48,6 @@ func (reachingNames) Equal(left, right map[string]bool) bool {
 	return true
 }
 
-// mustReachNames is the "must" counterpart: the names seen on every path to this point. Meet is
-// intersection, so Bottom has to be the universe rather than the empty set, which is the case the
-// LatticeOf doc warns reads backward.
-type mustReachNames struct{ universe map[string]bool }
-
-func (names mustReachNames) Bottom() map[string]bool {
-	all := make(map[string]bool, len(names.universe))
-	for name := range names.universe {
-		all[name] = true
-	}
-	return all
-}
-
-func (mustReachNames) Entry() map[string]bool { return map[string]bool{} }
-
-func (mustReachNames) Meet(left, right map[string]bool) map[string]bool {
-	merged := map[string]bool{}
-	for name := range left {
-		if right[name] {
-			merged[name] = true
-		}
-	}
-	return merged
-}
-
-func (mustReachNames) Transfer(block *Block[string], incoming map[string]bool) map[string]bool {
-	outgoing := make(map[string]bool, len(incoming)+len(block.Events))
-	for name := range incoming {
-		outgoing[name] = true
-	}
-	for _, event := range block.Events {
-		outgoing[event] = true
-	}
-	return outgoing
-}
-
-func (mustReachNames) Equal(left, right map[string]bool) bool {
-	return reachingNames{}.Equal(left, right)
-}
-
 func sortedNames(set map[string]bool) string {
 	names := make([]string, 0, len(set))
 	for name := range set {
@@ -209,33 +169,6 @@ func TestForwardMustAnalysis(test *testing.T) {
 			}
 		})
 	}
-}
-
-// liveNames is a Backward "may" analysis: the set of event names that appear anywhere later on some
-// path. It is the shape of liveness with the symbol table replaced by names, so it exercises the
-// backward direction and the exit seeding without dragging in a checker.
-type liveNames struct{}
-
-func (liveNames) Bottom() map[string]bool { return map[string]bool{} }
-func (liveNames) Entry() map[string]bool  { return map[string]bool{} }
-
-func (liveNames) Meet(left, right map[string]bool) map[string]bool {
-	return reachingNames{}.Meet(left, right)
-}
-
-func (liveNames) Transfer(block *Block[string], incoming map[string]bool) map[string]bool {
-	outgoing := make(map[string]bool, len(incoming)+len(block.Events))
-	for name := range incoming {
-		outgoing[name] = true
-	}
-	for _, event := range block.Events {
-		outgoing[event] = true
-	}
-	return outgoing
-}
-
-func (liveNames) Equal(left, right map[string]bool) bool {
-	return reachingNames{}.Equal(left, right)
 }
 
 // TestBackwardAnalysis checks the backward direction, including that the exit seeding reaches every

@@ -271,44 +271,10 @@ type shorthandCollapse struct {
 	shorthands []string
 }
 
-// shorthandDissection is one class split into the parts a collapse has to match on.
-type shorthandDissection struct {
-	className string
-	variants  string
-	base      string
-	negative  bool
-	important bool
-	markerEnd bool
-	// matches is every table pattern the base matches, with what each captured.
-	matches []shorthandMatch
-}
-
 // shorthandMatch is one table pattern a class's base matches, and the value its `(.*)` captured.
 type shorthandMatch struct {
 	pattern int
 	capture string
-}
-
-// match reports whether this class matches one pattern, and what it captured.
-func (dissection shorthandDissection) match(pattern int) (string, bool) {
-	for _, candidate := range dissection.matches {
-		if candidate.pattern == pattern {
-			return candidate.capture, true
-		}
-	}
-	return "", false
-}
-
-// shorthandPatternSet is a set of pattern indexes, one bit each.
-type shorthandPatternSet [2]uint64
-
-func (set *shorthandPatternSet) add(pattern int) {
-	set[pattern/64] |= 1 << (pattern % 64)
-}
-
-// holds reports whether every pattern in needed is in this set.
-func (set shorthandPatternSet) holds(needed shorthandPatternSet) bool {
-	return set[0]&needed[0] == needed[0] && set[1]&needed[1] == needed[1]
 }
 
 // shorthandTablePattern is one longhand pattern of the table, read as the plain text it is.

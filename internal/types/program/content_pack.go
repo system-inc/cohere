@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -15,7 +14,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
@@ -172,24 +170,6 @@ func (pack *ContentPack) Counts() (hits int, misses int, damaged int) {
 // wrap returns a filesystem that serves ReadFile from the pack where it can.
 func (pack *ContentPack) wrap(inner vfs.FS) vfs.FS {
 	return &contentPackFileSystem{FS: inner, pack: pack}
-}
-
-// contentPackFileSystem answers ReadFile from the pack when the file's stat still matches, and otherwise reads the
-// disk and hands the bytes to the pack. Everything else passes through.
-type contentPackFileSystem struct {
-	vfs.FS
-	pack *ContentPack
-}
-
-func (fileSystem *contentPackFileSystem) ReadFile(path tspath.RootedFilePath) (string, bool) {
-	if contents, served := fileSystem.pack.serve(path.AsString()); served {
-		return contents, true
-	}
-	// Stat first, so the key can only be older than the bytes read after it.
-	identity, statted := statIdentity(path.AsString())
-	contents, ok := fileSystem.FS.ReadFile(path)
-	fileSystem.pack.noteRead(path.AsString(), identity, statted && ok, contents)
-	return contents, ok
 }
 
 // serve returns a file's recorded bytes when its stat still matches the entry's.
@@ -406,55 +386,8 @@ func (pack *ContentPack) rewrite() error {
 	return nil
 }
 
-// packWriter appends entries' bytes to a data file through one buffer, tracking where each lands.
-type packWriter struct {
-	file   *os.File
-	offset int64
-	buffer []byte
-	err    error
-}
-
 func newPackWriter(file *os.File, offset int64) *packWriter {
 	return &packWriter{file: file, offset: offset, buffer: make([]byte, 0, 4<<20)}
-}
-
-// add appends contents to the data file and is the entry that says where they land.
-//
-// Unsafe: contents is viewed as bytes without a copy, and the checksum and the file's Write only read them, so
-// the string's bytes never change.
-func (writer *packWriter) add(identity fileIdentity, contents string) contentPackEntry {
-	entry := contentPackEntry{
-		identity: identity,
-		offset:   writer.offset,
-		length:   int64(len(contents)),
-		checksum: crc32.Update(0, castagnoli, unsafe.Slice(unsafe.StringData(contents), len(contents))),
-	}
-	writer.offset += int64(len(contents))
-	if len(writer.buffer)+len(contents) > cap(writer.buffer) {
-		writer.flush()
-	}
-	if len(contents) > cap(writer.buffer) {
-		writer.write(unsafe.Slice(unsafe.StringData(contents), len(contents)))
-	} else {
-		writer.buffer = append(writer.buffer, contents...)
-	}
-	return entry
-}
-
-func (writer *packWriter) flush() {
-	writer.write(writer.buffer)
-	writer.buffer = writer.buffer[:0]
-}
-
-func (writer *packWriter) write(data []byte) {
-	if writer.err == nil && len(data) > 0 {
-		_, writer.err = writer.file.Write(data)
-	}
-}
-
-func (writer *packWriter) finish() error {
-	writer.flush()
-	return writer.err
 }
 
 // writeContentPackIndex writes the index by rename, so a reader sees the old one or the new one whole.
@@ -546,42 +479,4 @@ func parseContentPackIndex(index []byte) (string, map[string]contentPackEntry, e
 		return "", nil, errors.New("bytes follow its last entry")
 	}
 	return dataName, entries, nil
-}
-
-// indexReader reads little-endian fields, remembering the first read past the end.
-type indexReader struct {
-	data     []byte
-	position int
-	err      error
-}
-
-func (reader *indexReader) bytes(length int) []byte {
-	if reader.err != nil || length < 0 || reader.position+length > len(reader.data) {
-		reader.err = io.ErrUnexpectedEOF
-		return nil
-	}
-	read := reader.data[reader.position : reader.position+length]
-	reader.position += length
-	return read
-}
-
-func (reader *indexReader) uint16() uint16 {
-	if read := reader.bytes(2); read != nil {
-		return binary.LittleEndian.Uint16(read)
-	}
-	return 0
-}
-
-func (reader *indexReader) uint32() uint32 {
-	if read := reader.bytes(4); read != nil {
-		return binary.LittleEndian.Uint32(read)
-	}
-	return 0
-}
-
-func (reader *indexReader) uint64() uint64 {
-	if read := reader.bytes(8); read != nil {
-		return binary.LittleEndian.Uint64(read)
-	}
-	return 0
 }
