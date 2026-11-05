@@ -1,7 +1,8 @@
 {
   "rules": {
     "TypeScript": "nexus/correctness-no-write-only-collection",
-    "Swift": "cohere-swift/correctness-no-write-only-collection"
+    "Swift": "cohere-swift/correctness-no-write-only-collection",
+    "Go": "cohere-go/correctness-no-write-only-collection"
   },
   "messages": {
     "writeOnlyCollection": {
@@ -9,7 +10,8 @@
       "terms": {
         "repair": {
           "TypeScript": "Either the code that was meant to read it is missing (a rank kept for the result and never copied in), or the collection is dead and should be deleted along with the writes.",
-          "Swift": "Either the code that was meant to read it is missing (a value kept for the result and never copied in), or the collection is dead and should be deleted along with its writes."
+          "Swift": "Either the code that was meant to read it is missing (a value kept for the result and never copied in), or the collection is dead and should be deleted along with its writes.",
+          "Go": "Either the code that was meant to read it is missing (a value kept for the result and never copied in), or the map or slice is dead and should be deleted along with its writes. The compiler counts every write as a use, so it will not say so."
         }
       }
     }
