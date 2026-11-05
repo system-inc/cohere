@@ -73,7 +73,7 @@ func loadedFixtures(test *testing.T) string {
 				return
 			}
 		}
-		fixtures.loaded, fixtures.failure = load.Packages(fixtures.root, []string{"./..."}, []string{"GOWORK=off"})
+		fixtures.loaded, fixtures.failure = load.Packages(fixtures.root, []string{"./..."}, []string{"GOWORK=off"}, nil)
 		if fixtures.failure == nil && len(fixtures.loaded.Diagnostics) > 0 {
 			fixtures.failure = fmt.Errorf("the fixtures loaded with diagnostics: %+v", fixtures.loaded.Diagnostics)
 		}
