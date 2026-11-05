@@ -25,15 +25,15 @@ type token struct {
 // at is token[index] for index 2 and up, the way the parser reads it.
 func (token *token) at(index int) int { return token.rest[index-2] }
 
-// loose is token[index] where the token may be shorter than the parser assumes, nil standing for
-// undefined. splitWord can leave currToken on a space token (a word ending in an escaped space, with
-// nothing word-like after it), and upstream then reads that token's [4] (its pos), [5] and [6]
-// (undefined) as if it were a word's.
-func (token *token) loose(index int) any {
+// loose is token[index] where the token may be shorter than the parser assumes, and whether the
+// token is that long, false standing for undefined. splitWord can leave currToken on a space token (a
+// word ending in an escaped space, with nothing word-like after it), and upstream then reads that
+// token's [4] (its pos), [5] and [6] (undefined) as if it were a word's.
+func (token *token) loose(index int) (int, bool) {
 	if index-2 < len(token.rest) {
-		return token.rest[index-2]
+		return token.rest[index-2], true
 	}
-	return nil
+	return 0, false
 }
 
 const (
@@ -93,22 +93,17 @@ func charCodeAt(css []uint16, index int) int {
 
 // slice is css.slice(start, end), as WTF-8 (see wtf8.go): it can cut a surrogate pair after a backslash.
 func slice(css []uint16, start int, end int) string {
-	if end > len(css) {
-		end = len(css)
-	}
-	if start >= end {
+	clampedEnd := min(end, len(css))
+	if start >= clampedEnd {
 		return ""
 	}
-	return unitsToWTF8(css[start:end])
+	return unitsToWTF8(css[start:clampedEnd])
 }
 
 // indexOf is css.indexOf(search, from).
 func indexOf(css []uint16, search string, from int) int {
 	units := utf16.Encode([]rune(search))
-	if from < 0 {
-		from = 0
-	}
-	for index := from; index+len(units) <= len(css); index++ {
+	for index := max(from, 0); index+len(units) <= len(css); index++ {
 		matched := true
 		for offset, unit := range units {
 			if css[index+offset] != unit {
@@ -126,9 +121,15 @@ func indexOf(css []uint16, search string, from int) int {
 func tokenize(css []uint16) []*token {
 	tokens := []*token{}
 
-	var code, next, nextLine, nextOffset, escapePosition int
-	var quote, content string
-	var escape, escaped bool
+	var code int
+	var next int
+	var nextLine int
+	var nextOffset int
+	var escapePosition int
+	var quote string
+	var content string
+	var escape bool
+	var escaped bool
 
 	length := len(css)
 	offset := -1

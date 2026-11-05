@@ -25,6 +25,13 @@ func mustParse(test *testing.T, text string) *estree.Node {
 	return root
 }
 
+// spaceOf is node.spaces[side] as a string, "" where it is missing or holds something else.
+func spaceOf(node *estree.Node, side string) string {
+	spaces, _ := node.Get("spaces").(map[string]any)
+	text, _ := spaces[side].(string)
+	return text
+}
+
 func TestParseTailwindEscapedClass(test *testing.T) {
 	test.Parallel()
 	root := mustParse(test, ".hover\\:bg-red:hover")
@@ -64,7 +71,7 @@ func TestParseAttribute(test *testing.T) {
 			test.Errorf("%s = %#v, want %#v", key, attribute.Get(key), want)
 		}
 	}
-	raws := rawsOf(attribute)
+	raws, _ := attribute.Get("raws").(map[string]any)
 	if raws["insensitive"] != " i" || raws["unquoted"] != "b" {
 		test.Errorf("raws %v", raws)
 	}
@@ -89,19 +96,24 @@ func TestParseCombinatorAndSpaces(test *testing.T) {
 	if len(nodes) != 3 || !nodes[1].Is("combinator") {
 		test.Fatalf("want tag, combinator, tag")
 	}
-	if spacesOf(nodes[0])["before"] != " " {
-		test.Errorf("leading space %q", spacesOf(nodes[0])["before"])
+	if spaceOf(nodes[0], "before") != " " {
+		test.Errorf("leading space %q", spaceOf(nodes[0], "before"))
 	}
 	combinator := nodes[1]
 	if combinator.String("value") != ">" ||
-		spacesOf(combinator)["before"] != "  " ||
-		spacesOf(combinator)["after"] != "\t" {
-		test.Errorf("combinator %q spaces %v", combinator.String("value"), spacesOf(combinator))
+		spaceOf(combinator, "before") != "  " ||
+		spaceOf(combinator, "after") != "\t" {
+		test.Errorf(
+			"combinator %q spaces %q and %q",
+			combinator.String("value"),
+			spaceOf(combinator, "before"),
+			spaceOf(combinator, "after"),
+		)
 	}
-	if spacesOf(nodes[2])["after"] != " " {
-		test.Errorf("space before the comma %q", spacesOf(nodes[2])["after"])
+	if spaceOf(nodes[2], "after") != " " {
+		test.Errorf("space before the comma %q", spaceOf(nodes[2], "after"))
 	}
-	if spacesOf(selectors[1].List("nodes")[0])["before"] != " " {
+	if spaceOf(selectors[1].List("nodes")[0], "before") != " " {
 		test.Errorf("space after the comma not on c")
 	}
 	if mustParse(test, "a,").Get("trailingComma") != true {
@@ -128,9 +140,10 @@ func TestParsePseudoWithSelectors(test *testing.T) {
 	if strings.Join(types, " ") != want {
 		test.Errorf("inner nodes\n got %s\nwant %s", strings.Join(types, " "), want)
 	}
-	end, isMap := sourceOf(pseudo)["end"].(map[string]any)
+	pseudoSource, _ := pseudo.Get("source").(map[string]any)
+	end, isMap := pseudoSource["end"].(map[string]any)
 	if !isMap {
-		test.Fatalf("pseudo source end %v, want a {line, column} object", sourceOf(pseudo)["end"])
+		test.Fatalf("pseudo source end %v, want a {line, column} object", pseudoSource["end"])
 	}
 	if end["line"] != 1 || end["column"] != 24 {
 		test.Errorf("pseudo end %v, want the closing parenthesis at 1:24 (columns are 1-based)", end)
@@ -146,9 +159,10 @@ func TestParseOffsetsAreBytes(test *testing.T) {
 	if second.Get("sourceIndex") != 6 {
 		test.Errorf("sourceIndex %v, want byte 6", second.Get("sourceIndex"))
 	}
-	start, isMap := sourceOf(second)["start"].(map[string]any)
+	secondSource, _ := second.Get("source").(map[string]any)
+	start, isMap := secondSource["start"].(map[string]any)
 	if !isMap {
-		test.Fatalf("class source start %v, want a {line, column} object", sourceOf(second)["start"])
+		test.Fatalf("class source start %v, want a {line, column} object", secondSource["start"])
 	}
 	if column := start["column"]; column != 6 {
 		test.Errorf("column %v, want UTF-16 column 6", column)
