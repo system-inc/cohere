@@ -126,6 +126,8 @@ var Messages = mustLoadEmbeddedMessages()
 func MessageFiles() fs.FS {
 	files, subError := fs.Sub(messageFiles, "messages")
 	if subError != nil {
+		// Invariant: fs.Sub fails only on an invalid path, and "messages" is a valid one, embedded by the
+		// go:embed above.
 		panic(fmt.Sprintf("policy/messages: %v", subError))
 	}
 	return files
@@ -134,6 +136,8 @@ func MessageFiles() fs.FS {
 func mustLoadEmbeddedMessages() *MessageCatalog {
 	catalog, loadMessagesError := LoadMessages(MessageFiles())
 	if loadMessagesError != nil {
+		// Invariant: the files are embedded at build and read when the package initializes, so an invalid one
+		// fails every test binary that links this package, and no build that passed its tests reaches here.
 		panic(fmt.Sprintf("policy/messages: %v", loadMessagesError))
 	}
 	currentMessages.Store(catalog)
@@ -242,6 +246,7 @@ func (catalog *MessageCatalog) add(idea string, data []byte) error {
 			if _, placeholderNamesError := placeholderNames(template.text, "{{", "}}"); placeholderNamesError != nil {
 				return fmt.Errorf("message %q, %s: %w", id, language, placeholderNamesError)
 			}
+			// Ignored: resolvePhrases read this same text's phrases above and returned the error this could give.
 			names, _ := placeholderNames(text, "<<", ">>")
 			for _, name := range names {
 				if phraseUsers[name] == nil {
@@ -503,6 +508,8 @@ func isCamelCaseName(text string) bool {
 // panics when the package initializes and every test binary that links the rule fails at once.
 func MessageOf(ruleName string, id string) MessageHandle {
 	if _, found := currentMessages.Load().templates[ruleName][id]; !found {
+		// Invariant: handles are taken in package-level vars, so a missing message fails every test binary
+		// that links the rule when it initializes, and no build that passed its tests reaches here.
 		panic(fmt.Sprintf("policy/messages: %s has no message %q", ruleName, id))
 	}
 	handle := MessageHandle{Rule: ruleName, Id: id}
@@ -523,6 +530,8 @@ func (handle MessageHandle) Option(phrase string, name string) MessageOption {
 func (catalog *MessageCatalog) Option(handle MessageHandle, phrase string, name string) MessageOption {
 	template, found := catalog.templates[handle.Rule][handle.Id]
 	if _, held := template.options[phrase][name]; !found || !held {
+		// Invariant: options are claimed in package-level vars like handles, so a missing option fails every
+		// test binary that links the rule when it initializes, and no build that passed its tests reaches here.
 		panic(fmt.Sprintf("policy/messages: %s %q has no option %q of the phrase %q", handle.Rule, handle.Id, name, phrase))
 	}
 	option := MessageOption{Rule: handle.Rule, Id: handle.Id, Phrase: phrase, Name: name}
@@ -547,6 +556,8 @@ func (handle MessageHandle) Render(values map[string]string, options ...MessageO
 func (catalog *MessageCatalog) Render(handle MessageHandle, values map[string]string, options ...MessageOption) string {
 	template, found := catalog.templates[handle.Rule][handle.Id]
 	if !found {
+		// Invariant: a rule's handle comes from MessageOf, which checked that the message exists, and a test
+		// rendering through a catalog it built names a message it wrote.
 		panic(fmt.Sprintf("policy/messages: %s has no message %q", handle.Rule, handle.Id))
 	}
 	text := template.text
@@ -554,21 +565,28 @@ func (catalog *MessageCatalog) Render(handle MessageHandle, values map[string]st
 	for _, option := range options {
 		optionText, held := template.options[option.Phrase][option.Name]
 		if option.Rule != handle.Rule || option.Id != handle.Id || !held || chosen[option.Phrase] {
+			// Invariant: a rule passes the options it claimed for this message, so the rule's own tests, which
+			// render every message it reports, fail here before a wrong option can ship.
 			panic(fmt.Sprintf("policy/messages: %s %q was given the option %q of %q, which it does not take", handle.Rule, handle.Id, option.Name, option.Phrase))
 		}
 		chosen[option.Phrase] = true
 		text = strings.ReplaceAll(text, "<<"+option.Phrase+">>", optionText)
 	}
 	if len(chosen) != len(template.options) {
+		// Invariant: a rule picks one option per phrase its message uses, which its own tests render.
 		panic(fmt.Sprintf("policy/messages: %s %q picks from %d phrases, and was given %d options", handle.Rule, handle.Id, len(template.options), len(chosen)))
 	}
+	// Ignored: the template's text and every option's were read as well-formed when the catalog loaded, and
+	// putting a whole option into a whole slot makes no new placeholder.
 	needed, _ := placeholderNames(text, "{{", "}}")
 	if len(values) != len(needed) {
+		// Invariant: a rule gives the values its message's text uses, which its own tests render.
 		panic(fmt.Sprintf("policy/messages: %s %q uses the values %v, and was given %d", handle.Rule, handle.Id, needed, len(values)))
 	}
 	for _, name := range needed {
 		value, given := values[name]
 		if !given {
+			// Invariant: a rule gives the values its message's text uses, which its own tests render.
 			panic(fmt.Sprintf("policy/messages: %s %q uses the value %q, and was not given it", handle.Rule, handle.Id, name))
 		}
 		text = strings.ReplaceAll(text, "{{"+name+"}}", value)

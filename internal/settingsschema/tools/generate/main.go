@@ -23,8 +23,7 @@ func main() {
 
 	files, buildError := settingsschema.Build(registry.Names())
 	if buildError != nil {
-		fmt.Fprintln(os.Stderr, buildError)
-		os.Exit(1)
+		exitWith(buildError)
 	}
 	paths := make([]string, 0, len(files))
 	for path := range files {
@@ -34,26 +33,37 @@ func main() {
 
 	stale := 0
 	for _, path := range paths {
+		// Ignored: a file missing or unreadable is not what Build produced, so it is stale, and written afresh
+		// unless this is a check.
 		existing, _ := os.ReadFile(path)
 		if bytes.Equal(existing, files[path]) {
 			continue
 		}
 		stale++
 		if *check {
-			fmt.Printf("stale: %s\n", path)
+			if _, printError := fmt.Printf("stale: %s\n", path); printError != nil {
+				exitWith(fmt.Errorf("naming a stale file: %w", printError))
+			}
 			continue
 		}
 		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
-			fmt.Fprintln(os.Stderr, createDirectoryError)
-			os.Exit(1)
+			exitWith(createDirectoryError)
 		}
 		if writeError := os.WriteFile(path, files[path], 0o644); writeError != nil {
-			fmt.Fprintln(os.Stderr, writeError)
-			os.Exit(1)
+			exitWith(writeError)
 		}
-		fmt.Printf("wrote %s\n", path)
+		if _, printError := fmt.Printf("wrote %s\n", path); printError != nil {
+			exitWith(fmt.Errorf("saying %s was written: %w", path, printError))
+		}
 	}
 	if *check && stale > 0 {
 		os.Exit(1)
 	}
+}
+
+// exitWith says why the run failed, on standard error, and exits 1.
+func exitWith(failure error) {
+	// Ignored: the exit code below says the run failed even when standard error cannot.
+	fmt.Fprintln(os.Stderr, failure)
+	os.Exit(1)
 }

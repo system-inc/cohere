@@ -483,8 +483,14 @@ func TestEveryDescriptionNamesAKeyThatExists(test *testing.T) {
 func TestEveryCarriedSetFitsTheSchema(test *testing.T) {
 	test.Parallel()
 	files := built(test)
-	nexusKeys, _ := SchemaKeys(files[NexusSchemaPath])
-	projectKeys, _ := SchemaKeys(files[ProjectSchemaPath])
+	nexusKeys, nexusKeysError := SchemaKeys(files[NexusSchemaPath])
+	if nexusKeysError != nil {
+		test.Fatal(nexusKeysError)
+	}
+	projectKeys, projectKeysError := SchemaKeys(files[ProjectSchemaPath])
+	if projectKeysError != nil {
+		test.Fatal(projectKeysError)
+	}
 	allowed := func(keys []string) map[string]bool {
 		set := map[string]bool{}
 		for _, key := range keys {

@@ -50,7 +50,8 @@ func TestReturningEarlyChangesNothingTheCallerSees(test *testing.T) {
 				if wait {
 					command.Env = append(command.Env, "COHERE_WAIT=1")
 				}
-				var stdout, stderr bytes.Buffer
+				var stdout bytes.Buffer
+				var stderr bytes.Buffer
 				command.Stdout, command.Stderr = &stdout, &stderr
 				code := 0
 				if runError := command.Run(); runError != nil {

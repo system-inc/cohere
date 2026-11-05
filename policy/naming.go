@@ -54,6 +54,8 @@ var Naming = mustLoadRuleNaming(ruleNamingFile)
 func mustLoadRuleNaming(data []byte) RuleNaming {
 	loaded, loadRuleNamingError := loadRuleNaming(data)
 	if loadRuleNamingError != nil {
+		// Invariant: the file is embedded at build and read when the package initializes, so an invalid one
+		// fails every test binary that links this package, and no build that passed its tests reaches here.
 		panic(fmt.Sprintf("RuleNaming.json: %v", loadRuleNamingError))
 	}
 	return loaded

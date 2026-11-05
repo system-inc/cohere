@@ -38,7 +38,7 @@ func joinQueue(slotsDirectory string) (*queueTicket, error) {
 	if taken, tryLockFileError := tryLockFile(file); tryLockFileError != nil || !taken {
 		file.Close()
 		os.Remove(pending)
-		return nil, fmt.Errorf("locking a new queue ticket: %v", tryLockFileError)
+		return nil, fmt.Errorf("locking a new queue ticket: %w", tryLockFileError)
 	}
 	path := filepath.Join(queue, name)
 	if renameError := os.Rename(pending, path); renameError != nil {
