@@ -54,8 +54,8 @@ func TestSSAOverRealCodebase(test *testing.T) {
 	terminals := map[string]int{}
 
 	for _, path := range files {
-		contents, err := os.ReadFile(path)
-		if err != nil {
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
 			continue
 		}
 		probe := rule.Rule{

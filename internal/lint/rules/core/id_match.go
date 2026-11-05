@@ -86,14 +86,14 @@ func DecodeIdMatchOptions(list []byte) (any, error) {
 	}
 
 	var patternText string
-	if err := json.Unmarshal(elements[0], &patternText); err != nil {
+	if decodeError := json.Unmarshal(elements[0], &patternText); decodeError != nil {
 		return settings, fmt.Errorf("id-match element 1 takes a pattern string, got %s", elements[0])
 	}
 
 	if len(elements) > 1 {
 		var flags idMatchRawOptions
-		if err := rule.UnmarshalOptions(elements[1], &flags); err != nil {
-			return settings, fmt.Errorf("id-match element 2: %w", err)
+		if unmarshalOptionsError := rule.UnmarshalOptions(elements[1], &flags); unmarshalOptionsError != nil {
+			return settings, fmt.Errorf("id-match element 2: %w", unmarshalOptionsError)
 		}
 		settings.CheckProperties = flags.Properties
 		settings.CheckClassFields = flags.ClassFields

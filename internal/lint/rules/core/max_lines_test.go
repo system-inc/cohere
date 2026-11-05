@@ -121,9 +121,9 @@ func TestMaxLinesDecodesUpstreamsShapes(test *testing.T) {
 		{`{"max": 10, "skipComments": true}`, MaxLinesOptions{Maximum: 10, SkipComments: true}},
 	}
 	for _, testCase := range cases {
-		decoded, err := DecodeMaxLinesOptions([]byte(testCase.raw))
-		if err != nil {
-			test.Errorf("%q: %v", testCase.raw, err)
+		decoded, decodeMaximumLinesOptionsError := DecodeMaxLinesOptions([]byte(testCase.raw))
+		if decodeMaximumLinesOptionsError != nil {
+			test.Errorf("%q: %v", testCase.raw, decodeMaximumLinesOptionsError)
 			continue
 		}
 		options, ok := decoded.(MaxLinesOptions)
@@ -135,7 +135,7 @@ func TestMaxLinesDecodesUpstreamsShapes(test *testing.T) {
 			test.Errorf("%q decoded to %+v, want %+v", testCase.raw, decoded, testCase.want)
 		}
 	}
-	if _, err := DecodeMaxLinesOptions([]byte("-1")); err == nil {
+	if _, decodeMaximumLinesOptionsError := DecodeMaxLinesOptions([]byte("-1")); decodeMaximumLinesOptionsError == nil {
 		test.Error("a negative maximum was accepted")
 	}
 }

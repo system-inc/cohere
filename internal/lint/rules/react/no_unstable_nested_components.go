@@ -66,8 +66,8 @@ func DecodeNoUnstableNestedComponentsOptions(raw []byte) (any, error) {
 	// Decoded into a fresh value so an absent key is distinguishable from an explicit empty string,
 	// then folded onto the defaults the way upstream's `||` folds a falsy value.
 	var wire NoUnstableNestedComponentsOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	options.AllowAsProps = wire.AllowAsProps
 	options.CustomValidators = wire.CustomValidators
@@ -891,8 +891,8 @@ func buildPropNamePattern(pattern string) func(string) bool {
 	}
 	builder.WriteString("$")
 
-	compiled, err := regexp.Compile(builder.String())
-	if err != nil {
+	compiled, compileError := regexp.Compile(builder.String())
+	if compileError != nil {
 		// Unreachable for any pattern this builder produces: every literal is escaped and the two
 		// metacharacters expand to valid fragments. Declining rather than panicking, because a rule
 		// that takes the run down over a configuration string is worse than one that stops matching

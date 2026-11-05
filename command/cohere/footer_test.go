@@ -183,8 +183,8 @@ func TestFooterGolden(test *testing.T) {
 			test.Parallel()
 			summary := cleanSummary()
 			testCase.summary(&summary)
-			if err := summary.countsAgree(); err != nil {
-				test.Fatalf("the fixture itself is inconsistent: %v", err)
+			if countsAgreeError := summary.countsAgree(); countsAgreeError != nil {
+				test.Fatalf("the fixture itself is inconsistent: %v", countsAgreeError)
 			}
 			if got := footer(summary, plain, testCase.options); got != testCase.want {
 				test.Errorf("footer:\n got  %s\n want %s", got, testCase.want)
@@ -222,8 +222,8 @@ func TestCheckedAndCachedAreEveryFileInScope(test *testing.T) {
 	test.Parallel()
 	summary := cleanSummary()
 	warmSummary(&summary)
-	if err := summary.countsAgree(); err != nil {
-		test.Fatalf("a consistent summary was refused: %v", err)
+	if countsAgreeError := summary.countsAgree(); countsAgreeError != nil {
+		test.Fatalf("a consistent summary was refused: %v", countsAgreeError)
 	}
 	summary.FilesCached--
 	if summary.countsAgree() == nil {
@@ -243,7 +243,7 @@ func TestCoheredIsTheListAboveTheFooter(test *testing.T) {
 		listed := 0
 		for _, line := range changedFileLines(summary.Changed, plain) {
 			var more int
-			if _, err := fmt.Sscanf(line, "… %d more", &more); err == nil {
+			if _, scanError := fmt.Sscanf(line, "… %d more", &more); scanError == nil {
 				listed += more
 				continue
 			}
@@ -367,8 +367,8 @@ func TestFooterSaysWhatWasNotChecked(test *testing.T) {
 			if !strings.HasPrefix(got, "✓ 💎") {
 				test.Errorf("planting %s turned the verdict: %s", condition.name, got)
 			}
-			if err := carriesMarker(got, condition.marker); err != nil {
-				test.Error(err)
+			if carriesMarkerError := carriesMarker(got, condition.marker); carriesMarkerError != nil {
+				test.Error(carriesMarkerError)
 			}
 
 			// The mutant: the same run with the marker dropped from its footer. The check must fail on it.

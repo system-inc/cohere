@@ -14,9 +14,9 @@ func TestTheSwiftScratchIsNeverInsideTheOutput(test *testing.T) {
 	root := test.TempDir()
 	output := filepath.Join(root, "dist")
 
-	scratch, err := swiftScratchDirectory(Options{OutputDirectory: output})
-	if err != nil {
-		test.Fatalf("the default was refused: %v", err)
+	scratch, swiftScratchDirectoryError := swiftScratchDirectory(Options{OutputDirectory: output})
+	if swiftScratchDirectoryError != nil {
+		test.Fatalf("the default was refused: %v", swiftScratchDirectoryError)
 	}
 	if strings.HasPrefix(scratch, output+string(filepath.Separator)) {
 		test.Fatalf("the default %s is inside the output %s", scratch, output)
@@ -33,9 +33,9 @@ func TestTheSwiftScratchIsNeverInsideTheOutput(test *testing.T) {
 		{filepath.Join(root, "elsewhere"), true},
 		{root, true},
 	} {
-		_, err := swiftScratchDirectory(Options{OutputDirectory: output, SwiftScratchDirectory: testCase.scratch})
-		if (err == nil) != testCase.allowed {
-			test.Errorf("%s: allowed %v, want %v (%v)", testCase.scratch, err == nil, testCase.allowed, err)
+		_, swiftScratchDirectoryError := swiftScratchDirectory(Options{OutputDirectory: output, SwiftScratchDirectory: testCase.scratch})
+		if (swiftScratchDirectoryError == nil) != testCase.allowed {
+			test.Errorf("%s: allowed %v, want %v (%v)", testCase.scratch, swiftScratchDirectoryError == nil, testCase.allowed, swiftScratchDirectoryError)
 		}
 	}
 }
@@ -45,13 +45,13 @@ func TestBuildRefusesASwiftScratchInsideTheOutput(test *testing.T) {
 	test.Parallel()
 
 	output := test.TempDir()
-	_, err := Build(Options{
+	_, buildError := Build(Options{
 		Version:               "1.0.0",
 		ModuleDirectory:       test.TempDir(),
 		OutputDirectory:       output,
 		SwiftScratchDirectory: filepath.Join(output, ".swift-build"),
 	})
-	if err == nil || !strings.Contains(err.Error(), "is inside the output") {
-		test.Fatalf("Build accepted a Swift scratch inside its output: %v", err)
+	if buildError == nil || !strings.Contains(buildError.Error(), "is inside the output") {
+		test.Fatalf("Build accepted a Swift scratch inside its output: %v", buildError)
 	}
 }

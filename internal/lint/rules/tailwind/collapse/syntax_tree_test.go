@@ -110,13 +110,13 @@ func (fixture *fixtureNode) toNode(test *testing.T) *Node {
 
 func loadASTCorpus(test *testing.T) astCorpus {
 	test.Helper()
-	raw, err := os.ReadFile(filepath.Join("testdata", "ast_fixtures.json"))
-	if err != nil {
-		test.Fatalf("read fixtures: %v", err)
+	raw, readError := os.ReadFile(filepath.Join("testdata", "ast_fixtures.json"))
+	if readError != nil {
+		test.Fatalf("read fixtures: %v", readError)
 	}
 	var corpus astCorpus
-	if err := json.Unmarshal(raw, &corpus); err != nil {
-		test.Fatalf("decode fixtures: %v", err)
+	if decodeError := json.Unmarshal(raw, &corpus); decodeError != nil {
+		test.Fatalf("decode fixtures: %v", decodeError)
 	}
 	if len(corpus.Cases) == 0 {
 		test.Fatal("fixture carries no cases")

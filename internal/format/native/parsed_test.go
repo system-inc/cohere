@@ -33,9 +33,9 @@ func TestFormattingFromTheGuardsTreePrintsWhatParsingAgainPrints(test *testing.T
 	formatter := Formatter{Options: formatoptions.Default()}
 	compared := 0
 	for _, fileName := range typeScriptFilesUnder(roots) {
-		contents, err := os.ReadFile(fileName)
-		if err != nil {
-			test.Fatal(err)
+		contents, readError := os.ReadFile(fileName)
+		if readError != nil {
+			test.Fatal(readError)
 		}
 		text := string(contents)
 
@@ -45,7 +45,7 @@ func TestFormattingFromTheGuardsTreePrintsWhatParsingAgainPrints(test *testing.T
 			return given, nil
 		}
 		noProposals := func(string, string) ([]edit.Proposal, error) { return nil, nil }
-		if _, err := edit.FixAndTransformText(fileName, text, noProposals, capture, 1); err != nil || guards == nil {
+		if _, fixAndTransformTextError := edit.FixAndTransformText(fileName, text, noProposals, capture, 1); fixAndTransformTextError != nil || guards == nil {
 			// A file the guard refuses never reaches the formatter.
 			continue
 		}
@@ -78,12 +78,12 @@ func errorText(err error) string {
 // moduleRootOf is the module's root, where the fixtures are.
 func moduleRootOf(test *testing.T) string {
 	test.Helper()
-	directory, err := os.Getwd()
-	if err != nil {
-		test.Fatal(err)
+	directory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		test.Fatal(workingDirectoryError)
 	}
 	for {
-		if _, err := os.Stat(filepath.Join(directory, "go.mod")); err == nil {
+		if _, statError := os.Stat(filepath.Join(directory, "go.mod")); statError == nil {
 			return directory
 		}
 		parent := filepath.Dir(directory)

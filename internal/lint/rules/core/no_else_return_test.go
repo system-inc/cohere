@@ -24,9 +24,9 @@ var (
 func elseReturnOptions(test *testing.T, allowElseIf *bool) any {
 	test.Helper()
 	if allowElseIf == nil {
-		decoded, err := DecodeNoElseReturnOptions(nil)
-		if err != nil {
-			test.Fatalf("the decoder refused an absent option: %v", err)
+		decoded, decodeNoElseReturnOptionsError := DecodeNoElseReturnOptions(nil)
+		if decodeNoElseReturnOptionsError != nil {
+			test.Fatalf("the decoder refused an absent option: %v", decodeNoElseReturnOptionsError)
 		}
 		return decoded
 	}
@@ -492,9 +492,9 @@ func TestDecodeNoElseReturnOptions(test *testing.T) {
 
 	test.Run("an absent option allows else if", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoElseReturnOptions(nil)
-		if err != nil {
-			test.Fatalf("the decoder refused an absent option: %v", err)
+		decoded, decodeNoElseReturnOptionsError := DecodeNoElseReturnOptions(nil)
+		if decodeNoElseReturnOptionsError != nil {
+			test.Fatalf("the decoder refused an absent option: %v", decodeNoElseReturnOptionsError)
 		}
 		settings, ok := decoded.(NoElseReturnSettings)
 		if !ok {
@@ -507,9 +507,9 @@ func TestDecodeNoElseReturnOptions(test *testing.T) {
 
 	test.Run("an empty object keeps the default", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoElseReturnOptions(json.RawMessage(`{}`))
-		if err != nil {
-			test.Fatalf("the decoder refused an empty object: %v", err)
+		decoded, decodeNoElseReturnOptionsError := DecodeNoElseReturnOptions(json.RawMessage(`{}`))
+		if decodeNoElseReturnOptionsError != nil {
+			test.Fatalf("the decoder refused an empty object: %v", decodeNoElseReturnOptionsError)
 		}
 		settings, ok := decoded.(NoElseReturnSettings)
 		if !ok {
@@ -522,9 +522,9 @@ func TestDecodeNoElseReturnOptions(test *testing.T) {
 
 	test.Run("an explicit false is distinguishable from absent", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoElseReturnOptions(json.RawMessage(`{"allowElseIf":false}`))
-		if err != nil {
-			test.Fatalf("the decoder refused an explicit false: %v", err)
+		decoded, decodeNoElseReturnOptionsError := DecodeNoElseReturnOptions(json.RawMessage(`{"allowElseIf":false}`))
+		if decodeNoElseReturnOptionsError != nil {
+			test.Fatalf("the decoder refused an explicit false: %v", decodeNoElseReturnOptionsError)
 		}
 		settings, ok := decoded.(NoElseReturnSettings)
 		if !ok {

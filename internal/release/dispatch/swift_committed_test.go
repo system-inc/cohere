@@ -85,9 +85,9 @@ func TestAnOlderCommitGetsItsOwnEngineWhileTheCheckoutIsCleanAtANewerOne(test *t
 	writeFile(test, fixture.rule(), "two\n")
 	fixture.commit(test, "swift")
 
-	engine, _, err := resolveCommittedSwiftEngine(fixture.paths, older, testToolchain, 2)
-	if err != nil {
-		test.Fatalf("building the older commit's engine: %v", err)
+	engine, _, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(fixture.paths, older, testToolchain, 2)
+	if resolveCommittedSwiftEngineError != nil {
+		test.Fatalf("building the older commit's engine: %v", resolveCommittedSwiftEngineError)
 	}
 	if output := run(test, engine); output != "rule=one\n" {
 		test.Fatalf("the older commit got an engine printing %q, which is the newer commit's", output)
@@ -98,8 +98,8 @@ func TestAnOlderCommitGetsItsOwnEngineWhileTheCheckoutIsCleanAtANewerOne(test *t
 // fixtures at once would build with each other's.
 func TestADirtySwiftWorktreeIsRefusedNotForced(test *testing.T) {
 	fixture := newSwiftFixture(test)
-	if _, _, err := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2); err != nil {
-		test.Fatalf("first build: %v", err)
+	if _, _, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2); resolveCommittedSwiftEngineError != nil {
+		test.Fatalf("first build: %v", resolveCommittedSwiftEngineError)
 	}
 
 	stray := filepath.Join(fixture.paths.SwiftSourceWorktree(), "swift", "Sources", "Stray.swift")
@@ -107,9 +107,9 @@ func TestADirtySwiftWorktreeIsRefusedNotForced(test *testing.T) {
 	writeFile(test, fixture.rule(), "two\n")
 	fixture.commit(test, "swift")
 
-	_, _, err := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
-	if err == nil || !strings.Contains(err.Error(), "changes nobody should have made") {
-		test.Fatalf("a dirty worktree was moved or built from: %v", err)
+	_, _, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
+	if resolveCommittedSwiftEngineError == nil || !strings.Contains(resolveCommittedSwiftEngineError.Error(), "changes nobody should have made") {
+		test.Fatalf("a dirty worktree was moved or built from: %v", resolveCommittedSwiftEngineError)
 	}
 	if _, statErr := os.Stat(stray); statErr != nil {
 		test.Fatalf("the refusal discarded the stray file, which forcing would do: %v", statErr)
@@ -122,9 +122,9 @@ func TestACommittedSwiftEngineReportingAModifiedTreeIsNotCached(test *testing.T)
 	fixture := newSwiftFixture(test)
 	fixture.reportModified = true
 
-	_, _, err := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
-	if err == nil || !strings.Contains(err.Error(), "modified source tree") {
-		test.Fatalf("an engine reporting a modified tree was accepted: %v", err)
+	_, _, resolveCommittedSwiftEngineError := resolveCommittedSwiftEngine(fixture.paths, fixture.head(test), testToolchain, 2)
+	if resolveCommittedSwiftEngineError == nil || !strings.Contains(resolveCommittedSwiftEngineError.Error(), "modified source tree") {
+		test.Fatalf("an engine reporting a modified tree was accepted: %v", resolveCommittedSwiftEngineError)
 	}
 	entries, _ := os.ReadDir(fixture.paths.BinaryDirectory())
 	for _, entry := range entries {
@@ -178,8 +178,8 @@ func (fixture *swiftFixture) fakeBuild(packageDirectory string, scratchDirectory
 
 	script := fmt.Sprintf("#!/bin/sh\nif [ \"$3\" = \"--version\" ]; then\n  echo '{\"kind\":\"provenance\",\"sourceTreeModified\":%t}'\n  exit 0\nfi\necho 'rule=%s'\n",
 		modified, strings.TrimSpace(string(rule)))
-	if err := os.MkdirAll(filepath.Dir(binaryPath), 0o755); err != nil {
-		return err
+	if createDirectoryError := os.MkdirAll(filepath.Dir(binaryPath), 0o755); createDirectoryError != nil {
+		return createDirectoryError
 	}
 	return os.WriteFile(binaryPath, []byte(script), 0o755)
 }

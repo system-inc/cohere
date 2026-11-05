@@ -124,14 +124,14 @@ var tailwindPackageRoots = map[string]string{
 func loadThemeCorpus(test *testing.T, name string) themeCorpus {
 	test.Helper()
 
-	raw, err := os.ReadFile(filepath.Join("testdata", name))
-	if err != nil {
-		test.Fatalf("read theme fixture: %v", err)
+	raw, readError := os.ReadFile(filepath.Join("testdata", name))
+	if readError != nil {
+		test.Fatalf("read theme fixture: %v", readError)
 	}
 
 	var fixture themeCorpus
-	if err := json.Unmarshal(raw, &fixture); err != nil {
-		test.Fatalf("decode theme fixture: %v", err)
+	if decodeError := json.Unmarshal(raw, &fixture); decodeError != nil {
+		test.Fatalf("decode theme fixture: %v", decodeError)
 	}
 	if len(fixture.Cases) == 0 {
 		test.Fatal("theme fixture holds no cases")
@@ -154,13 +154,13 @@ func buildThemeForCase(test *testing.T, aCase themeCase) (*Theme, []SkippedDirec
 		return theme, skipped, true
 	}
 
-	nodes, err := ParseCSS(aCase.Input)
-	if err != nil {
-		test.Fatalf("parse synthetic stylesheet: %v", err)
+	nodes, parseCSSError := ParseCSS(aCase.Input)
+	if parseCSSError != nil {
+		test.Fatalf("parse synthetic stylesheet: %v", parseCSSError)
 	}
 	loader := &themeLoader{theme: NewTheme(), visiting: make(map[string]bool)}
-	if err := loader.ingest(nodes, aCase.Name); err != nil {
-		test.Fatalf("ingest synthetic stylesheet: %v", err)
+	if ingestError := loader.ingest(nodes, aCase.Name); ingestError != nil {
+		test.Fatalf("ingest synthetic stylesheet: %v", ingestError)
 	}
 	return loader.theme, loader.skipped, true
 }
@@ -173,13 +173,13 @@ func loadRepositoryTheme(test *testing.T, aCase themeCase) (*Theme, []SkippedDir
 	if !ok {
 		test.Fatalf("repository case %q has no tailwindcss package root registered in tailwindPackageRoots", aCase.Name)
 	}
-	if _, err := os.Stat(filepath.Join(packageRoot, "index.css")); err != nil {
-		test.Fatalf("the vendored tailwindcss for %q is not at %s: %v", aCase.Name, packageRoot, err)
+	if _, statError := os.Stat(filepath.Join(packageRoot, "index.css")); statError != nil {
+		test.Fatalf("the vendored tailwindcss for %q is not at %s: %v", aCase.Name, packageRoot, statError)
 	}
 	entryPath := corpus.Resolve(test, aCase.EntryPath)
-	theme, skipped, err := LoadThemeFromFile(entryPath, NodeStylesheetResolver(packageRoot))
-	if err != nil {
-		test.Fatalf("load %s: %v", entryPath, err)
+	theme, skipped, loadThemeFromFileError := LoadThemeFromFile(entryPath, NodeStylesheetResolver(packageRoot))
+	if loadThemeFromFileError != nil {
+		test.Fatalf("load %s: %v", entryPath, loadThemeFromFileError)
 	}
 	return theme, skipped
 }
@@ -194,9 +194,9 @@ func coveredRepositoryCases(test *testing.T, fixture themeCorpus) int {
 		if aCase.Source != "repository" {
 			continue
 		}
-		repositoryCorpus, _, spelled, err := corpus.Spelled(aCase.EntryPath)
-		if err != nil {
-			test.Fatalf("repository case %q records %q: %v", aCase.Name, aCase.EntryPath, err)
+		repositoryCorpus, _, spelled, spelledError := corpus.Spelled(aCase.EntryPath)
+		if spelledError != nil {
+			test.Fatalf("repository case %q records %q: %v", aCase.Name, aCase.EntryPath, spelledError)
 		}
 		if !spelled {
 			if filepath.IsAbs(aCase.EntryPath) {
@@ -568,13 +568,13 @@ func TestThemeInsertionOrderSurvivesRedefinition(test *testing.T) {
 	test.Parallel()
 	theme := NewTheme()
 	for _, entry := range [][2]string{{"--color-a", "red"}, {"--color-b", "blue"}, {"--color-c", "green"}} {
-		if err := theme.Add(entry[0], entry[1], ThemeOptionNone); err != nil {
-			test.Fatalf("Add(%q): %v", entry[0], err)
+		if addError := theme.Add(entry[0], entry[1], ThemeOptionNone); addError != nil {
+			test.Fatalf("Add(%q): %v", entry[0], addError)
 		}
 	}
 
-	if err := theme.Add("--color-a", "rebeccapurple", ThemeOptionNone); err != nil {
-		test.Fatalf("redefine: %v", err)
+	if addError := theme.Add("--color-a", "rebeccapurple", ThemeOptionNone); addError != nil {
+		test.Fatalf("redefine: %v", addError)
 	}
 	assertThemeKeyOrder(test, theme, "overwrite keeps position", "--color-a", "--color-b", "--color-c")
 	if value, _ := theme.Get([]string{"--color-a"}); value != "rebeccapurple" {
@@ -582,11 +582,11 @@ func TestThemeInsertionOrderSurvivesRedefinition(test *testing.T) {
 	}
 
 	// Deleting genuinely gives up the position, so re-adding lands at the end.
-	if err := theme.Add("--color-a", "initial", ThemeOptionNone); err != nil {
-		test.Fatalf("delete: %v", err)
+	if addError := theme.Add("--color-a", "initial", ThemeOptionNone); addError != nil {
+		test.Fatalf("delete: %v", addError)
 	}
-	if err := theme.Add("--color-a", "red", ThemeOptionNone); err != nil {
-		test.Fatalf("re-add: %v", err)
+	if addError := theme.Add("--color-a", "red", ThemeOptionNone); addError != nil {
+		test.Fatalf("re-add: %v", addError)
 	}
 	assertThemeKeyOrder(test, theme, "delete then re-add moves to the end", "--color-b", "--color-c", "--color-a")
 }
@@ -605,15 +605,15 @@ func TestThemeKeyOrderCompacts(test *testing.T) {
 	const rounds = 500
 	for round := 0; round < rounds; round++ {
 		key := fmt.Sprintf("--churn-%d", round)
-		if err := theme.Add(key, "x", ThemeOptionNone); err != nil {
-			test.Fatalf("Add: %v", err)
+		if addError := theme.Add(key, "x", ThemeOptionNone); addError != nil {
+			test.Fatalf("Add: %v", addError)
 		}
-		if err := theme.Add(key, "initial", ThemeOptionNone); err != nil {
-			test.Fatalf("delete: %v", err)
+		if addError := theme.Add(key, "initial", ThemeOptionNone); addError != nil {
+			test.Fatalf("delete: %v", addError)
 		}
 	}
-	if err := theme.Add("--survivor", "y", ThemeOptionNone); err != nil {
-		test.Fatalf("Add survivor: %v", err)
+	if addError := theme.Add("--survivor", "y", ThemeOptionNone); addError != nil {
+		test.Fatalf("Add survivor: %v", addError)
 	}
 
 	if theme.Size() != 1 {
@@ -637,7 +637,7 @@ func TestThemeKeyOrderCompacts(test *testing.T) {
 func TestThemeAddRejectsInvalidNamespaceClear(test *testing.T) {
 	test.Parallel()
 	theme := NewTheme()
-	if err := theme.Add("--color-*", "red", ThemeOptionNone); err == nil {
+	if addError := theme.Add("--color-*", "red", ThemeOptionNone); addError == nil {
 		test.Fatal("Add(\"--color-*\", \"red\") returned no error; the engine throws")
 	}
 	if theme.Size() != 0 {

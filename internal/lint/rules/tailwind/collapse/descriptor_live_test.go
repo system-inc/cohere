@@ -73,9 +73,9 @@ func liveTableForOracle(test *testing.T, entryPoint string) (*LoadedDesignSystem
 func liveTableFor(test *testing.T, spelling string) (*LoadedDesignSystem, *Table) {
 	test.Helper()
 	entryPoint, packageRoot := liveEntryPointFor(test, spelling)
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		test.Fatalf("loading the design system at %s: %v", entryPoint, err)
+	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading the design system at %s: %v", entryPoint, loadDesignSystemError)
 	}
 	table := NewTable(system)
 	if table == nil {
@@ -92,7 +92,7 @@ func findTailwindPackageRootForTest(start string) string {
 	directory := start
 	for {
 		candidate := filepath.Join(directory, "node_modules", "tailwindcss")
-		if info, err := os.Stat(filepath.Join(candidate, "index.css")); err == nil && !info.IsDir() {
+		if info, statError := os.Stat(filepath.Join(candidate, "index.css")); statError == nil && !info.IsDir() {
 			return candidate
 		}
 		parent := filepath.Dir(directory)
@@ -395,9 +395,9 @@ func TestLiveTableIsNilWithoutADesignSystem(test *testing.T) {
 // the order of magnitude of a per-run cost, not whether it is fast in isolation.
 func BenchmarkNewTable(benchmark *testing.B) {
 	entryPoint, packageRoot := liveEntryPointFor(benchmark, corpusRepositories[0].spelling)
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		benchmark.Fatalf("loading the design system: %v", err)
+	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	if loadDesignSystemError != nil {
+		benchmark.Fatalf("loading the design system: %v", loadDesignSystemError)
 	}
 
 	benchmark.ReportAllocs()
@@ -418,9 +418,9 @@ func BenchmarkLoadDesignSystemWithTable(benchmark *testing.B) {
 	benchmark.ReportAllocs()
 	benchmark.ResetTimer()
 	for range benchmark.N {
-		system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
-		if err != nil {
-			benchmark.Fatalf("loading the design system: %v", err)
+		system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+		if loadDesignSystemError != nil {
+			benchmark.Fatalf("loading the design system: %v", loadDesignSystemError)
 		}
 		if table := NewTable(system); table == nil {
 			benchmark.Fatal("NewTable returned nil")

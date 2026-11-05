@@ -175,7 +175,7 @@ func readPinnedCorpus(repository string, count int) (paths []string, contents ma
 			return nil, nil, fmt.Sprintf("reading %s at %s: a size of %q", path, pinnedCorpusCommit, fields[2])
 		}
 		blob := make([]byte, size+1)
-		if _, err := io.ReadFull(reader, blob); err != nil || blob[size] != '\n' {
+		if _, readFullError := io.ReadFull(reader, blob); readFullError != nil || blob[size] != '\n' {
 			return nil, nil, fmt.Sprintf("reading %s at %s: the blob ended early", path, pinnedCorpusCommit)
 		}
 		contents[path] = string(blob[:size])
@@ -195,7 +195,7 @@ func TestLowerRealCodebase(test *testing.T) {
 	skipWithoutCorpus(test)
 
 	var files []string
-	err := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
+	walkError := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -208,8 +208,8 @@ func TestLowerRealCodebase(test *testing.T) {
 		files = append(files, path)
 		return nil
 	})
-	if err != nil {
-		test.Fatalf("walking the corpus: %v", err)
+	if walkError != nil {
+		test.Fatalf("walking the corpus: %v", walkError)
 	}
 	if len(files) < 10 {
 		test.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
@@ -221,8 +221,8 @@ func TestLowerRealCodebase(test *testing.T) {
 	unsupported := map[string]int{}
 
 	for _, path := range files {
-		contents, err := os.ReadFile(path)
-		if err != nil {
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
 			continue
 		}
 		kind := core.ScriptKindTS

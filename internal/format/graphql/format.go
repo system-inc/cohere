@@ -80,9 +80,9 @@ func PrintToDoc(text string, prettierOptions formatoptions.Options) (document do
 
 // printToDoc is parser-graphql.js's parse followed by printAstToDoc (src/main/ast-to-doc.js).
 func printToDoc(text string, prettierOptions formatoptions.Options) (doc.Doc, error) {
-	document, comments, err := Parse(text)
-	if err != nil {
-		return nil, err
+	document, comments, parseError := Parse(text)
+	if parseError != nil {
+		return nil, parseError
 	}
 	printOptions := &printerOptions{
 		Printer:                    graphqlPrinter,

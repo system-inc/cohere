@@ -524,9 +524,9 @@ func TestDecodeNoStringRefsOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoStringRefsOptions([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", testCase.raw, err)
+			decoded, decodeNoStringRefsOptionsError := DecodeNoStringRefsOptions([]byte(testCase.raw))
+			if decodeNoStringRefsOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.raw, decodeNoStringRefsOptionsError)
 			}
 			got, ok := decoded.(NoStringRefsOptions)
 			if !ok {
@@ -538,7 +538,7 @@ func TestDecodeNoStringRefsOptions(test *testing.T) {
 		})
 	}
 
-	if _, err := DecodeNoStringRefsOptions([]byte("not json")); err == nil {
+	if _, decodeNoStringRefsOptionsError := DecodeNoStringRefsOptions([]byte("not json")); decodeNoStringRefsOptionsError == nil {
 		test.Error("decoding malformed input returned no error")
 	}
 }

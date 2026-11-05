@@ -14,9 +14,9 @@ const objectShorthandFile = "/repository/source/ObjectShorthand.ts"
 // The argument is the option list as JSON TEXT, exactly the bytes the config layer hands the
 // decoder, so the fixtures exercise the three-shape `anyOf` decoder rather than bypassing it.
 func objectShorthandOf(optionJson string) any {
-	settings, err := DecodeObjectShorthandOptions([]byte(optionJson))
-	if err != nil {
-		panic(err)
+	settings, decodeObjectShorthandOptionsError := DecodeObjectShorthandOptions([]byte(optionJson))
+	if decodeObjectShorthandOptionsError != nil {
+		panic(decodeObjectShorthandOptionsError)
 	}
 	return settings
 }
@@ -493,9 +493,9 @@ func TestObjectShorthandIgnoresAccessors(test *testing.T) {
 func TestDecodeObjectShorthandOptions(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeObjectShorthandOptions([]byte(`["methods", {"ignoreConstructors": true, "avoidQuotes": true}]`))
-	if err != nil {
-		test.Fatalf("a legal mode and flags were refused: %v", err)
+	decoded, decodeObjectShorthandOptionsError := DecodeObjectShorthandOptions([]byte(`["methods", {"ignoreConstructors": true, "avoidQuotes": true}]`))
+	if decodeObjectShorthandOptionsError != nil {
+		test.Fatalf("a legal mode and flags were refused: %v", decodeObjectShorthandOptionsError)
 	}
 	settings, ok := decoded.(ObjectShorthandSettings)
 	if !ok {
@@ -521,7 +521,7 @@ func TestDecodeObjectShorthandOptions(test *testing.T) {
 		// A mode outside the six.
 		`["sometimes"]`,
 	} {
-		if decoded, err := DecodeObjectShorthandOptions([]byte(raw)); err == nil {
+		if decoded, decodeObjectShorthandOptionsError := DecodeObjectShorthandOptions([]byte(raw)); decodeObjectShorthandOptionsError == nil {
 			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}

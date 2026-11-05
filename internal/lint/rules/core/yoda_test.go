@@ -38,9 +38,9 @@ func decodeYodaOptionsForTest(test *testing.T, optionsJson string) any {
 	if optionsJson == "" {
 		return nil
 	}
-	decoded, err := DecodeYodaOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding options %q: %v", optionsJson, err)
+	decoded, decodeYodaOptionsError := DecodeYodaOptions(json.RawMessage(optionsJson))
+	if decodeYodaOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", optionsJson, decodeYodaOptionsError)
 	}
 	return decoded
 }
@@ -413,9 +413,9 @@ func TestYodaRangeTestRequiresLessThanOperators(test *testing.T) {
 func TestDecodeYodaOptions(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeYodaOptions([]byte(`["always", {"exceptRange": true, "onlyEquality": true}]`))
-	if err != nil {
-		test.Fatalf("upstream's spelling was refused: %v", err)
+	decoded, decodeYodaOptionsError := DecodeYodaOptions([]byte(`["always", {"exceptRange": true, "onlyEquality": true}]`))
+	if decodeYodaOptionsError != nil {
+		test.Fatalf("upstream's spelling was refused: %v", decodeYodaOptionsError)
 	}
 	settings, ok := decoded.(YodaSettings)
 	if !ok {
@@ -436,7 +436,7 @@ func TestDecodeYodaOptions(test *testing.T) {
 		`["always", {"exceptRange": true}, "never"]`,
 		`["sometimes"]`,
 	} {
-		if decoded, err := DecodeYodaOptions([]byte(raw)); err == nil {
+		if decoded, decodeYodaOptionsError := DecodeYodaOptions([]byte(raw)); decodeYodaOptionsError == nil {
 			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}

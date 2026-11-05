@@ -45,8 +45,8 @@ func DecodePreferArrowCallbackOptions(raw []byte) (any, error) {
 		return settings, nil
 	}
 	var wire preferArrowCallbackRawOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 	settings.AllowNamedFunctions = wire.AllowNamedFunctions
 	if wire.AllowUnboundThis != nil {

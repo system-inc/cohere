@@ -46,7 +46,7 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(test *testing.T) {
 				return
 			}
 			// Written beside the marker and renamed onto it, so the test never reads half a name.
-			if err := os.WriteFile(marker+".partial", []byte(temporaryName), 0o644); err == nil {
+			if writeError := os.WriteFile(marker+".partial", []byte(temporaryName), 0o644); writeError == nil {
 				os.Rename(marker+".partial", marker)
 			}
 			time.Sleep(time.Minute)
@@ -61,22 +61,22 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(test *testing.T) {
 			directory := test.TempDir()
 			// Outside the table's directory, which the write after the kill cleans.
 			marker := filepath.Join(test.TempDir(), "held")
-			if err := WriteCacheTable(directory, tableSaying("old"), identity, sections, PathAnchor{}); err != nil {
-				test.Fatal(err)
+			if writeCacheTableError := WriteCacheTable(directory, tableSaying("old"), identity, sections, PathAnchor{}); writeCacheTableError != nil {
+				test.Fatal(writeCacheTableError)
 			}
 
 			writer := exec.Command(os.Args[0], "-test.run=^TestAWriterKilledBeforeItsRenameLeavesTheOldTable$")
 			writer.Env = append(os.Environ(), "COHERE_TEST_WRITE_TABLE="+directory, fmt.Sprintf("COHERE_TEST_STOP_AT_RENAME=%d", stopAt),
 				"COHERE_TEST_HELD_MARKER="+marker)
-			if err := writer.Start(); err != nil {
-				test.Fatal(err)
+			if startError := writer.Start(); startError != nil {
+				test.Fatal(startError)
 			}
 			// Killed once the writer says it is held at the rename, naming the temporary it holds. The deadline
 			// only ends a writer that never got there; it never decides when the kill lands.
 			deadline := time.Now().Add(time.Minute)
 			temporary := ""
 			for temporary == "" && time.Now().Before(deadline) {
-				if held, err := os.ReadFile(marker); err == nil {
+				if held, readError := os.ReadFile(marker); readError == nil {
 					temporary = string(held)
 				}
 				time.Sleep(10 * time.Millisecond)
@@ -103,13 +103,13 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(test *testing.T) {
 			if read.Findings == nil || len(read.Findings.Entries) != 1 || read.Findings.Entries[0].Path != wantFindings {
 				test.Errorf("the findings after the kill are %v, want the old ones", read.Findings)
 			}
-			if _, err := os.Stat(temporary); err != nil {
-				test.Errorf("the temporary is gone, so the writer was not stopped where this test meant: %v", err)
+			if _, statError := os.Stat(temporary); statError != nil {
+				test.Errorf("the temporary is gone, so the writer was not stopped where this test meant: %v", statError)
 			}
 
 			// And the next run rebuilds cleanly over what the killed one left, its temporary included.
-			if err := WriteCacheTable(directory, tableSaying("rebuilt"), identity, sections, PathAnchor{}); err != nil {
-				test.Fatalf("the write after the kill failed: %v", err)
+			if writeCacheTableError := WriteCacheTable(directory, tableSaying("rebuilt"), identity, sections, PathAnchor{}); writeCacheTableError != nil {
+				test.Fatalf("the write after the kill failed: %v", writeCacheTableError)
 			}
 			rebuilt, err := ReadCacheTable(directory, identity, sections, PathAnchor{})
 			if err != nil || string(rebuilt.Runs["--no-fix"].Output) != "rebuilt" || rebuilt.Findings.Entries[0].Path != "/rebuilt.ts" {

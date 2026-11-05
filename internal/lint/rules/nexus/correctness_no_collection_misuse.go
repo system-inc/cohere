@@ -271,8 +271,8 @@ func correctnessNoCollectionMisuseIsInOnArray(ctx rule.Context, binary *ast.Bina
 // correctnessNoCollectionMisuseIsArrayIndex says whether a property name is a canonical array index:
 // the decimal spelling of an integer from 0 to 2^32 - 2, with no sign and no leading zero.
 func correctnessNoCollectionMisuseIsArrayIndex(name string) bool {
-	value, err := strconv.ParseUint(name, 10, 32)
-	return err == nil && value < 1<<32-1 && strconv.FormatUint(value, 10) == name
+	value, parseError := strconv.ParseUint(name, 10, 32)
+	return parseError == nil && value < 1<<32-1 && strconv.FormatUint(value, 10) == name
 }
 
 // correctnessNoCollectionMisuseIsImpossibleSizeComparison says whether a comparison sets a length
@@ -336,8 +336,8 @@ func correctnessNoCollectionMisuseNumericLiteral(node *ast.Node) (float64, bool)
 	if node.Kind != ast.KindNumericLiteral {
 		return 0, false
 	}
-	value, err := strconv.ParseFloat(node.Text(), 64)
-	if err != nil {
+	value, parseError := strconv.ParseFloat(node.Text(), 64)
+	if parseError != nil {
 		return 0, false
 	}
 	return sign * value, true

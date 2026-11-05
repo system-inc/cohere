@@ -193,20 +193,20 @@ process.stdout.write(JSON.stringify(inputs));
 // case's canonical dump.
 func TestYamlTestSuiteParseMatchesUpstream(test *testing.T) {
 	test.Parallel()
-	if _, err := exec.LookPath("node"); err != nil {
+	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
 		test.Skip("node is not installed")
 	}
 	script := filepath.Join(test.TempDir(), "suite.mjs")
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(suiteScript, "FORK", forkRoot(test))), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(suiteScript, "FORK", forkRoot(test))), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	output, err := exec.Command("node", script).Output()
-	if err != nil {
-		test.Skipf("the yaml-test-suite is not loadable: %v", err)
+	output, outputError := exec.Command("node", script).Output()
+	if outputError != nil {
+		test.Skipf("the yaml-test-suite is not loadable: %v", outputError)
 	}
 	var texts []string
-	if err := json.Unmarshal(output, &texts); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(output, &texts); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	failures, errored := compareAll(test, "suite", nil, texts, 30)
 	test.Logf("%d of %d yaml-test-suite inputs match upstream (%d of them errors)", len(texts)-failures, len(texts), errored)
@@ -227,9 +227,9 @@ func TestCorpusParseMatchesUpstream(test *testing.T) {
 	if roots == "" {
 		test.Skip("set COHERE_YAML_CORPUS to measure; this is a measuring run, not a unit test")
 	}
-	enumerator, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		test.Fatal(err)
+	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 	var names, texts []string
 	yamlFiles, frontMatters, tooLarge := 0, 0, 0
@@ -275,9 +275,9 @@ func TestCorpusParseMatchesUpstream(test *testing.T) {
 			if extension != ".yaml" && extension != ".yml" && extension != ".md" {
 				continue
 			}
-			source, err := os.ReadFile(file)
-			if err != nil {
-				test.Fatal(err)
+			source, readError := os.ReadFile(file)
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			if len(source) > corpusSizeLimit {
 				tooLarge++
@@ -414,13 +414,13 @@ func TestComparisonSeesEveryField(test *testing.T) {
 	}
 	for name, corrupt := range corruptions {
 		var root map[string]any
-		if err := json.Unmarshal(expected.Root, &root); err != nil {
-			test.Fatal(err)
+		if decodeError := json.Unmarshal(expected.Root, &root); decodeError != nil {
+			test.Fatal(decodeError)
 		}
 		corrupt(root)
-		encoded, err := json.Marshal(root)
-		if err != nil {
-			test.Fatal(err)
+		encoded, encodeError := json.Marshal(root)
+		if encodeError != nil {
+			test.Fatal(encodeError)
 		}
 		if differences := compareParse(text, oracleResult{Root: encoded}); len(differences) == 0 {
 			test.Errorf("corrupting the %s went unnoticed", name)

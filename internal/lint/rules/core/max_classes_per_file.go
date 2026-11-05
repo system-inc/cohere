@@ -90,7 +90,7 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
 	// The integer arm first, because it is the narrower shape: a JSON number cannot also decode as
 	// an object, so trying it first cannot swallow a case belonging to the other arm.
 	var configuredMaximum int
-	if err := json.Unmarshal(raw, &configuredMaximum); err == nil {
+	if decodeError := json.Unmarshal(raw, &configuredMaximum); decodeError == nil {
 		if configuredMaximum < 1 {
 			return DefaultMaxClassesPerFileSettings(), fmt.Errorf(
 				"max-classes-per-file takes a maximum of at least 1, got %d", configuredMaximum)
@@ -100,8 +100,8 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
 	}
 
 	var object maxClassesPerFileObjectShape
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return DefaultMaxClassesPerFileSettings(), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return DefaultMaxClassesPerFileSettings(), unmarshalOptionsError
 	}
 	// A nil Max is upstream's `option.max || 1` and stays at the default rather than becoming zero.
 	if object.Max != nil {

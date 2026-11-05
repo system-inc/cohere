@@ -157,8 +157,8 @@ var Probe = rule.Rule{Run: func(ctx rule.Context, options any) rule.Listeners { 
 			test.Parallel()
 
 			path := filepath.Join(test.TempDir(), "probe.go")
-			if err := os.WriteFile(path, []byte(testCase.source), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(path, []byte(testCase.source), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			got := readProgramFacts(test, path, helpers)
 			if got.readsProgram != testCase.want.readsProgram || got.definesRule != testCase.want.definesRule ||
@@ -289,9 +289,9 @@ func programHelperReads(test *testing.T, paths []string) map[string]programRead 
 	test.Helper()
 	uses := map[string]programUse{}
 	for _, path := range paths {
-		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
-		if err != nil {
-			test.Fatalf("parsing %s: %v", path, err)
+		file, parseFileError := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if parseFileError != nil {
+			test.Fatalf("parsing %s: %v", path, parseFileError)
 		}
 		for _, declaration := range file.Decls {
 			function, isFunction := declaration.(*ast.FuncDecl)
@@ -351,9 +351,9 @@ func programHelperReads(test *testing.T, paths []string) map[string]programRead 
 func readProgramFacts(test *testing.T, path string, helpers map[string]programRead) programFacts {
 	test.Helper()
 
-	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
-	if err != nil {
-		test.Fatalf("parsing %s: %v", path, err)
+	file, parseFileError := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+	if parseFileError != nil {
+		test.Fatalf("parsing %s: %v", path, parseFileError)
 	}
 
 	contextNames := map[string]bool{"ctx": true, "context": true}
@@ -483,7 +483,7 @@ func goSourceFilesUnder(test *testing.T, root string) []string {
 	test.Helper()
 
 	var found []string
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	walkError := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -493,8 +493,8 @@ func goSourceFilesUnder(test *testing.T, root string) []string {
 		found = append(found, path)
 		return nil
 	})
-	if err != nil {
-		test.Fatalf("walking %s: %v", root, err)
+	if walkError != nil {
+		test.Fatalf("walking %s: %v", root, walkError)
 	}
 	return found
 }

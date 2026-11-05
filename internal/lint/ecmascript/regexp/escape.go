@@ -141,8 +141,8 @@ func decodeUnicodeEscape(source string, i int, size int, ctx escapeContext) (dec
 		if end < 0 {
 			return decodedEscape{}, fmt.Errorf(`%w: \u{ that no } closes`, ErrUnsupportedSyntax)
 		}
-		value, err := strconv.ParseUint(source[i+size+1:i+size+end], 16, 32)
-		if err != nil || value > unicode.MaxRune {
+		value, parseError := strconv.ParseUint(source[i+size+1:i+size+end], 16, 32)
+		if parseError != nil || value > unicode.MaxRune {
 			return decodedEscape{}, fmt.Errorf(`%w: \u{…} naming no character`, ErrUnsupportedSyntax)
 		}
 		return decodedEscape{r: rune(value), width: size + end + 1}, nil
@@ -156,7 +156,7 @@ func decodeUnicodeEscape(source string, i int, size int, ctx escapeContext) (dec
 func decodeFixedHex(source string, i int, size int, digits int, ctx escapeContext) (decodedEscape, error) {
 	start := i + size
 	if start+digits <= len(source) {
-		if value, err := strconv.ParseUint(source[start:start+digits], 16, 32); err == nil {
+		if value, parseError := strconv.ParseUint(source[start:start+digits], 16, 32); parseError == nil {
 			return decodedEscape{r: rune(value), width: size + digits}, nil
 		}
 	}

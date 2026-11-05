@@ -97,8 +97,8 @@ func positiveVariable(name string, fallback int) (int, error) {
 	if value == "" {
 		return fallback, nil
 	}
-	parsed, err := strconv.Atoi(value)
-	if err != nil || parsed < 1 {
+	parsed, parseError := strconv.Atoi(value)
+	if parseError != nil || parsed < 1 {
 		return 0, fmt.Errorf("%s is %q, want a whole number of at least 1", name, value)
 	}
 	return parsed, nil
@@ -116,9 +116,9 @@ func poolHome() (string, error) {
 	if home := os.Getenv(homeVariable); home != "" {
 		return home, nil
 	}
-	account, err := user.Current()
-	if err != nil {
-		return "", fmt.Errorf("finding this account's home for the machine's pool: %w", err)
+	account, currentError := user.Current()
+	if currentError != nil {
+		return "", fmt.Errorf("finding this account's home for the machine's pool: %w", currentError)
 	}
 	return account.HomeDir, nil
 }
@@ -138,9 +138,9 @@ func userCacheDirectoryIn(home string) string {
 
 // poolDirectory is where the tokens, their holders and the line live, one per machine user.
 func poolDirectory() (string, error) {
-	home, err := poolHome()
-	if err != nil {
-		return "", err
+	home, poolHomeError := poolHome()
+	if poolHomeError != nil {
+		return "", poolHomeError
 	}
 	// The directory the whole-module slot used, so a checkout still on that wrapper and one on this pool take
 	// the same lock for slot 1 and never run at once on it.
@@ -210,8 +210,8 @@ func borrowTokens(directory string, shape poolShape, own int, what string) []*he
 	}
 	borrowed := []*heldSlot{}
 	for len(borrowed) < free-1 {
-		token, err := takeSlot(directory, shape.tokens, "borrowed by token "+strconv.Itoa(own)+"'s run: "+what)
-		if err != nil || token == nil {
+		token, takeSlotError := takeSlot(directory, shape.tokens, "borrowed by token "+strconv.Itoa(own)+"'s run: "+what)
+		if takeSlotError != nil || token == nil {
 			break
 		}
 		borrowed = append(borrowed, token)
@@ -346,9 +346,9 @@ func waitInLine(directory string, slots int, what string, noun string, explain f
 		}
 		// Only the first in line, as many as there are slots, may take one, so no later arrival passes them.
 		if ahead < slots {
-			held, err := takeSlot(directory, slots, what)
-			if err != nil {
-				return nil, fmt.Errorf("taking a %s: %w", noun, err)
+			held, takeSlotError := takeSlot(directory, slots, what)
+			if takeSlotError != nil {
+				return nil, fmt.Errorf("taking a %s: %w", noun, takeSlotError)
 			}
 			if held != nil {
 				if ticket != nil {
@@ -474,8 +474,8 @@ func status() int {
 // heldBy says who holds a token, or nothing when it is free: its lock is what says so, not its holder file,
 // which a run killed outright leaves behind.
 func heldBy(directory string, token int) string {
-	lock, err := os.OpenFile(lockPath(directory, token), os.O_RDWR, 0)
-	if err != nil {
+	lock, openError := os.OpenFile(lockPath(directory, token), os.O_RDWR, 0)
+	if openError != nil {
 		return ""
 	}
 	defer lock.Close()
@@ -492,8 +492,8 @@ func heldBy(directory string, token int) string {
 
 // waiters names every live ticket in line, oldest first, by its pid.
 func waiters(directory string) []string {
-	entries, err := os.ReadDir(queueDirectory(directory))
-	if err != nil {
+	entries, readDirectoryError := os.ReadDir(queueDirectory(directory))
+	if readDirectoryError != nil {
 		return nil
 	}
 	lines := []string{}
@@ -502,8 +502,8 @@ func waiters(directory string) []string {
 		if strings.HasPrefix(name, ".") {
 			continue
 		}
-		ticket, err := os.OpenFile(filepath.Join(queueDirectory(directory), name), os.O_RDWR, 0)
-		if err != nil {
+		ticket, openError := os.OpenFile(filepath.Join(queueDirectory(directory), name), os.O_RDWR, 0)
+		if openError != nil {
 			continue
 		}
 		if taken, _ := tryLockFile(ticket); taken {
@@ -515,7 +515,7 @@ func waiters(directory string) []string {
 		ticket.Close()
 		arrived, pid, _ := strings.Cut(name, "-")
 		since := ""
-		if nanoseconds, err := strconv.ParseInt(arrived, 10, 64); err == nil {
+		if nanoseconds, parseError := strconv.ParseInt(arrived, 10, 64); parseError == nil {
 			since = " since " + time.Unix(0, nanoseconds).Format("15:04:05")
 		}
 		lines = append(lines, "pid "+pid+since)

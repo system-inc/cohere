@@ -10,9 +10,9 @@ import (
 // value and COHERE_CORPUS_PROBE set to probe, and returns its verbose output.
 func runProbe(test *testing.T, name, probe, value string) string {
 	test.Helper()
-	executable, err := os.Executable()
-	if err != nil {
-		test.Fatal(err)
+	executable, executableError := os.Executable()
+	if executableError != nil {
+		test.Fatal(executableError)
 	}
 	command := exec.Command(executable, "-test.run", "^"+name+"$", "-test.v")
 	command.Env = append(os.Environ(), "COHERE_CORPUS_PROBE="+probe, Ahra.Variable+"="+value)

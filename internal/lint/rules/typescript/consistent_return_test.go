@@ -43,9 +43,9 @@ func decodeConsistentReturnOptionsForTest(test *testing.T, optionsJson string) a
 	if optionsJson == "" {
 		return nil
 	}
-	decoded, err := DecodeConsistentReturnOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", optionsJson, err)
+	decoded, decodeConsistentReturnOptionsError := DecodeConsistentReturnOptions(json.RawMessage(optionsJson))
+	if decodeConsistentReturnOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", optionsJson, decodeConsistentReturnOptionsError)
 	}
 	return decoded
 }
@@ -607,15 +607,15 @@ func TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers(test *tes
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeConsistentReturnOptions(json.RawMessage(testCase.raw))
+			decoded, decodeConsistentReturnOptionsError := DecodeConsistentReturnOptions(json.RawMessage(testCase.raw))
 			if testCase.wantErr {
-				if err == nil {
+				if decodeConsistentReturnOptionsError == nil {
 					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
 				}
 				return
 			}
-			if err != nil {
-				test.Fatalf("the decoder refused %s: %v", testCase.raw, err)
+			if decodeConsistentReturnOptionsError != nil {
+				test.Fatalf("the decoder refused %s: %v", testCase.raw, decodeConsistentReturnOptionsError)
 			}
 			settings, ok := decoded.(ConsistentReturnSettings)
 			if !ok {

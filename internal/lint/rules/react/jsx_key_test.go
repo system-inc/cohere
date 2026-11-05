@@ -295,9 +295,9 @@ func TestJsxKeyStaysSilent(test *testing.T) {
 // options grows a non-zero default.
 func decodeJsxKeyOptionsForTest(test *testing.T, raw string) any {
 	test.Helper()
-	options, err := DecodeJsxKeyOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding options %q: %v", raw, err)
+	options, decodeJsxKeyOptionsError := DecodeJsxKeyOptions([]byte(raw))
+	if decodeJsxKeyOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", raw, decodeJsxKeyOptionsError)
 	}
 	return options
 }

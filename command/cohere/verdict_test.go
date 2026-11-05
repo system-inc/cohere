@@ -32,9 +32,9 @@ func TestTheVerdictDescriptorIsNotInheritedByAChild(test *testing.T) {
 	}
 	probe := func() string {
 		script := fmt.Sprintf("if [ -e /dev/fd/%d ]; then echo open; else echo closed; fi; echo ${%s:-unset}", descriptor, VerdictVariable)
-		output, err := exec.Command("/bin/sh", "-c", script).Output()
-		if err != nil {
-			test.Fatal(err)
+		output, outputError := exec.Command("/bin/sh", "-c", script).Output()
+		if outputError != nil {
+			test.Fatal(outputError)
 		}
 		return strings.Join(strings.Fields(string(output)), " ")
 	}
@@ -73,8 +73,8 @@ func TestAVerdictDescriptorThatIsNotAPipeIsLeftAlone(test *testing.T) {
 	if sendVerdict(1) {
 		test.Fatal("a verdict was sent with no pipe to send it to")
 	}
-	if _, err := log.Write([]byte("still open\n")); err != nil {
-		test.Fatalf("the regular file was closed: %v", err)
+	if _, writeError := log.Write([]byte("still open\n")); writeError != nil {
+		test.Fatalf("the regular file was closed: %v", writeError)
 	}
 	if contents, _ := os.ReadFile(logPath); string(contents) != "still open\n" {
 		test.Errorf("the regular file holds %q, want only what its owner wrote", contents)

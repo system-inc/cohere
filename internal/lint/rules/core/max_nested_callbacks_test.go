@@ -23,9 +23,9 @@ import (
 // empty input.
 func decodeMaxNestedCallbacksForTest(test *testing.T, optionsJson string) any {
 	test.Helper()
-	decoded, err := DecodeMaxNestedCallbacksOptions([]byte(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding %q: %v", optionsJson, err)
+	decoded, decodeMaximumNestedCallbacksOptionsError := DecodeMaxNestedCallbacksOptions([]byte(optionsJson))
+	if decodeMaximumNestedCallbacksOptionsError != nil {
+		test.Fatalf("decoding %q: %v", optionsJson, decodeMaximumNestedCallbacksOptionsError)
 	}
 	return decoded
 }
@@ -278,9 +278,9 @@ func TestDecodeMaxNestedCallbacksOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeMaxNestedCallbacksOptions([]byte(testCase.optionsJson))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", testCase.optionsJson, err)
+			decoded, decodeMaximumNestedCallbacksOptionsError := DecodeMaxNestedCallbacksOptions([]byte(testCase.optionsJson))
+			if decodeMaximumNestedCallbacksOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.optionsJson, decodeMaximumNestedCallbacksOptionsError)
 			}
 			settings, isSettings := decoded.(MaxNestedCallbacksOptions)
 			if !isSettings {
@@ -324,9 +324,9 @@ func TestMaxNestedCallbacksHandlesNilOptions(test *testing.T) {
 	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, MaxNestedCallbacks, "file.ts", shallow, nil))
 	// And the same input through the decoder, so the two paths are pinned to the same answer.
 	var throughDecoder any
-	decoded, err := DecodeMaxNestedCallbacksOptions([]byte(""))
-	if err != nil {
-		test.Fatalf("decoding empty: %v", err)
+	decoded, decodeMaximumNestedCallbacksOptionsError := DecodeMaxNestedCallbacksOptions([]byte(""))
+	if decodeMaximumNestedCallbacksOptionsError != nil {
+		test.Fatalf("decoding empty: %v", decodeMaximumNestedCallbacksOptionsError)
 	}
 	throughDecoder = decoded
 	if len(rule_testing.RunWithOptions(test, MaxNestedCallbacks, "file.ts",

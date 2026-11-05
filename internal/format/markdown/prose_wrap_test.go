@@ -33,15 +33,15 @@ func newProseWrapOracle(test *testing.T) *proseWrapOracle {
 }
 
 func (oracle *proseWrapOracle) load() {
-	bundles, err := prettier.Bundles()
-	if err != nil {
-		oracle.err = err
+	bundles, bundlesError := prettier.Bundles()
+	if bundlesError != nil {
+		oracle.err = bundlesError
 		return
 	}
 	runtime := goja.New()
 	for _, name := range prettier.BundleFiles {
-		if _, err := runtime.RunString(string(bundles.Files[name])); err != nil {
-			oracle.err = fmt.Errorf("evaluating %s: %w", name, err)
+		if _, runStringError := runtime.RunString(string(bundles.Files[name])); runStringError != nil {
+			oracle.err = fmt.Errorf("evaluating %s: %w", name, runStringError)
 			return
 		}
 	}
@@ -68,12 +68,12 @@ func (oracle *proseWrapOracle) formatLive(text string, options formatoptions.Opt
 	oracle.runtime.Set("__tabWidth", options.TabWidth)
 	oracle.runtime.Set("__useTabs", options.UseTabs)
 	oracle.runtime.Set("__singleQuote", options.SingleQuote)
-	value, err := oracle.runtime.RunString(`prettier.format(__source, {
+	value, runStringError := oracle.runtime.RunString(`prettier.format(__source, {
 		filepath: "fixture.md", parser: "markdown", plugins: prettierPlugins, proseWrap: __proseWrap,
 		printWidth: __printWidth, tabWidth: __tabWidth, useTabs: __useTabs, singleQuote: __singleQuote,
 	})`)
-	if err != nil {
-		return "", err
+	if runStringError != nil {
+		return "", runStringError
 	}
 	// prettier.format returns a promise; each RunString drains goja's job queue, so pump until settled.
 	promise, isPromise := value.Export().(*goja.Promise)
@@ -81,8 +81,8 @@ func (oracle *proseWrapOracle) formatLive(text string, options formatoptions.Opt
 		return value.String(), nil
 	}
 	for pump := 0; pump < 100000 && promise.State() == goja.PromiseStatePending; pump++ {
-		if _, err := oracle.runtime.RunString("0"); err != nil {
-			return "", err
+		if _, runStringError := oracle.runtime.RunString("0"); runStringError != nil {
+			return "", runStringError
 		}
 	}
 	if promise.State() != goja.PromiseStateFulfilled {

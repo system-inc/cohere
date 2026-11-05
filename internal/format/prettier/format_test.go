@@ -15,8 +15,8 @@ import (
 // forkpath_test.go that set the variable do so with t.Setenv, serially, and go test finishes every serial
 // test, restoring what it set, before any parallel test runs.
 func TestMain(m *testing.M) {
-	if err := os.Unsetenv(ForkPathVariable); err != nil {
-		fmt.Fprintf(os.Stderr, "clearing %s: %v\n", ForkPathVariable, err)
+	if unsetenvError := os.Unsetenv(ForkPathVariable); unsetenvError != nil {
+		fmt.Fprintf(os.Stderr, "clearing %s: %v\n", ForkPathVariable, unsetenvError)
 		os.Exit(1)
 	}
 	os.Exit(m.Run())
@@ -50,9 +50,9 @@ func TestMain(m *testing.M) {
 // so a fork a developer's shell points at cannot stand in for them.
 func newTestEngine(test *testing.T) *Engine {
 	test.Helper()
-	engine, err := New(formatoptions.Default())
-	if err != nil {
-		test.Fatalf("building the engine from the embedded bundles: %v", err)
+	engine, newPrettierError := New(formatoptions.Default())
+	if newPrettierError != nil {
+		test.Fatalf("building the engine from the embedded bundles: %v", newPrettierError)
 	}
 	return engine
 }
@@ -63,9 +63,9 @@ func TestFormatsCrampedSource(test *testing.T) {
 	test.Parallel()
 
 	engine := newTestEngine(test)
-	formatted, err := engine.Format("probe.ts", "const   x=1\n")
-	if err != nil {
-		test.Fatalf("format: %v", err)
+	formatted, formatError := engine.Format("probe.ts", "const   x=1\n")
+	if formatError != nil {
+		test.Fatalf("format: %v", formatError)
 	}
 	if formatted != "const x = 1;\n" {
 		test.Fatalf("formatted %q, want %q", formatted, "const x = 1;\n")
@@ -79,9 +79,9 @@ func TestLeavesFormattedSourceAlone(test *testing.T) {
 
 	engine := newTestEngine(test)
 	source := "const x = 1;\n"
-	formatted, err := engine.Format("clean.ts", source)
-	if err != nil {
-		test.Fatalf("format: %v", err)
+	formatted, formatError := engine.Format("clean.ts", source)
+	if formatError != nil {
+		test.Fatalf("format: %v", formatError)
 	}
 	if formatted != source {
 		test.Fatalf("formatted %q, want it unchanged", formatted)
@@ -97,9 +97,9 @@ func TestPromiseIsDrained(test *testing.T) {
 	test.Parallel()
 
 	engine := newTestEngine(test)
-	formatted, err := engine.Format("probe.ts", "const x=1\n")
-	if err != nil {
-		test.Fatalf("format: %v", err)
+	formatted, formatError := engine.Format("probe.ts", "const x=1\n")
+	if formatError != nil {
+		test.Fatalf("format: %v", formatError)
 	}
 	if strings.Contains(formatted, "Promise") {
 		test.Fatalf("the promise was not drained: %q", formatted)
@@ -121,9 +121,9 @@ func TestForkCustomizationsSurvive(test *testing.T) {
 		"    switch(a) {\n        default:\n            break;\n    }\n" +
 		"    const f = function() {\n        return a;\n    };\n" +
 		"    return f();\n}\n"
-	formatted, err := engine.Format("probe.js", source)
-	if err != nil {
-		test.Fatalf("format: %v", err)
+	formatted, formatError := engine.Format("probe.js", source)
+	if formatError != nil {
+		test.Fatalf("format: %v", formatError)
 	}
 	for _, want := range []string{"if(a)", "for(const", "while(a)", "switch(a)", "function()", "\n    else {"} {
 		if !strings.Contains(formatted, want) {
@@ -142,9 +142,9 @@ func TestMarkdownTildeIsNotDoubled(test *testing.T) {
 
 	engine := newTestEngine(test)
 	source := "Sizes: `Seed` (~25K tokens), `Warm` (~75K tokens).\n"
-	formatted, err := engine.Format("probe.md", source)
-	if err != nil {
-		test.Fatalf("format: %v", err)
+	formatted, formatError := engine.Format("probe.md", source)
+	if formatError != nil {
+		test.Fatalf("format: %v", formatError)
 	}
 	if strings.Contains(formatted, "~~") {
 		test.Fatalf("a standalone tilde was doubled, so the bundles predate the fix: %q", formatted)
@@ -156,7 +156,7 @@ func TestUnhandledTypeIsAnError(test *testing.T) {
 	test.Parallel()
 
 	engine := newTestEngine(test)
-	if _, err := engine.Format("probe.rb", "puts 1\n"); err == nil {
+	if _, formatError := engine.Format("probe.rb", "puts 1\n"); formatError == nil {
 		test.Fatal("formatting a .rb file succeeded, want an error")
 	}
 	if engine.Handles("probe.rb") {
@@ -170,12 +170,12 @@ func TestSyntaxErrorSurfaces(test *testing.T) {
 	test.Parallel()
 
 	engine := newTestEngine(test)
-	_, err := engine.Format("broken.ts", "const x = {{{ broken\n")
-	if err == nil {
+	_, formatError := engine.Format("broken.ts", "const x = {{{ broken\n")
+	if formatError == nil {
 		test.Fatal("formatting malformed source succeeded, want an error")
 	}
-	if !strings.Contains(strings.ToLower(err.Error()), "syntaxerror") {
-		test.Fatalf("error %q does not name a syntax error, so the pipeline will count it as a crash", err)
+	if !strings.Contains(strings.ToLower(formatError.Error()), "syntaxerror") {
+		test.Fatalf("error %q does not name a syntax error, so the pipeline will count it as a crash", formatError)
 	}
 }
 
@@ -191,9 +191,9 @@ func TestFilepathReachesPrettier(test *testing.T) {
 		"probe.ts":  "const identity = <T>(value: T) => value;\n",
 		"probe.tsx": "const identity = <T,>(value: T) => value;\n",
 	} {
-		formatted, err := engine.Format(fileName, source)
-		if err != nil {
-			test.Fatalf("%s: %v", fileName, err)
+		formatted, formatError := engine.Format(fileName, source)
+		if formatError != nil {
+			test.Fatalf("%s: %v", fileName, formatError)
 		}
 		if formatted != want {
 			test.Errorf("%s formatted %q, want %q", fileName, formatted, want)

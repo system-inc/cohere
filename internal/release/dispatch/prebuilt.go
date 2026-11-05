@@ -19,6 +19,6 @@ var ErrNoToolchain = errors.New("no Go toolchain found on PATH")
 // Finding the shipped binary belongs to `internal/release`, which resolves it out of the installed
 // npm platform package rather than from a directory beside the source.
 func HasToolchain() bool {
-	_, err := exec.LookPath("go")
-	return err == nil
+	_, lookPathError := exec.LookPath("go")
+	return lookPathError == nil
 }

@@ -77,8 +77,8 @@ func DecodeNoImplicitCoercionOptions(raw []byte) (any, error) {
 	}
 
 	var configured NoImplicitCoercionOptions
-	if err := rule.UnmarshalOptions(raw, &configured); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &configured); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 	if configured.Boolean != nil {
 		settings.Boolean = configured.Boolean

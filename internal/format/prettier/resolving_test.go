@@ -9,11 +9,11 @@ import (
 
 func writeFile(test *testing.T, path string, contents string) {
 	test.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 }
 
@@ -69,7 +69,7 @@ func TestResolvingRefusesAtConstructionNotMidRun(test *testing.T) {
 
 	root := test.TempDir()
 	writeFile(test, filepath.Join(root, "prettier.config.js"), "module.exports = {}")
-	if _, err := NewResolving(root); err == nil {
+	if _, newResolvingError := NewResolving(root); newResolvingError == nil {
 		test.Fatal("a directory with a config cohere cannot read built a formatter, so the refusal would land mid-run")
 	}
 }

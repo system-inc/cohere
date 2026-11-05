@@ -36,9 +36,9 @@ func runArrowBodyStyle(test *testing.T, testCase arrowBodyStyleCase) rule_testin
 	if !ok {
 		test.Fatalf("case options are not ArrowBodyStyleOptions: got %T", testCase.options)
 	}
-	decoded, err := DecodeArrowBodyStyleOptions([]byte(arrowBodyStyleUpstreamList(options)))
-	if err != nil {
-		test.Fatalf("could not decode options: %v", err)
+	decoded, decodeArrowBodyStyleOptionsError := DecodeArrowBodyStyleOptions([]byte(arrowBodyStyleUpstreamList(options)))
+	if decodeArrowBodyStyleOptionsError != nil {
+		test.Fatalf("could not decode options: %v", decodeArrowBodyStyleOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, ArrowBodyStyle, arrowBodyStyleFile,
 		testCase.sourceText, decoded)
@@ -323,9 +323,9 @@ func TestDecodeArrowBodyStyleOptions(test *testing.T) {
 
 	test.Run("nil input selects upstream's default mode", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeArrowBodyStyleOptions(nil)
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeArrowBodyStyleOptionsError := DecodeArrowBodyStyleOptions(nil)
+		if decodeArrowBodyStyleOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeArrowBodyStyleOptionsError)
 		}
 		options, ok := decoded.(ArrowBodyStyleOptions)
 		if !ok {
@@ -338,10 +338,10 @@ func TestDecodeArrowBodyStyleOptions(test *testing.T) {
 
 	test.Run("the second element is read beside as-needed", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeArrowBodyStyleOptions(
+		decoded, decodeArrowBodyStyleOptionsError := DecodeArrowBodyStyleOptions(
 			[]byte(`["as-needed", {"requireReturnForObjectLiteral": true}]`))
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		if decodeArrowBodyStyleOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeArrowBodyStyleOptionsError)
 		}
 		options, ok := decoded.(ArrowBodyStyleOptions)
 		if !ok {
@@ -357,38 +357,38 @@ func TestDecodeArrowBodyStyleOptions(test *testing.T) {
 
 	test.Run("a second element beside always is refused rather than ignored", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeArrowBodyStyleOptions(
-			[]byte(`["always", {"requireReturnForObjectLiteral": true}]`)); err == nil {
+		if _, decodeArrowBodyStyleOptionsError := DecodeArrowBodyStyleOptions(
+			[]byte(`["always", {"requireReturnForObjectLiteral": true}]`)); decodeArrowBodyStyleOptionsError == nil {
 			test.Error("an option the always mode never reads decoded")
 		}
 	})
 
 	test.Run("a third element is refused", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeArrowBodyStyleOptions(
-			[]byte(`["as-needed", {"requireReturnForObjectLiteral": true}, "never"]`)); err == nil {
+		if _, decodeArrowBodyStyleOptionsError := DecodeArrowBodyStyleOptions(
+			[]byte(`["as-needed", {"requireReturnForObjectLiteral": true}, "never"]`)); decodeArrowBodyStyleOptionsError == nil {
 			test.Error("a third element decoded and would have been dropped")
 		}
 	})
 
 	test.Run("an unknown key in the second element is refused", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeArrowBodyStyleOptions(
-			[]byte(`["as-needed", {"requireReturnForObjectLiterals": true}]`)); err == nil {
+		if _, decodeArrowBodyStyleOptionsError := DecodeArrowBodyStyleOptions(
+			[]byte(`["as-needed", {"requireReturnForObjectLiterals": true}]`)); decodeArrowBodyStyleOptionsError == nil {
 			test.Error("a misspelled key decoded, so the option it carried would be ignored")
 		}
 	})
 
 	test.Run("an unknown mode is rejected rather than silently disabling the rule", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeArrowBodyStyleOptions([]byte(`["AsNeeded"]`)); err == nil {
+		if _, decodeArrowBodyStyleOptionsError := DecodeArrowBodyStyleOptions([]byte(`["AsNeeded"]`)); decodeArrowBodyStyleOptionsError == nil {
 			test.Error("the Go constant's spelling decoded; it is not one of upstream's three modes")
 		}
 	})
 
 	test.Run("the retired object spelling is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeArrowBodyStyleOptions([]byte(`{"mode":"Always"}`)); err == nil {
+		if _, decodeArrowBodyStyleOptionsError := DecodeArrowBodyStyleOptions([]byte(`{"mode":"Always"}`)); decodeArrowBodyStyleOptionsError == nil {
 			test.Error("the pre-list object spelling decoded, which the config layer never delivers")
 		}
 	})

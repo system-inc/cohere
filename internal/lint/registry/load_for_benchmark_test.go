@@ -20,8 +20,8 @@ func BenchmarkLoadForTheLiveConfig(benchmark *testing.B) {
 	path := corpus.Ahra.Path(benchmark, "CohereSettings.json")
 	names := Names()
 	for benchmark.Loop() {
-		if _, err := configuration.LoadFor(path, names); err != nil {
-			benchmark.Fatal(err)
+		if _, loadForError := configuration.LoadFor(path, names); loadForError != nil {
+			benchmark.Fatal(loadForError)
 		}
 	}
 }

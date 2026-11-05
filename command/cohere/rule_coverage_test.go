@@ -28,8 +28,8 @@ func countedLineTerms(test *testing.T, output string) (int, map[string]int) {
 			continue
 		}
 		head, tail, _ := strings.Cut(strings.TrimPrefix(line, "coverage: "), " = ")
-		total, err := strconv.Atoi(strings.TrimSuffix(head, " rules"))
-		if err != nil {
+		total, parseError := strconv.Atoi(strings.TrimSuffix(head, " rules"))
+		if parseError != nil {
 			test.Fatalf("the counted line does not start with a rule total: %q", line)
 		}
 		terms := map[string]int{}
@@ -38,8 +38,8 @@ func countedLineTerms(test *testing.T, output string) (int, map[string]int) {
 		}
 		for _, term := range strings.Split(tail, " + ") {
 			count, label, _ := strings.Cut(term, " ")
-			value, err := strconv.Atoi(count)
-			if err != nil {
+			value, parseError := strconv.Atoi(count)
+			if parseError != nil {
 				test.Fatalf("a term with no count: %q in %q", term, line)
 			}
 			terms[label] = value
@@ -113,12 +113,12 @@ func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
 	}
 
 	// The Swift record's parts add up to its whole the same way.
-	swift, err := classifyEngineCoverage(&engineLintRecord{
+	swift, classifyEngineCoverageError := classifyEngineCoverage(&engineLintRecord{
 		RulesRun: 9, RulesWatchedAndQuiet: 3, RulesSilent: []string{"a", "b", "c"},
 		RulesNotConfigured: []string{"a"}, RulesScopedOff: map[string]int{"b": 2, "quiet-but-partly-off": 1},
 	})
-	if err != nil {
-		test.Fatal(err)
+	if classifyEngineCoverageError != nil {
+		test.Fatal(classifyEngineCoverageError)
 	}
 	if swift.total() != 9 || swift.count(coverageFoundSomething) != 3 {
 		test.Fatalf("the Swift summary accounts for %d rules with %d found something, want 9 and 3", swift.total(), swift.count(coverageFoundSomething))
@@ -129,9 +129,9 @@ func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
 // counted line would state arithmetic nobody can vouch for.
 func TestSwiftCoverageRefusesPartsLargerThanTheWhole(test *testing.T) {
 	test.Parallel()
-	_, err := classifyEngineCoverage(&engineLintRecord{RulesRun: 2, RulesWatchedAndQuiet: 2, RulesSilent: []string{"a"}})
-	if err == nil || !strings.Contains(err.Error(), "more than that") {
-		test.Fatalf("a record counting 3 rules among 2 was accepted: %v", err)
+	_, classifyEngineCoverageError := classifyEngineCoverage(&engineLintRecord{RulesRun: 2, RulesWatchedAndQuiet: 2, RulesSilent: []string{"a"}})
+	if classifyEngineCoverageError == nil || !strings.Contains(classifyEngineCoverageError.Error(), "more than that") {
+		test.Fatalf("a record counting 3 rules among 2 was accepted: %v", classifyEngineCoverageError)
 	}
 }
 

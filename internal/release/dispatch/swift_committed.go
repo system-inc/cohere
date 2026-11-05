@@ -67,8 +67,8 @@ func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, c
 		return binaryPath, false, nil
 	}
 
-	if err := os.MkdirAll(paths.CacheDirectory, 0o755); err != nil {
-		return "", false, fmt.Errorf("creating %s: %w", paths.CacheDirectory, err)
+	if createDirectoryError := os.MkdirAll(paths.CacheDirectory, 0o755); createDirectoryError != nil {
+		return "", false, fmt.Errorf("creating %s: %w", paths.CacheDirectory, createDirectoryError)
 	}
 	unlock, err := lockExclusive(paths.swiftSourceLock())
 	if err != nil {
@@ -83,8 +83,8 @@ func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, c
 	}
 
 	worktree := paths.SwiftSourceWorktree()
-	if err := checkOutWorktree(paths.ModuleDirectory, worktree, commit); err != nil {
-		return "", false, err
+	if checkOutWorktreeError := checkOutWorktree(paths.ModuleDirectory, worktree, commit); checkOutWorktreeError != nil {
+		return "", false, checkOutWorktreeError
 	}
 
 	// Built to a temporary name and renamed only once proven, so a concurrent run never execs a binary
@@ -95,11 +95,11 @@ func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, c
 	if err := buildSwiftProduct(filepath.Join(worktree, "swift"), paths.SwiftCommittedBuildDirectory(), temporary); err != nil {
 		return "", false, err
 	}
-	if err := proveCommittedSwiftEngine(temporary, commit, contract); err != nil {
-		return "", false, err
+	if proveCommittedSwiftEngineError := proveCommittedSwiftEngine(temporary, commit, contract); proveCommittedSwiftEngineError != nil {
+		return "", false, proveCommittedSwiftEngineError
 	}
-	if err := os.Rename(temporary, binaryPath); err != nil {
-		return "", false, fmt.Errorf("moving the built Swift engine into the cache: %w", err)
+	if renameError := os.Rename(temporary, binaryPath); renameError != nil {
+		return "", false, fmt.Errorf("moving the built Swift engine into the cache: %w", renameError)
 	}
 	return binaryPath, true, nil
 }
@@ -110,9 +110,9 @@ func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, c
 // commit. A cache hit therefore never touches the worktree, and after the first run at a commit it
 // starts no git either: see swiftEngineInputObjects.
 func committedSwiftEngineHash(paths Paths, commit string, toolchain string) (string, error) {
-	objects, err := swiftEngineInputObjects(paths, commit)
-	if err != nil {
-		return "", err
+	objects, swiftEngineInputObjectsError := swiftEngineInputObjects(paths, commit)
+	if swiftEngineInputObjectsError != nil {
+		return "", swiftEngineInputObjectsError
 	}
 
 	digest := sha256.New()
@@ -134,7 +134,7 @@ func committedSwiftEngineHash(paths Paths, commit string, toolchain string) (str
 func swiftEngineInputObjects(paths Paths, commit string) ([]string, error) {
 	list := sha256.Sum256([]byte(strings.Join(swiftEngineInputs, "\x00")))
 	kept := filepath.Join(paths.CacheDirectory, "swift-inputs", commit+"-"+hex.EncodeToString(list[:])[:hashLength])
-	if contents, err := os.ReadFile(kept); err == nil {
+	if contents, readError := os.ReadFile(kept); readError == nil {
 		objects := strings.Fields(string(contents))
 		valid := len(objects) == len(swiftEngineInputs)
 		for _, object := range objects {
@@ -150,11 +150,11 @@ func swiftEngineInputObjects(paths Paths, commit string) ([]string, error) {
 		specifications = append(specifications, commit+":"+input)
 	}
 	// No --verify: it accepts exactly one argument. Each specification here is `<hex commit>:<path>`.
-	output, err := gitOutput(paths.ModuleDirectory, append([]string{"rev-parse"}, specifications...)...)
-	if err != nil {
+	output, gitOutputError := gitOutput(paths.ModuleDirectory, append([]string{"rev-parse"}, specifications...)...)
+	if gitOutputError != nil {
 		// rev-parse with several arguments stops at the first it cannot resolve, so the message names
 		// what was asked rather than guessing which one was missing.
-		return nil, fmt.Errorf("reading the Swift engine's inputs at %s (%s): %w", release.ShortCommit(commit), strings.Join(swiftEngineInputs, ", "), err)
+		return nil, fmt.Errorf("reading the Swift engine's inputs at %s (%s): %w", release.ShortCommit(commit), strings.Join(swiftEngineInputs, ", "), gitOutputError)
 	}
 	objects := strings.Fields(output)
 	if len(objects) != len(swiftEngineInputs) {
@@ -163,8 +163,8 @@ func swiftEngineInputObjects(paths Paths, commit string) ([]string, error) {
 
 	// Kept through a temporary and a rename, so a concurrent run reads a whole answer or none. Failing to
 	// keep it costs the next run one git call, so it is not an error.
-	if err := os.MkdirAll(filepath.Dir(kept), 0o755); err == nil {
-		if temporary, err := os.CreateTemp(filepath.Dir(kept), ".inputs-*"); err == nil {
+	if createDirectoryError := os.MkdirAll(filepath.Dir(kept), 0o755); createDirectoryError == nil {
+		if temporary, temporaryFileError := os.CreateTemp(filepath.Dir(kept), ".inputs-*"); temporaryFileError == nil {
 			_, writeErr := temporary.WriteString(strings.Join(objects, "\n") + "\n")
 			closeErr := temporary.Close()
 			if writeErr != nil || closeErr != nil || os.Rename(temporary.Name(), kept) != nil {
@@ -177,29 +177,29 @@ func swiftEngineInputObjects(paths Paths, commit string) ([]string, error) {
 
 // checkOutWorktree puts the worktree at commit, creating it the first time.
 func checkOutWorktree(moduleDirectory string, worktree string, commit string) error {
-	if _, err := os.Stat(worktree); errors.Is(err, os.ErrNotExist) {
-		if _, err := gitOutput(moduleDirectory, "worktree", "add", "--detach", worktree, commit); err != nil {
-			return fmt.Errorf("creating the Swift engine's worktree at %s: %w", worktree, err)
+	if _, statError := os.Stat(worktree); errors.Is(statError, os.ErrNotExist) {
+		if _, gitOutputError := gitOutput(moduleDirectory, "worktree", "add", "--detach", worktree, commit); gitOutputError != nil {
+			return fmt.Errorf("creating the Swift engine's worktree at %s: %w", worktree, gitOutputError)
 		}
 		return requireWorktreeAt(worktree, commit)
 	}
 
 	// The worktree exists, so it must be ours and clean before it moves. A plain checkout refuses to
 	// overwrite local changes on its own; this says why before git does, and names the path.
-	if err := requireCleanWorktree(worktree); err != nil {
-		return err
+	if requireCleanWorktreeError := requireCleanWorktree(worktree); requireCleanWorktreeError != nil {
+		return requireCleanWorktreeError
 	}
-	if _, err := gitOutput(worktree, "checkout", "--quiet", "--detach", commit); err != nil {
-		return fmt.Errorf("moving the Swift engine's worktree to %s: %w", release.ShortCommit(commit), err)
+	if _, gitOutputError := gitOutput(worktree, "checkout", "--quiet", "--detach", commit); gitOutputError != nil {
+		return fmt.Errorf("moving the Swift engine's worktree to %s: %w", release.ShortCommit(commit), gitOutputError)
 	}
 	return requireWorktreeAt(worktree, commit)
 }
 
 // requireCleanWorktree refuses a worktree with anything uncommitted in it, untracked files included.
 func requireCleanWorktree(worktree string) error {
-	status, err := gitOutput(worktree, "status", "--porcelain")
-	if err != nil {
-		return fmt.Errorf("%s is not a usable git worktree, so the Swift engine was not built (remove it by name and it will be recreated): %w", worktree, err)
+	status, gitOutputError := gitOutput(worktree, "status", "--porcelain")
+	if gitOutputError != nil {
+		return fmt.Errorf("%s is not a usable git worktree, so the Swift engine was not built (remove it by name and it will be recreated): %w", worktree, gitOutputError)
 	}
 	if strings.TrimSpace(status) != "" {
 		return fmt.Errorf("the Swift engine's worktree %s has changes nobody should have made there, so it was not moved or built:\n%s",
@@ -211,9 +211,9 @@ func requireCleanWorktree(worktree string) error {
 // requireWorktreeAt confirms the worktree is clean and at commit, which is what the build is about to
 // claim.
 func requireWorktreeAt(worktree string, commit string) error {
-	head, err := gitOutput(worktree, "rev-parse", "HEAD")
-	if err != nil {
-		return fmt.Errorf("reading the Swift engine's worktree: %w", err)
+	head, gitOutputError := gitOutput(worktree, "rev-parse", "HEAD")
+	if gitOutputError != nil {
+		return fmt.Errorf("reading the Swift engine's worktree: %w", gitOutputError)
 	}
 	if strings.TrimSpace(head) != commit {
 		return fmt.Errorf("the Swift engine's worktree is at %s after checking out %s", release.ShortCommit(strings.TrimSpace(head)), release.ShortCommit(commit))
@@ -231,10 +231,10 @@ func proveCommittedSwiftEngine(binaryPath string, commit string, contract int) e
 	command := exec.Command(binaryPath, "--contract", fmt.Sprint(contract), "--version")
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
-	output, err := command.Output()
-	if err != nil {
+	output, outputError := command.Output()
+	if outputError != nil {
 		return fmt.Errorf("the Swift engine built from %s failed its own --version (%w), so it was not cached: %s",
-			release.ShortCommit(commit), err, strings.TrimSpace(standardError.String()))
+			release.ShortCommit(commit), outputError, strings.TrimSpace(standardError.String()))
 	}
 
 	scanner := bufio.NewScanner(bytes.NewReader(output))

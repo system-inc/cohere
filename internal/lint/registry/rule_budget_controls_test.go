@@ -19,8 +19,8 @@ import (
 
 func budgetThreadCPU() time.Duration {
 	var spec unix.Timespec
-	if err := unix.ClockGettime(unix.CLOCK_THREAD_CPUTIME_ID, &spec); err != nil {
-		panic(err)
+	if clockGettimeError := unix.ClockGettime(unix.CLOCK_THREAD_CPUTIME_ID, &spec); clockGettimeError != nil {
+		panic(clockGettimeError)
 	}
 	return time.Duration(spec.Nano())
 }
@@ -61,9 +61,9 @@ func TestRuleBudgetBoundsANonReturningListener(test *testing.T) {
 		stuck := rule.Rule{Name: "planted-nonreturning", Run: func(ctx rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) { select {} }}
 		}}
-		_, err := checkRuleBudget(test, graph, []rule.Rule{stuck}, 20*time.Millisecond)
-		if err != nil {
-			test.Fatal(err)
+		_, checkRuleBudgetError := checkRuleBudget(test, graph, []rule.Rule{stuck}, 20*time.Millisecond)
+		if checkRuleBudgetError != nil {
+			test.Fatal(checkRuleBudgetError)
 		}
 		return
 	}
@@ -97,8 +97,8 @@ func TestRuleBudgetRefuses6911526cThroughGoOverlay(test *testing.T) {
 	add := func(target string, source []byte) {
 		test.Helper()
 		path := filepath.Join(directory, fmt.Sprintf("overlay-%d%s", len(replacements), filepath.Ext(target)))
-		if err := os.WriteFile(path, source, 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, source, 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		replacements[filepath.Join(root, target)] = path
 	}
@@ -107,14 +107,14 @@ func TestRuleBudgetRefuses6911526cThroughGoOverlay(test *testing.T) {
 		test.Fatal(err)
 	}
 	target := "internal/lint/rules/adamic/no_cross_enum_narrowing.go"
-	if _, err := os.Stat(filepath.Join(root, target)); os.IsNotExist(err) {
+	if _, statError := os.Stat(filepath.Join(root, target)); os.IsNotExist(statError) {
 		add("internal/lint/rules/adamic/no_cross_enum_narrowing_register.go", []byte(`package adamic
 import "github.com/system-inc/cohere/internal/lint/rule"
 func init() { rule.Register(rule.Registration{Rule: NoCrossEnumNarrowing}) }
 `))
 		add("policy/messages/no-cross-enum-narrowing.json", []byte(`{"rules":{"TypeScript":"adamic/no-cross-enum-narrowing"},"messages":{"crossEnumNarrowing":{"text":"{{other}} collides with {{member}} at {{value}}"}}}`))
-	} else if err != nil {
-		test.Fatal(err)
+	} else if statError != nil {
+		test.Fatal(statError)
 	}
 	add(target, source)
 	overlay, err := json.Marshal(map[string]any{"Replace": replacements})
@@ -122,8 +122,8 @@ func init() { rule.Register(rule.Registration{Rule: NoCrossEnumNarrowing}) }
 		test.Fatal(err)
 	}
 	overlayPath := filepath.Join(directory, "overlay.json")
-	if err := os.WriteFile(overlayPath, overlay, 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(overlayPath, overlay, 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	command := exec.Command("go", "test", "-overlay="+overlayPath, "./internal/lint/registry", "-count=1", "-timeout=30s", "-run=^TestRegisteredRuleCPUBudget$", "-v")
 	command.Dir = root

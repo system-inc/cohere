@@ -13,7 +13,7 @@ import (
 func listEverything(test *testing.T, root string) *program.DirectoryListings {
 	test.Helper()
 	listings := program.NewDirectoryListings()
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || !entry.IsDir() {
 			return err
 		}
@@ -24,8 +24,8 @@ func listEverything(test *testing.T, root string) *program.DirectoryListings {
 		listings.Add(path, entries)
 		return nil
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	return listings
 }
@@ -35,9 +35,9 @@ func listEverything(test *testing.T, root string) *program.DirectoryListings {
 func listingsReport(test *testing.T, directory string, listings *program.DirectoryListings) (ours []string, present []string, absent []string) {
 	test.Helper()
 	recorder := program.NewInputRecorder()
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, Inputs: recorder, Listings: listings})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, Inputs: recorder, Listings: listings})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 	for _, sourceFile := range graph.ProjectFiles() {
 		ours = append(ours, sourceFile.FileName().AsString())
@@ -57,7 +57,7 @@ func listingsReport(test *testing.T, directory string, listings *program.Directo
 // really reads the listings and the comparison can fail.
 func TestABuildListsFromDiscoverysListingsAsFromDisk(test *testing.T) {
 	test.Parallel()
-	directory, err := filepath.EvalSymlinks(writeProject(test, map[string]string{
+	directory, resolveSymlinksError := filepath.EvalSymlinks(writeProject(test, map[string]string{
 		"tsconfig.json":          `{"compilerOptions": {"target": "ES2022", "strict": true, "noEmit": true}, "include": ["src/**/*.ts"]}`,
 		"src/index.ts":           "export const index = 1;\n",
 		"src/nested/deep/a.ts":   "export const a = 1;\n",
@@ -66,16 +66,16 @@ func TestABuildListsFromDiscoverysListingsAsFromDisk(test *testing.T) {
 		"elsewhere/dir/inner.ts": "export const inner = 1;\n",
 		"outside/ignored.ts":     "export const ignored = 1;\n",
 	}))
-	if err != nil {
-		test.Fatal(err)
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
 	}
 	for link, target := range map[string]string{
 		"src/linked.ts":   "../elsewhere/linked.ts",
 		"src/linkeddir":   "../elsewhere/dir",
 		"src/dangling.ts": "../nowhere.ts",
 	} {
-		if err := os.Symlink(target, filepath.Join(directory, link)); err != nil {
-			test.Fatal(err)
+		if symlinkError := os.Symlink(target, filepath.Join(directory, link)); symlinkError != nil {
+			test.Fatal(symlinkError)
 		}
 	}
 
@@ -104,9 +104,9 @@ func TestABuildListsFromDiscoverysListingsAsFromDisk(test *testing.T) {
 func TestListingAnswersForWhatWasListedAndOnlyThat(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{"a.ts": "export const a = 1;\n", "sub/b.ts": "export const b = 1;\n"})
-	entries, err := os.ReadDir(directory)
-	if err != nil {
-		test.Fatal(err)
+	entries, readDirectoryError := os.ReadDir(directory)
+	if readDirectoryError != nil {
+		test.Fatal(readDirectoryError)
 	}
 	listings := program.NewDirectoryListings()
 	listings.Add(directory, entries)

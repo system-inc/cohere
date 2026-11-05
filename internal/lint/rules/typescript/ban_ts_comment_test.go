@@ -27,9 +27,9 @@ func decodeBanTsCommentOptions(test *testing.T, configuration string) any {
 		// here is what puts the rule's own fallback under test rather than the decoder's.
 		return nil
 	}
-	options, err := DecodeBanTsCommentOptions([]byte(configuration))
-	if err != nil {
-		test.Fatalf("could not decode %s: %v", configuration, err)
+	options, decodeBanTsCommentOptionsError := DecodeBanTsCommentOptions([]byte(configuration))
+	if decodeBanTsCommentOptionsError != nil {
+		test.Fatalf("could not decode %s: %v", configuration, decodeBanTsCommentOptionsError)
 	}
 	return options
 }
@@ -224,9 +224,9 @@ func TestDecodeBanTsCommentOptionsReadsEveryShape(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(banTsCommentCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeBanTsCommentOptions([]byte(testCase.configuration))
-			if err != nil {
-				test.Fatalf("could not decode %s: %v", testCase.configuration, err)
+			decoded, decodeBanTsCommentOptionsError := DecodeBanTsCommentOptions([]byte(testCase.configuration))
+			if decodeBanTsCommentOptionsError != nil {
+				test.Fatalf("could not decode %s: %v", testCase.configuration, decodeBanTsCommentOptionsError)
 			}
 			options, isOptions := decoded.(BanTsCommentOptions)
 			if !isOptions {
@@ -256,9 +256,9 @@ func TestDecodeBanTsCommentOptionsRefusesWhatUpstreamRefuses(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(banTsCommentCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			_, err := DecodeBanTsCommentOptions([]byte(testCase.configuration))
-			if err == nil || !strings.Contains(err.Error(), testCase.want) {
-				test.Fatalf("decoding %s: error %v, want one containing %q", testCase.configuration, err, testCase.want)
+			_, decodeBanTsCommentOptionsError := DecodeBanTsCommentOptions([]byte(testCase.configuration))
+			if decodeBanTsCommentOptionsError == nil || !strings.Contains(decodeBanTsCommentOptionsError.Error(), testCase.want) {
+				test.Fatalf("decoding %s: error %v, want one containing %q", testCase.configuration, decodeBanTsCommentOptionsError, testCase.want)
 			}
 		})
 	}

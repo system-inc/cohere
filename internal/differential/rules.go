@@ -52,7 +52,7 @@ var ruleCountPattern = regexp.MustCompile(`^lint: \d+ findings? — (\d+) rules?
 // registry linked into this harness, which is the entire point: when the two builds differ, a
 // classification read from the wrong registry describes the wrong tool and says so confidently.
 func CompiledRulesOf(ctx context.Context, command GateCommand, explainFile string) (map[string]bool, error) {
-	if names, err := rulesFromRulesFlag(ctx, command); err == nil {
+	if names, rulesFromRulesFlagError := rulesFromRulesFlag(ctx, command); rulesFromRulesFlagError == nil {
 		return names, nil
 	}
 	return rulesFromExplain(ctx, command, explainFile)
@@ -119,15 +119,15 @@ func rulesFromExplain(ctx context.Context, command GateCommand, explainFile stri
 	probe := command
 	probe.Arguments = []string{"-explain", explainFile}
 
-	output, err := runGate(ctx, probe)
-	if err != nil {
+	output, runGateError := runGate(ctx, probe)
+	if runGateError != nil {
 		// A binary predating `-explain` cannot answer, and that is a real state rather than a
 		// broken one: the harness is measuring an older build. It is an error rather than a silent
 		// fallback to this harness's own registry, because that fallback is exactly the defect
 		// being fixed, and a caller that wants the old behavior should have to ask for it.
 		return nil, fmt.Errorf(
 			"%s cannot report its own rules, so classification would describe this harness rather than the binary being measured: %w",
-			command.Program, err,
+			command.Program, runGateError,
 		)
 	}
 

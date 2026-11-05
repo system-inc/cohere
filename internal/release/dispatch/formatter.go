@@ -43,12 +43,12 @@ const FormatterPassLoop = "command/cohere/format.go"
 // caught by TestFormatterInputsCoverWhatCanChangeTheOutput, which needs the real module's list to be
 // whole.
 func FormatterIdentity(moduleDirectory string, goVersion string, environment []string) (string, error) {
-	if _, err := os.Stat(filepath.Join(moduleDirectory, filepath.FromSlash(formatterPackage))); errors.Is(err, os.ErrNotExist) {
+	if _, statError := os.Stat(filepath.Join(moduleDirectory, filepath.FromSlash(formatterPackage))); errors.Is(statError, os.ErrNotExist) {
 		return "", nil
 	}
-	inputs, err := FormatterInputs(moduleDirectory, environment)
-	if err != nil {
-		return "", err
+	inputs, formatterInputsError := FormatterInputs(moduleDirectory, environment)
+	if formatterInputsError != nil {
+		return "", formatterInputsError
 	}
 	return hashFormatterInputs(goVersion, inputs), nil
 }
@@ -84,9 +84,9 @@ func FormatterInputs(moduleDirectory string, environment []string) ([]FormatterI
 		if len(fields) != 3 {
 			continue
 		}
-		sum, err := fileSum(filepath.Join(fields[1], fields[2]))
-		if err != nil {
-			return nil, err
+		sum, fileSumError := fileSum(filepath.Join(fields[1], fields[2]))
+		if fileSumError != nil {
+			return nil, fileSumError
 		}
 		inputs = append(inputs, FormatterInput{Name: fields[0] + "/" + filepath.ToSlash(fields[2]), Sum: sum})
 	}
@@ -119,9 +119,9 @@ func hashFormatterInputs(goVersion string, inputs []FormatterInput) string {
 }
 
 func fileSum(path string) (string, error) {
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("reading formatter input %s: %w", path, err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		return "", fmt.Errorf("reading formatter input %s: %w", path, readError)
 	}
 	sum := sha256.Sum256(contents)
 	return hex.EncodeToString(sum[:]), nil

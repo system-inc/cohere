@@ -30,7 +30,7 @@ func eachTestFile(test *testing.T, visit func(path string, source []byte) error)
 			// A directory with a go.mod of its own is another module (the TypeScript shims), which this
 			// module's go test ./... never runs, so its tests are not this module's policies to hold.
 			if path != root {
-				if _, err := os.Stat(filepath.Join(path, "go.mod")); err == nil {
+				if _, statError := os.Stat(filepath.Join(path, "go.mod")); statError == nil {
 					return filepath.SkipDir
 				}
 			}
@@ -39,9 +39,9 @@ func eachTestFile(test *testing.T, visit func(path string, source []byte) error)
 		if !strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		source, err := os.ReadFile(path)
-		if err != nil {
-			return err
+		source, readError := os.ReadFile(path)
+		if readError != nil {
+			return readError
 		}
 		files++
 		return visit(path, source)

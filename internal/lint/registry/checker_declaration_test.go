@@ -116,9 +116,9 @@ type checkerDeclaration struct {
 func checkerDeclarationsOnDisk(test *testing.T) []checkerDeclaration {
 	test.Helper()
 
-	paths, err := filepath.Glob("../rules/*/*.go")
-	if err != nil {
-		test.Fatalf("globbing rule files: %v", err)
+	paths, globError := filepath.Glob("../rules/*/*.go")
+	if globError != nil {
+		test.Fatalf("globbing rule files: %v", globError)
 	}
 
 	var found []checkerDeclaration

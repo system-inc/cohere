@@ -18,9 +18,9 @@ import (
 )
 
 func main() {
-	files, err := notices.Generate(".")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "notices: %v\n", err)
+	files, generateError := notices.Generate(".")
+	if generateError != nil {
+		fmt.Fprintf(os.Stderr, "notices: %v\n", generateError)
 		os.Exit(1)
 	}
 	names := make([]string, 0, len(files))
@@ -29,8 +29,8 @@ func main() {
 	}
 	slices.Sort(names)
 	for _, name := range names {
-		if err := os.WriteFile(filepath.Join(".", name), files[name], 0o644); err != nil {
-			fmt.Fprintf(os.Stderr, "notices: writing %s: %v\n", name, err)
+		if writeError := os.WriteFile(filepath.Join(".", name), files[name], 0o644); writeError != nil {
+			fmt.Fprintf(os.Stderr, "notices: writing %s: %v\n", name, writeError)
 			os.Exit(1)
 		}
 		fmt.Printf("wrote %s (%d bytes)\n", name, len(files[name]))

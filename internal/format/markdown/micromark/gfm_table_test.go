@@ -154,13 +154,13 @@ func TestGfmTableAlignMatchesUpstream(test *testing.T) {
 	if !strings.Contains(gfmTableAlignOracleScript, "_align") {
 		test.Fatal("the align oracle script no longer matches the event oracle's")
 	}
-	if _, err := exec.LookPath("node"); err != nil {
+	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
 		test.Skip("node is not installed; the event oracle needs it")
 	}
 	directory := test.TempDir()
 	script := filepath.Join(directory, "align.mjs")
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(gfmTableAlignOracleScript, "FORK", forkRoot(test))), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(gfmTableAlignOracleScript, "FORK", forkRoot(test))), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	encoded, err := json.Marshal(gfmTableFixtures)
 	if err != nil {
@@ -173,8 +173,8 @@ func TestGfmTableAlignMatchesUpstream(test *testing.T) {
 		test.Fatal(err)
 	}
 	var expected [][]string
-	if err := json.Unmarshal(output, &expected); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(output, &expected); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	tables := 0
 	for index, input := range gfmTableFixtures {

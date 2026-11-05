@@ -19,9 +19,9 @@ import (
 // shape of green that means nothing.
 func fixturePath(test *testing.T, name string) string {
 	test.Helper()
-	absolute, err := filepath.Abs(filepath.Join("testdata", name))
-	if err != nil {
-		test.Fatalf("resolving the %s fixture: %v", name, err)
+	absolute, absolutePathError := filepath.Abs(filepath.Join("testdata", name))
+	if absolutePathError != nil {
+		test.Fatalf("resolving the %s fixture: %v", name, absolutePathError)
 	}
 	return absolute
 }

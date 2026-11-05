@@ -240,13 +240,13 @@ func TestCohereAgreesWithESLintsCoreCorpus(test *testing.T) {
 		}
 	}
 
-	gapsText, err := os.ReadFile(eslintCorpusGapsFile)
-	if err != nil {
-		test.Fatal(err)
+	gapsText, readError := os.ReadFile(eslintCorpusGapsFile)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	knownGaps := map[string]map[string]string{}
-	if err := json.Unmarshal(gapsText, &knownGaps); err != nil {
-		test.Fatalf("reading %s: %v", eslintCorpusGapsFile, err)
+	if decodeError := json.Unmarshal(gapsText, &knownGaps); decodeError != nil {
+		test.Fatalf("reading %s: %v", eslintCorpusGapsFile, decodeError)
 	}
 
 	corpus := map[string][]eslintCorpusRow{}
@@ -258,8 +258,8 @@ func TestCohereAgreesWithESLintsCoreCorpus(test *testing.T) {
 			continue
 		}
 		var rows []eslintCorpusRow
-		if err := json.Unmarshal(text, &rows); err != nil {
-			test.Fatalf("reading %s's rows: %v", name, err)
+		if decodeError := json.Unmarshal(text, &rows); decodeError != nil {
+			test.Fatalf("reading %s's rows: %v", name, decodeError)
 		}
 		corpus[name] = rows
 		rowCount += len(rows)
@@ -324,8 +324,8 @@ func TestCohereAgreesWithESLintsCoreCorpus(test *testing.T) {
 			}
 		}
 		encoded, _ := json.MarshalIndent(found, "", "    ")
-		if err := os.WriteFile(eslintCorpusGapsFile, append(encoded, '\n'), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(eslintCorpusGapsFile, append(encoded, '\n'), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 }

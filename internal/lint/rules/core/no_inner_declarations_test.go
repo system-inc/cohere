@@ -29,9 +29,9 @@ import (
 // does. An empty string stands for a rule configured as a bare severity.
 func decodeNoInnerDeclarationsForTest(test *testing.T, optionsJson string) any {
 	test.Helper()
-	decoded, err := DecodeNoInnerDeclarationsOptions([]byte(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding %q: %v", optionsJson, err)
+	decoded, decodeNoInnerDeclarationsOptionsError := DecodeNoInnerDeclarationsOptions([]byte(optionsJson))
+	if decodeNoInnerDeclarationsOptionsError != nil {
+		test.Fatalf("decoding %q: %v", optionsJson, decodeNoInnerDeclarationsOptionsError)
 	}
 	return decoded
 }
@@ -209,9 +209,9 @@ func TestDecodeNoInnerDeclarationsOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoInnerDeclarationsOptions([]byte(testCase.optionsJson))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", testCase.optionsJson, err)
+			decoded, decodeNoInnerDeclarationsOptionsError := DecodeNoInnerDeclarationsOptions([]byte(testCase.optionsJson))
+			if decodeNoInnerDeclarationsOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.optionsJson, decodeNoInnerDeclarationsOptionsError)
 			}
 			settings, isSettings := decoded.(NoInnerDeclarationsOptions)
 			if !isSettings {
@@ -239,7 +239,7 @@ func TestDecodeNoInnerDeclarationsOptions(test *testing.T) {
 		`["both", {"blockScopedFunction": "allow"}]`,
 		`["both", {"blockScopedFunctions": "allow"}, "functions"]`,
 	} {
-		if _, err := DecodeNoInnerDeclarationsOptions([]byte(bad)); err == nil {
+		if _, decodeNoInnerDeclarationsOptionsError := DecodeNoInnerDeclarationsOptions([]byte(bad)); decodeNoInnerDeclarationsOptionsError == nil {
 			test.Errorf("decoding %q should have failed, and a silent fallback to the default would "+
 				"turn a typo into a configuration nobody wrote", bad)
 		}

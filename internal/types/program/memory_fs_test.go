@@ -42,9 +42,9 @@ func inMemory(root string, files map[string]string) map[string]string {
 // its file and position, sorted.
 func buildReport(test *testing.T, options program.Options) (files []string, ours []string, diagnostics []string) {
 	test.Helper()
-	graph, err := program.Build(options)
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(options)
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 	root := options.CurrentDirectory
 	relative := func(fileName string) string {
@@ -78,9 +78,9 @@ func TestAMemoryProgramReportsWhatTheDiskProgramDoes(test *testing.T) {
 	test.Parallel()
 	// Resolved first: the compiler reads a node_modules package by its real path, and a temporary directory
 	// on macOS sits behind the /tmp symbolic link, which nothing in memory is.
-	directory, err := filepath.EvalSymlinks(writeProject(test, memoryFixture))
-	if err != nil {
-		test.Fatal(err)
+	directory, resolveSymlinksError := filepath.EvalSymlinks(writeProject(test, memoryFixture))
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
 	}
 	diskFiles, diskOurs, diskDiagnostics := buildReport(test, program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 
@@ -150,7 +150,7 @@ func TestAMemoryFSListsItsTree(test *testing.T) {
 	if information := memory.Stat("/project/sub/b.ts"); information == nil || information.IsDir() || information.Size() != 1 {
 		test.Errorf("a file's stat is %+v", information)
 	}
-	if err := memory.WriteFile("/project/new.ts", "x"); err == nil || memory.FileExists("/project/new.ts") {
+	if writeFileError := memory.WriteFile("/project/new.ts", "x"); writeFileError == nil || memory.FileExists("/project/new.ts") {
 		test.Error("a write to the read-only filesystem succeeded")
 	}
 }
@@ -178,8 +178,8 @@ func TestMemoryFSReadsBytesAsTheDiskDoes(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			onDisk := filepath.ToSlash(filepath.Join(directory, strings.ReplaceAll(testCase.name, " ", "-")+".ts"))
-			if err := os.WriteFile(onDisk, []byte(testCase.bytes), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(onDisk, []byte(testCase.bytes), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			fromDisk, diskOk := osvfs.FS().ReadFile(tspath.RootedFilePath(onDisk))
 			fromMemory, memoryOk := program.NewMemoryFS(map[string]string{"/fixture/a.ts": testCase.bytes}).ReadFile("/fixture/a.ts")

@@ -355,9 +355,9 @@ func TestTheEnginesRealParseErrorsAreRecognized(test *testing.T) {
 // changes who emits them. Measured by formatting malformed source, never written by hand.
 func TestTheNativeEnginesParseErrorsAreRecognized(test *testing.T) {
 	test.Parallel()
-	engine, err := configuredFormatter(true)
-	if err != nil {
-		test.Fatal(err)
+	engine, configuredFormatterError := configuredFormatter(true)
+	if configuredFormatterError != nil {
+		test.Fatal(configuredFormatterError)
 	}
 	for fileName, malformed := range map[string]string{
 		"a.ts":  "const a = ;\n",
@@ -383,9 +383,9 @@ func TestTheNativeEnginesParseErrorsAreRecognized(test *testing.T) {
 // With formatting off there is no formatter, and saying so is the coverage line's job, not an error.
 func TestFormattingOffConfiguresNoFormatter(test *testing.T) {
 	test.Parallel()
-	engine, err := configuredFormatter(false)
-	if err != nil || engine != nil {
-		test.Fatalf("formatting off configured %v, %v; want no formatter and no error", engine, err)
+	engine, configuredFormatterError := configuredFormatter(false)
+	if configuredFormatterError != nil || engine != nil {
+		test.Fatalf("formatting off configured %v, %v; want no formatter and no error", engine, configuredFormatterError)
 	}
 }
 

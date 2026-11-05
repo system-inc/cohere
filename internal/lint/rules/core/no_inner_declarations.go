@@ -69,26 +69,26 @@ type noInnerDeclarationsSecondOption struct {
 // which is upstream's `additionalProperties: false`, and so is a third element.
 func DecodeNoInnerDeclarationsOptions(list []byte) (any, error) {
 	settings := DefaultNoInnerDeclarationsSettings()
-	positional, err := rule.OptionElements(list, 2)
-	if err != nil {
-		return settings, err
+	positional, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil {
+		return settings, optionElementsError
 	}
 	if len(positional) > 0 {
 		var first string
-		if err := json.Unmarshal(positional[0], &first); err != nil {
-			return DefaultNoInnerDeclarationsSettings(), err
+		if decodeError := json.Unmarshal(positional[0], &first); decodeError != nil {
+			return DefaultNoInnerDeclarationsSettings(), decodeError
 		}
-		applied, err := noInnerDeclarationsApplyFirst(settings, first)
-		if err != nil {
-			return DefaultNoInnerDeclarationsSettings(), err
+		applied, noInnerDeclarationsApplyFirstError := noInnerDeclarationsApplyFirst(settings, first)
+		if noInnerDeclarationsApplyFirstError != nil {
+			return DefaultNoInnerDeclarationsSettings(), noInnerDeclarationsApplyFirstError
 		}
 		settings = applied
 	}
 	if len(positional) > 1 {
 		var second noInnerDeclarationsSecondOption
-		if err := rule.UnmarshalOptions(positional[1], &second); err != nil {
+		if unmarshalOptionsError := rule.UnmarshalOptions(positional[1], &second); unmarshalOptionsError != nil {
 			return DefaultNoInnerDeclarationsSettings(),
-				fmt.Errorf("no-inner-declarations element 2: %w", err)
+				fmt.Errorf("no-inner-declarations element 2: %w", unmarshalOptionsError)
 		}
 		if second.BlockScopedFunctions != nil {
 			switch *second.BlockScopedFunctions {

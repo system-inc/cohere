@@ -130,11 +130,11 @@ func TestCanonicalizeAgreesWithTailwind(test *testing.T) {
 // because an oracle that silently goes missing is a test that silently stops comparing.
 func readJsonFixture(test *testing.T, name string, into any) {
 	test.Helper()
-	contents, err := os.ReadFile(filepath.Clean(name))
-	if err != nil {
-		test.Fatalf("reading %s: %v", name, err)
+	contents, readError := os.ReadFile(filepath.Clean(name))
+	if readError != nil {
+		test.Fatalf("reading %s: %v", name, readError)
 	}
-	if err := json.Unmarshal(contents, into); err != nil {
-		test.Fatalf("decoding %s: %v", name, err)
+	if decodeError := json.Unmarshal(contents, into); decodeError != nil {
+		test.Fatalf("decoding %s: %v", name, decodeError)
 	}
 }

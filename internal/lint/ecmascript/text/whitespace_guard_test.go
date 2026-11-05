@@ -56,8 +56,8 @@ type goWhitespaceSite struct {
 func goWhitespaceSitesIn(fileSet *token.FileSet, file *ast.File, relative string) []goWhitespaceSite {
 	localNames := map[string]string{}
 	for _, specification := range file.Imports {
-		path, err := strconv.Unquote(specification.Path.Value)
-		if err != nil {
+		path, unquoteError := strconv.Unquote(specification.Path.Value)
+		if unquoteError != nil {
 			continue
 		}
 		if _, watched := goWhitespaceFunctions[path]; !watched {
@@ -114,9 +114,9 @@ func goWhitespaceSitesIn(fileSet *token.FileSet, file *ast.File, relative string
 // are left out: a test trimming its own expected output never reaches a verdict a user sees.
 func goWhitespaceSites(test *testing.T) []goWhitespaceSite {
 	test.Helper()
-	moduleRoot, err := filepath.Abs(filepath.Join("..", "..", "..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	moduleRoot, absolutePathError := filepath.Abs(filepath.Join("..", "..", "..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	var found []goWhitespaceSite
 	files := 0
@@ -213,9 +213,9 @@ func probe(value string, raw []byte) {
 }
 `
 	fileSet := token.NewFileSet()
-	file, err := parser.ParseFile(fileSet, "probe.go", source, parser.ParseComments)
-	if err != nil {
-		test.Fatal(err)
+	file, parseFileError := parser.ParseFile(fileSet, "probe.go", source, parser.ParseComments)
+	if parseFileError != nil {
+		test.Fatal(parseFileError)
 	}
 	var lines []string
 	for _, site := range goWhitespaceSitesIn(fileSet, file, "probe.go") {

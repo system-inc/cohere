@@ -38,8 +38,8 @@ func TestValidatorAgreesWithAjv(test *testing.T) {
 		test.Fatal(err)
 	}
 	var samples samplesFile
-	if err := json.Unmarshal(data, &samples); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(data, &samples); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	if !equalVersions(samples.GeneratedFrom, GeneratedFrom()) {
 		test.Fatalf("the samples were drawn from %v and the embedded schemas from %v; regenerate both together", samples.GeneratedFrom, GeneratedFrom())
@@ -48,9 +48,9 @@ func TestValidatorAgreesWithAjv(test *testing.T) {
 	var falseRefusals, falseAccepts []string
 	accepted, refused := 0, 0
 	for _, sample := range samples.Samples {
-		schema, found, err := For(sample.Rule)
-		if err != nil {
-			test.Fatalf("%s: %v", sample.Rule, err)
+		schema, found, optionSchemaForError := For(sample.Rule)
+		if optionSchemaForError != nil {
+			test.Fatalf("%s: %v", sample.Rule, optionSchemaForError)
 		}
 		if !found {
 			test.Fatalf("%s has a sample and no schema", sample.Rule)
@@ -90,8 +90,8 @@ func TestValidatorAgreesWithAjv(test *testing.T) {
 		var rows []struct {
 			Options []json.RawMessage `json:"options"`
 		}
-		if err := json.Unmarshal(data, &rows); err != nil {
-			test.Fatalf("%s: %v", entry.Name(), err)
+		if decodeError := json.Unmarshal(data, &rows); decodeError != nil {
+			test.Fatalf("%s: %v", entry.Name(), decodeError)
 		}
 		schema, found, err := For(ruleName)
 		if err != nil {
@@ -138,8 +138,8 @@ func TestEveryEmbeddedSchemaCompiles(test *testing.T) {
 	test.Parallel()
 
 	for _, name := range RuleNames() {
-		if _, _, err := For(name); err != nil {
-			test.Errorf("%s: %v", name, err)
+		if _, _, optionSchemaForError := For(name); optionSchemaForError != nil {
+			test.Errorf("%s: %v", name, optionSchemaForError)
 		}
 	}
 	if count := len(RuleNames()); count != 384 {
@@ -172,9 +172,9 @@ var pluginOrigins = map[string]bool{
 func TestSchemasCoverEveryPortedRule(test *testing.T) {
 	test.Parallel()
 
-	data, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "data", "rules.json"))
-	if err != nil {
-		test.Fatal(err)
+	data, readError := os.ReadFile(filepath.Join("..", "..", "..", "docs", "data", "rules.json"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	var rules struct {
 		Rules []struct {
@@ -182,8 +182,8 @@ func TestSchemasCoverEveryPortedRule(test *testing.T) {
 			Origin string `json:"origin"`
 		} `json:"rules"`
 	}
-	if err := json.Unmarshal(data, &rules); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(data, &rules); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	ported := map[string]bool{}
 	for _, row := range rules.Rules {
@@ -211,9 +211,9 @@ func TestEverySchemaAcceptsTheBareSeverity(test *testing.T) {
 	test.Parallel()
 
 	for _, name := range RuleNames() {
-		schema, found, err := For(name)
-		if err != nil {
-			test.Fatalf("%s: %v", name, err)
+		schema, found, optionSchemaForError := For(name)
+		if optionSchemaForError != nil {
+			test.Fatalf("%s: %v", name, optionSchemaForError)
 		}
 		if found {
 			if violation := schema.Validate(nil); violation != nil {
@@ -247,15 +247,15 @@ func TestTheBoundariesExtensionAcceptsElementsAndNothingElse(test *testing.T) {
 	test.Parallel()
 
 	withElements := []json.RawMessage{json.RawMessage(`{"default":"disallow","elements":[{"type":"api","pattern":"api/**"}]}`)}
-	if err := Check("boundaries/dependencies", withElements); err != nil {
-		test.Errorf("elements are refused: %v", err)
+	if checkError := Check("boundaries/dependencies", withElements); checkError != nil {
+		test.Errorf("elements are refused: %v", checkError)
 	}
 	schema, _, _ := For("boundaries/dependencies")
-	if err := schema.Validate(withElements); err == nil {
+	if validateError := schema.Validate(withElements); validateError == nil {
 		test.Errorf("upstream's schema accepts elements without the extension, so the extension is not needed")
 	}
 	otherKey := []json.RawMessage{json.RawMessage(`{"default":"disallow","elements":[],"notAnUpstreamKey":true}`)}
-	if err := Check("boundaries/dependencies", otherKey); err == nil {
+	if checkError := Check("boundaries/dependencies", otherKey); checkError == nil {
 		test.Errorf("a key outside the extension is accepted")
 	}
 }
@@ -265,13 +265,13 @@ func TestTheBoundariesExtensionAcceptsElementsAndNothingElse(test *testing.T) {
 func TestARefusalNamesTheElementThePathAndTheExpectation(test *testing.T) {
 	test.Parallel()
 
-	err := Check("@typescript-eslint/no-deprecated", []json.RawMessage{json.RawMessage(`{"allow":[{"from":"File","name":"x"}]}`)})
-	if err == nil {
+	checkError := Check("@typescript-eslint/no-deprecated", []json.RawMessage{json.RawMessage(`{"allow":[{"from":"File","name":"x"}]}`)})
+	if checkError == nil {
 		test.Fatal("a mis-cased from is accepted")
 	}
 	for _, want := range []string{"element 1 at allow[0]", "upstream's schema, which ESLint validates against, expects"} {
-		if !strings.Contains(err.Error(), want) {
-			test.Errorf("the refusal %q does not say %q", err, want)
+		if !strings.Contains(checkError.Error(), want) {
+			test.Errorf("the refusal %q does not say %q", checkError, want)
 		}
 	}
 }

@@ -117,8 +117,8 @@ func DecodePreferNullishCoalescingOptions(raw []byte) (any, error) {
 	}
 
 	var wire preferNullishCoalescingWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 
 	if wire.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing != nil {
@@ -143,9 +143,9 @@ func DecodePreferNullishCoalescingOptions(raw []byte) (any, error) {
 		options.ReactCompiler = *wire.ReactCompiler
 	}
 
-	primitives, err := decodePreferNullishCoalescingPrimitives(wire.IgnorePrimitives)
-	if err != nil {
-		return options, err
+	primitives, decodePreferNullishCoalescingPrimitivesError := decodePreferNullishCoalescingPrimitives(wire.IgnorePrimitives)
+	if decodePreferNullishCoalescingPrimitivesError != nil {
+		return options, decodePreferNullishCoalescingPrimitivesError
 	}
 	options.IgnorePrimitives = primitives
 	return options, nil
@@ -189,8 +189,8 @@ func decodePreferNullishCoalescingPrimitives(raw json.RawMessage) (
 		Number  *bool `json:"number"`
 		String  *bool `json:"string"`
 	}
-	if err := rule.UnmarshalOptions(raw, &asObject); err != nil {
-		return primitives, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &asObject); unmarshalOptionsError != nil {
+		return primitives, unmarshalOptionsError
 	}
 	primitives.Bigint = asObject.Bigint != nil && *asObject.Bigint
 	primitives.Boolean = asObject.Boolean != nil && *asObject.Boolean

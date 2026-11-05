@@ -211,8 +211,8 @@ func OptionElements(list []byte, maximum int) ([]json.RawMessage, error) {
 		return nil, nil
 	}
 	var elements []json.RawMessage
-	if err := json.Unmarshal(list, &elements); err != nil {
-		return nil, fmt.Errorf("the option list is not a JSON array: %w", err)
+	if decodeError := json.Unmarshal(list, &elements); decodeError != nil {
+		return nil, fmt.Errorf("the option list is not a JSON array: %w", decodeError)
 	}
 	if len(elements) <= maximum {
 		return elements, nil
@@ -242,8 +242,8 @@ func DecodeOptionsInto[Options any]() func(raw []byte) (any, error) {
 		if len(raw) == 0 {
 			return decoded, fmt.Errorf("no options were configured")
 		}
-		if err := UnmarshalOptions(raw, &decoded); err != nil {
-			return decoded, fmt.Errorf("decoding %T: %w", decoded, err)
+		if unmarshalOptionsError := UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
+			return decoded, fmt.Errorf("decoding %T: %w", decoded, unmarshalOptionsError)
 		}
 		return decoded, nil
 	}

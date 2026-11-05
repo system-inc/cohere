@@ -49,7 +49,7 @@ func DecodeYodaOptions(list []byte) (any, error) {
 	}
 
 	var when string
-	if err := json.Unmarshal(elements[0], &when); err != nil {
+	if decodeError := json.Unmarshal(elements[0], &when); decodeError != nil {
 		return settings, fmt.Errorf("yoda takes \"always\" or \"never\" first, got %s", elements[0])
 	}
 	decoded, err := yodaSettingsFromWhen(when)
@@ -62,8 +62,8 @@ func DecodeYodaOptions(list []byte) (any, error) {
 	}
 
 	var object yodaObjectWire
-	if err := rule.UnmarshalOptions(elements[1], &object); err != nil {
-		return DefaultYodaSettings(), fmt.Errorf("yoda element 2: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(elements[1], &object); unmarshalOptionsError != nil {
+		return DefaultYodaSettings(), fmt.Errorf("yoda element 2: %w", unmarshalOptionsError)
 	}
 	applyYodaFlags(&settings, object)
 	return settings, nil
@@ -371,7 +371,7 @@ func yodaParseNumber(text string) (float64, bool) {
 		text = text[:len(text)-1]
 	}
 	var value float64
-	if _, err := fmt.Sscanf(text, "%g", &value); err != nil {
+	if _, scanError := fmt.Sscanf(text, "%g", &value); scanError != nil {
 		return 0, false
 	}
 	return value, true

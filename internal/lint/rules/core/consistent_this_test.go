@@ -207,9 +207,9 @@ func TestDecodeConsistentThisOptions(test *testing.T) {
 
 	test.Run("an absent option is the alias that", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeConsistentThisOptions(nil)
-		if err != nil {
-			test.Fatalf("the decoder refused an absent option: %v", err)
+		decoded, decodeConsistentThisOptionsError := DecodeConsistentThisOptions(nil)
+		if decodeConsistentThisOptionsError != nil {
+			test.Fatalf("the decoder refused an absent option: %v", decodeConsistentThisOptionsError)
 		}
 		settings, ok := decoded.(ConsistentThisSettings)
 		if !ok {
@@ -233,9 +233,9 @@ func TestDecodeConsistentThisOptions(test *testing.T) {
 
 	test.Run("one element is one alias", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeConsistentThisOptions(json.RawMessage(`["self"]`))
-		if err != nil {
-			test.Fatalf("the decoder refused one alias: %v", err)
+		decoded, decodeConsistentThisOptionsError := DecodeConsistentThisOptions(json.RawMessage(`["self"]`))
+		if decodeConsistentThisOptionsError != nil {
+			test.Fatalf("the decoder refused one alias: %v", decodeConsistentThisOptionsError)
 		}
 		settings, ok := decoded.(ConsistentThisSettings)
 		if !ok {
@@ -248,9 +248,9 @@ func TestDecodeConsistentThisOptions(test *testing.T) {
 
 	test.Run("every element is an alias, upstream's variadic spelling", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeConsistentThisOptions(json.RawMessage(`["self","vm"]`))
-		if err != nil {
-			test.Fatalf("the decoder refused two aliases: %v", err)
+		decoded, decodeConsistentThisOptionsError := DecodeConsistentThisOptions(json.RawMessage(`["self","vm"]`))
+		if decodeConsistentThisOptionsError != nil {
+			test.Fatalf("the decoder refused two aliases: %v", decodeConsistentThisOptionsError)
 		}
 		settings, ok := decoded.(ConsistentThisSettings)
 		if !ok {
@@ -263,26 +263,26 @@ func TestDecodeConsistentThisOptions(test *testing.T) {
 
 	test.Run("the nested-array workaround is refused rather than read", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeConsistentThisOptions(json.RawMessage(`[["self","vm"]]`)); err == nil {
+		if _, decodeConsistentThisOptionsError := DecodeConsistentThisOptions(json.RawMessage(`[["self","vm"]]`)); decodeConsistentThisOptionsError == nil {
 			test.Error("an element that is not a string decoded; upstream's schema refuses it")
 		}
 	})
 
 	test.Run("an empty name is refused", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeConsistentThisOptions(json.RawMessage(`[""]`)); err == nil {
+		if _, decodeConsistentThisOptionsError := DecodeConsistentThisOptions(json.RawMessage(`[""]`)); decodeConsistentThisOptionsError == nil {
 			test.Error("expected the decoder to refuse an empty alias")
 		}
-		if _, err := DecodeConsistentThisOptions(json.RawMessage(`["self",""]`)); err == nil {
+		if _, decodeConsistentThisOptionsError := DecodeConsistentThisOptions(json.RawMessage(`["self",""]`)); decodeConsistentThisOptionsError == nil {
 			test.Error("expected the decoder to refuse an empty alias in a list")
 		}
 	})
 
 	test.Run("an empty list falls back to the default", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeConsistentThisOptions(json.RawMessage(`[]`))
-		if err != nil {
-			test.Fatalf("the decoder refused an empty list: %v", err)
+		decoded, decodeConsistentThisOptionsError := DecodeConsistentThisOptions(json.RawMessage(`[]`))
+		if decodeConsistentThisOptionsError != nil {
+			test.Fatalf("the decoder refused an empty list: %v", decodeConsistentThisOptionsError)
 		}
 		settings, ok := decoded.(ConsistentThisSettings)
 		if !ok {

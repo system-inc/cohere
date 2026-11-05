@@ -129,9 +129,9 @@ func printFile(fileName string, root *unist.Node, text string, prettierOptions f
 		return "", nil
 	}
 
-	document, err := printDocFile(fileName, root, text, prettierOptions, proseWrap, textToDoc, nodeCount)
-	if err != nil {
-		return "", err
+	document, printDocFileError := printDocFile(fileName, root, text, prettierOptions, proseWrap, textToDoc, nodeCount)
+	if printDocFileError != nil {
+		return "", printDocFileError
 	}
 	formatted := doc.Print(document, doc.Options{
 		PrintWidth: prettierOptions.PrintWidth,

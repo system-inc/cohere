@@ -128,7 +128,7 @@ func recordRunSummary(summary runSummary) {
 	if activeRunCache == nil {
 		return
 	}
-	if encoded, err := json.Marshal(summary); err == nil {
+	if encoded, encodeError := json.Marshal(summary); encodeError == nil {
 		activeRunCache.summary = encoded
 	}
 }
@@ -142,9 +142,9 @@ type teeStream struct {
 }
 
 func (t *teeStream) start(target **os.File) error {
-	reader, writer, err := os.Pipe()
-	if err != nil {
-		return err
+	reader, writer, pipeError := os.Pipe()
+	if pipeError != nil {
+		return pipeError
 	}
 	t.real = *target
 	t.writer = writer
@@ -157,7 +157,7 @@ func (t *teeStream) start(target **os.File) error {
 		// noting the buffer's length at the moment of printing would read it before the pipe delivered.
 		lines := bufio.NewReader(reader)
 		for {
-			line, err := lines.ReadBytes('\n')
+			line, readBytesError := lines.ReadBytes('\n')
 			if len(line) > 0 {
 				if rest, tagged := bytes.CutPrefix(line, invocationTag); tagged {
 					t.real.Write(rest)
@@ -170,7 +170,7 @@ func (t *teeStream) start(target **os.File) error {
 					t.buffer.Write(line)
 				}
 			}
-			if err != nil {
+			if readBytesError != nil {
 				return
 			}
 		}
@@ -305,10 +305,10 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		// See startRunCacheClock: before discovery reads anything, after the cache directory exists.
 		readSince: runCacheClock,
 	}
-	if err := session.stdout.start(&os.Stdout); err != nil {
+	if startError := session.stdout.start(&os.Stdout); startError != nil {
 		return nil
 	}
-	if err := session.stderr.start(&os.Stderr); err != nil {
+	if startError := session.stderr.start(&os.Stderr); startError != nil {
 		session.stdout.stop(&os.Stdout)
 		return nil
 	}
@@ -364,16 +364,16 @@ func startRunCacheClock(location projectLocation, locateError error) {
 
 func prepareCacheDirectory(root string) {
 	prepareCacheDirectoryOnce.Do(func() {
-		if err := os.MkdirAll(cacheDirectory(root), 0o755); err != nil {
-			fmt.Fprintf(accountOutput(os.Stderr), "note: the cache directory %s could not be created: %v\n", cacheDirectory(root), firstLine(err.Error()))
+		if createDirectoryError := os.MkdirAll(cacheDirectory(root), 0o755); createDirectoryError != nil {
+			fmt.Fprintf(accountOutput(os.Stderr), "note: the cache directory %s could not be created: %v\n", cacheDirectory(root), firstLine(createDirectoryError.Error()))
 			return
 		}
 		ignoreFile := filepath.Join(root, gitignore.IgnoreFileName)
-		matcher, err := gitignore.New(root)
-		if err != nil {
+		matcher, newGitignoreError := gitignore.New(root)
+		if newGitignoreError != nil {
 			return
 		}
-		if ignored, _, err := matcher.IgnoredPath(".cache/cohere/findings.gob", false); err == nil && !ignored {
+		if ignored, _, ignoredPathError := matcher.IgnoredPath(".cache/cohere/findings.gob", false); ignoredPathError == nil && !ignored {
 			fmt.Fprintf(accountOutput(os.Stderr), "note: %s does not ignore .cache/, so cohere's cache in %s would be tracked: add the line `.cache/` to it\n",
 				ignoreFile, cacheDirectory(root))
 		}
@@ -414,15 +414,15 @@ func writeFormatSection(root string, section *program.FormatSection) error {
 func dumpCacheTable(location projectLocation) error {
 	directory := cacheDirectory(location.Root)
 	release, _ := holdTableReadLock(directory, tableWriterWait)
-	table, err := program.ReadCacheTable(directory, cacheTableIdentity(), program.EveryCacheTableSection, program.NewPathAnchor(location.Root))
+	table, readCacheTableError := program.ReadCacheTable(directory, cacheTableIdentity(), program.EveryCacheTableSection, program.NewPathAnchor(location.Root))
 	release()
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+	if readCacheTableError != nil {
+		if errors.Is(readCacheTableError, os.ErrNotExist) {
 			fmt.Printf("no cache table for %s (looked in %s)\n", location.Root, directory)
 			return nil
 		}
-		fmt.Printf("%v\n", err)
-		if !errors.Is(err, program.ErrCacheTablePartlyKept) {
+		fmt.Printf("%v\n", readCacheTableError)
+		if !errors.Is(readCacheTableError, program.ErrCacheTablePartlyKept) {
 			return nil
 		}
 	}
@@ -537,7 +537,7 @@ func declareLintConfigInputs(path string) {
 		return
 	}
 	for _, source := range configuration.SourcesOnDisk(lintConfigSources(path)) {
-		if _, err := os.Stat(source); err == nil {
+		if _, statError := os.Stat(source); statError == nil {
 			session.extraFiles = append(session.extraFiles, source)
 		} else {
 			session.extraAbsent = append(session.extraAbsent, source)
@@ -565,7 +565,7 @@ func declareFormatWalk(enumeration formatfiles.Enumeration) {
 		return
 	}
 	for _, ignoreFile := range enumeration.IgnoreFiles {
-		if _, err := os.Stat(ignoreFile); err == nil {
+		if _, statError := os.Stat(ignoreFile); statError == nil {
 			session.extraFiles = append(session.extraFiles, ignoreFile)
 		} else {
 			session.extraAbsent = append(session.extraAbsent, ignoreFile)
@@ -580,7 +580,7 @@ func declareFormatWalk(enumeration formatfiles.Enumeration) {
 	}
 	// The settings the root itself resolves to can sit above it, in a directory the walk never listed, and so
 	// can the directories between: a settings file created in one of those would take over the options.
-	if resolution, err := formatoptions.Resolve(enumeration.Root); err == nil && resolution.Source != "" {
+	if resolution, resolveError := formatoptions.Resolve(enumeration.Root); resolveError == nil && resolution.Source != "" {
 		read = append(read, resolution.Source)
 		for directory := filepath.Clean(enumeration.Root); directory != filepath.Dir(resolution.Source); directory = filepath.Dir(directory) {
 			session.extraDirectories = append(session.extraDirectories, directory)
@@ -590,7 +590,7 @@ func declareFormatWalk(enumeration formatfiles.Enumeration) {
 		}
 	}
 	for _, path := range read {
-		if _, err := os.Stat(path); err != nil {
+		if _, statError := os.Stat(path); statError != nil {
 			continue
 		}
 		if filepath.Base(path) == formatoptions.SettingsFileName {
@@ -694,12 +694,12 @@ func (session *runCacheSession) record(exitCode int) *program.RunCache {
 	present, absent, probed := session.recorder.Inputs()
 	files := append(present, session.extraFiles...)
 	absent = append(absent, session.extraAbsent...)
-	cache, err := program.RecordRunCache(session.key, files, session.extraDirectories, absent, probed,
+	cache, recordRunCacheError := program.RecordRunCache(session.key, files, session.extraDirectories, absent, probed,
 		recordedOutput(session.stdout.buffer.Bytes(), session.anchor), exitCode, session.readSince)
-	if err != nil {
+	if recordRunCacheError != nil {
 		// Not recording is always safe. Said on stderr because a cache that silently never records is
 		// a saving that quietly never appears.
-		session.note(fmt.Sprintf("the run cache did not record this run: %v", firstLine(err.Error())))
+		session.note(fmt.Sprintf("the run cache did not record this run: %v", firstLine(recordRunCacheError.Error())))
 		return nil
 	}
 	cache.Errors = recordedOutput(session.stderr.buffer.Bytes(), session.anchor)
@@ -742,8 +742,8 @@ func (session *runCacheSession) write(recorded *program.RunCache) {
 			sections.Types = true
 		}
 	}
-	if err := program.WriteCacheTable(session.directory, table, cacheTableIdentity(), sections, session.anchor); err != nil {
-		session.note(fmt.Sprintf("the cache table could not be written: %v", firstLine(err.Error())))
+	if writeCacheTableError := program.WriteCacheTable(session.directory, table, cacheTableIdentity(), sections, session.anchor); writeCacheTableError != nil {
+		session.note(fmt.Sprintf("the cache table could not be written: %v", firstLine(writeCacheTableError.Error())))
 	}
 }
 
@@ -761,8 +761,8 @@ func cacheNote(directory string, text string) {
 		fmt.Fprintf(accountOutput(os.Stderr), "note: %s\n", text)
 		return
 	}
-	file, err := os.OpenFile(previousNotesPath(directory), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
+	file, openError := os.OpenFile(previousNotesPath(directory), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if openError != nil {
 		return
 	}
 	fmt.Fprintln(file, text)
@@ -778,8 +778,8 @@ func previousNotesPath(directory string) string {
 // A cache write that failed in the background otherwise fails silently forever, the saving quietly gone.
 func printPreviousNotes(directory string) {
 	path := previousNotesPath(directory)
-	contents, err := os.ReadFile(path)
-	if err != nil {
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
 		return
 	}
 	os.Remove(path)
@@ -826,8 +826,8 @@ func (w *taggingWriter) Write(data []byte) (int, error) {
 	written := 0
 	for len(data) > 0 {
 		if w.atLineStart {
-			if _, err := w.out.Write(w.tag); err != nil {
-				return written, err
+			if _, writeError := w.out.Write(w.tag); writeError != nil {
+				return written, writeError
 			}
 			w.atLineStart = false
 		}
@@ -837,10 +837,10 @@ func (w *taggingWriter) Write(data []byte) (int, error) {
 			chunk = data[:end+1]
 			w.atLineStart = true
 		}
-		n, err := w.out.Write(chunk)
+		n, writeError := w.out.Write(chunk)
 		written += n
-		if err != nil {
-			return written, err
+		if writeError != nil {
+			return written, writeError
 		}
 		data = data[len(chunk):]
 	}
@@ -967,8 +967,8 @@ func attachFindingsCache(graph *program.Graph, location projectLocation) {
 	if session == nil || graph == nil {
 		return
 	}
-	parts, err := findingsCacheKey(graph, location)
-	if err != nil {
+	parts, findingsCacheKeyError := findingsCacheKey(graph, location)
+	if findingsCacheKeyError != nil {
 		// Without a key nothing can be proven unchanged, so nothing is replayed or recorded.
 		return
 	}
@@ -996,7 +996,7 @@ func attachFindingsCache(graph *program.Graph, location projectLocation) {
 	if graph.Readiness != nil {
 		session.findings.MeasureReadiness()
 	}
-	if typesKey, err := typesCacheKey(graph, location); err == nil {
+	if typesKey, typesCacheKeyError := typesCacheKey(graph, location); typesCacheKeyError == nil {
 		session.types = program.NewTypeDiagnosticsReuse(session.table.Types, typesKey)
 	}
 }
@@ -1064,8 +1064,8 @@ func attachTypesCache(graph *program.Graph, location projectLocation) {
 	if cacheOff || activeRunCache != nil || graph == nil {
 		return
 	}
-	typesKey, err := typesCacheKey(graph, location)
-	if err != nil {
+	typesKey, typesCacheKeyError := typesCacheKey(graph, location)
+	if typesCacheKeyError != nil {
 		return
 	}
 	prepareCacheDirectory(location.Root)
@@ -1097,8 +1097,8 @@ func (record *typesRecord) write() {
 		table.Signatures = record.shapes
 		sections.Signatures = true
 	}
-	if err := program.WriteCacheTable(record.directory, table, cacheTableIdentity(), sections, record.anchor); err != nil {
-		cacheNote(record.directory, fmt.Sprintf("the cache table could not be written: %v", firstLine(err.Error())))
+	if writeCacheTableError := program.WriteCacheTable(record.directory, table, cacheTableIdentity(), sections, record.anchor); writeCacheTableError != nil {
+		cacheNote(record.directory, fmt.Sprintf("the cache table could not be written: %v", firstLine(writeCacheTableError.Error())))
 	}
 }
 
@@ -1127,9 +1127,9 @@ func findingsCacheKey(graph *program.Graph, location projectLocation) (program.R
 	anchor := program.NewPathAnchor(location.Root)
 	// An embedded set is hashed by its text, read the way the loader reads it, as a file is.
 	for _, lintConfigFile := range lintConfigFiles {
-		contents, err := configuration.SourceContents(lintConfigFile)
-		if err != nil {
-			return program.RunCacheKeyParts{}, err
+		contents, sourceContentsError := configuration.SourceContents(lintConfigFile)
+		if sourceContentsError != nil {
+			return program.RunCacheKeyParts{}, sourceContentsError
 		}
 		facts = append(facts, fmt.Sprintf("lint-config %s=%x", anchor.Stable(lintConfigFile), sha256.Sum256(contents)))
 	}
@@ -1138,9 +1138,9 @@ func findingsCacheKey(graph *program.Graph, location projectLocation) (program.R
 	if fingerprint := graph.LintConfig.DetectionFingerprint(); fingerprint != "" {
 		facts = append(facts, "house-sets="+fingerprint)
 	}
-	compilerFacts, err := compilerOptionsFacts(graph, location)
-	if err != nil {
-		return program.RunCacheKeyParts{}, err
+	compilerFacts, compilerOptionsFactsError := compilerOptionsFacts(graph, location)
+	if compilerOptionsFactsError != nil {
+		return program.RunCacheKeyParts{}, compilerOptionsFactsError
 	}
 	facts = append(facts, compilerFacts...)
 	names := make([]string, 0, len(registry.All()))
@@ -1172,9 +1172,9 @@ func compilerOptionsFacts(graph *program.Graph, location projectLocation) ([]str
 	facts := []string{}
 	anchor := program.NewPathAnchor(location.Root)
 	fileFact := func(label string, path string) error {
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			return err
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			return readError
 		}
 		facts = append(facts, fmt.Sprintf("%s %s=%x", label, anchor.Stable(path), sha256.Sum256(contents)))
 		return nil

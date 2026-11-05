@@ -64,8 +64,8 @@ func DecodeNoBitwiseOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	for _, spelling := range options.Allow {
 		if !slices.Contains(noBitwiseAllowedSpellings(), spelling) {

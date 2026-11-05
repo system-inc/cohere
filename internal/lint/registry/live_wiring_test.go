@@ -31,9 +31,9 @@ func liveConfigPath(test testing.TB) string {
 func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(test *testing.T) {
 	test.Parallel()
 
-	loaded, err := configuration.Load(liveConfigPath(test))
-	if err != nil {
-		test.Fatalf("loading the live config: %v", err)
+	loaded, loadError := configuration.Load(liveConfigPath(test))
+	if loadError != nil {
+		test.Fatalf("loading the live config: %v", loadError)
 	}
 	resolved := loaded.Resolve("app/Probe.tsx")
 

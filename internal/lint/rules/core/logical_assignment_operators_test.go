@@ -36,10 +36,10 @@ func logicalAssignmentAlwaysOptions() LogicalAssignmentOperatorsOptions {
 // positional-array wire shape and the default under test. A fixture building the struct directly
 // would leave both untested, and both are the lines with no upstream counterpart.
 func logicalAssignmentAlwaysIfOptions() LogicalAssignmentOperatorsOptions {
-	decoded, err := DecodeLogicalAssignmentOperatorsOptions(
+	decoded, decodeLogicalAssignmentOperatorsOptionsError := DecodeLogicalAssignmentOperatorsOptions(
 		json.RawMessage(`["always", {"enforceForIfStatements": true}]`))
-	if err != nil {
-		panic(err)
+	if decodeLogicalAssignmentOperatorsOptionsError != nil {
+		panic(decodeLogicalAssignmentOperatorsOptionsError)
 	}
 	options, ok := decoded.(LogicalAssignmentOperatorsOptions)
 	if !ok {
@@ -51,9 +51,9 @@ func logicalAssignmentAlwaysIfOptions() LogicalAssignmentOperatorsOptions {
 
 // logicalAssignmentNeverOptions is ["never"], also routed through the decoder.
 func logicalAssignmentNeverOptions() LogicalAssignmentOperatorsOptions {
-	decoded, err := DecodeLogicalAssignmentOperatorsOptions(json.RawMessage(`["never"]`))
-	if err != nil {
-		panic(err)
+	decoded, decodeLogicalAssignmentOperatorsOptionsError := DecodeLogicalAssignmentOperatorsOptions(json.RawMessage(`["never"]`))
+	if decodeLogicalAssignmentOperatorsOptionsError != nil {
+		panic(decodeLogicalAssignmentOperatorsOptionsError)
 	}
 	options, ok := decoded.(LogicalAssignmentOperatorsOptions)
 	if !ok {
@@ -2006,15 +2006,15 @@ func TestDecodeLogicalAssignmentOperatorsOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeLogicalAssignmentOperatorsOptions([]byte(testCase.raw))
+			decoded, decodeLogicalAssignmentOperatorsOptionsError := DecodeLogicalAssignmentOperatorsOptions([]byte(testCase.raw))
 			if testCase.wantError {
-				if err == nil {
+				if decodeLogicalAssignmentOperatorsOptionsError == nil {
 					test.Fatalf("wanted an error, got %+v", decoded)
 				}
 				return
 			}
-			if err != nil {
-				test.Fatalf("unexpected error: %v", err)
+			if decodeLogicalAssignmentOperatorsOptionsError != nil {
+				test.Fatalf("unexpected error: %v", decodeLogicalAssignmentOperatorsOptionsError)
 			}
 			settings, ok := decoded.(LogicalAssignmentOperatorsOptions)
 			if !ok {
@@ -2371,9 +2371,9 @@ func TestLogicalAssignmentOperatorsIsSilentInsideReactCompiledFunctions(test *te
 	test.Parallel()
 
 	decode := func(raw string) LogicalAssignmentOperatorsOptions {
-		decoded, err := DecodeLogicalAssignmentOperatorsOptions(json.RawMessage(raw))
-		if err != nil {
-			test.Fatalf("decoding %s: %v", raw, err)
+		decoded, decodeLogicalAssignmentOperatorsOptionsError := DecodeLogicalAssignmentOperatorsOptions(json.RawMessage(raw))
+		if decodeLogicalAssignmentOperatorsOptionsError != nil {
+			test.Fatalf("decoding %s: %v", raw, decodeLogicalAssignmentOperatorsOptionsError)
 		}
 		options, ok := decoded.(LogicalAssignmentOperatorsOptions)
 		if !ok {

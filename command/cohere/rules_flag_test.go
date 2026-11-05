@@ -22,9 +22,9 @@ func TestRulesFlagListsEveryRegisteredRule(test *testing.T) {
 	// TypeScript registry, which a run in no project lists.
 	command := exec.Command(binary, "-rules")
 	command.Dir = test.TempDir()
-	output, err := command.Output()
-	if err != nil {
-		test.Fatalf("running -rules: %v", err)
+	output, outputError := command.Output()
+	if outputError != nil {
+		test.Fatalf("running -rules: %v", outputError)
 	}
 	printed := strings.Fields(string(output))
 
@@ -67,9 +67,9 @@ func TestRulesFlagDisclosesADevelopmentBuildBesideTheList(test *testing.T) {
 	command.Dir = test.TempDir()
 	var standardError strings.Builder
 	command.Stderr = &standardError
-	standardOutput, err := command.Output()
-	if err != nil {
-		test.Fatalf("running -rules: %v", err)
+	standardOutput, outputError := command.Output()
+	if outputError != nil {
+		test.Fatalf("running -rules: %v", outputError)
 	}
 
 	// A test binary is built from the working tree, so it is always a development build. If this

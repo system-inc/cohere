@@ -91,12 +91,12 @@ type parsed struct {
 // parseTrees parses every text with the real parser, a few Node processes for all of them.
 func parseTrees(test testing.TB, texts []string) []parsed {
 	test.Helper()
-	if _, err := exec.LookPath("node"); err != nil {
+	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
 		test.Skip("node is not installed; the parser oracle needs it")
 	}
 	script := filepath.Join(test.TempDir(), "parse.mjs")
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(parseScript, "FORK", forkRoot(test))), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(parseScript, "FORK", forkRoot(test))), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	results := make([]parsed, 0, len(texts))
@@ -128,8 +128,8 @@ func parseBatch(test testing.TB, script string, texts []string) []parsed {
 		test.Fatalf("the parser oracle failed: %v\n%s", err, stderr.String())
 	}
 	var raw []parseResult
-	if err := json.Unmarshal(output, &raw); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(output, &raw); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	if len(raw) != len(texts) {
 		test.Fatalf("the parser oracle returned %d results for %d inputs", len(raw), len(texts))
@@ -143,8 +143,8 @@ func parseBatch(test testing.TB, script string, texts []string) []parsed {
 		decoder := json.NewDecoder(bytes.NewReader(result.Root))
 		decoder.DisallowUnknownFields()
 		var root jsonNode
-		if err := decoder.Decode(&root); err != nil {
-			test.Fatalf("decoding the tree of %q: %v", texts[index], err)
+		if decodeError := decoder.Decode(&root); decodeError != nil {
+			test.Fatalf("decoding the tree of %q: %v", texts[index], decodeError)
 		}
 		results[index] = parsed{root: loadTree(&root, newUnitOffsets(texts[index]), nil)}
 	}

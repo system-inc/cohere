@@ -42,15 +42,15 @@ func TestEveryPackageDeclaresTheDualLicense(test *testing.T) {
 	}
 
 	// The VS Code extension's manifest is a file in the repository rather than generated, so it is read.
-	contents, err := os.ReadFile(filepath.Join(moduleRoot(test), "editors", "vscode", "package.json"))
-	if err != nil {
-		test.Fatal(err)
+	contents, readError := os.ReadFile(filepath.Join(moduleRoot(test), "editors", "vscode", "package.json"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	var extension struct {
 		License string `json:"license"`
 	}
-	if err := json.Unmarshal(contents, &extension); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(contents, &extension); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	if extension.License != expectedLicenseExpression {
 		test.Errorf("the VS Code extension declares license %q, wanted exactly %q", extension.License, expectedLicenseExpression)
@@ -62,16 +62,16 @@ func TestPackagesShipBothLicenseTextsAsCommitted(test *testing.T) {
 
 	module := moduleRoot(test)
 	output := test.TempDir()
-	dispatcher, err := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: output, Version: "1.0.0"}, placeholderChecksums)
-	if err != nil {
-		test.Fatal(err)
+	dispatcher, buildDispatcherPackageError := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: output, Version: "1.0.0"}, placeholderChecksums)
+	if buildDispatcherPackageError != nil {
+		test.Fatal(buildDispatcherPackageError)
 	}
 	platform := filepath.Join(output, "cohere-linux-x64")
-	if err := os.MkdirAll(platform, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(platform, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := stageLicenses(module, platform); err != nil {
-		test.Fatal(err)
+	if stageLicensesError := stageLicenses(module, platform); stageLicensesError != nil {
+		test.Fatal(stageLicensesError)
 	}
 
 	for _, directory := range []string{dispatcher.Directory, platform} {
@@ -94,7 +94,7 @@ func TestPackagesShipBothLicenseTextsAsCommitted(test *testing.T) {
 	for _, name := range LegalFileNames {
 		writeFile(test, filepath.Join(empty, name), "\n")
 	}
-	if err := stageLicenses(empty, test.TempDir()); err == nil {
+	if stageLicensesError := stageLicenses(empty, test.TempDir()); stageLicensesError == nil {
 		test.Fatalf("an empty license was staged, so a package would ship terms with nothing in them")
 	}
 }
@@ -169,8 +169,8 @@ func TestTheCopyrightHolderIsSystemInc(test *testing.T) {
 	var extension struct {
 		Author string `json:"author"`
 	}
-	if err := json.Unmarshal(contents, &extension); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(contents, &extension); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	if extension.Author != wanted {
 		test.Errorf("the VS Code extension names its author as %q, wanted %q", extension.Author, wanted)
@@ -188,9 +188,9 @@ func mitTerms(license []byte) string {
 
 func moduleRoot(test *testing.T) string {
 	test.Helper()
-	module, err := filepath.Abs(filepath.Join("..", "..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	module, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	return module
 }

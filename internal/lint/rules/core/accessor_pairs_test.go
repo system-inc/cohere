@@ -619,9 +619,9 @@ func TestDecodeAccessorPairsOptions(test *testing.T) {
 
 	test.Run("nil input yields upstream's defaults", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeAccessorPairsOptions(nil)
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeAccessorPairsOptionsError := DecodeAccessorPairsOptions(nil)
+		if decodeAccessorPairsOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeAccessorPairsOptionsError)
 		}
 		options, ok := decoded.(AccessorPairsOptions)
 		if !ok {
@@ -636,9 +636,9 @@ func TestDecodeAccessorPairsOptions(test *testing.T) {
 
 	test.Run("an explicit false overrides a true default", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeAccessorPairsOptions([]byte(`{"setWithoutGet": false}`))
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeAccessorPairsOptionsError := DecodeAccessorPairsOptions([]byte(`{"setWithoutGet": false}`))
+		if decodeAccessorPairsOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeAccessorPairsOptionsError)
 		}
 		options, ok := decoded.(AccessorPairsOptions)
 		if !ok {
@@ -657,7 +657,7 @@ func TestDecodeAccessorPairsOptions(test *testing.T) {
 		test.Parallel()
 		// cohere's config layer unwraps the `[severity, options]` tuple before dispatch, so the
 		// decoder is handed `{...}` where upstream's schema writes `[{...}]`.
-		if _, err := DecodeAccessorPairsOptions([]byte(`[{"setWithoutGet": false}]`)); err == nil {
+		if _, decodeAccessorPairsOptionsError := DecodeAccessorPairsOptions([]byte(`[{"setWithoutGet": false}]`)); decodeAccessorPairsOptionsError == nil {
 			test.Error("the array spelling decoded, which means the wire shape is not what is assumed")
 		}
 	})

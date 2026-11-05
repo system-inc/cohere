@@ -94,12 +94,12 @@ func TestDesignSystemIsBuiltOnceUnderTheRealWalk(test *testing.T) {
 
 	resetDesignSystemCacheForTest()
 
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   "tsconfig.json",
 		CurrentDirectory: liveWalkRepository,
 	})
-	if err != nil {
-		test.Fatalf("building a program over %s: %v", liveWalkRepository, err)
+	if buildError != nil {
+		test.Fatalf("building a program over %s: %v", liveWalkRepository, buildError)
 	}
 
 	files := graph.ProjectFiles()
@@ -118,8 +118,8 @@ func TestDesignSystemIsBuiltOnceUnderTheRealWalk(test *testing.T) {
 
 	rules := liveWalkRules()
 	before := tailwindengine.BuildsSoFar()
-	if _, err := graph.Walk(context.Background(), files, rules); err != nil {
-		test.Fatalf("walking %s: %v", liveWalkRepository, err)
+	if _, walkError := graph.Walk(context.Background(), files, rules); walkError != nil {
+		test.Fatalf("walking %s: %v", liveWalkRepository, walkError)
 	}
 	built := tailwindengine.BuildsSoFar() - before
 

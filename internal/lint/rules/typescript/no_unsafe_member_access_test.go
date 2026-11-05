@@ -22,9 +22,9 @@ func noUnsafeMemberAccessCaseName(index int) string {
 // is what puts the wire key name and the absent-versus-explicit-false handling under test.
 func noUnsafeMemberAccessDecoded(test *testing.T, optionsJson string) any {
 	test.Helper()
-	decoded, err := DecodeNoUnsafeMemberAccessOptions([]byte(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", optionsJson, err)
+	decoded, decodeNoUnsafeMemberAccessOptionsError := DecodeNoUnsafeMemberAccessOptions([]byte(optionsJson))
+	if decodeNoUnsafeMemberAccessOptionsError != nil {
+		test.Fatalf("decoding %s: %v", optionsJson, decodeNoUnsafeMemberAccessOptionsError)
 	}
 	return decoded
 }

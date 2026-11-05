@@ -17,21 +17,21 @@ func TestTheWalkGivesEachWorkerTheFilesOfOneChecker(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
 	config := `{"compilerOptions": {"target": "ES2022", "module": "esnext", "moduleResolution": "bundler", "strict": true, "noEmit": true}}`
-	if err := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(config), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(config), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	for index := range 40 {
 		text := fmt.Sprintf("export const value%d = %d;\n", index, index)
 		if index > 0 {
 			text = fmt.Sprintf("import { value%d } from \"./f%d\";\nexport const value%d = value%d + 1;\n", index-1, index-1, index, index-1)
 		}
-		if err := os.WriteFile(filepath.Join(root, fmt.Sprintf("f%d.ts", index)), []byte(text), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(root, fmt.Sprintf("f%d.ts", index)), []byte(text), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
-	graph, err := Build(Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), Checkers: 4})
-	if err != nil {
-		test.Fatal(err)
+	graph, buildError := Build(Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), Checkers: 4})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	files := graph.ProjectFiles()
 	workers := graph.Workers()

@@ -13,9 +13,9 @@ import (
 // the interpolation after it.
 func TestParseSCSSTree(test *testing.T) {
 	test.Parallel()
-	root, err := ParseSCSS("// a /* b\n.x { margin: 0 // c\n { left: 1px } }\n@media#{$q} {}")
-	if err != nil {
-		test.Fatal(err)
+	root, parseSCSSError := ParseSCSS("// a /* b\n.x { margin: 0 // c\n { left: 1px } }\n@media#{$q} {}")
+	if parseSCSSError != nil {
+		test.Fatal(parseSCSSError)
 	}
 	nodes := root.List("nodes")
 	if len(nodes) != 3 {
@@ -61,10 +61,10 @@ func TestParseSCSSErrors(test *testing.T) {
 		{"a { b: \"#{c\" }", "Unclosed interpolation", 8},
 		{"a{b:\"", "Unclosed string", 5},
 	} {
-		_, err := ParseSCSS(each.text)
+		_, parseSCSSError := ParseSCSS(each.text)
 		var syntaxError *CssSyntaxError
-		if !printing.IsSyntax(err) || !errors.As(err, &syntaxError) {
-			test.Errorf("%q: %v is not a marked CssSyntaxError", each.text, err)
+		if !printing.IsSyntax(parseSCSSError) || !errors.As(parseSCSSError, &syntaxError) {
+			test.Errorf("%q: %v is not a marked CssSyntaxError", each.text, parseSCSSError)
 			continue
 		}
 		if syntaxError.Reason != each.reason || syntaxError.Line != 1 || syntaxError.Column != each.column {
@@ -72,14 +72,14 @@ func TestParseSCSSErrors(test *testing.T) {
 		}
 	}
 
-	_, err := ParseSCSS("a { :\"x\" {} }")
+	_, parseSCSSError := ParseSCSS("a { :\"x\" {} }")
 	var typeError *TypeError
-	if !printing.IsSyntax(err) || !errors.As(err, &typeError) {
-		test.Errorf("a nested property with no word: %v is not a marked TypeError", err)
+	if !printing.IsSyntax(parseSCSSError) || !errors.As(parseSCSSError, &typeError) {
+		test.Errorf("a nested property with no word: %v is not a marked TypeError", parseSCSSError)
 	}
 
 	// The css parser reads none of it: `//` is a word there and #{ is not interpolation.
-	if _, err := Parse("a { b: #{c }"); err == nil {
+	if _, parseError := Parse("a { b: #{c }"); parseError == nil {
 		test.Errorf("Parse accepted an scss-only input")
 	}
 }
@@ -90,9 +90,9 @@ func TestParseSCSSNeverPanics(test *testing.T) {
 	test.Parallel()
 	for _, fixture := range scssParseFixtures {
 		for end := 0; end <= len(fixture.text); end++ {
-			_, err := ParseSCSS(fixture.text[:end])
-			if err != nil && !printing.IsSyntax(err) {
-				test.Errorf("%s, first %d bytes: %v", fixture.name, end, err)
+			_, parseSCSSError := ParseSCSS(fixture.text[:end])
+			if parseSCSSError != nil && !printing.IsSyntax(parseSCSSError) {
+				test.Errorf("%s, first %d bytes: %v", fixture.name, end, parseSCSSError)
 			}
 		}
 	}

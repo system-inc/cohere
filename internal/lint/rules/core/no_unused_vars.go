@@ -2276,8 +2276,8 @@ func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUn
 
 	// Upstream's `new RegExp(pattern, "u")`, read as JavaScript reads it: RE2 refuses a lookaround or a
 	// backreference its user wrote, and reads `\s` and `\b` differently (#7mztrdd).
-	compiled, err := esregexp.Compile(pattern, "u")
-	if err != nil {
+	compiled, compileError := esregexp.Compile(pattern, "u")
+	if compileError != nil {
 		// An unparseable pattern ignores nothing rather than everything. The other direction would
 		// silence the whole rule on a typo in a config file, which is the failure that looks clean.
 		return false
@@ -2369,7 +2369,7 @@ var noUnusedVarsModes = []struct {
 // outside upstream's enum is refused by key and value.
 func (options *NoUnusedVarsOptions) UnmarshalJSON(raw []byte) error {
 	var shorthand string
-	if err := json.Unmarshal(raw, &shorthand); err == nil {
+	if decodeError := json.Unmarshal(raw, &shorthand); decodeError == nil {
 		if shorthand != "all" && shorthand != "local" {
 			return fmt.Errorf("the string form is \"all\" or \"local\", and the config gives %q", shorthand)
 		}
@@ -2377,8 +2377,8 @@ func (options *NoUnusedVarsOptions) UnmarshalJSON(raw []byte) error {
 		return nil
 	}
 	var fields noUnusedVarsOptionFields
-	if err := rule.UnmarshalOptions(raw, &fields); err != nil {
-		return err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &fields); unmarshalOptionsError != nil {
+		return unmarshalOptionsError
 	}
 	decoded := NoUnusedVarsOptions(fields)
 	for _, mode := range noUnusedVarsModes {
@@ -2422,8 +2422,8 @@ func DecodeNoUnusedVarsOptions(raw json.RawMessage) (NoUnusedVarsOptions, error)
 	if len(raw) == 0 {
 		return resolveNoUnusedVarsOptions(nil), nil
 	}
-	if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
-		return resolveNoUnusedVarsOptions(nil), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
+		return resolveNoUnusedVarsOptions(nil), unmarshalOptionsError
 	}
 	return resolveNoUnusedVarsOptions(decoded), nil
 }

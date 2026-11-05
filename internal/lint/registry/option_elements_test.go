@@ -217,9 +217,9 @@ func TestTheSecondOptionElementReachesTheRule(test *testing.T) {
 				{"control", testCase.control, testCase.controlCount},
 				{"treatment", testCase.treatment, testCase.treatmentCount},
 			} {
-				options, err := optionsThroughTheConfigLayer(test, testCase.rule, arm.config)
-				if err != nil {
-					test.Fatalf("%s %s was refused: %v", arm.name, arm.config, err)
+				options, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, arm.config)
+				if optionsThroughTheConfigurationLayerError != nil {
+					test.Fatalf("%s %s was refused: %v", arm.name, arm.config, optionsThroughTheConfigurationLayerError)
 				}
 				result := rule_testing.RunTypedWithOptions(test, subject, fileName, testCase.source, options)
 				if len(result.Diagnostics) != arm.want {
@@ -253,12 +253,12 @@ func TestASecondElementTheRuleCannotHonourIsRefused(test *testing.T) {
 			key:      "includeFromSettings",
 		},
 	} {
-		if _, err := optionsThroughTheConfigLayer(test, testCase.rule, testCase.accepted); err != nil {
-			test.Errorf("%s refused its second element at the default: %v", testCase.rule, err)
+		if _, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, testCase.accepted); optionsThroughTheConfigurationLayerError != nil {
+			test.Errorf("%s refused its second element at the default: %v", testCase.rule, optionsThroughTheConfigurationLayerError)
 		}
-		_, err := optionsThroughTheConfigLayer(test, testCase.rule, testCase.refused)
-		if err == nil || !strings.Contains(err.Error(), testCase.key) {
-			test.Errorf("%s: want a refusal naming %s, got %v", testCase.rule, testCase.key, err)
+		_, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, testCase.refused)
+		if optionsThroughTheConfigurationLayerError == nil || !strings.Contains(optionsThroughTheConfigurationLayerError.Error(), testCase.key) {
+			test.Errorf("%s: want a refusal naming %s, got %v", testCase.rule, testCase.key, optionsThroughTheConfigurationLayerError)
 		}
 	}
 }
@@ -296,22 +296,22 @@ func TestAnElementTheRuleDoesNotTakeIsALoudError(test *testing.T) {
 			mustName: []string{"prefer-destructuring", `element 3 {"array":true}`},
 		},
 	} {
-		_, err := optionsThroughTheConfigLayer(test, testCase.rule, testCase.config)
-		if err == nil {
+		_, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, testCase.config)
+		if optionsThroughTheConfigurationLayerError == nil {
 			test.Errorf("%s %s loaded, and the extra element would never be read", testCase.rule, testCase.config)
 			continue
 		}
 		for _, want := range testCase.mustName {
-			if !strings.Contains(err.Error(), want) {
-				test.Errorf("%s: the refusal does not name %q: %v", testCase.rule, want, err)
+			if !strings.Contains(optionsThroughTheConfigurationLayerError.Error(), want) {
+				test.Errorf("%s: the refusal does not name %q: %v", testCase.rule, want, optionsThroughTheConfigurationLayerError)
 			}
 		}
 	}
 
 	// The control: the same single-element rule with one element loads, so the refusals above are
 	// about the count rather than about the rule refusing everything.
-	if _, err := optionsThroughTheConfigLayer(test, "array-callback-return", `["error", {"allowImplicit": true}]`); err != nil {
-		test.Errorf("array-callback-return refused its one element: %v", err)
+	if _, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, "array-callback-return", `["error", {"allowImplicit": true}]`); optionsThroughTheConfigurationLayerError != nil {
+		test.Errorf("array-callback-return refused its one element: %v", optionsThroughTheConfigurationLayerError)
 	}
 }
 
@@ -355,17 +355,17 @@ func TestANullInARulesOptionsIsRefused(test *testing.T) {
 			mustName: "element 1 is null",
 		},
 	} {
-		if _, err := optionsThroughTheConfigLayer(test, testCase.rule, testCase.accepted); err != nil {
-			test.Errorf("%s refused %s, so the refusal below would not be about the null: %v", testCase.rule, testCase.accepted, err)
+		if _, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, testCase.accepted); optionsThroughTheConfigurationLayerError != nil {
+			test.Errorf("%s refused %s, so the refusal below would not be about the null: %v", testCase.rule, testCase.accepted, optionsThroughTheConfigurationLayerError)
 		}
-		_, err := optionsThroughTheConfigLayer(test, testCase.rule, testCase.refused)
-		if err == nil {
+		_, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, testCase.refused)
+		if optionsThroughTheConfigurationLayerError == nil {
 			test.Errorf("%s %s loaded, and the null would have read as the default", testCase.rule, testCase.refused)
 			continue
 		}
 		for _, want := range []string{testCase.rule, testCase.mustName} {
-			if !strings.Contains(err.Error(), want) {
-				test.Errorf("%s: the refusal does not name %q: %v", testCase.rule, want, err)
+			if !strings.Contains(optionsThroughTheConfigurationLayerError.Error(), want) {
+				test.Errorf("%s: the refusal does not name %q: %v", testCase.rule, want, optionsThroughTheConfigurationLayerError)
 			}
 		}
 	}
@@ -381,12 +381,12 @@ func optionsThroughTheConfigLayer(test *testing.T, ruleName string, value string
 	directory := test.TempDir()
 	path := filepath.Join(directory, "CohereSettings.json")
 	contents := `{"rules": {"` + ruleName + `": ` + value + `}}`
-	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
-		test.Fatalf("writing %s: %v", path, err)
+	if writeError := os.WriteFile(path, []byte(contents), 0o600); writeError != nil {
+		test.Fatalf("writing %s: %v", path, writeError)
 	}
-	loaded, err := configuration.Load(path)
-	if err != nil {
-		test.Fatalf("loading %s: %v", contents, err)
+	loaded, loadError := configuration.Load(path)
+	if loadError != nil {
+		test.Fatalf("loading %s: %v", contents, loadError)
 	}
 	resolved := loaded.Resolve(filepath.Join(directory, "Probe.ts"))
 	return Options().Decode(ruleName, resolved.RawOptionsFor(ruleName))

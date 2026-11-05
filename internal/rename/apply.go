@@ -47,9 +47,9 @@ func Apply(plan *Plan) (int, error) {
 	// partial one is the failure mode this whole verb exists to prevent.
 	rewritten := map[string]string{}
 	for fileName, edits := range byFile {
-		original, err := os.ReadFile(fileName)
-		if err != nil {
-			return 0, fmt.Errorf("reading %s: %w", fileName, err)
+		original, readError := os.ReadFile(fileName)
+		if readError != nil {
+			return 0, fmt.Errorf("reading %s: %w", fileName, readError)
 		}
 		text := string(original)
 
@@ -114,13 +114,13 @@ func Apply(plan *Plan) (int, error) {
 
 	written := 0
 	for fileName, text := range rewritten {
-		information, err := os.Stat(fileName)
+		information, statError := os.Stat(fileName)
 		mode := os.FileMode(0o644)
-		if err == nil {
+		if statError == nil {
 			mode = information.Mode()
 		}
-		if err := os.WriteFile(fileName, []byte(text), mode); err != nil {
-			return written, fmt.Errorf("writing %s: %w", fileName, err)
+		if writeError := os.WriteFile(fileName, []byte(text), mode); writeError != nil {
+			return written, fmt.Errorf("writing %s: %w", fileName, writeError)
 		}
 		written++
 	}

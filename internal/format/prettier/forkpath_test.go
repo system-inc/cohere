@@ -33,10 +33,10 @@ import (
 func TestOverrideReachesTheLoader(test *testing.T) {
 	test.Setenv(ForkPathVariable, "/nonexistent/elsewhere")
 
-	if _, err := New(formatoptions.Default()); err == nil {
+	if _, newPrettierError := New(formatoptions.Default()); newPrettierError == nil {
 		test.Fatalf("New succeeded with %s pointed at a nonexistent path, so the loader is not reading it", ForkPathVariable)
-	} else if !strings.Contains(err.Error(), "/nonexistent/elsewhere") {
-		test.Fatalf("the failure does not name the overridden path, so something else failed: %v", err)
+	} else if !strings.Contains(newPrettierError.Error(), "/nonexistent/elsewhere") {
+		test.Fatalf("the failure does not name the overridden path, so something else failed: %v", newPrettierError)
 	}
 }
 
@@ -53,9 +53,9 @@ func TestOverrideReachesTheLoader(test *testing.T) {
 func TestOverrideIsTheOnlyKnobThatMoves(test *testing.T) {
 	test.Setenv(ForkPathVariable, "")
 
-	bundles, err := Bundles()
-	if err != nil {
-		test.Fatalf("with no override the embedded bundles failed to load: %v", err)
+	bundles, bundlesError := Bundles()
+	if bundlesError != nil {
+		test.Fatalf("with no override the embedded bundles failed to load: %v", bundlesError)
 	}
 	if bundles.Origin != Embedded {
 		test.Fatalf("with no override the origin is %q, want %q", bundles.Origin, Embedded)
@@ -77,8 +77,8 @@ func TestOverrideIsTheOnlyKnobThatMoves(test *testing.T) {
 func TestEmbeddedBundlesNeedNoFork(test *testing.T) {
 	test.Setenv(ForkPathVariable, "")
 
-	if _, err := New(formatoptions.Default()); err != nil {
-		test.Fatalf("building an engine from the embedded bundles: %v", err)
+	if _, newPrettierError := New(formatoptions.Default()); newPrettierError != nil {
+		test.Fatalf("building an engine from the embedded bundles: %v", newPrettierError)
 	}
 }
 
@@ -95,9 +95,9 @@ func TestEmbeddedBundlesNeedNoFork(test *testing.T) {
 func TestEmbedMatchesBundleFiles(test *testing.T) {
 	test.Setenv(ForkPathVariable, "")
 
-	bundles, err := Bundles()
-	if err != nil {
-		test.Fatalf("loading the embedded bundles: %v", err)
+	bundles, bundlesError := Bundles()
+	if bundlesError != nil {
+		test.Fatalf("loading the embedded bundles: %v", bundlesError)
 	}
 	if len(bundles.Files) != len(BundleFiles) {
 		test.Fatalf("the embed carries %d bundles, BundleFiles names %d", len(bundles.Files), len(BundleFiles))

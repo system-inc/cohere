@@ -44,17 +44,17 @@ func typeScriptImplicitReturns(test *testing.T, source string, strict bool) []st
 		"Case.ts":       text,
 		"tsconfig.json": implicitReturnConfiguration(true, strict),
 	} {
-		if err := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   filepath.Join(directory, "tsconfig.json"),
 		CurrentDirectory: directory,
 		SingleThreaded:   true,
 	})
-	if err != nil {
-		test.Fatalf("building the oracle's program: %v", err)
+	if buildError != nil {
+		test.Fatalf("building the oracle's program: %v", buildError)
 	}
 	spans := []string{}
 	for _, sourceFile := range graph.ProjectFiles() {
@@ -78,8 +78,8 @@ func ruleImplicitReturns(test *testing.T, source string, strict bool, noImplicit
 		map[string]string{"Case.ts": source}, "Case.ts",
 		func(directory string) {
 			configuration := implicitReturnConfiguration(noImplicitReturns, strict)
-			if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 		})
 	text := strings.TrimSpace(source) + "\n"

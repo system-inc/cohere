@@ -33,9 +33,9 @@ import (
 func TestPreserveManualMemoizationAgainstGoldens(test *testing.T) {
 	test.Parallel()
 
-	fixtures, err := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
-	if err != nil {
-		test.Fatalf("loading the vendored corpus: %v", err)
+	fixtures, loadError := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
+	if loadError != nil {
+		test.Fatalf("loading the vendored corpus: %v", loadError)
 	}
 
 	// The fixtures whose golden carries this rule's message. Everything else is another rule's
@@ -323,9 +323,9 @@ func TestPreserveManualMemoizationAgainstGoldens(test *testing.T) {
 func TestPreserveManualMemoizationFalsePositiveRate(test *testing.T) {
 	test.Parallel()
 
-	fixtures, err := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
-	if err != nil {
-		test.Fatalf("loading the vendored corpus: %v", err)
+	fixtures, loadError := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
+	if loadError != nil {
+		test.Fatalf("loading the vendored corpus: %v", loadError)
 	}
 
 	const ruleMessage = "Existing memoization could not be preserved"
@@ -593,8 +593,8 @@ func pipelineFindings(function *Function, checker *shimchecker.Checker) []Preser
 // silently dropped from the population.
 func upstreamReportsInLogs(test *testing.T, expectPath string, ruleMessage string) bool {
 	test.Helper()
-	body, err := os.ReadFile(expectPath)
-	if err != nil {
+	body, readError := os.ReadFile(expectPath)
+	if readError != nil {
 		return false
 	}
 	text := string(body)

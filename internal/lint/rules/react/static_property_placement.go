@@ -73,13 +73,13 @@ func DefaultStaticPropertyPlacementOptions() StaticPropertyPlacementOptions {
 // element is refused too: it was never upstream's.
 func DecodeStaticPropertyPlacementOptions(list []byte) (any, error) {
 	options := DefaultStaticPropertyPlacementOptions()
-	slots, err := rule.OptionElements(list, 2)
-	if err != nil || len(slots) == 0 {
-		return options, err
+	slots, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(slots) == 0 {
+		return options, optionElementsError
 	}
 
 	var defaultSpelling string
-	if err := json.Unmarshal(slots[0], &defaultSpelling); err != nil {
+	if decodeError := json.Unmarshal(slots[0], &defaultSpelling); decodeError != nil {
 		return options, fmt.Errorf("static-property-placement element 1 takes a position string, got %s", slots[0])
 	}
 	position, recognised := staticPropertyPlacementPositionFor(defaultSpelling)
@@ -95,8 +95,8 @@ func DecodeStaticPropertyPlacementOptions(list []byte) (any, error) {
 	}
 
 	var overrides map[string]string
-	if err := json.Unmarshal(slots[1], &overrides); err != nil {
-		return options, fmt.Errorf("static-property-placement element 2: %w", err)
+	if decodeError := json.Unmarshal(slots[1], &overrides); decodeError != nil {
+		return options, fmt.Errorf("static-property-placement element 2: %w", decodeError)
 	}
 	for property, spelling := range overrides {
 		if _, isKnown := options.Positions[property]; !isKnown {

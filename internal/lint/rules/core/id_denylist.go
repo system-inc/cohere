@@ -59,10 +59,10 @@ func DecodeIdDenylistOptions(list []byte) (any, error) {
 	}
 
 	var names []string
-	if err := json.Unmarshal(list, &names); err != nil {
+	if decodeError := json.Unmarshal(list, &names); decodeError != nil {
 		return settings, fmt.Errorf(
 			"id-denylist takes each name as its own string element, as in "+
-				"[\"error\", \"data\", \"err\"]: %w", err)
+				"[\"error\", \"data\", \"err\"]: %w", decodeError)
 	}
 	if len(names) == 0 {
 		return settings, nil

@@ -29,11 +29,11 @@ func TestABuildAnsweredFromTheCheckBuildsTheProgramTheDiskDoes(test *testing.T) 
 	write := func(name string, contents string) {
 		test.Helper()
 		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"module":"esnext","moduleResolution":"bundler"},"files":["source/index.ts"]}`)
@@ -44,10 +44,10 @@ func TestABuildAnsweredFromTheCheckBuildsTheProgramTheDiskDoes(test *testing.T) 
 	build := func(snapshot *program.StatSnapshot, recorder *program.InputRecorder) ([]string, int64) {
 		test.Helper()
 		timing := &program.GraphTiming{}
-		graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root,
+		graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root,
 			Inputs: recorder, CheckedStats: snapshot, Timing: timing})
-		if err != nil {
-			test.Fatalf("build: %v", err)
+		if buildError != nil {
+			test.Fatalf("build: %v", buildError)
 		}
 		var ours []string
 		for _, sourceFile := range graph.SourceFiles() {
@@ -66,9 +66,9 @@ func TestABuildAnsweredFromTheCheckBuildsTheProgramTheDiskDoes(test *testing.T) 
 		if !slices.Contains(absent, helper) {
 			test.Fatalf("the build did not record looking for %s, so the case below is not the one this test is about: %v", helper, absent)
 		}
-		recorded, err := program.RecordRunCache("key", present, nil, absent, probed, []byte("verdict"), 0, time.Time{})
-		if err != nil {
-			test.Fatal(err)
+		recorded, recordRunCacheError := program.RecordRunCache("key", present, nil, absent, probed, []byte("verdict"), 0, time.Time{})
+		if recordRunCacheError != nil {
+			test.Fatal(recordRunCacheError)
 		}
 		return recorded
 	}
@@ -76,8 +76,8 @@ func TestABuildAnsweredFromTheCheckBuildsTheProgramTheDiskDoes(test *testing.T) 
 	// The untouched tree.
 	recorded := record()
 	snapshot := program.NewStatSnapshot()
-	if err := recorded.CheckNoting("key", snapshot); err != nil {
-		test.Fatalf("the untouched tree missed: %v", err)
+	if checkNotingError := recorded.CheckNoting("key", snapshot); checkNotingError != nil {
+		test.Fatalf("the untouched tree missed: %v", checkNotingError)
 	}
 	fromDisk, _ := build(nil, nil)
 	fromCheck, answered := build(snapshot, nil)
@@ -92,7 +92,7 @@ func TestABuildAnsweredFromTheCheckBuildsTheProgramTheDiskDoes(test *testing.T) 
 	time.Sleep(10 * time.Millisecond)
 	write("source/helper.ts", "export const a = 'text';\n")
 	snapshot = program.NewStatSnapshot()
-	if err := recorded.CheckNoting("key", snapshot); err == nil {
+	if checkNotingError := recorded.CheckNoting("key", snapshot); checkNotingError == nil {
 		test.Fatal("the check replayed over a created module")
 	}
 	fromDisk, _ = build(nil, nil)

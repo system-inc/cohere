@@ -23,11 +23,11 @@ func TestCompiledRulesAgainstARealBinary(test *testing.T) {
 		test.Skip("set COHERE_BINARY, COHERE_TREE and COHERE_EXPLAIN_FILE to run this against a real build")
 	}
 
-	names, err := CompiledRulesOf(context.Background(), GateCommand{
+	names, compiledRulesOfError := CompiledRulesOf(context.Background(), GateCommand{
 		Name: "cohere", Program: binary, Directory: tree,
 	}, explainFile)
-	if err != nil {
-		test.Fatalf("could not read the rule list: %v", err)
+	if compiledRulesOfError != nil {
+		test.Fatalf("could not read the rule list: %v", compiledRulesOfError)
 	}
 
 	sorted := make([]string, 0, len(names))

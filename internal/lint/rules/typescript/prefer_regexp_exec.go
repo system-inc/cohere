@@ -527,7 +527,7 @@ func preferRegexpExecLiteralHasGlobalFlag(literal string) bool {
 func preferRegexpExecRegexLiteralFor(value string) (string, bool) {
 	// `esregexp` is this tree's JavaScript-semantics regular-expression engine, already used by
 	// two other rules to answer "would `new RegExp(source)` throw".
-	if _, err := esregexp.Compile(value, ""); err != nil {
+	if _, compileError := esregexp.Compile(value, ""); compileError != nil {
 		return "", false
 	}
 	if value == "" {

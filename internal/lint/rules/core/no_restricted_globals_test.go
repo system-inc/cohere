@@ -46,9 +46,9 @@ func decodeNoRestrictedGlobalsOptionsForTest(test *testing.T, optionsJson string
 	if optionsJson == "" {
 		return nil
 	}
-	decoded, err := DecodeNoRestrictedGlobalsOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding options %q: %v", optionsJson, err)
+	decoded, decodeNoRestrictedGlobalsOptionsError := DecodeNoRestrictedGlobalsOptions(json.RawMessage(optionsJson))
+	if decodeNoRestrictedGlobalsOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", optionsJson, decodeNoRestrictedGlobalsOptionsError)
 	}
 	return decoded
 }
@@ -525,7 +525,7 @@ func TestDecodeNoRestrictedGlobalsOptions(test *testing.T) {
 		`[{"globals": ["event"], "checkGlobalObjects": true}]`,
 		`[{"name": "event", "mesage": "x"}]`,
 	} {
-		if decoded, err := DecodeNoRestrictedGlobalsOptions([]byte(raw)); err == nil {
+		if decoded, decodeNoRestrictedGlobalsOptionsError := DecodeNoRestrictedGlobalsOptions([]byte(raw)); decodeNoRestrictedGlobalsOptionsError == nil {
 			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}

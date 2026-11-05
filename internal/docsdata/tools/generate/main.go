@@ -65,9 +65,9 @@ func main() {
 	recapture := flag.Bool("capture", false, "rerun the lint tests with "+capture.Variable+" set and pick the examples afresh")
 	flag.Parse()
 
-	if err := run(*check, *checkRendering, *recapture); err != nil {
-		if !errors.Is(err, errStale) {
-			fmt.Fprintln(os.Stderr, err)
+	if runError := run(*check, *checkRendering, *recapture); runError != nil {
+		if !errors.Is(runError, errStale) {
+			fmt.Fprintln(os.Stderr, runError)
 		}
 		os.Exit(1)
 	}
@@ -87,9 +87,9 @@ func run(check bool, checkRendering bool, recapture bool) error {
 	defer removeScratch(scratch)
 
 	if check || checkRendering {
-		stale, err := staleFiles(moduleSources, scratch, check)
-		if err != nil {
-			return err
+		stale, staleFilesError := staleFiles(moduleSources, scratch, check)
+		if staleFilesError != nil {
+			return staleFilesError
 		}
 		for _, path := range stale {
 			fmt.Printf("stale: %s\n", path)
@@ -126,11 +126,11 @@ func run(check bool, checkRendering bool, recapture bool) error {
 		if bytes.Equal(existing, files[path]) {
 			continue
 		}
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return err
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			return createDirectoryError
 		}
-		if err := os.WriteFile(path, files[path], 0o644); err != nil {
-			return err
+		if writeError := os.WriteFile(path, files[path], 0o644); writeError != nil {
+			return writeError
 		}
 		fmt.Printf("wrote %s\n", path)
 	}
@@ -139,8 +139,8 @@ func run(check bool, checkRendering bool, recapture bool) error {
 		return err
 	}
 	for _, path := range orphans {
-		if err := os.Remove(path); err != nil {
-			return err
+		if removeError := os.Remove(path); removeError != nil {
+			return removeError
 		}
 		fmt.Printf("removed %s\n", path)
 	}
@@ -208,8 +208,8 @@ func captureLintTests(directory string) error {
 	test := exec.Command("go", "test", capturedPackages)
 	test.Env = append(os.Environ(), capture.Variable+"="+directory)
 	test.Stdout, test.Stderr = os.Stderr, os.Stderr
-	if err := test.Run(); err != nil {
-		return fmt.Errorf("the lint tests failed under capture, so their cases are not all asserted: %w", err)
+	if runError := test.Run(); runError != nil {
+		return fmt.Errorf("the lint tests failed under capture, so their cases are not all asserted: %w", runError)
 	}
 	return nil
 }
@@ -220,8 +220,8 @@ func binaryHelp(scratch string) ([]byte, map[string][]byte, error) {
 	binary := filepath.Join(scratch, "cohere")
 	build := exec.Command("go", "build", "-o", binary, "./command/cohere")
 	build.Stdout, build.Stderr = os.Stderr, os.Stderr
-	if err := build.Run(); err != nil {
-		return nil, nil, fmt.Errorf("building ./command/cohere for its help: %w", err)
+	if runError := build.Run(); runError != nil {
+		return nil, nil, fmt.Errorf("building ./command/cohere for its help: %w", runError)
 	}
 
 	help, err := helpOutput(binary, "-help")
@@ -245,10 +245,10 @@ func helpOutput(binary string, arguments ...string) ([]byte, error) {
 	command.Dir = filepath.Dir(binary)
 	var output bytes.Buffer
 	command.Stdout, command.Stderr = &output, &output
-	if err := command.Run(); err != nil {
+	if runError := command.Run(); runError != nil {
 		var exit *exec.ExitError
-		if !errors.As(err, &exit) {
-			return nil, err
+		if !errors.As(runError, &exit) {
+			return nil, runError
 		}
 	}
 	var kept []string

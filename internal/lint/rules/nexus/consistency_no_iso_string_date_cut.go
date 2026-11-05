@@ -216,8 +216,8 @@ func consistencyNoIsoStringDateCutIndex(node *ast.Node) (int, bool) {
 	if node == nil || node.Kind != ast.KindNumericLiteral {
 		return 0, false
 	}
-	value, err := strconv.Atoi(node.Text())
-	if err != nil || value < 0 {
+	value, parseError := strconv.Atoi(node.Text())
+	if parseError != nil || value < 0 {
 		return 0, false
 	}
 	return value, true

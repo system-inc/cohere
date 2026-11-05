@@ -128,8 +128,8 @@ func decodeImportRequirePathAliasOptions(raw []byte, base rule.OptionsBase) (any
 // and refusing a root over a spelling would be a false alarm on a correct config.
 func pathsNest(first string, second string) bool {
 	nests := func(outer string, inner string) bool {
-		relative, err := filepath.Rel(outer, inner)
-		return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
+		relative, relativePathError := filepath.Rel(outer, inner)
+		return relativePathError == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
 	}
 	if nests(first, second) || nests(second, first) {
 		return true

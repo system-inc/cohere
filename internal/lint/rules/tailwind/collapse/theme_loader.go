@@ -101,8 +101,8 @@ func LoadThemeFromFile(path string, resolve StylesheetResolver) (*Theme, []Skipp
 		resolve:  resolve,
 		visiting: make(map[string]bool),
 	}
-	if err := loader.loadFile(path); err != nil {
-		return nil, nil, err
+	if loadFileError := loader.loadFile(path); loadFileError != nil {
+		return nil, nil, loadFileError
 	}
 	return loader.theme, loader.skipped, nil
 }
@@ -158,13 +158,13 @@ func (loader *themeLoader) ingest(nodes []*Node, path string) error {
 	for _, node := range nodes {
 		switch {
 		case node.Kind == KindAtRule && node.Name == "@import":
-			if err := loader.followImport(node, path); err != nil {
-				return err
+			if followImportError := loader.followImport(node, path); followImportError != nil {
+				return followImportError
 			}
 
 		case node.Kind == KindAtRule && node.Name == "@theme":
-			if err := loader.ingestThemeBlock(node, path); err != nil {
-				return err
+			if ingestThemeBlockError := loader.ingestThemeBlock(node, path); ingestThemeBlockError != nil {
+				return ingestThemeBlockError
 			}
 
 		case node.Kind == KindAtRule && (node.Name == "@config" || node.Name == "@plugin"):
@@ -177,8 +177,8 @@ func (loader *themeLoader) ingest(nodes []*Node, path string) error {
 		case node.IsContainer():
 			// `@layer theme { @theme default { ... } }` is how the framework's own index.css is
 			// written, so descending into container at-rules is required rather than defensive.
-			if err := loader.ingest(node.Nodes, path); err != nil {
-				return err
+			if ingestError := loader.ingest(node.Nodes, path); ingestError != nil {
+				return ingestError
 			}
 		}
 	}
@@ -261,8 +261,8 @@ func (loader *themeLoader) ingestThemeBlock(node *Node, path string) error {
 		if child.Kind == KindDeclaration && strings.HasPrefix(child.Property, "--") {
 			// The property is unescaped on the way in, so `--color-a\/b` is stored as
 			// `--color-a/b`. GetOptions and MarkUsedVariable unescape their arguments to match.
-			if err := loader.theme.Add(unescapeCSSIdentifier(child.Property), child.Value, options); err != nil {
-				walkErr = fmt.Errorf("%s: %w", path, err)
+			if addError := loader.theme.Add(unescapeCSSIdentifier(child.Property), child.Value, options); addError != nil {
+				walkErr = fmt.Errorf("%s: %w", path, addError)
 				return WalkStop
 			}
 			return WalkContinue

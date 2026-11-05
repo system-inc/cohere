@@ -50,12 +50,12 @@ func loadLintConfig(graph *program.Graph, location projectLocation) (*configurat
 // usesHouseSets reports whether the run takes the house stack: its settings file is the default one and
 // is missing, or names no set cohere carries.
 func usesHouseSets(location projectLocation) bool {
-	if _, err := os.Stat(location.LintConfigFileName); err != nil && location.LintConfigFileNameGiven {
+	if _, statError := os.Stat(location.LintConfigFileName); statError != nil && location.LintConfigFileNameGiven {
 		return false
 	}
-	zero, err := configuration.IsZeroConfig(location.LintConfigFileName)
+	zero, isZeroConfigurationError := configuration.IsZeroConfig(location.LintConfigFileName)
 	// A chain that cannot be read is not zero config: LoadFor reads it again and fails the run naming why.
-	return err == nil && zero
+	return isZeroConfigurationError == nil && zero
 }
 
 // houseSources is lintConfigSources under zero config: the house sets and the project's own file, when it
@@ -64,8 +64,8 @@ func houseSources(location projectLocation) []string {
 	if !usesHouseSets(location) {
 		return lintConfigSources(location.LintConfigFileName)
 	}
-	sources, err := configuration.HouseSources(location.LintConfigFileName)
-	if err != nil {
+	sources, houseSourcesError := configuration.HouseSources(location.LintConfigFileName)
+	if houseSourcesError != nil {
 		return []string{location.LintConfigFileName}
 	}
 	return sources

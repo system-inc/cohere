@@ -177,9 +177,9 @@ func TestButtonHasTypeStaysSilent(test *testing.T) {
 // the same resolution `checked-requires-onchange-or-readonly` needs and the same helper.
 func runButtonHasType(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
 	test.Helper()
-	decoded, err := DecodeButtonHasTypeOptions([]byte(rawOptions))
-	if err != nil {
-		test.Fatalf("decoding %q: %v", rawOptions, err)
+	decoded, decodeButtonHasTypeOptionsError := DecodeButtonHasTypeOptions([]byte(rawOptions))
+	if decodeButtonHasTypeOptionsError != nil {
+		test.Fatalf("decoding %q: %v", rawOptions, decodeButtonHasTypeOptionsError)
 	}
 	return rule_testing.RunTypedWithOptions(test, ButtonHasType, buttonHasTypeFile, sourceText, decoded)
 }
@@ -552,9 +552,9 @@ func TestButtonHasTypeDecodesItsOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeButtonHasTypeOptions([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", testCase.raw, err)
+			decoded, decodeButtonHasTypeOptionsError := DecodeButtonHasTypeOptions([]byte(testCase.raw))
+			if decodeButtonHasTypeOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.raw, decodeButtonHasTypeOptionsError)
 			}
 			settings, ok := decoded.(ButtonHasTypeOptions)
 			if !ok {
@@ -573,10 +573,10 @@ func TestButtonHasTypeDecodesItsOptions(test *testing.T) {
 func TestButtonHasTypeRejectsMalformedOptions(test *testing.T) {
 	test.Parallel()
 
-	if _, err := DecodeButtonHasTypeOptions([]byte(`{"button":`)); err == nil {
+	if _, decodeButtonHasTypeOptionsError := DecodeButtonHasTypeOptions([]byte(`{"button":`)); decodeButtonHasTypeOptionsError == nil {
 		test.Fatal("truncated JSON decoded without error")
 	}
-	if _, err := DecodeButtonHasTypeOptions([]byte(`"error"`)); err == nil {
+	if _, decodeButtonHasTypeOptionsError := DecodeButtonHasTypeOptions([]byte(`"error"`)); decodeButtonHasTypeOptionsError == nil {
 		test.Fatal("a string decoded into the options struct without error")
 	}
 }

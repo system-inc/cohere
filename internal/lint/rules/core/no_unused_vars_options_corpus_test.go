@@ -59,14 +59,14 @@ func TestNoUnusedVarsOptionsUpstreamCorpus(test *testing.T) {
 		}
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			options, err := DecodeNoUnusedVarsOptions(json.RawMessage(row.options))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", row.options, err)
+			options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(row.options))
+			if decodeNoUnusedVariablesOptionsError != nil {
+				test.Fatalf("decoding %q: %v", row.options, decodeNoUnusedVariablesOptionsError)
 			}
 			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{"file.ts": row.source}, "file.ts", options,
 				func(directory string) {
-					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noUnusedVarsOptionsCorpusTsconfig), 0o644); err != nil {
-						test.Fatal(err)
+					if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noUnusedVarsOptionsCorpusTsconfig), 0o644); writeError != nil {
+						test.Fatal(writeError)
 					}
 				})
 
@@ -120,9 +120,9 @@ func TestNoUnusedVarsUsedIgnoredMessageNamesItsPattern(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			options, err := DecodeNoUnusedVarsOptions(json.RawMessage(testCase.options))
-			if err != nil {
-				test.Fatal(err)
+			options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(testCase.options))
+			if decodeNoUnusedVariablesOptionsError != nil {
+				test.Fatal(decodeNoUnusedVariablesOptionsError)
 			}
 			result := rule_testing.RunTypedWithOptions(test, NoUnusedVars, "/repository/source/Case.ts", testCase.source, options)
 			if len(result.Diagnostics) != 1 || result.Diagnostics[0].Message.Id != "usedIgnoredVar" {

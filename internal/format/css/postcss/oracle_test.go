@@ -270,7 +270,7 @@ func TestParseAgreesWithPostcss(test *testing.T) {
 			home, _ := os.UserHomeDir()
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		err := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
+		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -292,8 +292,8 @@ func TestParseAgreesWithPostcss(test *testing.T) {
 			corpusFiles++
 			return nil
 		})
-		if err != nil {
-			test.Fatalf("walking %s: %v", corpus, err)
+		if walkError != nil {
+			test.Fatalf("walking %s: %v", corpus, walkError)
 		}
 	}
 	if corpusFiles == 0 {
@@ -307,9 +307,9 @@ func TestParseAgreesWithPostcss(test *testing.T) {
 
 	var stdin bytes.Buffer
 	for _, each := range inputs {
-		encoded, err := json.Marshal(each)
-		if err != nil {
-			test.Fatal(err)
+		encoded, encodeError := json.Marshal(each)
+		if encodeError != nil {
+			test.Fatal(encodeError)
 		}
 		stdin.Write(encoded)
 		stdin.WriteByte('\n')
@@ -319,8 +319,8 @@ func TestParseAgreesWithPostcss(test *testing.T) {
 	command.Stdin = &stdin
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		test.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 	oracle := map[string]map[string]any{}
 	for _, line := range strings.Split(stdout.String(), "\n") {
@@ -328,8 +328,8 @@ func TestParseAgreesWithPostcss(test *testing.T) {
 			continue
 		}
 		var record map[string]any
-		if err := json.Unmarshal([]byte(line), &record); err != nil {
-			test.Fatal(err)
+		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
+			test.Fatal(decodeError)
 		}
 		oracle[record["name"].(string)] = record
 	}
@@ -414,13 +414,13 @@ func dumpParseWith(parse func(string) (*estree.Node, error), text string) (any, 
 }
 
 func throughJSON(value any) any {
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Sprintf("not JSON: %v", err)
+	encoded, encodeError := json.Marshal(value)
+	if encodeError != nil {
+		return fmt.Sprintf("not JSON: %v", encodeError)
 	}
 	var result any
-	if err := json.Unmarshal(encoded, &result); err != nil {
-		return fmt.Sprintf("not JSON: %v", err)
+	if decodeError := json.Unmarshal(encoded, &result); decodeError != nil {
+		return fmt.Sprintf("not JSON: %v", decodeError)
 	}
 	return result
 }

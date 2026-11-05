@@ -55,7 +55,7 @@ func DecodeJsxFragmentsOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var mode string
-	if err := json.Unmarshal(raw, &mode); err != nil {
+	if decodeError := json.Unmarshal(raw, &mode); decodeError != nil {
 		return options, fmt.Errorf(`expected a mode string, "syntax" or "element", got %s`, trimmed)
 	}
 	switch mode {

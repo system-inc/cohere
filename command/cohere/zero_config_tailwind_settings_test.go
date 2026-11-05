@@ -26,11 +26,11 @@ func zeroConfigTailwindProject(test *testing.T, files map[string]string) string 
 	root := test.TempDir()
 	files["tsconfig.json"] = tailwindProjectConfig
 	writeTree(test, root, files)
-	if err := os.MkdirAll(filepath.Join(root, "node_modules"), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(filepath.Join(root, "node_modules"), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.Symlink(packageRoot, filepath.Join(root, "node_modules", "tailwindcss")); err != nil {
-		test.Fatal(err)
+	if symlinkError := os.Symlink(packageRoot, filepath.Join(root, "node_modules", "tailwindcss")); symlinkError != nil {
+		test.Fatal(symlinkError)
 	}
 	return root
 }

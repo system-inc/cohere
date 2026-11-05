@@ -136,9 +136,9 @@ func NewResolver() *Resolver {
 
 // Resolve answers as the package's Resolve does, from memory where it can.
 func (resolver *Resolver) Resolve(directory string) (Resolution, error) {
-	absolute, err := filepath.Abs(directory)
-	if err != nil {
-		return Resolution{}, err
+	absolute, absolutePathError := filepath.Abs(directory)
+	if absolutePathError != nil {
+		return Resolution{}, absolutePathError
 	}
 	answer := resolver.resolve(absolute)
 	return answer.resolution, answer.err
@@ -163,9 +163,9 @@ func (resolver *Resolver) resolve(directory string) resolved {
 // including the directory whose settings win: cohere never reads it, so keeping it is a second
 // statement of the options that nothing checks. A directory with neither answers as its parent does.
 func (resolver *Resolver) resolveHere(directory string) resolved {
-	leftover, found, err := prettierConfigIn(directory)
-	if err != nil {
-		return resolved{err: err}
+	leftover, found, prettierConfigurationInError := prettierConfigIn(directory)
+	if prettierConfigurationInError != nil {
+		return resolved{err: prettierConfigurationInError}
 	}
 	if found {
 		return resolved{err: fmt.Errorf("%s: %w; delete it, since cohere reads format options only from a \"format\" block in %s",
@@ -173,16 +173,16 @@ func (resolver *Resolver) resolveHere(directory string) resolved {
 	}
 
 	path := filepath.Join(directory, SettingsFileName)
-	if _, err := os.Stat(path); err == nil {
-		resolution, err := chainOf(path)
-		return resolved{resolution: resolution, err: err}
+	if _, statError := os.Stat(path); statError == nil {
+		resolution, chainOfError := chainOf(path)
+		return resolved{resolution: resolution, err: chainOfError}
 	}
 
 	parent := filepath.Dir(directory)
 	if parent == directory {
 		// No settings anywhere above: zero config, which is the house stack and its format.
-		resolution, err := houseResolution()
-		return resolved{resolution: resolution, err: err}
+		resolution, houseResolutionError := houseResolution()
+		return resolved{resolution: resolution, err: houseResolutionError}
 	}
 	return resolver.resolve(parent)
 }
@@ -221,9 +221,9 @@ func chainOf(path string) (Resolution, error) {
 	}
 	files := map[string][]byte{}
 	for _, source := range configuration.SourcesOnDisk(sources) {
-		contents, err := os.ReadFile(source)
-		if err != nil {
-			return Resolution{}, err
+		contents, readError := os.ReadFile(source)
+		if readError != nil {
+			return Resolution{}, readError
 		}
 		files[source] = contents
 	}
@@ -240,8 +240,8 @@ func chainOf(path string) (Resolution, error) {
 // stillReads reports whether every file of the chain reads what it did when the entry was made.
 func (entry chainEntry) stillReads() bool {
 	for source, recorded := range entry.files {
-		contents, err := os.ReadFile(source)
-		if err != nil || !bytes.Equal(contents, recorded) {
+		contents, readError := os.ReadFile(source)
+		if readError != nil || !bytes.Equal(contents, recorded) {
 			return false
 		}
 	}
@@ -283,13 +283,13 @@ func resolveChain(path string) (Resolution, error) {
 
 	blocks := make([]json.RawMessage, len(sources))
 	for index, source := range sources {
-		contents, err := configuration.SourceContents(source)
-		if err != nil {
-			return Resolution{}, err
+		contents, sourceContentsError := configuration.SourceContents(source)
+		if sourceContentsError != nil {
+			return Resolution{}, sourceContentsError
 		}
 		var settings map[string]json.RawMessage
-		if err := json.Unmarshal(contents, &settings); err != nil {
-			return Resolution{}, fmt.Errorf("%s is not valid JSON: %w", source, err)
+		if decodeError := json.Unmarshal(contents, &settings); decodeError != nil {
+			return Resolution{}, fmt.Errorf("%s is not valid JSON: %w", source, decodeError)
 		}
 		blocks[index] = settings["format"]
 	}
@@ -331,9 +331,9 @@ func resolveChain(path string) (Resolution, error) {
 			if blocks[index] == nil || isNexusTier(sources[index]) {
 				continue
 			}
-			own, err := blockResolution(sources[index], blocks[index])
-			if err != nil {
-				return Resolution{}, err
+			own, blockResolutionError := blockResolution(sources[index], blocks[index])
+			if blockResolutionError != nil {
+				return Resolution{}, blockResolutionError
 			}
 			resolution.Options = own.Options
 			if own.HouseIgnoreDeclared {
@@ -359,8 +359,8 @@ func houseResolution() (Resolution, error) {
 		return Resolution{}, err
 	}
 	var settings map[string]json.RawMessage
-	if err := json.Unmarshal(contents, &settings); err != nil {
-		return Resolution{}, fmt.Errorf("%s is not valid JSON: %w", NexusTierSetName, err)
+	if decodeError := json.Unmarshal(contents, &settings); decodeError != nil {
+		return Resolution{}, fmt.Errorf("%s is not valid JSON: %w", NexusTierSetName, decodeError)
 	}
 	block, present := settings["format"]
 	if !present {
@@ -378,19 +378,19 @@ func houseResolution() (Resolution, error) {
 
 // blockResolution is one format block applied over Prettier's defaults, with its `ignore` list.
 func blockResolution(source string, block json.RawMessage) (Resolution, error) {
-	options, err := applyFormatBlock(source, block, PrettierDefaults())
-	if err != nil {
-		return Resolution{}, err
+	options, applyFormatBlockError := applyFormatBlock(source, block, PrettierDefaults())
+	if applyFormatBlockError != nil {
+		return Resolution{}, applyFormatBlockError
 	}
 	resolution := Resolution{Options: options}
 
 	var keys map[string]json.RawMessage
-	if err := json.Unmarshal(block, &keys); err != nil {
-		return Resolution{}, fmt.Errorf("%s: the \"format\" block is not a JSON object: %w", source, err)
+	if decodeError := json.Unmarshal(block, &keys); decodeError != nil {
+		return Resolution{}, fmt.Errorf("%s: the \"format\" block is not a JSON object: %w", source, decodeError)
 	}
 	if raw, present := keys["ignore"]; present {
-		if err := json.Unmarshal(raw, &resolution.HouseIgnore); err != nil {
-			return Resolution{}, fmt.Errorf("%s: the format block's \"ignore\" is not a list of patterns: %w", source, err)
+		if decodeError := json.Unmarshal(raw, &resolution.HouseIgnore); decodeError != nil {
+			return Resolution{}, fmt.Errorf("%s: the format block's \"ignore\" is not a list of patterns: %w", source, decodeError)
 		}
 		resolution.HouseIgnoreDeclared = true
 	}
@@ -401,10 +401,10 @@ func blockResolution(source string, block json.RawMessage) (Resolution, error) {
 // "prettier" key, or one of Prettier's config files.
 func prettierConfigIn(directory string) (string, bool, error) {
 	manifestPath := filepath.Join(directory, "package.json")
-	if contents, err := os.ReadFile(manifestPath); err == nil {
+	if contents, readError := os.ReadFile(manifestPath); readError == nil {
 		var manifest map[string]json.RawMessage
-		if err := json.Unmarshal(contents, &manifest); err != nil {
-			return "", false, fmt.Errorf("%s is not valid JSON: %w", manifestPath, err)
+		if decodeError := json.Unmarshal(contents, &manifest); decodeError != nil {
+			return "", false, fmt.Errorf("%s is not valid JSON: %w", manifestPath, decodeError)
 		}
 		if _, present := manifest["prettier"]; present {
 			return manifestPath + " (its \"prettier\" key)", true, nil
@@ -412,7 +412,7 @@ func prettierConfigIn(directory string) (string, bool, error) {
 	}
 	for _, candidate := range prettierConfigFiles {
 		path := filepath.Join(directory, candidate)
-		if _, err := os.Stat(path); err == nil {
+		if _, statError := os.Stat(path); statError == nil {
 			return path, true, nil
 		}
 	}
@@ -463,8 +463,8 @@ func blockKeyNamed(name string) (BlockKey, bool) {
 // ignore.
 func applyFormatBlock(path string, raw json.RawMessage, over Options) (Options, error) {
 	var block map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &block); err != nil {
-		return Options{}, fmt.Errorf("%s: the \"format\" block is not a JSON object: %w", path, err)
+	if decodeError := json.Unmarshal(raw, &block); decodeError != nil {
+		return Options{}, fmt.Errorf("%s: the \"format\" block is not a JSON object: %w", path, decodeError)
 	}
 
 	applied := over
@@ -487,8 +487,8 @@ func applyFormatBlock(path string, raw json.RawMessage, over Options) (Options, 
 		if !known {
 			return Options{}, fmt.Errorf("%s: format option %q is not one cohere applies; add it to Options rather than formatting without it", path, key)
 		}
-		if err := json.Unmarshal(value, blockKey.Option(options)); err != nil {
-			return Options{}, fmt.Errorf("%s: format option %q: %w", path, key, err)
+		if decodeError := json.Unmarshal(value, blockKey.Option(options)); decodeError != nil {
+			return Options{}, fmt.Errorf("%s: format option %q: %w", path, key, decodeError)
 		}
 	}
 

@@ -17,9 +17,9 @@ func TestWiredRulesAgainstReactsOwnGoldens(test *testing.T) {
 	if testing.Short() {
 		test.Skip("builds a TypeScript program per fixture")
 	}
-	fixtures, err := react_conformance.Load(fixtureRoot)
-	if err != nil {
-		test.Fatalf("loading the corpus: %v", err)
+	fixtures, loadError := react_conformance.Load(fixtureRoot)
+	if loadError != nil {
+		test.Fatalf("loading the corpus: %v", loadError)
 	}
 
 	grand := map[react_conformance.Verdict]int{}

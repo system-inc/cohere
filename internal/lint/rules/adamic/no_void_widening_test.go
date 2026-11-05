@@ -22,9 +22,9 @@ func voidWideningSubject() rule.Rule {
 
 func TestNoVoidWidening(test *testing.T) {
 	test.Parallel()
-	files, err := filepath.Glob("testdata/void-widening/*.ts")
-	if err != nil {
-		test.Fatal(err)
+	files, globError := filepath.Glob("testdata/void-widening/*.ts")
+	if globError != nil {
+		test.Fatal(globError)
 	}
 	if len(files) != 59 {
 		test.Fatalf("got %d fixtures, want 59", len(files))
@@ -32,9 +32,9 @@ func TestNoVoidWidening(test *testing.T) {
 	for _, file := range files {
 		test.Run(filepath.Base(file), func(test *testing.T) {
 			test.Parallel()
-			contents, err := os.ReadFile(file)
-			if err != nil {
-				test.Fatal(err)
+			contents, readError := os.ReadFile(file)
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			source := string(contents)
 			if count := typeErrorCount(test, source); count != 0 {

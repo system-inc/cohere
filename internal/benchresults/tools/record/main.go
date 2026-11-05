@@ -44,9 +44,9 @@ func main() {
 	for _, mode := range strings.Split(*modes, ",") {
 		measured = append(measured, benchresults.Mode(mode))
 	}
-	path, err := record(*runsPath, *engine, *project, *projectCommit, *idleFloor, *settle, *rounds, measured, *band, *stoppedEarly, *edit, *out)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "record: %v\n", err)
+	path, recordError := record(*runsPath, *engine, *project, *projectCommit, *idleFloor, *settle, *rounds, measured, *band, *stoppedEarly, *edit, *out)
+	if recordError != nil {
+		fmt.Fprintf(os.Stderr, "record: %v\n", recordError)
 		os.Exit(1)
 	}
 	fmt.Printf("recorded %s\n", path)
@@ -86,11 +86,11 @@ func record(runsPath, engine, project, projectCommit string, idleFloor, settle f
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(out, 0o755); err != nil {
-		return "", err
+	if createDirectoryError := os.MkdirAll(out, 0o755); createDirectoryError != nil {
+		return "", createDirectoryError
 	}
 	path := filepath.Join(out, benchresults.FileName(result))
-	if _, err := os.Stat(path); err == nil {
+	if _, statError := os.Stat(path); statError == nil {
 		return "", fmt.Errorf("%s exists; a second run of this commit on this machine today needs a record of its own", path)
 	}
 	return path, os.WriteFile(path, encoded, 0o644)
@@ -129,7 +129,7 @@ func engineProvenance(engine string) (benchresults.Cohere, error) {
 		return cohere, fmt.Errorf("%s was built from %s, which this repository does not have", engine, short)
 	}
 	cohere.Commit = strings.TrimSpace(string(full))
-	if info, err := buildinfo.ReadFile(engine); err == nil {
+	if info, readFileError := buildinfo.ReadFile(engine); readFileError == nil {
 		for _, setting := range info.Settings {
 			if setting.Key == "vcs.modified" && setting.Value == "true" {
 				cohere.Dirty = true
@@ -142,9 +142,9 @@ func engineProvenance(engine string) (benchresults.Cohere, error) {
 // thisMachine is the hardware, read from sysctl and sw_vers. The host's name is never read.
 func thisMachine() (benchresults.Machine, error) {
 	read := func(name string, arguments ...string) (string, error) {
-		output, err := exec.Command(name, arguments...).Output()
-		if err != nil {
-			return "", fmt.Errorf("%s %s: %w", name, strings.Join(arguments, " "), err)
+		output, outputError := exec.Command(name, arguments...).Output()
+		if outputError != nil {
+			return "", fmt.Errorf("%s %s: %w", name, strings.Join(arguments, " "), outputError)
 		}
 		return strings.TrimSpace(string(output)), nil
 	}

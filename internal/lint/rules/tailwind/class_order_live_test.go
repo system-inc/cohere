@@ -87,14 +87,14 @@ func classOrderLiveLoadCorpus(test *testing.T) []classOrderLiveList {
 	test.Helper()
 
 	path := filepath.Join("collapse", "testdata", "variant_fixtures.json")
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		test.Fatalf("read %s: %v", path, err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatalf("read %s: %v", path, readError)
 	}
 
 	var fixture classOrderLiveCorpus
-	if err := json.Unmarshal(contents, &fixture); err != nil {
-		test.Fatalf("parse %s: %v", path, err)
+	if decodeError := json.Unmarshal(contents, &fixture); decodeError != nil {
+		test.Fatalf("parse %s: %v", path, decodeError)
 	}
 	if fixture.TailwindVersion != "4.3.3" {
 		test.Fatalf("the fixture was captured from Tailwind %s and this port targets 4.3.3",
@@ -155,12 +155,12 @@ func classOrderLiveSystems(test *testing.T, lists []classOrderLiveList) map[stri
 			}
 			continue
 		}
-		system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+		system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 			EntryPoint:          entryPoint,
 			TailwindPackageRoot: packageRoot,
 		})
-		if err != nil {
-			systems[list.entryPath] = DesignSystemResult{Err: err}
+		if loadDesignSystemError != nil {
+			systems[list.entryPath] = DesignSystemResult{Err: loadDesignSystemError}
 			continue
 		}
 		systems[list.entryPath] = DesignSystemResult{
@@ -296,15 +296,15 @@ func TestClassOrderLiveMatchesTheEngineOverTheSyntheticCases(test *testing.T) {
 			test.Fatalf("%s has neither an entry path nor a stylesheet, so nothing says which system sorted it", list.name)
 		}
 		entryPoint := filepath.Join(test.TempDir(), "theme.css")
-		if err := os.WriteFile(entryPoint, []byte(list.input), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(entryPoint, []byte(list.input), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
-		system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+		system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 			EntryPoint:          entryPoint,
 			TailwindPackageRoot: vendored.TailwindPackageRoot(),
 		})
-		if err != nil {
-			test.Fatalf("%s: loading its stylesheet: %v", list.name, err)
+		if loadDesignSystemError != nil {
+			test.Fatalf("%s: loading its stylesheet: %v", list.name, loadDesignSystemError)
 		}
 		systems[list.systemKey()] = loadedDesignSystemResult(system, entryPoint)
 	}
@@ -528,12 +528,12 @@ func classOrderLiveRepositorySystem(test *testing.T) DesignSystemResult {
 	if packageRoot == "" {
 		test.Fatalf("%s is set, but there is no installed tailwindcss beside %s", corpus.Ahra.Variable, entryPoint)
 	}
-	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
 	})
-	if err != nil {
-		test.Fatalf("loading the design system: %v", err)
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading the design system: %v", loadDesignSystemError)
 	}
 	return loadedDesignSystemResult(system, entryPoint)
 }

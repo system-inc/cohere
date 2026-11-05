@@ -9,9 +9,9 @@ import (
 
 func names(test *testing.T, source string) []string {
 	test.Helper()
-	violations, err := SerialTests("planted_test.go", []byte(source))
-	if err != nil {
-		test.Fatal(err)
+	violations, serialTestsError := SerialTests("planted_test.go", []byte(source))
+	if serialTestsError != nil {
+		test.Fatal(serialTestsError)
 	}
 	var found []string
 	for _, violation := range violations {
@@ -56,9 +56,9 @@ func TestEveryCohereTestRunsInParallel(test *testing.T) {
 	test.Parallel()
 	var violations []Violation
 	root, files := eachTestFile(test, func(path string, source []byte) error {
-		found, err := SerialTests(path, source)
+		found, serialTestsError := SerialTests(path, source)
 		violations = append(violations, found...)
-		return err
+		return serialTestsError
 	})
 	if len(violations) == 0 {
 		return

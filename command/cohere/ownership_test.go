@@ -141,8 +141,8 @@ func TestAFileIncludedTwiceBelongsToTheNearerTsconfig(test *testing.T) {
 
 	// The outer tsconfig includes nothing the inner ones do not own.
 	writeTree(test, root, map[string]string{"tsconfig.json": `{` + ownershipOptions + `,"include":["packages/a/src"]}`})
-	if err := os.Remove(filepath.Join(root, "index.ts")); err != nil {
-		test.Fatal(err)
+	if removeError := os.Remove(filepath.Join(root, "index.ts")); removeError != nil {
+		test.Fatal(removeError)
 	}
 	found = ownedDiscovery(test, root)
 	if want := []string{"packages/a"}; !reflect.DeepEqual(found.labels(), want) || !reflect.DeepEqual(found.Ownership.Yielding, []string{"."}) {

@@ -52,7 +52,7 @@ func DecodeStrictOptions(raw []byte) (any, error) {
 		return StrictSafe, nil
 	}
 	var mode StrictMode
-	if err := json.Unmarshal(raw, &mode); err != nil {
+	if decodeError := json.Unmarshal(raw, &mode); decodeError != nil {
 		return StrictSafe, fmt.Errorf(
 			"strict: the option is a bare string, one of \"never\", \"global\", \"function\" or "+
 				"\"safe\", got %s", raw)

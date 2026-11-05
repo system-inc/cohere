@@ -78,9 +78,9 @@ func TestPerformanceNoIndependentAwaitInLoopAhraShapes(test *testing.T) {
 
 	var onDisk []string
 	for _, directory := range []string{"fires", "silent"} {
-		entries, err := os.ReadDir(filepath.Join(performanceNoIndependentAwaitInLoopTestdata, directory))
-		if err != nil {
-			test.Fatalf("reading %s: %v", directory, err)
+		entries, readDirectoryError := os.ReadDir(filepath.Join(performanceNoIndependentAwaitInLoopTestdata, directory))
+		if readDirectoryError != nil {
+			test.Fatalf("reading %s: %v", directory, readDirectoryError)
 		}
 		for _, entry := range entries {
 			onDisk = append(onDisk, directory+"/"+entry.Name())
@@ -99,9 +99,9 @@ func TestPerformanceNoIndependentAwaitInLoopAhraShapes(test *testing.T) {
 	for name, wantCount := range performanceNoIndependentAwaitInLoopAhraShapes {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			source, err := os.ReadFile(filepath.Join(performanceNoIndependentAwaitInLoopTestdata, name))
-			if err != nil {
-				test.Fatal(err)
+			source, readError := os.ReadFile(filepath.Join(performanceNoIndependentAwaitInLoopTestdata, name))
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			result := rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, "/repository/source/"+filepath.Base(name), string(source))
 			if wantCount == 0 {

@@ -571,8 +571,8 @@ func DecodeClassMethodsUseThisOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var decoded ClassMethodsUseThisOptions
-	if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	if decoded.EnforceForClassFields == nil {
 		decoded.EnforceForClassFields = options.EnforceForClassFields

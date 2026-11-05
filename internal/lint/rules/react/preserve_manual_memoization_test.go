@@ -504,9 +504,9 @@ func TestFixturesMatchTheVendoredCorpus(test *testing.T) {
 	}
 	checked := 0
 	for relative, copied := range copies {
-		original, err := os.ReadFile(filepath.Join(corpus, relative))
-		if err != nil {
-			test.Errorf("reading %s: %v", relative, err)
+		original, readError := os.ReadFile(filepath.Join(corpus, relative))
+		if readError != nil {
+			test.Errorf("reading %s: %v", relative, readError)
 			continue
 		}
 		if string(original) != copied {

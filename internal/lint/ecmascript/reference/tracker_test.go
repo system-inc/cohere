@@ -41,8 +41,8 @@ func trackedIn(test *testing.T, code string, traceMap map[string]*reference.Trac
 func decodeTraceMap(test *testing.T, raw string) map[string]*reference.TraceMap {
 	test.Helper()
 	var decoded map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
-		test.Fatalf("trace map %s: %v", raw, err)
+	if decodeError := json.Unmarshal([]byte(raw), &decoded); decodeError != nil {
+		test.Fatalf("trace map %s: %v", raw, decodeError)
 	}
 	members := map[string]*reference.TraceMap{}
 	for key, value := range decoded {
@@ -54,8 +54,8 @@ func decodeTraceMap(test *testing.T, raw string) map[string]*reference.TraceMap 
 func decodeTraceNode(test *testing.T, raw json.RawMessage) *reference.TraceMap {
 	test.Helper()
 	var decoded map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &decoded); err != nil {
-		test.Fatalf("trace node %s: %v", raw, err)
+	if decodeError := json.Unmarshal(raw, &decoded); decodeError != nil {
+		test.Fatalf("trace node %s: %v", raw, decodeError)
 	}
 	node := &reference.TraceMap{Members: map[string]*reference.TraceMap{}}
 	for key, value := range decoded {

@@ -24,8 +24,8 @@ func TestTheOutputSettingIsHonored(test *testing.T) {
 		// The default view, so not runCohere, which asks for --verbose.
 		command := exec.Command(binary, "--no-fix", "--no-format", "--no-cache")
 		command.Dir = root
-		output, err := command.CombinedOutput()
-		if exitError, isExit := err.(*exec.ExitError); isExit {
+		output, outputError := command.CombinedOutput()
+		if exitError, isExit := outputError.(*exec.ExitError); isExit {
 			return string(output), childExitCode(test, exitError)
 		}
 		return string(output), 0

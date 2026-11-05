@@ -58,10 +58,10 @@ func DecodeConsistentThisOptions(list []byte) (any, error) {
 	}
 
 	var aliases []string
-	if err := json.Unmarshal(list, &aliases); err != nil {
+	if decodeError := json.Unmarshal(list, &aliases); decodeError != nil {
 		return DefaultConsistentThisSettings(), fmt.Errorf(
 			"consistent-this takes each alias as its own string element, as in "+
-				"[\"error\", \"self\", \"vm\"]: %w", err)
+				"[\"error\", \"self\", \"vm\"]: %w", decodeError)
 	}
 	// Upstream's schema says `minLength: 1` on each item, so an empty name is refused rather than
 	// quietly matching every unnamed thing.

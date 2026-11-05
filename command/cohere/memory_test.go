@@ -79,12 +79,12 @@ func TestLinuxAvailableMemoryTakesTheSmallerOfMemAvailableAndTheCgroup(test *tes
 		{"a cgroup above the host", linuxCgroupMemory{v2Max: []byte("68719476736\n"), v2Current: []byte("0\n")}, host},
 	}
 	for _, entry := range cases {
-		got, err := linuxAvailableMemory(meminfo, entry.cgroup)
-		if err != nil || got != entry.want {
-			test.Errorf("%s: got %d, %v; want %d", entry.name, got, err, entry.want)
+		got, linuxAvailableMemoryError := linuxAvailableMemory(meminfo, entry.cgroup)
+		if linuxAvailableMemoryError != nil || got != entry.want {
+			test.Errorf("%s: got %d, %v; want %d", entry.name, got, linuxAvailableMemoryError, entry.want)
 		}
 	}
-	if _, err := linuxAvailableMemory([]byte("MemTotal: 1 kB\n"), linuxCgroupMemory{}); err == nil {
+	if _, linuxAvailableMemoryError := linuxAvailableMemory([]byte("MemTotal: 1 kB\n"), linuxCgroupMemory{}); linuxAvailableMemoryError == nil {
 		test.Error("a meminfo without MemAvailable read as a number")
 	}
 }

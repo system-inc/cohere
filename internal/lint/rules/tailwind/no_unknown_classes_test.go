@@ -104,11 +104,11 @@ func runUnknownFixtureWithOptions(
 	}
 	plantPackage := func(root string) {
 		modules := filepath.Join(root, "node_modules")
-		if err := os.MkdirAll(modules, 0o755); err != nil {
-			test.Fatalf("creating the fixture node_modules: %v", err)
+		if createDirectoryError := os.MkdirAll(modules, 0o755); createDirectoryError != nil {
+			test.Fatalf("creating the fixture node_modules: %v", createDirectoryError)
 		}
-		if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
-			test.Fatalf("linking the installed tailwindcss into the fixture: %v", err)
+		if symlinkError := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); symlinkError != nil {
+			test.Fatalf("linking the installed tailwindcss into the fixture: %v", symlinkError)
 		}
 	}
 
@@ -605,17 +605,17 @@ func unknownFixtureLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSyste
 	test.Helper()
 
 	entryPoint := corpus.Ahra.Path(test, "app", "_theme", "styles", "theme.css")
-	if _, err := os.Stat(entryPoint); err != nil {
+	if _, statError := os.Stat(entryPoint); statError != nil {
 		test.Fatalf("the ahra corpus has no stylesheet at %s, so there is no live design system to ask", entryPoint)
 	}
 	packageRoot := unknownFixturePackageRoot()
 
-	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
 	})
-	if err != nil {
-		test.Fatalf("loading the corpus design system: %v", err)
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading the corpus design system: %v", loadDesignSystemError)
 	}
 	return system
 }
@@ -646,20 +646,20 @@ func independentLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSystem {
 	// walk a repository uses. Written into a directory this test owns and removed after, rather than
 	// into the corpus repository's working tree.
 	staging := test.TempDir()
-	if err := os.Symlink(packageRoot, filepath.Join(staging, "node_modules_link")); err != nil {
-		test.Fatalf("linking the installed tailwindcss beside the independent stylesheet: %v", err)
+	if symlinkError := os.Symlink(packageRoot, filepath.Join(staging, "node_modules_link")); symlinkError != nil {
+		test.Fatalf("linking the installed tailwindcss beside the independent stylesheet: %v", symlinkError)
 	}
 	modules := filepath.Join(staging, "node_modules")
-	if err := os.MkdirAll(modules, 0o755); err != nil {
-		test.Fatalf("creating the staging node_modules: %v", err)
+	if createDirectoryError := os.MkdirAll(modules, 0o755); createDirectoryError != nil {
+		test.Fatalf("creating the staging node_modules: %v", createDirectoryError)
 	}
-	if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
-		test.Fatalf("linking the installed tailwindcss into the staging directory: %v", err)
+	if symlinkError := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); symlinkError != nil {
+		test.Fatalf("linking the installed tailwindcss into the staging directory: %v", symlinkError)
 	}
 
 	entryPoint := filepath.Join(staging, "independent_theme.css")
-	if err := os.WriteFile(entryPoint, contents, 0o644); err != nil {
-		test.Fatalf("staging the independent stylesheet: %v", err)
+	if writeError := os.WriteFile(entryPoint, contents, 0o644); writeError != nil {
+		test.Fatalf("staging the independent stylesheet: %v", writeError)
 	}
 
 	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{

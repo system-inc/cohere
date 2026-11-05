@@ -71,9 +71,9 @@ func DecodeConsistentTypeDefinitionsOptions(raw []byte) (any, error) {
 	}
 
 	var style string
-	if err := json.Unmarshal(raw, &style); err != nil {
+	if decodeError := json.Unmarshal(raw, &style); decodeError != nil {
 		return settings, fmt.Errorf(
-			"consistent-type-definitions takes the string \"interface\" or \"type\": %w", err)
+			"consistent-type-definitions takes the string \"interface\" or \"type\": %w", decodeError)
 	}
 	switch ConsistentTypeDefinitionsStyle(style) {
 	case ConsistentTypeDefinitionsInterface, ConsistentTypeDefinitionsType:

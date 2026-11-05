@@ -77,8 +77,8 @@ func decodeTailwindOptionsAt[Options any, Settled interface {
 		merged := map[string]json.RawMessage{}
 		if settings := tailwindSettings(base.Settings); len(settings) > 0 {
 			var written map[string]json.RawMessage
-			if err := json.Unmarshal(settings, &written); err != nil {
-				return decoded, fmt.Errorf("decoding settings[%q]: %w", tailwindSettingsNamespaces[0], err)
+			if decodeError := json.Unmarshal(settings, &written); decodeError != nil {
+				return decoded, fmt.Errorf("decoding settings[%q]: %w", tailwindSettingsNamespaces[0], decodeError)
 			}
 			for key, value := range written {
 				if keys[key] {
@@ -87,23 +87,23 @@ func decodeTailwindOptionsAt[Options any, Settled interface {
 			}
 		}
 		if len(raw) > 0 {
-			if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
-				return decoded, fmt.Errorf("decoding %T: %w", decoded, err)
+			if unmarshalOptionsError := rule.UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
+				return decoded, fmt.Errorf("decoding %T: %w", decoded, unmarshalOptionsError)
 			}
 			var own map[string]json.RawMessage
-			if err := json.Unmarshal(raw, &own); err != nil {
-				return decoded, fmt.Errorf("decoding %T: %w", decoded, err)
+			if decodeError := json.Unmarshal(raw, &own); decodeError != nil {
+				return decoded, fmt.Errorf("decoding %T: %w", decoded, decodeError)
 			}
 			maps.Copy(merged, own)
 		}
 		if len(merged) > 0 {
-			encoded, err := json.Marshal(merged)
-			if err != nil {
-				return decoded, fmt.Errorf("merging settings into %T: %w", decoded, err)
+			encoded, encodeError := json.Marshal(merged)
+			if encodeError != nil {
+				return decoded, fmt.Errorf("merging settings into %T: %w", decoded, encodeError)
 			}
 			decoded = *new(Options)
-			if err := rule.UnmarshalOptions(encoded, &decoded); err != nil {
-				return decoded, fmt.Errorf("decoding %T with settings merged: %w", decoded, err)
+			if unmarshalOptionsError := rule.UnmarshalOptions(encoded, &decoded); unmarshalOptionsError != nil {
+				return decoded, fmt.Errorf("decoding %T with settings merged: %w", decoded, unmarshalOptionsError)
 			}
 		}
 		anchor := base.ConfigDirectory
@@ -113,8 +113,8 @@ func decodeTailwindOptionsAt[Options any, Settled interface {
 		Settled(&decoded).anchorAt(anchor)
 		// Checked and compiled here, once per configuration selection, rather than by the rule on every
 		// file.
-		if err := Settled(&decoded).compileClassLiterals(); err != nil {
-			return decoded, fmt.Errorf("decoding %T: %w", decoded, err)
+		if compileClassLiteralsError := Settled(&decoded).compileClassLiterals(); compileClassLiteralsError != nil {
+			return decoded, fmt.Errorf("decoding %T: %w", decoded, compileClassLiteralsError)
 		}
 		return decoded, nil
 	}
@@ -140,8 +140,8 @@ func tailwindSettings(settings map[string]json.RawMessage) json.RawMessage {
 // refused here exactly as it is in a rule's own element, until its port lands.
 func splitTailwindSettings(raw []byte) (map[string]json.RawMessage, error) {
 	var written map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &written); err != nil {
-		return nil, fmt.Errorf("expected an object of better-tailwindcss options: %w", err)
+	if decodeError := json.Unmarshal(raw, &written); decodeError != nil {
+		return nil, fmt.Errorf("expected an object of better-tailwindcss options: %w", decodeError)
 	}
 	parts := map[string]map[string]json.RawMessage{}
 	read := map[string]bool{}
@@ -170,9 +170,9 @@ func splitTailwindSettings(raw []byte) (map[string]json.RawMessage, error) {
 	}
 	encoded := make(map[string]json.RawMessage, len(parts))
 	for ruleName, part := range parts {
-		bytes, err := json.Marshal(part)
-		if err != nil {
-			return nil, err
+		bytes, encodeError := json.Marshal(part)
+		if encodeError != nil {
+			return nil, encodeError
 		}
 		encoded[ruleName] = bytes
 	}
@@ -259,7 +259,7 @@ func ConfiguredEntryPoint(projectRoot string, location DesignSystemLocation, fil
 // too; registry.CheckSettings refuses a malformed value by name.
 func LocationInSettings(settings map[string]json.RawMessage, anchor string) (DesignSystemLocation, bool) {
 	var written map[string]json.RawMessage
-	if err := json.Unmarshal(tailwindSettings(settings), &written); err != nil || len(written) == 0 {
+	if decodeError := json.Unmarshal(tailwindSettings(settings), &written); decodeError != nil || len(written) == 0 {
 		return DesignSystemLocation{}, false
 	}
 	read := func(key string) string {
@@ -328,9 +328,9 @@ func stylesheetResolverAt(cwd string, configured string, packageRoot string, fil
 	if configPath == "" {
 		return next, nil
 	}
-	mapping, err := loadTsconfigPaths(configPath, readFile, fileExists)
-	if err != nil {
-		return nil, err
+	mapping, loadTsconfigPathsError := loadTsconfigPaths(configPath, readFile, fileExists)
+	if loadTsconfigPathsError != nil {
+		return nil, loadTsconfigPathsError
 	}
 	return tsconfigStylesheetResolver(mapping, next, readFile, fileExists), nil
 }

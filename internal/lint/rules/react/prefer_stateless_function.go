@@ -41,8 +41,8 @@ func DecodePreferStatelessFunctionOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var wire preferStatelessFunctionWireOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	options.IgnorePureComponents = wire.IgnorePureComponents
 	return options, nil

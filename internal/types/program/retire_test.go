@@ -25,9 +25,9 @@ func TestARetiredGraphRecordsNothing(test *testing.T) {
 	ctx := context.Background()
 	build := func() *program.Graph {
 		test.Helper()
-		graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-		if err != nil {
-			test.Fatalf("building: %v", err)
+		graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+		if buildError != nil {
+			test.Fatalf("building: %v", buildError)
 		}
 		graph.Shapes, _ = graph.Signatures(ctx, program.RecordedRealSignatures(graph))
 		return graph

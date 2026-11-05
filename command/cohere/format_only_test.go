@@ -135,8 +135,8 @@ func TestOnlyAFileTheFormatterCouldNotReadIsUnchecked(test *testing.T) {
 
 func removeForTest(test *testing.T, fileName string) {
 	test.Helper()
-	if err := os.Remove(fileName); err != nil {
-		test.Fatal(err)
+	if removeError := os.Remove(fileName); removeError != nil {
+		test.Fatal(removeError)
 	}
 }
 

@@ -19,9 +19,9 @@ func strictVoidReturnOptionsFor(test *testing.T, optionsJson string) any {
 	if optionsJson == "" {
 		return DefaultStrictVoidReturnSettings()
 	}
-	decoded, err := DecodeStrictVoidReturnOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", optionsJson, err)
+	decoded, decodeStrictVoidReturnOptionsError := DecodeStrictVoidReturnOptions(json.RawMessage(optionsJson))
+	if decodeStrictVoidReturnOptionsError != nil {
+		test.Fatalf("decoding %s: %v", optionsJson, decodeStrictVoidReturnOptionsError)
 	}
 	return decoded
 }
@@ -342,9 +342,9 @@ func TestDecodeStrictVoidReturnOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeStrictVoidReturnOptions(json.RawMessage(testCase.raw))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.raw, err)
+			decoded, decodeStrictVoidReturnOptionsError := DecodeStrictVoidReturnOptions(json.RawMessage(testCase.raw))
+			if decodeStrictVoidReturnOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.raw, decodeStrictVoidReturnOptionsError)
 			}
 			options, isOptions := decoded.(StrictVoidReturnOptions)
 			if !isOptions {

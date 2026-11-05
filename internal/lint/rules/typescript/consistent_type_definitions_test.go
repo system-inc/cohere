@@ -200,9 +200,9 @@ func TestConsistentTypeDefinitionsDeclinesInsideDeclareGlobal(test *testing.T) {
 func TestConsistentTypeDefinitionsDecoderDefaultsToInterface(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeConsistentTypeDefinitionsOptions(nil)
-	if err != nil {
-		test.Fatalf("empty options should decode to the default: %v", err)
+	decoded, decodeConsistentTypeDefinitionsOptionsError := DecodeConsistentTypeDefinitionsOptions(nil)
+	if decodeConsistentTypeDefinitionsOptionsError != nil {
+		test.Fatalf("empty options should decode to the default: %v", decodeConsistentTypeDefinitionsOptionsError)
 	}
 	settings, ok := decoded.(ConsistentTypeDefinitionsOptions)
 	if !ok {
@@ -223,7 +223,7 @@ func TestConsistentTypeDefinitionsDecoderDefaultsToInterface(test *testing.T) {
 	rule_testing.ExpectClean(test, silent)
 
 	// And a bad value fails loudly rather than silencing the rule.
-	if _, err := DecodeConsistentTypeDefinitionsOptions([]byte(`"neither"`)); err == nil {
+	if _, decodeConsistentTypeDefinitionsOptionsError := DecodeConsistentTypeDefinitionsOptions([]byte(`"neither"`)); decodeConsistentTypeDefinitionsOptionsError == nil {
 		test.Error("expected the decoder to refuse an unknown style")
 	}
 }
@@ -287,9 +287,9 @@ func TestConsistentTypeDefinitionsKeepsTheDeclarationModifiers(test *testing.T) 
 		{"interface", "export /* c */ type Foo = { a: string };\n", "export /* c */ interface Foo { a: string }\n"},
 	}
 	for _, testCase := range cases {
-		decoded, err := DecodeConsistentTypeDefinitionsOptions([]byte(`"` + testCase.style + `"`))
-		if err != nil {
-			test.Fatal(err)
+		decoded, decodeConsistentTypeDefinitionsOptionsError := DecodeConsistentTypeDefinitionsOptions([]byte(`"` + testCase.style + `"`))
+		if decodeConsistentTypeDefinitionsOptionsError != nil {
+			test.Fatal(decodeConsistentTypeDefinitionsOptionsError)
 		}
 		result := rule_testing.RunWithOptions(test, ConsistentTypeDefinitions,
 			consistentTypeDefinitionsFile, testCase.sourceText, decoded)

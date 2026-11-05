@@ -61,13 +61,13 @@ func DecodeConsistentGenericConstructorsOptions(raw []byte) (any, error) {
 
 	// The spelling cohere actually delivers: the mode as a bare string.
 	var mode string
-	if err := json.Unmarshal(raw, &mode); err == nil {
+	if decodeError := json.Unmarshal(raw, &mode); decodeError == nil {
 		return consistentGenericConstructorsOptionsFor(mode)
 	}
 
 	// The spelling an ESLint config is written in, accepted so a copied setting still works.
 	var modes []string
-	if err := json.Unmarshal(raw, &modes); err == nil && len(modes) == 1 {
+	if decodeError := json.Unmarshal(raw, &modes); decodeError == nil && len(modes) == 1 {
 		return consistentGenericConstructorsOptionsFor(modes[0])
 	}
 

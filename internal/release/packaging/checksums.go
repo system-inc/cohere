@@ -33,9 +33,9 @@ func Checksums(outputDirectory string, packageDirectoryNames []string) ([]byte, 
 	var lines []string
 	for _, packageDirectoryName := range packageDirectoryNames {
 		binDirectory := filepath.Join(outputDirectory, packageDirectoryName, "bin")
-		entries, err := os.ReadDir(binDirectory)
-		if err != nil {
-			return nil, fmt.Errorf("reading %s to checksum it: %w", binDirectory, err)
+		entries, readDirectoryError := os.ReadDir(binDirectory)
+		if readDirectoryError != nil {
+			return nil, fmt.Errorf("reading %s to checksum it: %w", binDirectory, readDirectoryError)
 		}
 
 		hashed := 0
@@ -45,9 +45,9 @@ func Checksums(outputDirectory string, packageDirectoryNames []string) ([]byte, 
 				// at would vouch for a file outside the package.
 				return nil, fmt.Errorf("%s holds %s, which is not a regular file, so its checksum would not describe what installs", binDirectory, entry.Name())
 			}
-			digest, err := sha256File(filepath.Join(binDirectory, entry.Name()))
-			if err != nil {
-				return nil, err
+			digest, sha256FileError := sha256File(filepath.Join(binDirectory, entry.Name()))
+			if sha256FileError != nil {
+				return nil, sha256FileError
 			}
 			lines = append(lines, digest+"  "+packageDirectoryName+"/bin/"+entry.Name())
 			hashed++
@@ -69,15 +69,15 @@ func Checksums(outputDirectory string, packageDirectoryNames []string) ([]byte, 
 
 // sha256File is a file's SHA-256 in lowercase hex, the spelling `shasum` prints and compares.
 func sha256File(path string) (string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return "", fmt.Errorf("opening %s to checksum it: %w", path, err)
+	file, openError := os.Open(path)
+	if openError != nil {
+		return "", fmt.Errorf("opening %s to checksum it: %w", path, openError)
 	}
 	defer file.Close()
 
 	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil {
-		return "", fmt.Errorf("reading %s to checksum it: %w", path, err)
+	if _, copyError := io.Copy(hash, file); copyError != nil {
+		return "", fmt.Errorf("reading %s to checksum it: %w", path, copyError)
 	}
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }

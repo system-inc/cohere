@@ -40,8 +40,8 @@ func listedTree(test *testing.T) string {
 		"zone.js":         filepath.Join(root, "source", "deep"),
 		"dangling.ts":     filepath.Join(root, "missing.ts"),
 	} {
-		if err := os.Symlink(target, filepath.Join(root, link)); err != nil {
-			test.Skipf("this filesystem cannot make symbolic links: %v", err)
+		if symlinkError := os.Symlink(target, filepath.Join(root, link)); symlinkError != nil {
+			test.Skipf("this filesystem cannot make symbolic links: %v", symlinkError)
 		}
 	}
 	return root
@@ -52,7 +52,7 @@ func listedTree(test *testing.T) string {
 func diskListings(test *testing.T, root string) map[string][]os.DirEntry {
 	test.Helper()
 	listings := map[string][]os.DirEntry{}
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil || !entry.IsDir() {
 			return err
 		}
@@ -60,8 +60,8 @@ func diskListings(test *testing.T, root string) map[string][]os.DirEntry {
 		listings[path] = entries
 		return err
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	return listings
 }
@@ -96,9 +96,9 @@ func without(listings map[string][]os.DirEntry, directory string, name string) m
 func TestAWalkReadFromListingsIsTheWalkOfTheDisk(test *testing.T) {
 	test.Parallel()
 	root := listedTree(test)
-	disk, err := Enumerate(root, handlesEveryLanguage)
-	if err != nil {
-		test.Fatal(err)
+	disk, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatal(enumerateError)
 	}
 	if len(disk.Files) < 4 || disk.SymbolicLinks != 3 || len(disk.NestedRepositories) != 2 || len(disk.Adamic) != 1 {
 		test.Fatalf("the fixture's walk is too thin to prove anything: %+v", disk)
@@ -128,9 +128,9 @@ func TestAWalkReadFromListingsIsTheWalkOfTheDisk(test *testing.T) {
 		"none listed":            {},
 		"every listing reversed": reversed,
 	} {
-		listed, err := EnumerateListed(root, handlesEveryLanguage, listingOf(listing))
-		if err != nil {
-			test.Fatalf("%s: %v", name, err)
+		listed, enumerateListedError := EnumerateListed(root, handlesEveryLanguage, listingOf(listing))
+		if enumerateListedError != nil {
+			test.Fatalf("%s: %v", name, enumerateListedError)
 		}
 		if !reflect.DeepEqual(listed, disk) {
 			test.Errorf("%s: the listed walk differs from the walk of the disk\nlisted: %+v\ndisk:   %+v", name, listed, disk)
@@ -145,8 +145,8 @@ func TestAWalkReadFromListingsIsTheWalkOfTheDisk(test *testing.T) {
 		"a directory dropped":    without(listings, root, "source"),
 		"an Adamic file dropped": without(listings, filepath.Join(root, "source"), "x.a"),
 	} {
-		listed, err := EnumerateListed(root, handlesEveryLanguage, listingOf(mutant))
-		if err == nil && reflect.DeepEqual(listed, disk) {
+		listed, enumerateListedError := EnumerateListed(root, handlesEveryLanguage, listingOf(mutant))
+		if enumerateListedError == nil && reflect.DeepEqual(listed, disk) {
 			test.Errorf("%s: the listed walk still equals the disk's, so it did not read that listing", name)
 		}
 	}

@@ -27,13 +27,13 @@ func TestRequiredOptionsFailLoudlyWhenAbsent(test *testing.T) {
 		"guard": {Decode: DecodeInto[guardOptions](), Required: true},
 	}
 
-	if _, err := registry.Decode("guard", nil); err == nil {
+	if _, decodeError := registry.Decode("guard", nil); decodeError == nil {
 		test.Fatal("a required option was absent and no error was raised, so the rule would decline every file in silence")
 	}
 
-	decoded, err := registry.Decode("guard", []json.RawMessage{json.RawMessage(`{"libraryDirectory":"/libraries/structure/"}`)})
-	if err != nil {
-		test.Fatalf("valid options failed to decode: %v", err)
+	decoded, decodeError := registry.Decode("guard", []json.RawMessage{json.RawMessage(`{"libraryDirectory":"/libraries/structure/"}`)})
+	if decodeError != nil {
+		test.Fatalf("valid options failed to decode: %v", decodeError)
 	}
 	typed, isTyped := decoded.(guardOptions)
 	if !isTyped {
@@ -52,9 +52,9 @@ func TestTuningOptionsFallBackToDefaults(test *testing.T) {
 		"tunable": {Decode: DecodeInto[tuningOptions]()},
 	}
 
-	decoded, err := registry.Decode("tunable", nil)
-	if err != nil {
-		test.Fatalf("an absent optional option was treated as fatal: %v", err)
+	decoded, decodeError := registry.Decode("tunable", nil)
+	if decodeError != nil {
+		test.Fatalf("an absent optional option was treated as fatal: %v", decodeError)
 	}
 	if decoded != nil {
 		test.Fatalf("expected nil so the rule uses its own defaults, got %+v", decoded)
@@ -64,9 +64,9 @@ func TestTuningOptionsFallBackToDefaults(test *testing.T) {
 // TestARuleWithNoDecoderGetsNil keeps the common case cheap: most rules take no options at all.
 func TestARuleWithNoDecoderGetsNil(test *testing.T) {
 	test.Parallel()
-	decoded, err := OptionsRegistry{}.Decode("plain", nil)
-	if err != nil {
-		test.Fatalf("a rule with no decoder errored on a bare severity: %v", err)
+	decoded, decodeError := OptionsRegistry{}.Decode("plain", nil)
+	if decodeError != nil {
+		test.Fatalf("a rule with no decoder errored on a bare severity: %v", decodeError)
 	}
 	if decoded != nil {
 		test.Fatalf("expected nil for a rule that takes no options, got %+v", decoded)
@@ -78,13 +78,13 @@ func TestARuleWithNoDecoderGetsNil(test *testing.T) {
 // rule that reads none was accepted and had no effect.
 func TestARuleWithNoDecoderRefusesAnOption(test *testing.T) {
 	test.Parallel()
-	_, err := OptionsRegistry{}.Decode("plain", []json.RawMessage{json.RawMessage(`{"ignored":true}`)})
-	if err == nil {
+	_, decodeError := OptionsRegistry{}.Decode("plain", []json.RawMessage{json.RawMessage(`{"ignored":true}`)})
+	if decodeError == nil {
 		test.Fatal("an option given to a rule that takes none was accepted and would never be read")
 	}
 	for _, want := range []string{"plain", `element 1 {"ignored":true}`} {
-		if !strings.Contains(err.Error(), want) {
-			test.Errorf("the refusal does not name %q, so the author cannot tell what to remove: %v", want, err)
+		if !strings.Contains(decodeError.Error(), want) {
+			test.Errorf("the refusal does not name %q, so the author cannot tell what to remove: %v", want, decodeError)
 		}
 	}
 }
@@ -136,15 +136,15 @@ func TestAListRuleReceivesEveryElement(test *testing.T) {
 		return string(raw), nil
 	}}}
 
-	if _, err := registry.Decode("listed", []json.RawMessage{
+	if _, decodeError := registry.Decode("listed", []json.RawMessage{
 		json.RawMessage(`"always"`),
 		json.RawMessage(`{"null": "ignore"}`),
 		json.RawMessage(`"third"`),
-	}); err != nil {
-		test.Fatalf("a list rule refused its elements: %v", err)
+	}); decodeError != nil {
+		test.Fatalf("a list rule refused its elements: %v", decodeError)
 	}
-	if _, err := registry.Decode("listed", nil); err != nil {
-		test.Fatalf("a list rule with a bare severity errored: %v", err)
+	if _, decodeError := registry.Decode("listed", nil); decodeError != nil {
+		test.Fatalf("a list rule with a bare severity errored: %v", decodeError)
 	}
 
 	want := []string{`["always",{"null":"ignore"},"third"]`, ``}
@@ -179,21 +179,21 @@ func TestANullIsRefusedBeforeAnyDecoderSeesIt(test *testing.T) {
 		for _, element := range testCase.elements {
 			elements = append(elements, json.RawMessage(element))
 		}
-		_, err := registry.Decode(testCase.rule, elements)
-		if err == nil {
+		_, decodeError := registry.Decode(testCase.rule, elements)
+		if decodeError == nil {
 			test.Errorf("%s %v was accepted", testCase.rule, testCase.elements)
 			continue
 		}
 		for _, want := range []string{testCase.rule, testCase.want} {
-			if !strings.Contains(err.Error(), want) {
-				test.Errorf("%s %v: the refusal does not name %q: %v", testCase.rule, testCase.elements, want, err)
+			if !strings.Contains(decodeError.Error(), want) {
+				test.Errorf("%s %v: the refusal does not name %q: %v", testCase.rule, testCase.elements, want, decodeError)
 			}
 		}
 	}
 
 	// The control: the string "null" and a key named null are values, not nulls, and pass through.
-	if _, err := registry.Decode("listed", []json.RawMessage{json.RawMessage(`"null"`), json.RawMessage(`{"null": "ignore"}`)}); err != nil {
-		test.Errorf("a string and a key spelled null were refused: %v", err)
+	if _, decodeError := registry.Decode("listed", []json.RawMessage{json.RawMessage(`"null"`), json.RawMessage(`{"null": "ignore"}`)}); decodeError != nil {
+		test.Errorf("a string and a key spelled null were refused: %v", decodeError)
 	}
 }
 
@@ -203,7 +203,7 @@ func TestMalformedOptionsAreAnError(test *testing.T) {
 	test.Parallel()
 	registry := OptionsRegistry{"guard": {Decode: DecodeInto[guardOptions](), Required: true}}
 
-	if _, err := registry.Decode("guard", []json.RawMessage{json.RawMessage(`{"libraryDirectory": 42}`)}); err == nil {
+	if _, decodeError := registry.Decode("guard", []json.RawMessage{json.RawMessage(`{"libraryDirectory": 42}`)}); decodeError == nil {
 		test.Fatal("options of the wrong JSON type decoded successfully")
 	}
 }
@@ -242,9 +242,9 @@ func TestUnconfiguredIsNotScopedOff(test *testing.T) {
 // TestTheLiveGuardRuleGetsItsOptions is the specific rule that was inert, against the real configuration.
 func TestTheLiveGuardRuleGetsItsOptions(test *testing.T) {
 	test.Parallel()
-	loaded, err := Load(liveConfigPath(test))
-	if err != nil {
-		test.Fatalf("loading the live config: %v", err)
+	loaded, loadError := Load(liveConfigPath(test))
+	if loadError != nil {
+		test.Fatalf("loading the live config: %v", loadError)
 	}
 
 	elements := loaded.Resolve("libraries/structure/source/api/Fetch.ts").RawOptionsFor("boundary-no-project-import")
@@ -256,8 +256,8 @@ func TestTheLiveGuardRuleGetsItsOptions(test *testing.T) {
 	}
 
 	var typed guardOptions
-	if err := json.Unmarshal(elements[0], &typed); err != nil {
-		test.Fatalf("the live options did not decode: %v", err)
+	if decodeError := json.Unmarshal(elements[0], &typed); decodeError != nil {
+		test.Fatalf("the live options did not decode: %v", decodeError)
 	}
 	if typed.LibraryDirectory != "/libraries/structure/" {
 		test.Fatalf("libraryDirectory did not survive the round trip: %q", typed.LibraryDirectory)

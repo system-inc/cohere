@@ -93,8 +93,8 @@ func DecodeUnicodeBomOptions(raw []byte) (any, error) {
 	}
 
 	var configured string
-	if err := json.Unmarshal(raw, &configured); err != nil {
-		return DefaultUnicodeBomSettings(), err
+	if decodeError := json.Unmarshal(raw, &configured); decodeError != nil {
+		return DefaultUnicodeBomSettings(), decodeError
 	}
 
 	setting := UnicodeBomSetting(configured)

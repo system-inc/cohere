@@ -39,9 +39,9 @@ func TestAggregatedScoreAgainstReactsOwnFixtures(test *testing.T) {
 	test.Parallel()
 	fixtures := load(test)
 
-	report, err := Aggregate(fixtures, declineEverything{reason: "scored without a rule engine; see the note on this test"})
-	if err != nil {
-		test.Fatalf("aggregating: %v", err)
+	report, aggregateError := Aggregate(fixtures, declineEverything{reason: "scored without a rule engine; see the note on this test"})
+	if aggregateError != nil {
+		test.Fatalf("aggregating: %v", aggregateError)
 	}
 
 	if report.Considered != ExpectedFixtureCount {
@@ -467,7 +467,7 @@ func TestReportCheckCatchesANonPartition(test *testing.T) {
 		Counts:     map[Verdict]int{VerdictPassed: 1},
 		Fixtures:   []FixtureVerdict{{Name: "a", Verdict: VerdictPassed}},
 	}
-	if err := report.Check(); err == nil {
+	if checkError := report.Check(); checkError == nil {
 		test.Fatal("Check accepted a report whose categories do not sum to the denominator")
 	}
 
@@ -476,7 +476,7 @@ func TestReportCheckCatchesANonPartition(test *testing.T) {
 		Counts:     map[Verdict]int{VerdictFailed: 1},
 		Fixtures:   []FixtureVerdict{{Name: "a", Verdict: VerdictFailed}},
 	}
-	if err := unreasoned.Check(); err == nil {
+	if checkError := unreasoned.Check(); checkError == nil {
 		test.Fatal("Check accepted a non-pass with no reason")
 	}
 }

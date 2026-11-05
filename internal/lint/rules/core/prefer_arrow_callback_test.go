@@ -14,9 +14,9 @@ const preferArrowCallbackFile = "/repository/source/PreferArrowCallback.ts"
 //
 // The argument is the option as JSON TEXT, exactly the bytes the config layer hands the decoder.
 func preferArrowCallbackOf(optionJson string) any {
-	settings, err := DecodePreferArrowCallbackOptions([]byte(optionJson))
-	if err != nil {
-		panic(err)
+	settings, decodePreferArrowCallbackOptionsError := DecodePreferArrowCallbackOptions([]byte(optionJson))
+	if decodePreferArrowCallbackOptionsError != nil {
+		panic(decodePreferArrowCallbackOptionsError)
 	}
 	return settings
 }

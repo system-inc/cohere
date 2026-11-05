@@ -42,7 +42,7 @@ func checkInMemory(test *testing.T, source string) int {
 	test.Helper()
 	root := path.Join(test.TempDir(), "regression")
 	configFileName := path.Join(root, "tsconfig.json")
-	graph, err := Build(Options{
+	graph, buildError := Build(Options{
 		ConfigFileName:   configFileName,
 		CurrentDirectory: root,
 		SingleThreaded:   true,
@@ -52,8 +52,8 @@ func checkInMemory(test *testing.T, source string) int {
 			path.Join(root, "probe.ts"): source,
 		},
 	})
-	if err != nil {
-		test.Fatalf("building the in-memory program: %v", err)
+	if buildError != nil {
+		test.Fatalf("building the in-memory program: %v", buildError)
 	}
 	return len(graph.AllDiagnostics(context.Background()))
 }

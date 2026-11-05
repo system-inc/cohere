@@ -36,29 +36,29 @@ func TestDesignSystemReadsAreRunCacheInputs(test *testing.T) {
 	}
 	for name, contents := range files {
 		path := filepath.Join(directory, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
-	if err := os.MkdirAll(filepath.Join(directory, "node_modules"), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(filepath.Join(directory, "node_modules"), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.Symlink(packageRoot, filepath.Join(directory, "node_modules", "tailwindcss")); err != nil {
-		test.Fatal(err)
+	if symlinkError := os.Symlink(packageRoot, filepath.Join(directory, "node_modules", "tailwindcss")); symlinkError != nil {
+		test.Fatal(symlinkError)
 	}
 
 	recorder := program.NewInputRecorder()
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   filepath.Join(directory, "tsconfig.json"),
 		CurrentDirectory: directory,
 		SingleThreaded:   true,
 		Inputs:           recorder,
 	})
-	if err != nil {
-		test.Fatalf("building the program: %v", err)
+	if buildError != nil {
+		test.Fatalf("building the program: %v", buildError)
 	}
 
 	result := DesignSystemForProgram(designSystemProgram(graph.Program))

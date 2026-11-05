@@ -98,8 +98,8 @@ func Sign(binaryPath string, signing Signing) error {
 	)
 	command.Stderr = os.Stderr
 
-	if err := command.Run(); err != nil {
-		return fmt.Errorf("codesigning %s: %w", binaryPath, err)
+	if runError := command.Run(); runError != nil {
+		return fmt.Errorf("codesigning %s: %w", binaryPath, runError)
 	}
 
 	return VerifySignature(binaryPath)
@@ -163,8 +163,8 @@ func Notarize(binaryPath string, signing Signing) error {
 	zipPath := filepath.Join(directory, filepath.Base(binaryPath)+".zip")
 	// ditto rather than zip, as Apple's notarization guide uses: it keeps the signature's extended
 	// attributes, which zip can drop.
-	if output, err := exec.Command("ditto", "-c", "-k", "--keepParent", binaryPath, zipPath).CombinedOutput(); err != nil {
-		return fmt.Errorf("archiving %s for the notary service: %w\n%s", binaryPath, err, output)
+	if output, outputError := exec.Command("ditto", "-c", "-k", "--keepParent", binaryPath, zipPath).CombinedOutput(); outputError != nil {
+		return fmt.Errorf("archiving %s for the notary service: %w\n%s", binaryPath, outputError, output)
 	}
 
 	fmt.Printf("notarizing %s\n", binaryPath)
@@ -214,8 +214,8 @@ type notaryVerdict struct {
 // anything, since the status is the whole point of waiting for it.
 func readNotaryVerdict(output []byte) (notaryVerdict, error) {
 	var verdict notaryVerdict
-	if err := json.Unmarshal(output, &verdict); err != nil {
-		return notaryVerdict{}, fmt.Errorf("reading the notary service's answer: %w\n%s", err, output)
+	if decodeError := json.Unmarshal(output, &verdict); decodeError != nil {
+		return notaryVerdict{}, fmt.Errorf("reading the notary service's answer: %w\n%s", decodeError, output)
 	}
 	if verdict.Status == "" {
 		return notaryVerdict{}, fmt.Errorf("the notary service's answer carries no status\n%s", output)

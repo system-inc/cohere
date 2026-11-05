@@ -21,8 +21,8 @@ func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(test *testing.T) {
 	test.Parallel()
 	binary := filepath.Join(test.TempDir(), "cohere")
 	build := exec.Command("go", "build", "-buildvcs=false", "-tags", "cohere_planted_panic", "-o", binary, ".")
-	if output, err := build.CombinedOutput(); err != nil {
-		test.Fatalf("cannot build cohere with the planted rule: %v\n%s", err, output)
+	if output, outputError := build.CombinedOutput(); outputError != nil {
+		test.Fatalf("cannot build cohere with the planted rule: %v\n%s", outputError, output)
 	}
 
 	// The settings name the planted rule on top of the house's, so a body other rules have nothing to say
@@ -42,15 +42,15 @@ func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(test *testing.T) {
 		test.Helper()
 		command := exec.Command(binary, append([]string{"--no-format", "--no-cache"}, arguments...)...)
 		command.Dir = root
-		output, err := command.CombinedOutput()
+		output, outputError := command.CombinedOutput()
 		var exitError *exec.ExitError
 		switch {
-		case err == nil:
+		case outputError == nil:
 			return string(output), 0
-		case errors.As(err, &exitError):
+		case errors.As(outputError, &exitError):
 			return string(output), childExitCode(test, exitError)
 		}
-		test.Fatalf("running cohere: %v\n%s", err, output)
+		test.Fatalf("running cohere: %v\n%s", outputError, output)
 		return "", 0
 	}
 	const planted = "cohere-test/panics-on-marked-file"
@@ -108,8 +108,8 @@ func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(test *testing.T) {
 				RuleCrashes int `json:"ruleCrashes"`
 			} `json:"gaps"`
 		}
-		if err := json.Unmarshal([]byte(line), &record); err != nil {
-			test.Fatalf("a --json line is not JSON: %v\n%s", err, line)
+		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
+			test.Fatalf("a --json line is not JSON: %v\n%s", decodeError, line)
 		}
 		switch record.Kind {
 		case "crash":

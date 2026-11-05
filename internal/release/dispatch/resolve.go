@@ -101,17 +101,17 @@ func ResolveWorkingTree(paths Paths, packagePath string) (string, bool, error) {
 	// hash is recorded beside it and compared instead. Skipping this would serve a stale binary from
 	// a stable path, which is the same lie as a wrong hash.
 	binaryPath := paths.DevelopmentBinaryPath()
-	if upToDate, err := developmentBinaryIsCurrent(paths, hash); err != nil {
-		return "", false, err
+	if upToDate, developmentBinaryIsCurrentError := developmentBinaryIsCurrent(paths, hash); developmentBinaryIsCurrentError != nil {
+		return "", false, developmentBinaryIsCurrentError
 	} else if upToDate {
 		return binaryPath, false, nil
 	}
 
-	if err := build(paths, packagePath, binaryPath, inputs.GoVersion); err != nil {
-		return "", false, err
+	if buildError := build(paths, packagePath, binaryPath, inputs.GoVersion); buildError != nil {
+		return "", false, buildError
 	}
-	if err := recordDevelopmentHash(paths, hash); err != nil {
-		return "", false, err
+	if recordDevelopmentHashError := recordDevelopmentHash(paths, hash); recordDevelopmentHashError != nil {
+		return "", false, recordDevelopmentHashError
 	}
 
 	return binaryPath, true, nil
@@ -124,12 +124,12 @@ func (paths Paths) developmentHashPath() string {
 
 // developmentBinaryIsCurrent reports whether the stable-path binary matches the current inputs.
 func developmentBinaryIsCurrent(paths Paths, hash string) (bool, error) {
-	if _, err := os.Stat(paths.DevelopmentBinaryPath()); err != nil {
+	if _, statError := os.Stat(paths.DevelopmentBinaryPath()); statError != nil {
 		return false, nil
 	}
 
-	recorded, err := os.ReadFile(paths.developmentHashPath())
-	if err != nil {
+	recorded, readError := os.ReadFile(paths.developmentHashPath())
+	if readError != nil {
 		// A binary with no recorded hash is of unknown provenance. Rebuilding costs a second;
 		// trusting it could run rules that are not the ones on disk.
 		return false, nil
@@ -153,8 +153,8 @@ func developmentBinaryIsCurrent(paths Paths, hash string) (bool, error) {
 // project is a cohere checkout placed inside that project's tree, and then they are still that
 // checkout's ignored cache rather than the project's files.
 func recordDevelopmentHash(paths Paths, hash string) error {
-	if err := os.WriteFile(paths.developmentHashPath(), []byte(hash+"\n"), 0o644); err != nil {
-		return fmt.Errorf("recording the development build hash: %w", err)
+	if writeError := os.WriteFile(paths.developmentHashPath(), []byte(hash+"\n"), 0o644); writeError != nil {
+		return fmt.Errorf("recording the development build hash: %w", writeError)
 	}
 	return nil
 }
@@ -163,13 +163,13 @@ func recordDevelopmentHash(paths Paths, hash string) error {
 // a `--dev` run reads and keeps the same format record. It builds through the Go cache every other `go`
 // command uses (see ReleaseBuildFlags).
 func build(paths Paths, packagePath string, binaryPath string, goVersion string) error {
-	if err := os.MkdirAll(paths.BinaryDirectory(), 0o755); err != nil {
-		return fmt.Errorf("creating the binary cache directory: %w", err)
+	if createDirectoryError := os.MkdirAll(paths.BinaryDirectory(), 0o755); createDirectoryError != nil {
+		return fmt.Errorf("creating the binary cache directory: %w", createDirectoryError)
 	}
 
-	formatter, err := FormatterIdentity(paths.ModuleDirectory, goVersion, nil)
-	if err != nil {
-		return err
+	formatter, formatterIdentityError := FormatterIdentity(paths.ModuleDirectory, goVersion, nil)
+	if formatterIdentityError != nil {
+		return formatterIdentityError
 	}
 	stamp := "-X github.com/system-inc/cohere/internal/release/packaging.formatterIdentity=" + formatter
 	arguments := []string{"build"}
@@ -197,15 +197,15 @@ func build(paths Paths, packagePath string, binaryPath string, goVersion string)
 	)
 	command.Stderr = os.Stderr
 
-	if err := command.Run(); err != nil {
-		return fmt.Errorf("building cohere: %w", err)
+	if runError := command.Run(); runError != nil {
+		return fmt.Errorf("building cohere: %w", runError)
 	}
 
 	// Go reports success by exit code, but the thing we are about to exec is the file. Checking it
 	// exists closes the gap between "the build said it worked" and "there is a binary here", which
 	// is exactly the kind of gap that lets a missing binary reach an exec.
-	if _, err := os.Stat(binaryPath); err != nil {
-		return fmt.Errorf("go build reported success but produced no binary at %s: %w", binaryPath, err)
+	if _, statError := os.Stat(binaryPath); statError != nil {
+		return fmt.Errorf("go build reported success but produced no binary at %s: %w", binaryPath, statError)
 	}
 	return nil
 }

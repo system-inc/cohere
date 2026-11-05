@@ -221,11 +221,11 @@ func runTypedFiles(
 		directory = test.TempDir()
 		for name, contents := range files {
 			path := filepath.Join(directory, name)
-			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-				test.Fatalf("creating the fixture directory for %s: %v", name, err)
+			if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+				test.Fatalf("creating the fixture directory for %s: %v", name, createDirectoryError)
 			}
-			if err := os.WriteFile(path, []byte(FixtureText(contents)), 0o644); err != nil {
-				test.Fatalf("writing the fixture %s: %v", name, err)
+			if writeError := os.WriteFile(path, []byte(FixtureText(contents)), 0o644); writeError != nil {
+				test.Fatalf("writing the fixture %s: %v", name, writeError)
 			}
 		}
 
@@ -238,12 +238,12 @@ func runTypedFiles(
 		// a program built under that option.
 		configPath := filepath.Join(directory, "tsconfig.json")
 		if _, statError := os.Stat(configPath); os.IsNotExist(statError) {
-			if err := os.WriteFile(configPath, []byte(defaultTsConfig), 0o644); err != nil {
-				test.Fatalf("writing the tsconfig: %v", err)
+			if writeError := os.WriteFile(configPath, []byte(defaultTsConfig), 0o644); writeError != nil {
+				test.Fatalf("writing the tsconfig: %v", writeError)
 			}
 		}
 
-		built, err := program.Build(program.Options{
+		built, buildError := program.Build(program.Options{
 			ConfigFileName:   configPath,
 			CurrentDirectory: directory,
 			LibraryParses:    libraryParses,
@@ -251,14 +251,14 @@ func runTypedFiles(
 			// scheduling nondeterminism to a test whose whole value is being deterministic.
 			SingleThreaded: true,
 		})
-		if err != nil {
-			test.Fatalf("building the type graph: %v", err)
+		if buildError != nil {
+			test.Fatalf("building the type graph: %v", buildError)
 		}
 		graph = built
 	} else {
-		built, cachedDirectory, err := buildCachedProgram(files, subjectFileName, verbatim)
-		if err != nil {
-			test.Fatalf("%v", err)
+		built, cachedDirectory, buildCachedProgramError := buildCachedProgram(files, subjectFileName, verbatim)
+		if buildCachedProgramError != nil {
+			test.Fatalf("%v", buildCachedProgramError)
 		}
 		graph, directory = built, cachedDirectory
 	}

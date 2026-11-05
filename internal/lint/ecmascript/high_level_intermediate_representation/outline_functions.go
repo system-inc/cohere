@@ -109,8 +109,8 @@ func outlinedFunctionByName(function *Function, name string) (FunctionId, bool) 
 	if suffix == "" {
 		return 0, len(function.Functions) > 0
 	}
-	parsed, err := strconv.Atoi(suffix)
-	if err != nil || parsed < 1 {
+	parsed, parseError := strconv.Atoi(suffix)
+	if parseError != nil || parsed < 1 {
 		return 0, false
 	}
 	id := FunctionId(parsed - 1)

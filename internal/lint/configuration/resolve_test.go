@@ -94,9 +94,9 @@ func TestParseRuleSettingKeepsEveryOptionElement(test *testing.T) {
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			setting, err := parseRuleSetting([]byte(testCase.body))
-			if err != nil {
-				test.Fatalf("parse: %v", err)
+			setting, parseRuleSettingError := parseRuleSetting([]byte(testCase.body))
+			if parseRuleSettingError != nil {
+				test.Fatalf("parse: %v", parseRuleSettingError)
 			}
 			if testCase.wantOptions == nil && setting.Options != nil {
 				test.Fatalf("Options = %s, want nil for a rule with no option elements", setting.Options)

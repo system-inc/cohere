@@ -51,8 +51,8 @@ func TestNoMisusedPromisesConditionalsUpstreamCorpus(test *testing.T) {
 			}
 			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoMisusedPromises, map[string]string{"file.ts": row.source}, "file.ts", options,
 				func(directory string) {
-					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noMisusedPromisesConditionalsCorpusTsconfig), 0o644); err != nil {
-						test.Fatal(err)
+					if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noMisusedPromisesConditionalsCorpusTsconfig), 0o644); writeError != nil {
+						test.Fatal(writeError)
 					}
 				})
 

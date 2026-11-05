@@ -34,8 +34,8 @@ func DecodeSortDefaultPropsOptions(raw []byte) (any, error) {
 	var wire struct {
 		IgnoreCase bool `json:"ignoreCase"`
 	}
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	options.IgnoreCase = wire.IgnoreCase
 	return options, nil

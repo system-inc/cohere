@@ -25,9 +25,9 @@ type requireDescriptionCase struct {
 // object reaches the rule the way the config layer hands it over.
 func runRequireDescription(test *testing.T, testCase requireDescriptionCase) rule_testing.Result {
 	test.Helper()
-	decoded, err := DecodeRequireDescriptionOptions([]byte(testCase.options))
-	if err != nil {
-		test.Fatalf("decoding %q: %v", testCase.options, err)
+	decoded, decodeRequireDescriptionOptionsError := DecodeRequireDescriptionOptions([]byte(testCase.options))
+	if decodeRequireDescriptionOptionsError != nil {
+		test.Fatalf("decoding %q: %v", testCase.options, decodeRequireDescriptionOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, RequireDescription, requireDescriptionFile, testCase.sourceText, decoded)
 }
@@ -302,9 +302,9 @@ func TestRequireDescriptionDecoderRefusesWhatTheSchemaRefuses(test *testing.T) {
 		`{"ignore":["exported"],"ignore ":["global"]}`: "unknown field",
 	}
 	for raw, wantFragment := range refused {
-		_, err := DecodeRequireDescriptionOptions([]byte(raw))
-		if err == nil || !strings.Contains(err.Error(), wantFragment) {
-			test.Errorf("decoding %s: got %v, want an error containing %q", raw, err, wantFragment)
+		_, decodeRequireDescriptionOptionsError := DecodeRequireDescriptionOptions([]byte(raw))
+		if decodeRequireDescriptionOptionsError == nil || !strings.Contains(decodeRequireDescriptionOptionsError.Error(), wantFragment) {
+			test.Errorf("decoding %s: got %v, want an error containing %q", raw, decodeRequireDescriptionOptionsError, wantFragment)
 		}
 	}
 

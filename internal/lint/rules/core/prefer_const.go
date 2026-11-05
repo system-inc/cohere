@@ -45,8 +45,8 @@ const (
 // more useful than guessing which of the two the author meant.
 func (destructuring *PreferConstDestructuring) UnmarshalJSON(raw []byte) error {
 	var spelling string
-	if err := json.Unmarshal(raw, &spelling); err != nil {
-		return err
+	if decodeError := json.Unmarshal(raw, &spelling); decodeError != nil {
+		return decodeError
 	}
 	switch spelling {
 	case "any":

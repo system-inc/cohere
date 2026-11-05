@@ -99,13 +99,13 @@ func main() {
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
-	if err := command.Run(); err != nil {
-		fail("running node in %s: %v\n%s", *prettierRoot, err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		fail("running node in %s: %v\n%s", *prettierRoot, runError, stderr.String())
 	}
 
 	var captured capture
-	if err := json.Unmarshal(stdout.Bytes(), &captured); err != nil {
-		fail("decoding the capture: %v", err)
+	if decodeError := json.Unmarshal(stdout.Bytes(), &captured); decodeError != nil {
+		fail("decoding the capture: %v", decodeError)
 	}
 	// A flag would change what the patterns mean: `u` makes them match code points, `i` folds case.
 	// Only the global flag (which replace() uses and Go's ReplaceAll implies) and no flag are understood.
@@ -116,8 +116,8 @@ func main() {
 	emoji := translate("emoji-regex", captured.EmojiSource)
 	narrow := translate("narrow-emojis", captured.NarrowSource)
 	for name, source := range map[string]string{"emoji": emoji, "narrow": narrow} {
-		if _, err := regexp.Compile(source); err != nil {
-			fail("the translated %s pattern does not compile: %v", name, err)
+		if _, compileError := regexp.Compile(source); compileError != nil {
+			fail("the translated %s pattern does not compile: %v", name, compileError)
 		}
 	}
 
@@ -138,15 +138,15 @@ func main() {
 	fmt.Fprintf(&file, "// narrowEmojiPatternSource is narrow-emojis' narrowEmojiRegexp, translated the same way.\n")
 	fmt.Fprintf(&file, "const narrowEmojiPatternSource = %s\n", strconv.Quote(narrow))
 
-	generated, err := format.Source(file.Bytes())
-	if err != nil {
-		fail("formatting the generated Go: %v", err)
+	generated, sourceError := format.Source(file.Bytes())
+	if sourceError != nil {
+		fail("formatting the generated Go: %v", sourceError)
 	}
 
 	if *check {
-		committed, err := os.ReadFile(*output)
-		if err != nil {
-			fail("reading %s: %v", *output, err)
+		committed, readError := os.ReadFile(*output)
+		if readError != nil {
+			fail("reading %s: %v", *output, readError)
 		}
 		if !bytes.Equal(committed, generated) {
 			fail("%s is stale: the width packages changed, regenerate it", *output)
@@ -154,8 +154,8 @@ func main() {
 		fmt.Printf("%s matches the packages\n", *output)
 		return
 	}
-	if err := os.WriteFile(*output, generated, 0o644); err != nil {
-		fail("writing %s: %v", *output, err)
+	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		fail("writing %s: %v", *output, writeError)
 	}
 	fmt.Printf("wrote %s: %d wide ranges\n", *output, len(captured.WideRanges))
 }
@@ -189,14 +189,14 @@ func translate(name string, source string) string {
 			}
 			switch source[index+1] {
 			case 'u':
-				value, err := strconv.ParseUint(source[index+2:index+6], 16, 32)
-				if err != nil {
+				value, parseError := strconv.ParseUint(source[index+2:index+6], 16, 32)
+				if parseError != nil {
 					fail("%s: bad \\u escape at %d", name, index)
 				}
 				unit, width = int(value), 6
 			case 'x':
-				value, err := strconv.ParseUint(source[index+2:index+4], 16, 32)
-				if err != nil {
+				value, parseError := strconv.ParseUint(source[index+2:index+4], 16, 32)
+				if parseError != nil {
 					fail("%s: bad \\x escape at %d", name, index)
 				}
 				unit, width = int(value), 4

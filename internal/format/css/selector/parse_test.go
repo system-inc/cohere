@@ -15,9 +15,9 @@ import (
 
 func mustParse(test *testing.T, text string) *estree.Node {
 	test.Helper()
-	root, err := Parse(text)
-	if err != nil {
-		test.Fatalf("Parse(%q): %v", text, err)
+	root, parseError := Parse(text)
+	if parseError != nil {
+		test.Fatalf("Parse(%q): %v", text, parseError)
 	}
 	if !root.Is("root") {
 		test.Fatalf("Parse(%q) returned a %q", text, root.Type())
@@ -169,15 +169,15 @@ func TestParseRefusals(test *testing.T) {
 		"[a=\"]\"":    "Cannot read properties of undefined (reading '2')",
 	}
 	for text, message := range refusals {
-		_, err := Parse(text)
-		if err == nil || err.Error() != message || !printing.IsSyntax(err) {
-			test.Errorf("Parse(%q) = %v, want the syntax error %q", text, err, message)
+		_, parseError := Parse(text)
+		if parseError == nil || parseError.Error() != message || !printing.IsSyntax(parseError) {
+			test.Errorf("Parse(%q) = %v, want the syntax error %q", text, parseError, message)
 		}
 	}
 	for _, text := range []string{"a| b", ":is(a|)", "a|@x", "*|)"} {
-		_, err := Parse(text)
-		if !errors.Is(err, ErrLoopsForever) || !printing.IsSyntax(err) {
-			test.Errorf("Parse(%q) = %v, want ErrLoopsForever marked as a syntax error", text, err)
+		_, parseError := Parse(text)
+		if !errors.Is(parseError, ErrLoopsForever) || !printing.IsSyntax(parseError) {
+			test.Errorf("Parse(%q) = %v, want ErrLoopsForever marked as a syntax error", text, parseError)
 		}
 	}
 }
@@ -193,8 +193,8 @@ func TestParseNeverPanics(test *testing.T) {
 		for range 1 + random.IntN(8) {
 			text.WriteString(pieces[random.IntN(len(pieces))])
 		}
-		if _, err := Parse(text.String()); err != nil && !printing.IsSyntax(err) {
-			test.Fatalf("Parse(%q): %v", text.String(), err)
+		if _, parseError := Parse(text.String()); parseError != nil && !printing.IsSyntax(parseError) {
+			test.Fatalf("Parse(%q): %v", text.String(), parseError)
 		}
 	}
 }

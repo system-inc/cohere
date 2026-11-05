@@ -140,11 +140,11 @@ func invarianceProvenance(verifiedAgainst []string) string {
 // header is a diff every other machine produces on regeneration, which makes `-check` fail for a
 // reason that has nothing to do with Tailwind.
 func portablePath(path string) string {
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
+	home, homeDirectoryError := os.UserHomeDir()
+	if homeDirectoryError != nil || home == "" {
 		return path
 	}
-	if relative, err := filepath.Rel(home, path); err == nil && !strings.HasPrefix(relative, "..") {
+	if relative, relativePathError := filepath.Rel(home, path); relativePathError == nil && !strings.HasPrefix(relative, "..") {
 		return filepath.Join("~", relative)
 	}
 	return path
@@ -238,8 +238,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := validate(result); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", err)
+	if validateError := validate(result); validateError != nil {
+		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", validateError)
 		os.Exit(1)
 	}
 
@@ -258,13 +258,13 @@ func main() {
 	// is caught.
 	verifiedAgainst := make([]string, 0, len(invarianceInputs))
 	for _, entryPoint := range invarianceInputs {
-		otherResult, err := enumerate(*packageRoot, entryPoint)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "generate_framework_variants: enumerating %s for the invariance check: %v\n", entryPoint, err)
+		otherResult, enumerateError := enumerate(*packageRoot, entryPoint)
+		if enumerateError != nil {
+			fmt.Fprintf(os.Stderr, "generate_framework_variants: enumerating %s for the invariance check: %v\n", entryPoint, enumerateError)
 			os.Exit(1)
 		}
-		if err := validate(otherResult); err != nil {
-			fmt.Fprintf(os.Stderr, "generate_framework_variants: %s: %v\n", entryPoint, err)
+		if validateError := validate(otherResult); validateError != nil {
+			fmt.Fprintf(os.Stderr, "generate_framework_variants: %s: %v\n", entryPoint, validateError)
 			os.Exit(1)
 		}
 
@@ -286,9 +286,9 @@ func main() {
 	}
 
 	if *check {
-		committed, err := os.ReadFile(*output)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "generate_framework_variants: cannot read %s to check it: %v\n", *output, err)
+		committed, readError := os.ReadFile(*output)
+		if readError != nil {
+			fmt.Fprintf(os.Stderr, "generate_framework_variants: cannot read %s to check it: %v\n", *output, readError)
 			os.Exit(1)
 		}
 		if !bytes.Equal(committed, rendered) {
@@ -302,8 +302,8 @@ func main() {
 		return
 	}
 
-	if err := os.WriteFile(*output, rendered, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", err)
+	if writeError := os.WriteFile(*output, rendered, 0o644); writeError != nil {
+		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", writeError)
 		os.Exit(1)
 	}
 
@@ -558,9 +558,9 @@ var FrameworkVariantComparisonGroups = []FrameworkVariantComparisonGroup{
 	}
 	builder.WriteString("}\n")
 
-	formatted, err := format.Source([]byte(builder.String()))
-	if err != nil {
-		return nil, fmt.Errorf("formatting the generated table: %w", err)
+	formatted, sourceError := format.Source([]byte(builder.String()))
+	if sourceError != nil {
+		return nil, fmt.Errorf("formatting the generated table: %w", sourceError)
 	}
 	return formatted, nil
 }
@@ -574,8 +574,8 @@ func enumerate(packageRoot string, designSystem string) (*enumeration, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", packageRoot, err)
 	}
-	if _, err := os.Stat(filepath.Join(absolutePackageRoot, "package.json")); err != nil {
-		return nil, fmt.Errorf("%s does not look like a tailwindcss package root: %w", absolutePackageRoot, err)
+	if _, statError := os.Stat(filepath.Join(absolutePackageRoot, "package.json")); statError != nil {
+		return nil, fmt.Errorf("%s does not look like a tailwindcss package root: %w", absolutePackageRoot, statError)
 	}
 
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -593,12 +593,12 @@ func enumerate(packageRoot string, designSystem string) (*enumeration, error) {
 	// measurable rather than asserted.
 	arguments := []string{script, absolutePackageRoot}
 	if designSystem != "" {
-		absoluteDesignSystem, err := filepath.Abs(designSystem)
-		if err != nil {
-			return nil, fmt.Errorf("resolving %s: %w", designSystem, err)
+		absoluteDesignSystem, absolutePathError := filepath.Abs(designSystem)
+		if absolutePathError != nil {
+			return nil, fmt.Errorf("resolving %s: %w", designSystem, absolutePathError)
 		}
-		if _, err := os.Stat(absoluteDesignSystem); err != nil {
-			return nil, fmt.Errorf("design system %s is not readable: %w", absoluteDesignSystem, err)
+		if _, statError := os.Stat(absoluteDesignSystem); statError != nil {
+			return nil, fmt.Errorf("design system %s is not readable: %w", absoluteDesignSystem, statError)
 		}
 		arguments = append(arguments, absoluteDesignSystem)
 	}
@@ -608,13 +608,13 @@ func enumerate(packageRoot string, designSystem string) (*enumeration, error) {
 	command.Stdout = &stdout
 	command.Stderr = os.Stderr
 
-	if err := command.Run(); err != nil {
-		return nil, fmt.Errorf("node %s: %w", script, err)
+	if runError := command.Run(); runError != nil {
+		return nil, fmt.Errorf("node %s: %w", script, runError)
 	}
 
 	var result enumeration
-	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-		return nil, fmt.Errorf("parsing the enumeration: %w", err)
+	if decodeError := json.Unmarshal(stdout.Bytes(), &result); decodeError != nil {
+		return nil, fmt.Errorf("parsing the enumeration: %w", decodeError)
 	}
 	return &result, nil
 }

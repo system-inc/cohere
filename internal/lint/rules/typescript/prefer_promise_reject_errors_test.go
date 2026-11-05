@@ -229,9 +229,9 @@ func TestPreferPromiseRejectErrorsWithOptions(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(fmt.Sprintf("upstream option case %d", index), func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodePreferPromiseRejectErrorsOptions(json.RawMessage(testCase.optionsJson))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.optionsJson, err)
+			decoded, decodePreferPromiseRejectErrorsOptionsError := DecodePreferPromiseRejectErrorsOptions(json.RawMessage(testCase.optionsJson))
+			if decodePreferPromiseRejectErrorsOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.optionsJson, decodePreferPromiseRejectErrorsOptionsError)
 			}
 			result := rule_testing.RunTypedWithOptions(test, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText, decoded)
 			expected := make([]string, testCase.findings)
@@ -281,9 +281,9 @@ func TestPreferPromiseRejectErrorsAcrossFiles(test *testing.T) {
 			}
 			var decoded any
 			if testCase.optionsJson != "" {
-				value, err := DecodePreferPromiseRejectErrorsOptions(json.RawMessage(testCase.optionsJson))
-				if err != nil {
-					test.Fatalf("decoding %s: %v", testCase.optionsJson, err)
+				value, decodePreferPromiseRejectErrorsOptionsError := DecodePreferPromiseRejectErrorsOptions(json.RawMessage(testCase.optionsJson))
+				if decodePreferPromiseRejectErrorsOptionsError != nil {
+					test.Fatalf("decoding %s: %v", testCase.optionsJson, decodePreferPromiseRejectErrorsOptionsError)
 				}
 				decoded = value
 			}

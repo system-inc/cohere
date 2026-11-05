@@ -161,7 +161,7 @@ type designSystemInput struct {
 func parseDesignSystemInput(value string) designSystemInput {
 	if index := strings.LastIndex(value, ":"); index > 0 {
 		candidate := value[:index]
-		if _, err := os.Stat(candidate); err == nil {
+		if _, statError := os.Stat(candidate); statError == nil {
 			return designSystemInput{entryPoint: candidate, resolveRoot: value[index+1:]}
 		}
 	}
@@ -215,11 +215,11 @@ func invarianceProvenance(verifiedAgainst []string) string {
 // header is a diff every other machine produces on regeneration, which makes `-check` fail for a
 // reason that has nothing to do with Tailwind.
 func portablePath(path string) string {
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
+	home, homeDirectoryError := os.UserHomeDir()
+	if homeDirectoryError != nil || home == "" {
 		return path
 	}
-	if relative, err := filepath.Rel(home, path); err == nil && !strings.HasPrefix(relative, "..") {
+	if relative, relativePathError := filepath.Rel(home, path); relativePathError == nil && !strings.HasPrefix(relative, "..") {
 		return filepath.Join("~", relative)
 	}
 	return path
@@ -322,9 +322,9 @@ func main() {
 	verifiedAgainst := make([]string, 0, len(invarianceInputs))
 	for _, raw := range invarianceInputs {
 		other := parseDesignSystemInput(raw)
-		otherResult, err := enumerate(other.entryPoint, other.resolveRoot)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "generate_collapse: enumerating %s for the invariance check: %v\n", other.entryPoint, err)
+		otherResult, enumerateError := enumerate(other.entryPoint, other.resolveRoot)
+		if enumerateError != nil {
+			fmt.Fprintf(os.Stderr, "generate_collapse: enumerating %s for the invariance check: %v\n", other.entryPoint, enumerateError)
 			os.Exit(1)
 		}
 		if otherResult.TailwindVersion != result.TailwindVersion {
@@ -392,9 +392,9 @@ func main() {
 			{*output, rendered, "The installed Tailwind collapses a different set of families than the committed table records."},
 			{orderPath, orderRendered, "The installed Tailwind sorts by a different property order than the committed table records."},
 		} {
-			committed, err := os.ReadFile(file.path)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "generate_collapse: cannot read %s to check it: %v\n", file.path, err)
+			committed, readError := os.ReadFile(file.path)
+			if readError != nil {
+				fmt.Fprintf(os.Stderr, "generate_collapse: cannot read %s to check it: %v\n", file.path, readError)
 				os.Exit(1)
 			}
 			if !bytes.Equal(committed, file.rendered) {
@@ -408,14 +408,14 @@ func main() {
 			*output, orderPath, result.TailwindVersion, len(result.Families), len(result.PropertyOrder))
 		return
 	}
-	if err := os.WriteFile(orderPath, orderRendered, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", err)
+	if writeError := os.WriteFile(orderPath, orderRendered, 0o644); writeError != nil {
+		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", writeError)
 		os.Exit(1)
 	}
 	fmt.Fprintf(os.Stderr, "generate_collapse: wrote %s — %d ordered properties.\n", orderPath, len(result.PropertyOrder))
 
-	if err := os.WriteFile(*output, rendered, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", err)
+	if writeError := os.WriteFile(*output, rendered, 0o644); writeError != nil {
+		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", writeError)
 		os.Exit(1)
 	}
 
@@ -443,8 +443,8 @@ func enumerate(entryPoint string, resolveRoot string) (*enumeration, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", entryPoint, err)
 	}
-	if _, err := os.Stat(absoluteEntryPoint); err != nil {
-		return nil, fmt.Errorf("entry point %s is not readable: %w", absoluteEntryPoint, err)
+	if _, statError := os.Stat(absoluteEntryPoint); statError != nil {
+		return nil, fmt.Errorf("entry point %s is not readable: %w", absoluteEntryPoint, statError)
 	}
 
 	scriptPath, err := scriptBesideThisTool()
@@ -458,12 +458,12 @@ func enumerate(entryPoint string, resolveRoot string) (*enumeration, error) {
 	// the checked-in independent theme and nothing else so far.
 	arguments := []string{scriptPath, absoluteEntryPoint}
 	if resolveRoot != "" {
-		absoluteResolveRoot, err := filepath.Abs(resolveRoot)
-		if err != nil {
-			return nil, fmt.Errorf("resolving %s: %w", resolveRoot, err)
+		absoluteResolveRoot, absolutePathError := filepath.Abs(resolveRoot)
+		if absolutePathError != nil {
+			return nil, fmt.Errorf("resolving %s: %w", resolveRoot, absolutePathError)
 		}
-		if _, err := os.Stat(filepath.Join(absoluteResolveRoot, "node_modules")); err != nil {
-			return nil, fmt.Errorf("resolve root %s has no node_modules, so `tailwindcss` cannot resolve from it: %w", absoluteResolveRoot, err)
+		if _, statError := os.Stat(filepath.Join(absoluteResolveRoot, "node_modules")); statError != nil {
+			return nil, fmt.Errorf("resolve root %s has no node_modules, so `tailwindcss` cannot resolve from it: %w", absoluteResolveRoot, statError)
 		}
 		arguments = append(arguments, absoluteResolveRoot)
 	}
@@ -477,8 +477,8 @@ func enumerate(entryPoint string, resolveRoot string) (*enumeration, error) {
 	}
 
 	var result enumeration
-	if err := json.Unmarshal(stdout, &result); err != nil {
-		return nil, fmt.Errorf("parsing the enumeration: %w", err)
+	if decodeError := json.Unmarshal(stdout, &result); decodeError != nil {
+		return nil, fmt.Errorf("parsing the enumeration: %w", decodeError)
 	}
 	return &result, nil
 }
@@ -490,7 +490,7 @@ func enumerate(entryPoint string, resolveRoot string) (*enumeration, error) {
 // would silently pick up a different checkout when run from a subdirectory.
 func scriptBesideThisTool() (string, error) {
 	candidate := filepath.Join("tools", "generate_collapse", "enumerate.mjs")
-	if _, err := os.Stat(candidate); err == nil {
+	if _, statError := os.Stat(candidate); statError == nil {
 		return candidate, nil
 	}
 	return "", fmt.Errorf("cannot find %s; run this from the repository root", candidate)
@@ -596,9 +596,9 @@ var CollapseFamilies = []CollapseFamily{
 const TailwindVersion = %q
 `, result.TailwindVersion)
 
-	formatted, err := format.Source(buffer.Bytes())
-	if err != nil {
-		return nil, fmt.Errorf("formatting the generated table: %w", err)
+	formatted, sourceError := format.Source(buffer.Bytes())
+	if sourceError != nil {
+		return nil, fmt.Errorf("formatting the generated table: %w", sourceError)
 	}
 	return formatted, nil
 }

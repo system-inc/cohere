@@ -91,9 +91,9 @@ func runHtmlLinkTreeWithOption(test *testing.T, rows []htmlLinkRow, option strin
 	result := rule_testing.RunTypedFilesWithOptionsFor(test, NoHtmlLinkForPages, htmlLinkTree(rows, paths...), "foo.tsx", func(directory string) any {
 		quoted, _ := json.Marshal(directory)
 		raw := strings.ReplaceAll(option, "{root}", strings.Trim(string(quoted), `"`))
-		decoded, err := decodeNoHtmlLinkForPagesOptions([]byte(raw), rule.OptionsBase{ConfigDirectory: directory, ProjectRoot: directory})
-		if err != nil {
-			test.Fatalf("decoding %s: %v", raw, err)
+		decoded, decodeNoHtmlLinkForPagesOptionsError := decodeNoHtmlLinkForPagesOptions([]byte(raw), rule.OptionsBase{ConfigDirectory: directory, ProjectRoot: directory})
+		if decodeNoHtmlLinkForPagesOptionsError != nil {
+			test.Fatalf("decoding %s: %v", raw, decodeNoHtmlLinkForPagesOptionsError)
 		}
 		return decoded
 	})
@@ -420,11 +420,11 @@ func TestNoHtmlLinkForPagesFollowsSymbolicLinksAsNodeLists(test *testing.T) {
 		{`<a href="/dirlink/deep">x</a>`, nil},
 	}
 	result := rule_testing.RunTypedFilesWithSetup(test, NoHtmlLinkForPages, htmlLinkTree(rows, "real/linked.tsx", "pages/index.tsx", "realdir/deep.tsx"), "foo.tsx", func(directory string) {
-		if err := os.Symlink(filepath.Join("..", "real", "linked.tsx"), filepath.Join(directory, "pages", "link.tsx")); err != nil {
-			test.Fatalf("linking the page file: %v", err)
+		if symlinkError := os.Symlink(filepath.Join("..", "real", "linked.tsx"), filepath.Join(directory, "pages", "link.tsx")); symlinkError != nil {
+			test.Fatalf("linking the page file: %v", symlinkError)
 		}
-		if err := os.Symlink(filepath.Join("..", "realdir"), filepath.Join(directory, "pages", "dirlink")); err != nil {
-			test.Fatalf("linking the directory: %v", err)
+		if symlinkError := os.Symlink(filepath.Join("..", "realdir"), filepath.Join(directory, "pages", "dirlink")); symlinkError != nil {
+			test.Fatalf("linking the directory: %v", symlinkError)
 		}
 	})
 	expectHtmlLinkRows(test, result, rows)
@@ -478,9 +478,9 @@ func TestNoHtmlLinkForPagesAnchorsRelativeDirectoriesToTheConfig(test *testing.T
 	}
 	files := htmlLinkTree(rows, "sub/custom/sub-page.tsx", "custom/root-page.tsx")
 	result := rule_testing.RunTypedFilesWithOptionsFor(test, NoHtmlLinkForPages, files, "foo.tsx", func(directory string) any {
-		decoded, err := decodeNoHtmlLinkForPagesOptions([]byte(`"custom"`), rule.OptionsBase{ConfigDirectory: filepath.Join(directory, "sub"), ProjectRoot: directory})
-		if err != nil {
-			test.Fatalf("decoding: %v", err)
+		decoded, decodeNoHtmlLinkForPagesOptionsError := decodeNoHtmlLinkForPagesOptions([]byte(`"custom"`), rule.OptionsBase{ConfigDirectory: filepath.Join(directory, "sub"), ProjectRoot: directory})
+		if decodeNoHtmlLinkForPagesOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeNoHtmlLinkForPagesOptionsError)
 		}
 		return decoded
 	})
@@ -509,9 +509,9 @@ func TestNoHtmlLinkForPagesDecodesUpstreamsSchema(test *testing.T) {
 			if testCase.raw != "" {
 				raw = []byte(testCase.raw)
 			}
-			decoded, err := decodeNoHtmlLinkForPagesOptions(raw, base)
-			if err != nil {
-				test.Fatalf("refused: %v", err)
+			decoded, decodeNoHtmlLinkForPagesOptionsError := decodeNoHtmlLinkForPagesOptions(raw, base)
+			if decodeNoHtmlLinkForPagesOptionsError != nil {
+				test.Fatalf("refused: %v", decodeNoHtmlLinkForPagesOptionsError)
 			}
 			got, isOptions := decoded.(NoHtmlLinkForPagesOptions)
 			if !isOptions {
@@ -539,9 +539,9 @@ func TestNoHtmlLinkForPagesDecodesUpstreamsSchema(test *testing.T) {
 	for _, testCase := range refused {
 		test.Run("refuses "+testCase.raw, func(test *testing.T) {
 			test.Parallel()
-			_, err := decodeNoHtmlLinkForPagesOptions([]byte(testCase.raw), testCase.base)
-			if err == nil || !strings.Contains(err.Error(), testCase.want) {
-				test.Errorf("error %v, want one containing %q", err, testCase.want)
+			_, decodeNoHtmlLinkForPagesOptionsError := decodeNoHtmlLinkForPagesOptions([]byte(testCase.raw), testCase.base)
+			if decodeNoHtmlLinkForPagesOptionsError == nil || !strings.Contains(decodeNoHtmlLinkForPagesOptionsError.Error(), testCase.want) {
+				test.Errorf("error %v, want one containing %q", decodeNoHtmlLinkForPagesOptionsError, testCase.want)
 			}
 		})
 	}
@@ -586,9 +586,9 @@ func htmlLinkFingerprintOf(test *testing.T, files map[string]string, option stri
 		}
 		quoted, _ := json.Marshal(directory)
 		raw := strings.ReplaceAll(option, "{root}", strings.Trim(string(quoted), `"`))
-		decoded, err := decodeNoHtmlLinkForPagesOptions([]byte(raw), rule.OptionsBase{ConfigDirectory: directory, ProjectRoot: directory})
-		if err != nil {
-			test.Fatalf("decoding %s: %v", raw, err)
+		decoded, decodeNoHtmlLinkForPagesOptionsError := decodeNoHtmlLinkForPagesOptions([]byte(raw), rule.OptionsBase{ConfigDirectory: directory, ProjectRoot: directory})
+		if decodeNoHtmlLinkForPagesOptionsError != nil {
+			test.Fatalf("decoding %s: %v", raw, decodeNoHtmlLinkForPagesOptionsError)
 		}
 		return decoded
 	})

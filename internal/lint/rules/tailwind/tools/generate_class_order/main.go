@@ -79,9 +79,9 @@ func main() {
 	}
 
 	if *check {
-		committed, err := os.ReadFile(*output)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "read committed fixture: %v\n", err)
+		committed, readError := os.ReadFile(*output)
+		if readError != nil {
+			fmt.Fprintf(os.Stderr, "read committed fixture: %v\n", readError)
 			os.Exit(1)
 		}
 		// Go whitespace: this tool comparing its own committed fixture with its own output.
@@ -93,8 +93,8 @@ func main() {
 		return
 	}
 
-	if err := os.WriteFile(*output, generated, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, err)
+	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, writeError)
 		os.Exit(1)
 	}
 
@@ -194,8 +194,8 @@ func build(toolDirectory, systemsPath string) ([]byte, fixture, error) {
 		return nil, fixture{}, fmt.Errorf("read %s: %w", systemsPath, err)
 	}
 	var definitions []systemDefinition
-	if err := json.Unmarshal(definitionBytes, &definitions); err != nil {
-		return nil, fixture{}, fmt.Errorf("parse %s: %w", systemsPath, err)
+	if decodeError := json.Unmarshal(definitionBytes, &definitions); decodeError != nil {
+		return nil, fixture{}, fmt.Errorf("parse %s: %w", systemsPath, decodeError)
 	}
 	if len(definitions) < 2 {
 		// The floor is two and it is not a preference. One design system is not a population, and
@@ -210,8 +210,8 @@ func build(toolDirectory, systemsPath string) ([]byte, fixture, error) {
 		return nil, fixture{}, err
 	}
 	var built fixture
-	if err := json.Unmarshal(enumerated, &built); err != nil {
-		return nil, fixture{}, fmt.Errorf("parse enumerate.mjs output: %w", err)
+	if decodeError := json.Unmarshal(enumerated, &built); decodeError != nil {
+		return nil, fixture{}, fmt.Errorf("parse enumerate.mjs output: %w", decodeError)
 	}
 	if len(built.Systems) != len(definitions) {
 		return nil, fixture{}, fmt.Errorf("enumerate.mjs returned %d systems for %d definitions", len(built.Systems), len(definitions))
@@ -234,18 +234,18 @@ func build(toolDirectory, systemsPath string) ([]byte, fixture, error) {
 		}
 
 		descriptorTablePath := filepath.Join(os.TempDir(), "classorder-table-"+system.Name+".json")
-		if _, err := runNode(
+		if _, runNodeError := runNode(
 			filepath.Join(toolsDirectory, "generate_descriptors", "extract.mjs"),
 			system.EntryPoint, "--json", descriptorTablePath,
-		); err != nil {
-			return nil, fixture{}, fmt.Errorf("descriptor table for %s: %w", system.Name, err)
+		); runNodeError != nil {
+			return nil, fixture{}, fmt.Errorf("descriptor table for %s: %w", system.Name, runNodeError)
 		}
 		descriptorTable, err := os.ReadFile(descriptorTablePath)
 		if err != nil {
 			return nil, fixture{}, fmt.Errorf("read descriptor table for %s: %w", system.Name, err)
 		}
-		if err := os.Remove(descriptorTablePath); err != nil {
-			return nil, fixture{}, fmt.Errorf("remove %s: %w", descriptorTablePath, err)
+		if removeError := os.Remove(descriptorTablePath); removeError != nil {
+			return nil, fixture{}, fmt.Errorf("remove %s: %w", descriptorTablePath, removeError)
 		}
 		system.DescriptorTable = json.RawMessage(descriptorTable)
 
@@ -278,8 +278,8 @@ func runNode(script string, arguments ...string) ([]byte, error) {
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
-	if err := command.Run(); err != nil {
-		return nil, fmt.Errorf("node %s: %w\n%s", filepath.Base(script), err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		return nil, fmt.Errorf("node %s: %w\n%s", filepath.Base(script), runError, stderr.String())
 	}
 	return stdout.Bytes(), nil
 }

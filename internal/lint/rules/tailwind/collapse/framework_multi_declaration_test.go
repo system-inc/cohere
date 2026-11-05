@@ -181,13 +181,13 @@ func TestFrameworkMultiDeclarationLiteralReadingsBeatTheTheme(test *testing.T) {
 
 func loadWave2bFixture(test *testing.T, name string) wave2bFixture {
 	test.Helper()
-	raw, err := os.ReadFile(filepath.Join("testdata", name))
-	if err != nil {
-		test.Fatalf("read %s: %v", name, err)
+	raw, readError := os.ReadFile(filepath.Join("testdata", name))
+	if readError != nil {
+		test.Fatalf("read %s: %v", name, readError)
 	}
 	var fixture wave2bFixture
-	if err := json.Unmarshal(raw, &fixture); err != nil {
-		test.Fatalf("parse %s: %v", name, err)
+	if decodeError := json.Unmarshal(raw, &fixture); decodeError != nil {
+		test.Fatalf("parse %s: %v", name, decodeError)
 	}
 	if fixture.CaseCount == 0 || fixture.Answered == 0 {
 		test.Fatalf("%s carries %d cases and %d answered; a comparison over it would pass by comparing nothing", name, fixture.CaseCount, fixture.Answered)

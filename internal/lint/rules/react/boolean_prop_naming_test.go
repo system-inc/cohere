@@ -355,15 +355,15 @@ func TestDecodeBooleanPropNamingOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeBooleanPropNamingOptions([]byte(testCase.raw))
+			decoded, decodeBooleanPropertyNamingOptionsError := DecodeBooleanPropNamingOptions([]byte(testCase.raw))
 			if testCase.wantErr {
-				if err == nil {
+				if decodeBooleanPropertyNamingOptionsError == nil {
 					test.Fatalf("want an error, got %#v", decoded)
 				}
 				return
 			}
-			if err != nil {
-				test.Fatalf("unexpected error: %v", err)
+			if decodeBooleanPropertyNamingOptionsError != nil {
+				test.Fatalf("unexpected error: %v", decodeBooleanPropertyNamingOptionsError)
 			}
 			options, isOptions := decoded.(BooleanPropNamingOptions)
 			if !isOptions {

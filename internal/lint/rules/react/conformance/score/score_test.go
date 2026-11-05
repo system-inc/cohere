@@ -59,9 +59,9 @@ func TestGlobalsScoresAgainstReactsOwnGoldens(test *testing.T) {
 		test.Skip("builds a TypeScript program per fixture")
 	}
 
-	fixtures, err := react_conformance.Load(fixtureRoot)
-	if err != nil {
-		test.Fatalf("loading the corpus: %v", err)
+	fixtures, loadError := react_conformance.Load(fixtureRoot)
+	if loadError != nil {
+		test.Fatalf("loading the corpus: %v", loadError)
 	}
 
 	subject := Rules["globals"]
@@ -131,9 +131,9 @@ func TestScoringHarnessCanFail(test *testing.T) {
 		test.Skip("builds a TypeScript program per fixture")
 	}
 
-	fixtures, err := react_conformance.Load(fixtureRoot)
-	if err != nil {
-		test.Fatalf("loading the corpus: %v", err)
+	fixtures, loadError := react_conformance.Load(fixtureRoot)
+	if loadError != nil {
+		test.Fatalf("loading the corpus: %v", loadError)
 	}
 
 	silent := RuleUnderTest{Upstream: "globals", Rule: rule.Rule{
@@ -173,9 +173,9 @@ func TestScoringHarnessCanFail(test *testing.T) {
 // it would manufacture failures on fixtures the rule never had a chance at.
 func TestUpstreamMessageJoinIsNotByResemblance(test *testing.T) {
 	test.Parallel()
-	fixtures, err := react_conformance.Load(fixtureRoot)
-	if err != nil {
-		test.Fatalf("loading the corpus: %v", err)
+	fixtures, loadError := react_conformance.Load(fixtureRoot)
+	if loadError != nil {
+		test.Fatalf("loading the corpus: %v", loadError)
 	}
 
 	present := map[string]bool{}

@@ -1475,8 +1475,8 @@ func TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment(test *testing.T) {
 			test.Parallel()
 
 			var options SwitchExhaustivenessCheckOptions
-			if err := rule.UnmarshalOptions([]byte(testCase.options), &options); err != nil {
-				test.Fatalf("decoding %s: %v", testCase.options, err)
+			if unmarshalOptionsError := rule.UnmarshalOptions([]byte(testCase.options), &options); unmarshalOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.options, unmarshalOptionsError)
 			}
 			// The harness writes the file trimmed, so positions are in the trimmed text.
 			source := strings.TrimSpace(testCase.code) + "\n"

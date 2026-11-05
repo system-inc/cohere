@@ -150,8 +150,8 @@ func TestADirectiveFileReplaysWithItsAdamicReadiness(test *testing.T) {
 			Cached int             `json:"cached"`
 			Adamic json.RawMessage `json:"adamic"`
 		}
-		if err := json.Unmarshal([]byte(lines[len(lines)-1]), &summary); err != nil || len(summary.Adamic) == 0 {
-			test.Fatalf("no readiness in the summary line (%v):\n%s", err, output)
+		if decodeError := json.Unmarshal([]byte(lines[len(lines)-1]), &summary); decodeError != nil || len(summary.Adamic) == 0 {
+			test.Fatalf("no readiness in the summary line (%v):\n%s", decodeError, output)
 		}
 		return string(summary.Adamic), fmt.Sprint(summary.Cached)
 	}
