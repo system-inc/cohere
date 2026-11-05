@@ -274,18 +274,7 @@ struct TypesPhase {
         return Parser.parse(source: source)
     }
 
-    /*
-     Every owned file's diagnostics from the records under these target directories, and which files have none.
-
-     A diagnostic counts only when its record is at least as new as the file it names. A record older than that
-     file's text describes text that has changed since, so its diagnostics about that file are gone, even though
-     the record is still on disk. This happens two ways. A file's own record goes stale when the build stopped
-     before recompiling it. And a batch-mode compile files one file's diagnostics under another's `.dia`, so a
-     record that is never rewritten keeps another file's old errors at old lines after that file is fixed. Both
-     were seen on Presence (2026-11-04, PoseSearchTests.dia holding RigBodyTests' and FaceMeshReaderTests' old
-     errors, #zggj9xy). A dropped diagnostic's own file is then covered only by a newer record of its own, which
-     coverage below checks.
-     */
+    /* Every owned file's diagnostics from the records under these target directories, and which files have none, judged by `CompilerRecords`. */
     func read(
         targetDirectories: [(String, URL)],
         failedBuilds: [ProcessRunner.Result],
@@ -293,96 +282,12 @@ struct TypesPhase {
         build: String,
         answeredInProcess: [String: [FindingRecord]] = [:],
     ) throws -> Result {
-        let reader = try SerializedDiagnosticsReader(
-            libraryPath: SerializedDiagnosticsReader.toolchainLibraryPath(runner: runner)
+        let reading = try CompilerRecords(files: files, runner: runner).read(
+            targetDirectories: targetDirectories,
+            answeredInProcess: answeredInProcess,
         )
-
-        let ours = Dictionary(
-            files.map { ($0.url.resolvingSymlinksInPath().path, $0) },
-            uniquingKeysWith: { first, _ in first },
-        )
-        var seen = Set<String>()
-        var findings: [FindingRecord] = []
-        var recordFor: [String: Date] = [:]
-        /* Each named file's text as it stands, read once however many records name it. */
-        var sourceModified: [String: Date] = [:]
-        func modifiedNow(_ file: String) -> Date {
-            if let known = sourceModified[file] {
-                return known
-            }
-            let modified =
-                (try? URL(fileURLWithPath: file).resourceValues(forKeys: [.contentModificationDateKey]))?
-                .contentModificationDate ?? .distantFuture
-            sourceModified[file] = modified
-            return modified
-        }
-
-        for (targetName, directory) in targetDirectories {
-            for record in try diaFiles(in: directory) {
-                let modified =
-                    try record.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
-                    ?? .distantPast
-                /* Keyed by target as well as name: two targets may each hold a `Utilities.swift`, and one must not vouch for the other. */
-                let key = "\(targetName)/\(record.deletingPathExtension().lastPathComponent)"
-                /*
-                 A record libclang cannot read (seen once on Presence, a `.dia` left half-written by a build that
-                 was interrupted) vouches for nothing: its file is left without a record, which marks the run
-                 incomplete and makes a reused build rebuild, rather than one bad file ending the whole run. The
-                 record is removed, since it sits in the engine's own scratch: SwiftPM recompiles a file whose
-                 output is missing, so the build that follows writes a good one.
-                 */
-                let diagnostics: [SerializedDiagnosticsReader.Diagnostic]
-                do {
-                    diagnostics = try reader.read(record)
-                }
-                catch {
-                    do {
-                        try FileManager.default.removeItem(at: record)
-                    }
-                    catch {
-                        /* Left in place, the file stays without a record and the run says so; only the repair is lost. */
-                    }
-                    continue
-                }
-                recordFor[key] = max(recordFor[key] ?? .distantPast, modified)
-                for diagnostic in diagnostics {
-                    guard let severity = diagnostic.severity else { continue }
-                    let file = URL(fileURLWithPath: diagnostic.file).resolvingSymlinksInPath().path
-                    /* A file sourcekitd just checked is answered by that check; its record describes text that has changed since. */
-                    guard ours[file] != nil, answeredInProcess[file] == nil else { continue }
-                    guard modified >= modifiedNow(file) else { continue }
-                    let identity = "\(file):\(diagnostic.line):\(diagnostic.column):\(diagnostic.message)"
-                    guard seen.insert(identity).inserted else { continue }
-                    findings.append(
-                        FindingRecord(
-                            source: .compiler,
-                            file: file,
-                            line: max(diagnostic.line, 1),
-                            column: max(diagnostic.column, 1),
-                            severity: severity,
-                            rule: diagnostic.group,
-                            messageId: "",
-                            message: diagnostic.message,
-                        )
-                    )
-                }
-            }
-        }
-
-        findings.append(contentsOf: answeredInProcess.values.joined())
-
-        /* Coverage: each file's own record, by stem, newer than the source as it stands, or a check in this process. */
-        var withoutRecord: [String] = []
-        for file in files where answeredInProcess[file.url.resolvingSymlinksInPath().path] == nil {
-            let key = "\(file.targetName)/\(file.url.deletingPathExtension().lastPathComponent)"
-            let sourceModified =
-                try file.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
-                ?? .distantFuture
-            guard let recorded = recordFor[key], recorded >= sourceModified else {
-                withoutRecord.append(file.url.path)
-                continue
-            }
-        }
+        var findings = reading.findings
+        let withoutRecord = reading.filesWithoutRecord
 
         /* A failed build with no error in any file of ours failed somewhere no file carries: linking, a dependency, the manifest. Said, never swallowed. */
         if let failed = failedBuilds.first, !findings.contains(where: { $0.severity == .error }) {
@@ -501,21 +406,6 @@ struct TypesPhase {
         }
         guard let lastDash = base.lastIndex(of: "-") else { return base }
         return String(base[..<lastDash])
-    }
-
-    private func diaFiles(in targetDirectory: URL) throws -> [URL] {
-        let objects = targetDirectory.appendingPathComponent("Objects-normal", isDirectory: true)
-        guard FileManager.default.fileExists(atPath: objects.path) else { return [] }
-        var records: [URL] = []
-        for architecture in try FileManager.default.contentsOfDirectory(at: objects, includingPropertiesForKeys: nil) {
-            records.append(
-                contentsOf: try FileManager.default.contentsOfDirectory(
-                    at: architecture,
-                    includingPropertiesForKeys: nil,
-                ).filter { $0.pathExtension == "dia" }
-            )
-        }
-        return records
     }
 
     /* The last lines of the build's own output, colours stripped, for a failure no file carries. */
