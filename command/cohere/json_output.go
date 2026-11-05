@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"os"
 	"sort"
+	"time"
 )
 
 // `--json` is the run for a program to read: newline-delimited JSON, one object per line, each with a
@@ -94,6 +96,9 @@ type summaryJSON struct {
 	// Adamic is the run's readiness, present only under --adamic-readiness (#9tgm3dq). A run that asked and
 	// did not lint says not measured, and why, so a reader who asked never takes its absence for a pass.
 	Adamic *readinessSummary `json:"adamic,omitempty"`
+	// Error is why the run stopped before it could judge anything, in the words the human view prints, as
+	// a tsconfig that does not load (#9zqayzh). Present only then, and the verdict is fail.
+	Error string `json:"error,omitempty"`
 }
 
 // phaseJSON is one phase's outcome.
@@ -147,6 +152,37 @@ func summaryAsJSON(summary runSummary) summaryJSON {
 		Gaps:              summary.Gaps,
 		Adamic:            adamic,
 	}
+}
+
+// summaryWritten is whether this run printed its summary line under `--json`, so a run that then fails
+// prints no second one. See writeFailedRunSummary.
+var summaryWritten bool
+
+// writeSummaryLine prints the summary as the last line and notes that it did.
+func writeSummaryLine(out io.Writer, summary summaryJSON) {
+	summaryWritten = true
+	writeJSONLine(out, summary)
+}
+
+// writeFailedRunSummary ends a run that stopped on an error with a summary line of its own under `--json`:
+// verdict fail, the error's words, and the project's label in a repository with several. Every run ends on
+// a summary, so a reader that saw none would read the stream as cut off, and one that counted the lines it
+// did see would read a project that never loaded as one with nothing wrong (#9zqayzh). A run that already
+// printed its summary prints nothing more, and the human views print nothing here: the error line on
+// stderr is theirs.
+func writeFailedRunSummary(out io.Writer, err error) {
+	if activeOutput.Mode != outputJSON || summaryWritten {
+		return
+	}
+	summary := activeSummary
+	summary.Total = time.Since(processStart)
+	if label := os.Getenv(projectLabelVariable); label != "" {
+		summary.Label = label
+	}
+	line := summaryAsJSON(summary)
+	line.Verdict = "fail"
+	line.Error = err.Error()
+	writeSummaryLine(out, line)
 }
 
 // writeJSONLine writes one object as one line.
