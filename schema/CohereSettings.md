@@ -48,6 +48,7 @@ never something it silently ignores.
 | [`reasons`](#reasons) | object of reasons | any settings file |
 | [`rules`](#rules) | object of rule settings | any settings file |
 | [`settings`](#settings) | object | the file cohere reads first |
+| [`swift`](#swift) | object | the file beside a Swift project, or the one --lint-config names; never a file another extends |
 
 ### `$schema`
 
@@ -185,6 +186,14 @@ Per-plugin settings, read for better-tailwindcss: its rules read settings["bette
 
 ```json
 { "settings": { "better-tailwindcss": { "entryPoint": "./app/theme.css", "callees": ["cn", "clsx"] } } }
+```
+
+### `swift`
+
+The Swift engine's rules, read by cohere-swift itself: under rules, each Swift rule's severity, error, warning or off, or an array of one and, for a rule that reads options, an object of them, which may only make the rule stricter: cohere-swift/file-length reads max, at or below the house's 2,000 lines. An option a rule does not read is refused by name. A house rule the block does not name runs at error. The engine reads the block from the settings file beside a Swift project's root (its Package.swift, project.yml or .xcodeproj), or the file --lint-config names, and never follows extends, so a block in a file another extends, or beside no Swift project, is refused by name. Formatting is not configured here: Swift has one house format, and a format key in this block is refused.
+
+```json
+{ "swift": { "rules": { "cohere-swift/force-unwrapping": "error", "cohere-swift/file-length": "warning", "cohere-swift/force-cast": "off" } } }
 ```
 
 ## Severities

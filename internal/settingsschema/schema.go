@@ -179,6 +179,46 @@ var ignoredKeyShapes = map[string]func() map[string]any{
 		}
 	},
 	FormatKey: formatShape,
+	SwiftKey:  swiftShape,
+}
+
+// SwiftKey is the Swift engine's block, which cohere-swift reads itself.
+const SwiftKey = "swift"
+
+// swiftSeverities are the severities the Swift engine accepts, as written: its RuleConfiguration.Severity,
+// whose raw values are compared exactly. Fewer than the TypeScript loader's, so the block has its own
+// rather than the shared severity definition, which would complete a "warn" the engine refuses.
+var swiftSeverities = []string{"error", "warning", "off"}
+
+// swiftShape is what the Swift engine reads from its block (RuleConfiguration.parse): a rules object, each
+// value a severity or an array of a severity and at most one options object, and nothing else, since the
+// engine refuses a block with no rules and a format key in it. Which options a rule reads, and their limits,
+// stay the engine's (RuleConfiguration.optionsRead), which refuses by name any it does not read, so the
+// schema does not copy them and cannot drift from them.
+func swiftShape() map[string]any {
+	severity := map[string]any{"type": "string", "enum": swiftSeverities}
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"rules"},
+		"properties": map[string]any{
+			"rules": map[string]any{
+				"type":        "object",
+				"description": "Each Swift rule's severity, or an array of its severity and, for a rule that reads options, an object of them.",
+				"additionalProperties": map[string]any{
+					"oneOf": []any{
+						severity,
+						map[string]any{
+							"type":        "array",
+							"minItems":    1,
+							"maxItems":    2,
+							"prefixItems": []any{severity, map[string]any{"type": "object"}},
+						},
+					},
+				},
+			},
+		},
+	}
 }
 
 func formatShape() map[string]any {
