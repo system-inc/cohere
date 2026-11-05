@@ -60,16 +60,30 @@ struct XcodeProjectFileTests {
                             under: folder,
                         ),
                         swiftVersion: nil,
+                        sdkRoot: "macosx",
                     )
                 ]
             )
         }
     }
 
-    /* The application writes its own Swift version; the test bundle writes none and inherits the project's. */
-    @Test func readsEachTargetsSwiftVersion() throws {
+    /*
+     The application writes its own Swift version; the test bundle writes none and inherits the project's. The
+     application's Debug configuration is given an SDK of its own here, so the bundle inheriting the project's shows
+     the same precedence for `SDKROOT`.
+     */
+    @Test func readsEachTargetsSwiftVersionAndSdk() throws {
         try Self.withFolder { folder in
-            try Self.write(Self.twoTargetProject, "two/Two.xcodeproj/project.pbxproj", under: folder)
+            let applicationDebug = "\t\t\t\tSWIFT_VERSION = 6.0;\n\t\t\t};\n\t\t\tname = Debug;"
+            try #require(Self.twoTargetProject.components(separatedBy: applicationDebug).count == 2)
+            try Self.write(
+                Self.twoTargetProject.replacingOccurrences(
+                    of: applicationDebug,
+                    with: "\t\t\t\tSDKROOT = xros;\n" + applicationDebug,
+                ),
+                "two/Two.xcodeproj/project.pbxproj",
+                under: folder,
+            )
             try Self.write("", "two/App/App.swift", under: folder)
             try Self.write("", "two/Tests/AppTests.swift", under: folder)
             let project = try XcodeProjectFile.read(folder.appendingPathComponent("two/Two.xcodeproj"))
@@ -80,12 +94,14 @@ struct XcodeProjectFileTests {
                         productType: "com.apple.product-type.application",
                         sources: Self.urls(["two/App/App.swift"], under: folder),
                         swiftVersion: "6.0",
+                        sdkRoot: "xros",
                     ),
                     XcodeProjectFile.Target(
                         name: "AppTests",
                         productType: "com.apple.product-type.bundle.unit-test",
                         sources: Self.urls(["two/Tests/AppTests.swift"], under: folder),
                         swiftVersion: "5.0",
+                        sdkRoot: "iphoneos",
                     ),
                 ]
             )
@@ -129,6 +145,34 @@ struct XcodeProjectFileTests {
             #expect(project.sourceRoot.path == folder.appendingPathComponent("elsewhere/build/out").path)
             #expect(project.targets.map(\.productType) == ["com.apple.product-type.framework"])
             #expect(project.targets.first?.sources == Self.urls(["elsewhere/work/Sources/Away.swift"], under: folder))
+        }
+    }
+
+    /*
+     A package reference counted from the folder holding the .xcodeproj, and a folder reference holding a
+     `Package.swift`, are both local packages. A folder reference without one is a folder of resources, not listed.
+     */
+    @Test func readsTheLocalPackagesItLinks() throws {
+        try Self.withFolder { folder in
+            let section = "/* Begin PBXBuildFile section */\n"
+            let references = [
+                "AAAA00000000000000000001 = {isa = XCLocalSwiftPackageReference; relativePath = ../Near; };",
+                "AAAA00000000000000000002 = {isa = PBXFileReference; lastKnownFileType = folder; path = ../Far; sourceTree = SOURCE_ROOT; };",
+                "AAAA00000000000000000003 = {isa = PBXFileReference; lastKnownFileType = folder; path = Assets; sourceTree = SOURCE_ROOT; };",
+            ]
+            try Self.write(
+                Self.plainProject.replacingOccurrences(
+                    of: section,
+                    with: section + references.map { "\t\t\($0)\n" }.joined(),
+                ),
+                "plain/Plain.xcodeproj/project.pbxproj",
+                under: folder,
+            )
+            for file in ["Near/Package.swift", "Far/Package.swift", "plain/Assets/Notes.txt"] {
+                try Self.write("", file, under: folder)
+            }
+            let project = try XcodeProjectFile.read(folder.appendingPathComponent("plain/Plain.xcodeproj"))
+            #expect(project.localPackages == Self.urls(["Far", "Near"], under: folder))
         }
     }
 

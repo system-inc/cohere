@@ -57,10 +57,21 @@ public enum XcodeProject {
         return nil
     }
 
+    /* A project as the run reads it: the model fix, format and lint check, and the bundle and project file the types phase builds. */
+    public struct Loaded: Sendable {
+        public var model: PackageModel
+        /* The .xcodeproj xcodebuild is given: the generated one in the scratch, or the committed one where it stands. */
+        public var bundle: URL
+        public var projectFile: XcodeProjectFile
+        /* The file a person edits to change the project, where a finding about the project as a whole points: the spec, or the committed project file. */
+        public var definition: URL
+    }
+
     /* The project as a package model: generated first when it is a spec, then read. */
-    public static func load(source: Source, root: URL, scratchPath: URL, runner: ProcessRunner) throws -> PackageModel {
+    public static func load(source: Source, root: URL, scratchPath: URL, runner: ProcessRunner) throws -> Loaded {
         let bundle: URL
         let kind: PackageModel.ProjectKind
+        let definition: URL
         switch source {
             case let .xcodeGenSpecification(specification):
                 bundle = try XcodeGeneration.generate(
@@ -70,9 +81,11 @@ public enum XcodeProject {
                     runner: runner,
                 )
                 kind = .xcodeGen
+                definition = specification
             case let .projectBundle(projectBundle):
                 bundle = projectBundle
                 kind = .xcodeProject
+                definition = projectBundle.appendingPathComponent("project.pbxproj")
         }
         let projectFile = try XcodeProjectFile.read(bundle)
         var model = PackageModel(
@@ -91,7 +104,7 @@ public enum XcodeProject {
             },
         )
         model.projectKind = kind
-        return model
+        return Loaded(model: model, bundle: bundle, projectFile: projectFile, definition: definition)
     }
 
     /*

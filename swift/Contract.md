@@ -112,9 +112,9 @@ nothing else.
   name, and each native target's kind is Xcode's product type in SwiftPM's words: an app or an extension
   is `application`, a unit-test or interface-test bundle `test`, a framework or library `library`, a
   command-line tool `executable`.
-- An Xcode project is not built yet, so its `types` phase is `skipped` with a detail that names the gap
-  (never `not requested`), the run is incomplete, and `--unused` is `notReached`. The package rules, which
-  judge settings an Xcode project keeps elsewhere, are offered no package there and listed as silent.
+- An Xcode project's types are built with xcodebuild (see `types`). Its index is not read yet, so `--unused`
+  is `notReached` there (#9ktapz2). The package rules, which judge settings an Xcode project keeps elsewhere,
+  are offered no package there and listed as silent.
 
 Rendered (whole package, then scoped):
 
@@ -305,6 +305,18 @@ scratch prune removed, as `; the scratch prune removed 6.9 MB: 226 index records
 prune runs after such a build, at most once an hour per scratch. It removes the index store's records
 no unit names and the scratch of a package that is no longer local, each unused for an hour, and never
 touches a build in flight or the build descriptions, whose cache the build system bounds itself.
+
+At an Xcode root (#gg0x95n) the build is xcodebuild, one per native target that compiles a file of ours,
+through the scheme Xcode makes for it, for the generic device of the platform its `SDKROOT` names: `build`, or
+`build-for-testing` for a test bundle. It writes only into the scratch (`xcode-build` as derived data,
+`xcode-packages` for packages), never into `~/Library/Developer/Xcode/DerivedData`, signs nothing, and holds
+run-script phases to their declared files (`ENABLE_USER_SCRIPT_SANDBOXING=YES`). Under `--no-fix` it resolves no
+package, and leaves a committed project's bundle as it found it. Its records are judged by the same rules as a
+package's, and `build` reads `xcodebuild of <n> targets for <platforms>, derived data <path>`, or that the last
+build's records were reused because no input changed, then names each build that failed and the step it failed
+at, and each target not built and why (an `SDKROOT` naming no platform the engine knows). A failure no file of
+ours carries an error for is a finding at the spec or the committed project file, and a build that left no
+record leaves every file it was for in `filesWithoutRecord`, never an empty report.
 
 **Only compiler errors cut lint off.** In TypeScript every diagnostic the checker reports is an
 error, so "any type diagnostic bails" and "any type error bails" were the same rule. In Swift they

@@ -110,7 +110,7 @@ public struct Pipeline {
 
         /* The packages a run here accounts for, from the same traversal the run uses: manifests only, no build. */
         if options.listCoveredPackages {
-            let package = try loadProject(root: root, xcodeSource: xcodeSource, toolchain: toolchain)
+            let package = try loadProject(root: root, xcodeSource: xcodeSource, toolchain: toolchain).package
             let inside = package.localPackages.filter { PackageModel.isInside($0.root, root) }
             let path = { (model: PackageModel) in model.root.standardizedFileURL.path }
             try writer.write(
@@ -146,7 +146,7 @@ public struct Pipeline {
         let fileRules = RuleRegistry.fileRules(vocabulary: vocabulary)
 
         let describeStart = Date()
-        let package = try loadProject(root: root, xcodeSource: xcodeSource, toolchain: toolchain)
+        let (package, xcodeProject) = try loadProject(root: root, xcodeSource: xcodeSource, toolchain: toolchain)
         let fileSet = try FileSet.build(package: package)
         let scope = try FileScope.resolve(options: options, fileSet: fileSet, workingDirectory: workingDirectory)
         /*
@@ -369,26 +369,36 @@ public struct Pipeline {
         if !options.runTypes {
             try writer.write(PhaseRecord(name: .types, outcome: .skipped, detail: "not requested"))
         }
-        else if package.projectKind != .swiftPackage {
-            /* A gap, not a choice: the caller asked for types and got none, so the run is incomplete and says why. */
-            complete = false
-            try writer.write(PhaseRecord(name: .types, outcome: .skipped, detail: Self.xcodeTypesNotBuilt))
-        }
         else {
             /* The whole package, whatever the scope: a change in one file changes what the rest of its module means. */
-            var typesPhase = TypesPhase(
-                package: package,
-                files: fileSet.owned,
-                scratchPath: runScratch(for: root),
-                resolutionAllowed: !options.noFix,
-                toolchain: toolchain,
-                runner: runner,
-            )
-            typesPhase.parsed = Dictionary(
-                parsed.files.map { ($0.url.path, $0.tree) },
-                uniquingKeysWith: { first, _ in first },
-            )
-            let types = try typesPhase.run()
+            let types: TypesPhase.Result
+            if let xcodeProject {
+                types = try XcodeTypesPhase(
+                    package: package,
+                    project: xcodeProject,
+                    files: fileSet.owned,
+                    scratchPath: runScratch(for: root),
+                    resolutionAllowed: !options.noFix,
+                    toolchain: toolchain,
+                    runner: runner,
+                )
+                .run()
+            }
+            else {
+                var typesPhase = TypesPhase(
+                    package: package,
+                    files: fileSet.owned,
+                    scratchPath: runScratch(for: root),
+                    resolutionAllowed: !options.noFix,
+                    toolchain: toolchain,
+                    runner: runner,
+                )
+                typesPhase.parsed = Dictionary(
+                    parsed.files.map { ($0.url.path, $0.tree) },
+                    uniquingKeysWith: { first, _ in first },
+                )
+                types = try typesPhase.run()
+            }
             for finding in types.findings {
                 try writer.write(finding)
             }
@@ -472,7 +482,7 @@ public struct Pipeline {
         }
 
         if options.unused && package.projectKind != .swiftPackage {
-            try writer.write(PhaseRecord(name: .unused, outcome: .notReached, detail: Self.xcodeTypesNotBuilt))
+            try writer.write(PhaseRecord(name: .unused, outcome: .notReached, detail: Self.xcodeIndexNotRead))
         }
         else if options.unused {
             try await runUnused(package: package, root: root, fileSet: fileSet, parsed: parsed.files)
@@ -485,26 +495,35 @@ public struct Pipeline {
 
     static let unusedNotRequested = "not requested — this is a report, ask for it with --unused"
 
-    /* Why an Xcode project's types and index are not read yet, in the words the phase line prints. */
-    static let xcodeTypesNotBuilt =
-        "an Xcode project is not built yet, so its types and index were not checked (block B, #gg0x95n, builds it with xcodebuild)"
+    /* Why an Xcode project's unused report does not run yet, in the words the phase line prints. */
+    static let xcodeIndexNotRead =
+        "an Xcode project's index is not read yet, so nothing judges what is unused (block C, #9ktapz2, reads it)"
 
-    /* The run's project: SwiftPM's answer for a package, or an Xcode project read into the same model. */
-    private func loadProject(root: URL, xcodeSource: XcodeProject.Source?, toolchain: String) throws -> PackageModel {
+    /*
+     The run's project: SwiftPM's answer for a package, or an Xcode project read into the same model, with the
+     bundle and project file its types phase builds from.
+     */
+    private func loadProject(
+        root: URL,
+        xcodeSource: XcodeProject.Source?,
+        toolchain: String,
+    ) throws -> (package: PackageModel, xcode: XcodeProject.Loaded?) {
         if let xcodeSource {
-            return try XcodeProject.load(
+            let loaded = try XcodeProject.load(
                 source: xcodeSource,
                 root: root,
                 scratchPath: runScratch(for: root),
                 runner: runner,
             )
+            return (loaded.model, loaded)
         }
-        return try PackageModel.load(
+        let package = try PackageModel.load(
             root: root,
             scratchPath: runScratch(for: root),
             runner: runner,
             toolchain: toolchain,
         )
+        return (package, nil)
     }
 
     /* The unused phase of a run cut off before it: not reached when it was asked for, not requested otherwise. */
