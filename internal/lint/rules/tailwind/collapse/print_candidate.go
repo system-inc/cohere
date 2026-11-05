@@ -55,15 +55,15 @@ func PrintCandidate(candidate ParsedCandidate, prefix string) string {
 //
 // Apart from `bracketed` only because of the typehint, which goes inside whichever brackets the value
 // takes. A variant value never carries one, so the variant printer has no need of it.
-func printArbitraryCandidateValue(value *ParsedValue) string {
-	text := value.Value
+func printArbitraryCandidateValue(parsedValue *ParsedValue) string {
+	text := parsedValue.Value
 	open, close := "[", "]"
 	if isLoneVar(text) {
 		text = text[len("var(") : len(text)-1]
 		open, close = "(", ")"
 	}
-	if value.DataType != "" {
-		return open + value.DataType + ":" + printArbitraryValue(text) + close
+	if parsedValue.DataType != "" {
+		return open + parsedValue.DataType + ":" + printArbitraryValue(text) + close
 	}
 	return open + printArbitraryValue(text) + close
 }

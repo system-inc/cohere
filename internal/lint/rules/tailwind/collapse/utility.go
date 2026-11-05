@@ -153,19 +153,6 @@ func (evaluator *UtilityEvaluator) Reading(candidate *ParsedCandidate) (Reading,
 	return Reading(sort), true
 }
 
-// Compile evaluates a candidate against its `@utility` definition and returns the surviving body.
-//
-// This is `createCssUtility`'s per-candidate function. The returned nodes are the utility's body
-// before it is wrapped in its selector rule and before variants are applied, which is what
-// PropertySort expects and what upstream passes to `getPropertySort`.
-//
-// The definition is not mutated. Upstream clones the at-rule per candidate for the same reason:
-// resolution rewrites declaration values in place and removes declarations, and a definition
-// consumed once would answer differently on the second class that used it.
-func (evaluator *UtilityEvaluator) Compile(candidate *ParsedCandidate) ([]*Node, bool) {
-	return evaluator.compile(candidate, utilityRemovalsAll)
-}
-
 // utilityRemovals selects which of the two post-walk removals `compile` applies.
 //
 // It exists so the tests can suppress one removal at a time and observe what changes, on the real
@@ -188,6 +175,19 @@ const (
 	// TestUtilityRatioSpliceIsLoadBearing.
 	utilityRemovalsKeepNonRatio
 )
+
+// Compile evaluates a candidate against its `@utility` definition and returns the surviving body.
+//
+// This is `createCssUtility`'s per-candidate function. The returned nodes are the utility's body
+// before it is wrapped in its selector rule and before variants are applied, which is what
+// PropertySort expects and what upstream passes to `getPropertySort`.
+//
+// The definition is not mutated. Upstream clones the at-rule per candidate for the same reason:
+// resolution rewrites declaration values in place and removes declarations, and a definition
+// consumed once would answer differently on the second class that used it.
+func (evaluator *UtilityEvaluator) Compile(candidate *ParsedCandidate) ([]*Node, bool) {
+	return evaluator.compile(candidate, utilityRemovalsAll)
+}
 
 // compileKeepingDroppedDeclarations is Compile with the resolve-or-drop rule suppressed.
 //
@@ -328,6 +328,9 @@ func (state *utilityEvaluation) walk(nodes []*Node) {
 // `WalkAction.ReplaceSkip([])` and the node is spliced out of its parent by the walker. Here the
 // node is flagged and removeNodes does the splice, which keeps the traversal free of the
 // index-shifting that in-place removal during iteration invites.
+//
+// Mutates: node its value is rewritten with every call resolved, on the clone compile walks so the
+// definition itself is never touched
 func (state *utilityEvaluation) resolveDeclaration(node *Node) {
 	if !node.ValuePresent || node.Value == "" {
 		// Upstream's `if (!node.value) return`, which skips a declaration with no value and,
@@ -439,13 +442,13 @@ func (state *utilityEvaluation) modifierAsValue() *ParsedValue {
 // `--percentage` and never reaches the second argument. Which one wins does not change this
 // declaration's survival, but the general rule does decide which theme value is substituted.
 func (state *utilityEvaluation) resolveValueFunction(
-	value *ParsedValue,
+	parsedValue *ParsedValue,
 	function *ValueNode,
 ) ([]ValueNode, bool, bool) {
 	// No value at all: only `--default(…)` can answer, and it is the utility's own opt-in to the
 	// bare form. A definition without one does not compile bare, which is why `slide-in-from-top`
 	// is a separate static `@utility` block rather than a fallback of the functional one.
-	if value == nil {
+	if parsedValue == nil {
 		for _, argument := range function.Nodes {
 			if argument.Kind == ValueNodeKindFunction && argument.Value == "--default" {
 				return argument.Nodes, false, true
@@ -459,29 +462,29 @@ func (state *utilityEvaluation) resolveValueFunction(
 		// A literal, e.g. `--modifier('closest-side')`. Quoted, and the quotes must match at both
 		// ends, so `'closest-side` is not a literal and falls through to the bare-value branch,
 		// where it is not a known data type and is skipped.
-		case value.Kind == ParsedValueKindNamed && argument.Kind == ValueNodeKindWord &&
-			isQuotedLiteral(argument.Value) && argument.Value[1:len(argument.Value)-1] == value.Value:
-			return ParseValue(value.Value), false, true
+		case parsedValue.Kind == ParsedValueKindNamed && argument.Kind == ValueNodeKindWord &&
+			isQuotedLiteral(argument.Value) && argument.Value[1:len(argument.Value)-1] == parsedValue.Value:
+			return ParseValue(parsedValue.Value), false, true
 
 		// A theme namespace, e.g. `--value(--percentage-*)`.
-		case value.Kind == ParsedValueKindNamed && argument.Kind == ValueNodeKindWord &&
+		case parsedValue.Kind == ParsedValueKindNamed && argument.Kind == ValueNodeKindWord &&
 			strings.HasPrefix(argument.Value, "--"):
-			resolved, ok := state.resolveThemeArgument(argument.Value, value.Value)
+			resolved, ok := state.resolveThemeArgument(argument.Value, parsedValue.Value)
 			if ok {
 				return ParseValue(resolved), false, true
 			}
 
 		// A bare value with a data type, e.g. `--value(integer)`.
-		case value.Kind == ParsedValueKindNamed && argument.Kind == ValueNodeKindWord:
-			resolved, isRatio, ok := state.resolveBareArgument(argument.Value, value)
+		case parsedValue.Kind == ParsedValueKindNamed && argument.Kind == ValueNodeKindWord:
+			resolved, isRatio, ok := state.resolveBareArgument(argument.Value, parsedValue)
 			if ok {
 				return resolved, isRatio, true
 			}
 
 		// An arbitrary value, e.g. `--value([length])`.
-		case value.Kind == ParsedValueKindArbitrary && argument.Kind == ValueNodeKindWord &&
+		case parsedValue.Kind == ParsedValueKindArbitrary && argument.Kind == ValueNodeKindWord &&
 			isBracketed(argument.Value):
-			resolved, ok := state.resolveArbitraryArgument(argument.Value, value)
+			resolved, ok := state.resolveArbitraryArgument(argument.Value, parsedValue)
 			if ok {
 				return resolved, false, true
 			}
@@ -548,15 +551,18 @@ func (state *utilityEvaluation) resolveThemeArgument(argument, candidateValue st
 //   - A `number` must be a valid spacing multiplier, a non-negative multiple of 0.25 written
 //     canonically, so `1.3` is rejected and `1.25` is not.
 //   - A `percentage` must be an integer percentage, so `12.5%` is rejected.
-func (state *utilityEvaluation) resolveBareArgument(argument string, value *ParsedValue) ([]ValueNode, bool, bool) {
+func (state *utilityEvaluation) resolveBareArgument(
+	argument string,
+	parsedValue *ParsedValue,
+) ([]ValueNode, bool, bool) {
 	dataType := DataType(argument)
 	if !bareValueDataTypes[dataType] {
 		return nil, false, false
 	}
 
-	resolved := value.Value
+	resolved := parsedValue.Value
 	if dataType == DataTypeRatio {
-		resolved = value.Fraction
+		resolved = parsedValue.Fraction
 	}
 	if resolved == "" {
 		return nil, false, false
@@ -597,20 +603,23 @@ func (state *utilityEvaluation) resolveBareArgument(argument string, value *Pars
 // carries `color`, and an argument naming a different type is skipped rather than inferred, because
 // the author's annotation is a claim the engine trusts. With no typehint the value is inferred
 // against the single named type.
-func (state *utilityEvaluation) resolveArbitraryArgument(argument string, value *ParsedValue) ([]ValueNode, bool) {
+func (state *utilityEvaluation) resolveArbitraryArgument(
+	argument string,
+	parsedValue *ParsedValue,
+) ([]ValueNode, bool) {
 	dataType := argument[1 : len(argument)-1]
 
 	if dataType == "*" {
-		return ParseValue(value.Value), true
+		return ParseValue(parsedValue.Value), true
 	}
-	if value.DataType != "" {
-		if value.DataType != dataType {
+	if parsedValue.DataType != "" {
+		if parsedValue.DataType != dataType {
 			return nil, false
 		}
-		return ParseValue(value.Value), true
+		return ParseValue(parsedValue.Value), true
 	}
-	if InferDataType(value.Value, []DataType{DataType(dataType)}) != "" {
-		return ParseValue(value.Value), true
+	if InferDataType(parsedValue.Value, []DataType{DataType(dataType)}) != "" {
+		return ParseValue(parsedValue.Value), true
 	}
 	return nil, false
 }

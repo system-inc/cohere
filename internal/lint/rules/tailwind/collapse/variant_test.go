@@ -297,6 +297,23 @@ func variantOrderRegistryForCase(
 	return nil
 }
 
+// variantOrderDefaultBreakpointScale is Tailwind 4.3.3's own `--breakpoint-*`, which both corpus repositories
+// inherit unchanged.
+//
+// Hardcoded here and only here, in the test's resolver, never in variant.go. The port reads
+// breakpoints from the theme; this table exists so the differential can answer the same question
+// without taking a dependency on a sibling component's port.
+var variantOrderDefaultBreakpointScale = map[string]string{
+	"sm": "40rem", "md": "48rem", "lg": "64rem", "xl": "80rem", "2xl": "96rem",
+}
+
+// variantOrderDefaultContainerScale is Tailwind 4.3.3's `--container-*`, for the `@` container-query variants.
+var variantOrderDefaultContainerScale = map[string]string{
+	"3xs": "16rem", "2xs": "18rem", "xs": "20rem", "sm": "24rem", "md": "28rem",
+	"lg": "32rem", "xl": "36rem", "2xl": "42rem", "3xl": "48rem", "4xl": "56rem",
+	"5xl": "64rem", "6xl": "72rem", "7xl": "80rem",
+}
+
 // variantOrderBreakpointResolverFor answers what a breakpoint variant resolves to, from the fixture's own data.
 //
 // The engine resolves these through the theme's `--breakpoint` and `--container` namespaces, which
@@ -333,23 +350,6 @@ func variantOrderBreakpointResolverFor(
 			return "", false
 		}
 	}
-}
-
-// variantOrderDefaultBreakpointScale is Tailwind 4.3.3's own `--breakpoint-*`, which both corpus repositories
-// inherit unchanged.
-//
-// Hardcoded here and only here, in the test's resolver, never in variant.go. The port reads
-// breakpoints from the theme; this table exists so the differential can answer the same question
-// without taking a dependency on a sibling component's port.
-var variantOrderDefaultBreakpointScale = map[string]string{
-	"sm": "40rem", "md": "48rem", "lg": "64rem", "xl": "80rem", "2xl": "96rem",
-}
-
-// variantOrderDefaultContainerScale is Tailwind 4.3.3's `--container-*`, for the `@` container-query variants.
-var variantOrderDefaultContainerScale = map[string]string{
-	"3xs": "16rem", "2xs": "18rem", "xs": "20rem", "sm": "24rem", "md": "28rem",
-	"lg": "32rem", "xl": "36rem", "2xl": "42rem", "3xl": "48rem", "4xl": "56rem",
-	"5xl": "64rem", "6xl": "72rem", "7xl": "80rem",
 }
 
 // checkVariantOrderIndices compares the port's dense indices against the engine's, for one case.

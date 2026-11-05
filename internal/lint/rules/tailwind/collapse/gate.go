@@ -287,19 +287,19 @@ func importanceKey(important bool) string {
 //
 // The brackets around an arbitrary value are part of the key rather than decoration: they are also
 // what CouldRewriteAlone reads to decide that `z-[1]` is worth asking about while `px-4` is not.
-func valueKey(value Value) string {
-	switch value.Kind {
+func valueKey(candidateValue Value) string {
+	switch candidateValue.Kind {
 	case ValueKindNone:
 		return ""
 
 	case ValueKindArbitrary:
-		return "[" + value.Value + "]"
+		return "[" + candidateValue.Value + "]"
 
 	default:
-		if value.Fraction != "" {
-			return value.Value + "/" + value.Fraction
+		if candidateValue.Fraction != "" {
+			return candidateValue.Value + "/" + candidateValue.Fraction
 		}
-		return value.Value
+		return candidateValue.Value
 	}
 }
 
@@ -389,8 +389,9 @@ func (gate *Gate) CannotCollapse(classNames []string) bool {
 //
 // alreadyChecked carries singles the caller has resolved in this process; pass nil on a first call.
 func (gate *Gate) NeedsEngine(classNames []string, alreadyChecked map[string]bool) bool {
-	if alreadyChecked == nil {
-		alreadyChecked = map[string]bool{}
+	checked := alreadyChecked
+	if checked == nil {
+		checked = map[string]bool{}
 	}
 
 	distinct := distinctPreservingOrder(classNames)
@@ -398,7 +399,7 @@ func (gate *Gate) NeedsEngine(classNames []string, alreadyChecked map[string]boo
 		return false
 	}
 
-	if gate.CannotCollapse(distinct) && len(gate.SingleClassesWorthChecking(distinct, alreadyChecked)) == 0 {
+	if gate.CannotCollapse(distinct) && len(gate.SingleClassesWorthChecking(distinct, checked)) == 0 {
 		return false
 	}
 	return true

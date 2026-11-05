@@ -82,10 +82,11 @@ type signatureCanonicalizer struct {
 // variables resolved. The siblings an enter hook compares against are the list as it stands, earlier
 // nodes already rewritten and later ones not yet, as upstream's are.
 func (canonicalizer *signatureCanonicalizer) canonicalize(nodes []*Node) []*Node {
-	for index := 0; index < len(nodes); {
-		node := nodes[index]
-		if replacement, replaced := canonicalizer.enter(node, nodes); replaced {
-			nodes = append(nodes[:index:index], append(replacement, nodes[index+1:]...)...)
+	spliced := nodes
+	for index := 0; index < len(spliced); {
+		node := spliced[index]
+		if replacement, replaced := canonicalizer.enter(node, spliced); replaced {
+			spliced = append(spliced[:index:index], append(replacement, spliced[index+1:]...)...)
 			continue
 		}
 		if node.IsContainer() && len(node.Nodes) > 0 {
@@ -94,11 +95,14 @@ func (canonicalizer *signatureCanonicalizer) canonicalize(nodes []*Node) []*Node
 		canonicalizer.exit(node)
 		index++
 	}
-	return nodes
+	return spliced
 }
 
 // enter is canonicalizeAst's enter hook. It returns the nodes to put in this one's place, or false to
 // keep it and descend.
+//
+// Mutates: node a kept declaration's value is rewritten to its canonical form in place, since the walk
+// canonicalizes the tree it is handed
 func (canonicalizer *signatureCanonicalizer) enter(node *Node, siblings []*Node) ([]*Node, bool) {
 	switch node.Kind {
 	case KindDeclaration:
@@ -156,6 +160,9 @@ var signatureHexColor = regexp.MustCompile(`(?i)#(?:[a-f0-9]{8}|[a-f0-9]{6}|[a-f
 
 // exit is canonicalizeAst's exit hook: a rule's declarations deduplicated, last one winning, and sorted
 // by property, and a declaration's hex colours lowercased unless it is a custom property.
+//
+// Mutates: node its children are deduplicated and sorted, or its value lowercased, in place, since the walk
+// canonicalizes the tree it is handed
 func (canonicalizer *signatureCanonicalizer) exit(node *Node) {
 	switch node.Kind {
 	case KindRule, KindAtRule:
@@ -221,6 +228,8 @@ func isByteCollatedProperty(property string) bool {
 //
 // A list of 64 or more would be merged in runs upstream. No signature holds one, so it falls back to a
 // stable insertion sort, which agrees whenever the comparator is consistent.
+//
+// Mutates: nodes the caller's slice is reordered in place, as Array.prototype.sort reorders its array
 func sortLikeJavaScript(nodes []*Node, compare func(left *Node, right *Node) int) {
 	length := len(nodes)
 	if length < 2 {
@@ -309,13 +318,14 @@ func resolveVariablesInValue(value string, theme *Theme) string {
 	seen := map[string]bool{}
 	var walk func(nodes []ValueNode) []ValueNode
 	walk = func(nodes []ValueNode) []ValueNode {
-		for index := 0; index < len(nodes); {
-			node := &nodes[index]
+		spliced := nodes
+		for index := 0; index < len(spliced); {
+			node := &spliced[index]
 			if node.Kind == ValueNodeKindFunction &&
 				node.Value == "var" &&
 				(len(node.Nodes) == 1 || len(node.Nodes) >= 3) {
 				if replacement, replaced := resolveVariableNode(node, theme, seen, &changed); replaced {
-					nodes = append(nodes[:index:index], append(replacement, nodes[index+1:]...)...)
+					spliced = append(spliced[:index:index], append(replacement, spliced[index+1:]...)...)
 					continue
 				}
 			}
@@ -324,7 +334,7 @@ func resolveVariablesInValue(value string, theme *Theme) string {
 			}
 			index++
 		}
-		return nodes
+		return spliced
 	}
 	nodes := walk(ParseValue(value))
 	if !changed {
@@ -334,6 +344,10 @@ func resolveVariablesInValue(value string, theme *Theme) string {
 }
 
 // resolveVariableNode is the walk's body for one `var()`, returning its replacement when it has one.
+//
+// Mutates: node a lone `var(--key)` gains the key's value as its fallback in place
+// Mutates: seen each variable is marked once read, so a key is resolved once per value
+// Mutates: changed set when the value gains a fallback or is replaced, so the caller knows to reprint it
 func resolveVariableNode(node *ValueNode, theme *Theme, seen map[string]bool, changed *bool) ([]ValueNode, bool) {
 	variable := node.Nodes[0].Value
 	// Upstream drops the prefix as `variable.slice(`--${prefix}-`.length)`, which drops the leading

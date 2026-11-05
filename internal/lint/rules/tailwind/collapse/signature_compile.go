@@ -149,8 +149,9 @@ func substituteSpacingFunction(value string, theme *Theme) (string, bool) {
 	substituted := true
 	var walk func(nodes []ValueNode) []ValueNode
 	walk = func(nodes []ValueNode) []ValueNode {
-		for index := 0; index < len(nodes); {
-			node := &nodes[index]
+		spliced := nodes
+		for index := 0; index < len(spliced); {
+			node := &spliced[index]
 			if node.Kind == ValueNodeKindFunction {
 				switch node.Value {
 				case "--alpha", "--theme", "theme":
@@ -162,7 +163,7 @@ func substituteSpacingFunction(value string, theme *Theme) (string, bool) {
 						index++
 						continue
 					}
-					nodes = append(nodes[:index:index], append(ParseValue(result), nodes[index+1:]...)...)
+					spliced = append(spliced[:index:index], append(ParseValue(result), spliced[index+1:]...)...)
 					continue
 				}
 			}
@@ -171,7 +172,7 @@ func substituteSpacingFunction(value string, theme *Theme) (string, bool) {
 			}
 			index++
 		}
-		return nodes
+		return spliced
 	}
 	nodes := walk(ParseValue(value))
 	return ValueToCss(nodes), substituted
@@ -339,6 +340,23 @@ func (compiler *SignatureCompiler) readingNodes(candidate *ParsedCandidate) ([]*
 		return compiler.functionalReadingNodes(candidate)
 	}
 	return nil, SignatureUnknown
+}
+
+// signatureValueUnportedRoots are the roots whose emitter here writes the resolved value where upstream
+// wraps it in an expression this port does not hold: the filter functions (`blur(8px)` where the emitter
+// writes `8px`), `span n / span n`, the reverse-aware `calc()` chains of space and divide, the degree
+// suffix and sign of skew and the mask angles, line-clamp's five declarations and the container's
+// breakpoints. Each disagreed with upstream's signature on every theme TestSignatureAgreesWithTailwind
+// reads, and every other root agreed, so these answer unknown.
+var signatureValueUnportedRoots = map[string]bool{
+	"backdrop-blur": true, "backdrop-brightness": true, "backdrop-contrast": true, "backdrop-grayscale": true,
+	"backdrop-hue-rotate": true, "backdrop-invert": true, "backdrop-opacity": true, "backdrop-saturate": true,
+	"backdrop-sepia": true, "blur": true, "brightness": true, "contrast": true, "grayscale": true,
+	"hue-rotate": true, "invert": true, "saturate": true, "sepia": true,
+	"col-span": true, "row-span": true,
+	"space-x": true, "space-y": true, "divide-x": true, "divide-y": true,
+	"skew": true, "skew-x": true, "skew-y": true, "mask-conic": true, "mask-linear": true,
+	"line-clamp": true, "container": true, "transition": true,
 }
 
 // functionalReadingNodes compiles one functional reading.
@@ -516,21 +534,4 @@ func suggestsColourKeywords(root string) bool {
 		}
 	}
 	return false
-}
-
-// signatureValueUnportedRoots are the roots whose emitter here writes the resolved value where upstream
-// wraps it in an expression this port does not hold: the filter functions (`blur(8px)` where the emitter
-// writes `8px`), `span n / span n`, the reverse-aware `calc()` chains of space and divide, the degree
-// suffix and sign of skew and the mask angles, line-clamp's five declarations and the container's
-// breakpoints. Each disagreed with upstream's signature on every theme TestSignatureAgreesWithTailwind
-// reads, and every other root agreed, so these answer unknown.
-var signatureValueUnportedRoots = map[string]bool{
-	"backdrop-blur": true, "backdrop-brightness": true, "backdrop-contrast": true, "backdrop-grayscale": true,
-	"backdrop-hue-rotate": true, "backdrop-invert": true, "backdrop-opacity": true, "backdrop-saturate": true,
-	"backdrop-sepia": true, "blur": true, "brightness": true, "contrast": true, "grayscale": true,
-	"hue-rotate": true, "invert": true, "saturate": true, "sepia": true,
-	"col-span": true, "row-span": true,
-	"space-x": true, "space-y": true, "divide-x": true, "divide-y": true,
-	"skew": true, "skew-x": true, "skew-y": true, "mask-conic": true, "mask-linear": true,
-	"line-clamp": true, "container": true, "transition": true,
 }

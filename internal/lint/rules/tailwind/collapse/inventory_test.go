@@ -11,6 +11,61 @@ import (
 	"testing"
 )
 
+// Tables the inventory deliberately does not carry an entry for, each with the reason.
+//
+// The inventory is about tables that answer a question upstream answers by running code, because
+// those are the ones that go stale against a repository or a Tailwind version. Three kinds do not:
+//
+// The ported handle bodies. `frameworkEmitters`, `frameworkMultiEmitters`,
+// `frameworkMultiLiteralEmitters` and `gapEmitters` are the port's own source, one closure per root
+// read at the tag. They are code written as a map, not data recording what code produced, and
+// TestEveryFrameworkRootHasAnEmitter already holds them against the registration tables.
+//
+// The CSS grammar. `lengthUnits`, `angleUnits`, `mathFunctions`, `imageFunctions`,
+// `gradientFunctions`, `colorFunctions`, `namedColors`, `genericNames`, `absoluteSizes`,
+// `backgroundPositionKeywords`, `percentSuffix` and `colorKeywords` are facts about CSS rather than
+// about Tailwind or about a repository. They move when the CSS specification moves, which is not the
+// drift this inventory watches, and upstream carries the same lists for the same reason.
+//
+// Small local constants. `ignoredThemeKeys`, `bareValueDataTypes`, `themedModifierValues`,
+// `composedAggregateValues` and `FrameworkVariantComparisonGroups` are each read by one function in
+// the file that declares them and are part of that function's definition.
+//
+// An entry here is a claim that a table cannot go stale against a repository. Adding one to silence
+// a failure rather than because that claim is true is the failure mode, and it is not defended
+// against: measured, adding a two-entry table to this package and an exemption for it turns the
+// check green. That is the honest limit of this test. It catches a table added and forgotten, which
+// is what happened to `KnownRoots`, `KnownStatics` and the three ordering tables, and it does not
+// catch a table added deliberately with a false reason.
+//
+// Each is grouped under a reason above rather than listed bare, so the claim is at least written
+// down where review can see it.
+var tablesExemptFromTheInventory = map[string]bool{
+	"frameworkEmitters":             true,
+	"frameworkMultiEmitters":        true,
+	"frameworkMultiLiteralEmitters": true,
+	"gapEmitters":                   true,
+
+	"lengthUnits":                true,
+	"angleUnits":                 true,
+	"mathFunctions":              true,
+	"imageFunctions":             true,
+	"gradientFunctions":          true,
+	"colorFunctions":             true,
+	"namedColors":                true,
+	"genericNames":               true,
+	"absoluteSizes":              true,
+	"backgroundPositionKeywords": true,
+	"percentSuffix":              true,
+	"colorKeywords":              true,
+
+	"ignoredThemeKeys":                 true,
+	"bareValueDataTypes":               true,
+	"themedModifierValues":             true,
+	"composedAggregateValues":          true,
+	"FrameworkVariantComparisonGroups": true,
+}
+
 // TestEveryTableIsTailwindsOrHasAStatedReason is the inventory this package owes its reader.
 //
 // The port removed the tables that did not need to exist. What remains splits in two, and the split
@@ -302,59 +357,4 @@ func tablesDeclaredInPackage(test *testing.T) map[string]tableInPackage {
 		test.Fatal("the parse found no tables at all, so this check measured nothing")
 	}
 	return declared
-}
-
-// Tables the inventory deliberately does not carry an entry for, each with the reason.
-//
-// The inventory is about tables that answer a question upstream answers by running code, because
-// those are the ones that go stale against a repository or a Tailwind version. Three kinds do not:
-//
-// The ported handle bodies. `frameworkEmitters`, `frameworkMultiEmitters`,
-// `frameworkMultiLiteralEmitters` and `gapEmitters` are the port's own source, one closure per root
-// read at the tag. They are code written as a map, not data recording what code produced, and
-// TestEveryFrameworkRootHasAnEmitter already holds them against the registration tables.
-//
-// The CSS grammar. `lengthUnits`, `angleUnits`, `mathFunctions`, `imageFunctions`,
-// `gradientFunctions`, `colorFunctions`, `namedColors`, `genericNames`, `absoluteSizes`,
-// `backgroundPositionKeywords`, `percentSuffix` and `colorKeywords` are facts about CSS rather than
-// about Tailwind or about a repository. They move when the CSS specification moves, which is not the
-// drift this inventory watches, and upstream carries the same lists for the same reason.
-//
-// Small local constants. `ignoredThemeKeys`, `bareValueDataTypes`, `themedModifierValues`,
-// `composedAggregateValues` and `FrameworkVariantComparisonGroups` are each read by one function in
-// the file that declares them and are part of that function's definition.
-//
-// An entry here is a claim that a table cannot go stale against a repository. Adding one to silence
-// a failure rather than because that claim is true is the failure mode, and it is not defended
-// against: measured, adding a two-entry table to this package and an exemption for it turns the
-// check green. That is the honest limit of this test. It catches a table added and forgotten, which
-// is what happened to `KnownRoots`, `KnownStatics` and the three ordering tables, and it does not
-// catch a table added deliberately with a false reason.
-//
-// Each is grouped under a reason above rather than listed bare, so the claim is at least written
-// down where review can see it.
-var tablesExemptFromTheInventory = map[string]bool{
-	"frameworkEmitters":             true,
-	"frameworkMultiEmitters":        true,
-	"frameworkMultiLiteralEmitters": true,
-	"gapEmitters":                   true,
-
-	"lengthUnits":                true,
-	"angleUnits":                 true,
-	"mathFunctions":              true,
-	"imageFunctions":             true,
-	"gradientFunctions":          true,
-	"colorFunctions":             true,
-	"namedColors":                true,
-	"genericNames":               true,
-	"absoluteSizes":              true,
-	"backgroundPositionKeywords": true,
-	"percentSuffix":              true,
-	"colorKeywords":              true,
-
-	"ignoredThemeKeys":                 true,
-	"bareValueDataTypes":               true,
-	"themedModifierValues":             true,
-	"composedAggregateValues":          true,
-	"FrameworkVariantComparisonGroups": true,
 }
