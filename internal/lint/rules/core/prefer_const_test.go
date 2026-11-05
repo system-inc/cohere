@@ -12,7 +12,7 @@ const preferConstFile = "/repository/source/PreferConst.ts"
 
 // The corpus is oxc's, copied rather than rewritten.
 //
-// `oxc/crates/oxc_linter/src/rules/eslint/prefer_const.rs` carries FIVE Tester blocks, which the
+// `oxc/crates/oxc_linter/src/rules/eslint/prefer_const.rs` carries five Tester blocks, which the
 // extractor reports and which reading only the last one would silently drop four of:
 //
 //	block 1   75 pass, 65 fail   test_and_snapshot
@@ -103,7 +103,7 @@ func TestPreferConstFires(test *testing.T) {
 
 // TestPreferConstStaysSilent is where this rule earns its keep.
 //
-// The inversion note on PreferConst applies to every case here: this rule reports the ABSENCE of a
+// The inversion note on PreferConst applies to every case here: this rule reports the absence of a
 // write, so each of these is a write category that, if the rule fails to see it, becomes a false
 // positive on correct code carrying a fix that breaks the file. They are not "cases upstream also
 // declines"; they are the rule's entire safety margin.
@@ -209,10 +209,10 @@ func TestPreferConstStaysSilent(test *testing.T) {
 		// does not separate, because upstream's semantic layer classifies them all as is_write()
 		// and so never has to enumerate them.
 		//
-		// A rest element in a destructuring assignment target. `ast.IsWriteAccess` returns FALSE
+		// A rest element in a destructuring assignment target. `ast.IsWriteAccess` returns `false`
 		// for these, measured; without the spread arms in writesToBinding the rule reports `w` as
 		// never reassigned and offers a fix that produces a const it then writes to.
-		// These carry an INITIALIZER, and that is the whole point of them. With one the test is
+		// These carry an initializer, and that is the whole point of them. With one the test is
 		// `len(writes) == 0` and nothing else runs, so the rest arm is the only thing standing
 		// between correct code and a finding that rewrites it into a const it then writes to. A
 		// mutation stubbing isRestTargetOfAssignment to false survived the whole suite until these
@@ -311,7 +311,7 @@ func TestPreferConstStaysSilent(test *testing.T) {
 // `ignoreReadBeforeAssign: { type: "boolean" }`, `additionalProperties: false`. oxc's config agrees.
 //
 // The cases are upstream's own, and they are the answer to the task's third question: a pattern
-// where only some bindings are reassigned DOES report under the default, naming just the
+// where only some bindings are reassigned does report under the default, naming just the
 // never-reassigned ones, and reports nothing under "all".
 func TestPreferConstDestructuringOption(test *testing.T) {
 	test.Parallel()
@@ -437,7 +437,7 @@ func TestPreferConstIgnoreReadBeforeAssignOption(test *testing.T) {
 		})
 	}
 
-	// A read AFTER the declaration is not a read before assignment, so the option must not
+	// A read after the declaration is not a read before assignment, so the option must not
 	// suppress it. Upstream lists this one only under `ignoreReadBeforeAssign: false`, and it is
 	// the case that stops the option from being implemented as "never report anything that is
 	// read".
@@ -551,7 +551,7 @@ func TestPreferConstIgnoreReadBeforeAssignClearsMutuallyReferencingTimers(test *
 // reportedTextOf slices the source with a finding's own range.
 //
 // Brief step 8: ExpectFindings asserts message ids and count and nothing else, so a rule whose
-// defect is WHERE it points passes a complete fixture pair while being wrong. A clone shipped 187
+// defect is where it points passes a complete fixture pair while being wrong. A clone shipped 187
 // green fixtures over a rule whose findings all pointed at the wrong place.
 func reportedTextOf(test *testing.T, result rule_testing.Result, index int) string {
 	test.Helper()
@@ -841,7 +841,7 @@ func TestPreferConstNeedsTheTypedHarness(test *testing.T) {
 
 // TestPreferConstUsesNodeIdentityNotDeclarationKind is the trap from brief step 8b.
 //
-// Both anchors here are KindVariableDeclaration, so comparing the resolved declaration's KIND
+// Both anchors here are KindVariableDeclaration, so comparing the resolved declaration's kind
 // instead of its identity cannot separate them at all. Under a kind comparison the inner write is
 // seen as a write to the outer binding too, so the outer `a` is silenced and the finding count
 // drops. Nothing in the imported corpus catches this, because upstream's shadow cases resolve to
@@ -855,7 +855,7 @@ func TestPreferConstUsesNodeIdentityNotDeclarationKind(test *testing.T) {
 	if got := reportedTextOf(test, result, 0); got != "a" {
 		test.Fatalf("reported %q, want the outer binding", got)
 	}
-	// The span pins WHICH `a`: the outer one is at offset 4, the inner at offset 17.
+	// The span pins which `a`: the outer one is at offset 4, the inner at offset 17.
 	if position := result.Diagnostics[0].Range.Pos(); position != 4 {
 		test.Fatalf("reported the `a` at offset %d, want the outer one at 4", position)
 	}

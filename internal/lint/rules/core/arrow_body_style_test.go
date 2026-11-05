@@ -11,7 +11,7 @@ const arrowBodyStyleFile = "/repository/source/ArrowBodyStyle.ts"
 
 // arrowBodyStyleCase is one imported corpus row.
 //
-// `wantFixedSource` empty means the case is reported and deliberately NOT repaired, which upstream
+// `wantFixedSource` empty means the case is reported and deliberately not repaired, which upstream
 // records as `output: null` and which is a decision rather than an omission: seven of its cases are
 // in that state, and a fixer that repaired any of them would be a defect no message-id fixture
 // could see.
@@ -62,7 +62,7 @@ func arrowBodyStyleUpstreamList(options ArrowBodyStyleOptions) string {
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
 //
 // `tests/lib/rules/arrow-body-style.js` was loaded with its RuleTester stubbed so every case came
-// out as data, then each was replayed against the INSTALLED rule in `node_modules` to record both
+// out as data, then each was replayed against the installed rule in `node_modules` to record both
 // what it reports and what its fixer writes. All 87 findings and all 63 fix outputs reproduced, so
 // everything below is a measurement rather than a transcription.
 //
@@ -189,7 +189,7 @@ func TestArrowBodyStyleStaysSilent(test *testing.T) {
 	}
 }
 
-// What the fixer WRITES, which is half this rule and which no message-id fixture can see.
+// What the fixer writes, which is half this rule and which no message-id fixture can see.
 //
 // Every invalid case in a fixable rule's corpus carries the exact text the repair must produce, and
 // this rule has 56 of them plus 7 deliberate declines. A fixer that repairs the right span with the
@@ -197,7 +197,7 @@ func TestArrowBodyStyleStaysSilent(test *testing.T) {
 //
 // `ExpectFixedSource` compares the whole rewritten file, so the expectation is upstream's `output`
 // verbatim. Worth stating because the neighbouring hazard is real and points the other way: the
-// TYPED harness writes each fixture as `TrimSpace(source) + "\n"` (`rule_testing/program.go:160`),
+// typed harness writes each fixture as `TrimSpace(source) + "\n"` (`rule_testing/program.go:160`),
 // so a typed rule's expectation must be transformed the same way or every byte-correct repair fails
 // on a trailing newline. `Run` does not trim, this rule needs no checker, and transforming here
 // instead broke all 56 rows before the difference was measured rather than assumed.
@@ -223,7 +223,7 @@ func TestArrowBodyStyleFixesTheSource(test *testing.T) {
 // `+"`"+`([/`+"`"+`, a backtick, plus or minus would be joined onto the shortened expression once the closing
 // brace stops separating them, so the repair is declined rather than made safe.
 //
-// Asserted as carrying NO fix at all, rather than as a fix that happens to be a no-op: those are
+// Asserted as carrying no fix at all, rather than as a fix that happens to be a no-op: those are
 // different artifacts and only the first is what upstream ships.
 func TestArrowBodyStyleDeclinesToFix(test *testing.T) {
 	test.Parallel()
@@ -255,7 +255,7 @@ func TestArrowBodyStyleDeclinesToFix(test *testing.T) {
 
 // Where the finding points, which no message-id fixture can see.
 //
-// Upstream reports the arrow function node but overrides the location to the BODY, which is a
+// Upstream reports the arrow function node but overrides the location to the body, which is a
 // distinction invisible from the message id and easy to get wrong in the direction that still looks
 // plausible: pointing at the whole arrow reads fine in a terminal and puts the caret on `var`.
 func TestArrowBodyStylePointsAtTheBody(test *testing.T) {
@@ -404,7 +404,7 @@ func TestArrowBodyStyleWithNilOptionsUsesAsNeeded(test *testing.T) {
 
 	rule_testing.ExpectFindings(test, rule_testing.Run(test, ArrowBodyStyle, arrowBodyStyleFile,
 		"var foo = () => { return 0; };"), "unexpectedSingleBlock")
-	// Always and Never both differ from AsNeeded here, so this pins WHICH default was chosen
+	// Always and Never both differ from AsNeeded here, so this pins which default was chosen
 	// rather than merely that some default was.
 	rule_testing.ExpectClean(test, rule_testing.Run(test, ArrowBodyStyle, arrowBodyStyleFile,
 		"var foo = () => 0;"))
@@ -416,7 +416,7 @@ func TestArrowBodyStyleWithNilOptionsUsesAsNeeded(test *testing.T) {
 //
 // Written for a defect this port had: the guard scanned bytes and stopped at the first
 // non-whitespace character, so the `/` opening a trailing block comment read as the division
-// operator and every repair with a trailing comment was declined. Upstream asks for the next TOKEN,
+// operator and every repair with a trailing comment was declined. Upstream asks for the next token,
 // which skips comments, and its own nine-comment case is repaired.
 //
 // The three rows separate the two things a `/` can start. Every verdict was measured against the
@@ -428,7 +428,7 @@ func TestArrowBodyStyleSkipsCommentsWhenCheckingTheNextToken(test *testing.T) {
 		// A comment then a semicolon: repaired, and the comment survives.
 		{"var foo = () => { return bar } /* c */ ;", nil, []string{"unexpectedSingleBlock"},
 			"var foo = () => bar /* c */ ;"},
-		// A comment then a token that WOULD join on: declined, so the comment did not mask it.
+		// A comment then a token that would join on: declined, so the comment did not mask it.
 		{"var foo = () => { return bar } /* c */ + 1;", nil, []string{"unexpectedSingleBlock"}, ""},
 		// A line comment, whose ending is a newline rather than a delimiter.
 		{"var foo = () => { return bar } // c\n[1,2].map(foo)", nil,
@@ -455,13 +455,13 @@ func TestArrowBodyStyleSkipsCommentsWhenCheckingTheNextToken(test *testing.T) {
 // The `in` operator, whose handling replaces upstream's frame stack and whose breadth is the part
 // most likely to be quietly wrong.
 //
-// Upstream sets a flag on every enclosing ARROW frame when it meets an `in`, and nothing else
+// Upstream sets a flag on every enclosing arrow frame when it meets an `in`, and nothing else
 // pushes a frame, so an `in` inside a nested `function`, a class method, or a bracketed subscript
 // reaches the outer arrow too. This port asks the subtree instead, which is the same answer reached
 // without a stack, and these rows are what pin that the two agree. All six were measured against
 // the installed rule.
 //
-// The clause discrimination is the other half: only a for statement's INITIALIZER makes `in`
+// The clause discrimination is the other half: only a for statement's initializer makes `in`
 // ambiguous, so the same arrow in the condition clause needs no parentheses.
 func TestArrowBodyStyleParenthesizesTheInOperatorLikeUpstream(test *testing.T) {
 	test.Parallel()
@@ -501,7 +501,7 @@ func TestArrowBodyStyleParenthesizesTheInOperatorLikeUpstream(test *testing.T) {
 	}
 }
 
-// A comment on ONE side of the returned value, which the imported corpus does not separate.
+// A comment on one side of the returned value, which the imported corpus does not separate.
 //
 // Written for a surviving mutant. The repair takes a comment-preserving branch when trivia sits
 // anywhere in the ceremony being deleted, and the check is two halves: comments before the value
@@ -524,7 +524,7 @@ func TestArrowBodyStyleKeepsCommentsOnEitherSide(test *testing.T) {
 		// Between the keyword and the value, which is also before the value.
 		{"var foo = () => { return /* mid */ 5; };", nil, []string{"unexpectedSingleBlock"},
 			"var foo = () =>   /* mid */ 5 ;"},
-		// Between the value and its semicolon: the trailing window starts AFTER the semicolon, so
+		// Between the value and its semicolon: the trailing window starts after the semicolon, so
 		// this takes the ordinary branch and the comment survives inside the kept span. The
 		// doubled spaces in the rows below are what distinguish the two branches by eye.
 		{"var foo = () => { return 5 /* trailing */; };", nil, []string{"unexpectedSingleBlock"},

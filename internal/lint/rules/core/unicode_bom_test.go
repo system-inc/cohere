@@ -42,7 +42,7 @@ func decodedUnicodeBomOptions(test *testing.T, raw string) any {
 // into a different character on the way in, and each verdict was reproduced by driving the installed
 // eslint at 10.8.1 before being written here.
 //
-// The option spelling is the BARE string upstream writes second in its `["error", "always"]` tuple.
+// The option spelling is the bare string upstream writes second in its `["error", "always"]` tuple.
 // cohere's config layer strips the tuple, so what a decoder receives is `"always"` rather than
 // `["always"]`, and a fixture copying ESLint's array spelling would fail on every row.
 func TestUnicodeBomFires(test *testing.T) {
@@ -103,7 +103,7 @@ func TestUnicodeBomStaysSilent(test *testing.T) {
 //
 // Upstream overrides the location explicitly, to line 1 column 0, for both arms. Nothing in a
 // message-id fixture can see this, and getting it wrong is easy in a specific way: the source file
-// NODE's own range begins AFTER the mark, measured at position 3 on a marked file, so reporting the
+// node's own range begins after the mark, measured at position 3 on a marked file, so reporting the
 // node would point at the first real token in exactly the case where the mark is what is being
 // complained about.
 func TestUnicodeBomReportsAtPositionZero(test *testing.T) {
@@ -233,7 +233,7 @@ func TestDecodeUnicodeBomOptions(test *testing.T) {
 
 // TestUnicodeBomRemovesOneMarkPerPass pins the doubled-mark behaviour.
 //
-// A file beginning with the mark twice reports ONCE and this rule's single fix removes one of them.
+// A file beginning with the mark twice reports once and this rule's single fix removes one of them.
 // Measured against the installed build: `linter.cohere` returns exactly one message carrying one
 // fix, and `cohereAndFix` strips the second only on a later pass of its own re-lint loop. A port
 // removing both in one edit would be doing something upstream's rule never does, and no message-id

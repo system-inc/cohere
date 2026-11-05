@@ -67,7 +67,7 @@ func consistencyNoHandRolledDelayMessage() rule.Message {
 //
 // What this does not catch is a second definition of the primitive somewhere else (`function
 // sleep(ms) { return new Promise(...) }`), which is a duplicate helper rather than a hand-rolled
-// wait: its callers already read as a named wait. Measured on ahra at HEAD on 2026-10-01: the only
+// wait: its callers already read as a named wait. Measured on ahra at `HEAD` on 2026-10-01: the only
 // function of that shape is `delay` in `nexus/source/coordination/Delay.ts`.
 //
 // # No fix

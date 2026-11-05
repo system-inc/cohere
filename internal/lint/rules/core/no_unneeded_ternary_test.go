@@ -12,7 +12,7 @@ const noUnneededTernaryFile = "/repository/source/NoUnneededTernary.ts"
 
 // noUnneededTernaryBoolean makes an addressable bool for the one pointer option.
 //
-// The pointer is not decoration: `defaultAssignment` defaults to TRUE, so a plain bool field cannot
+// The pointer is not decoration: `defaultAssignment` defaults to `true`, so a plain bool field cannot
 // tell an absent key from an explicit false, and the zero value would switch the second judgment on
 // for anyone configuring the rule as a bare severity.
 func noUnneededTernaryBoolean(value bool) *bool { return &value }
@@ -22,7 +22,7 @@ type noUnneededTernaryCase struct {
 	sourceText string
 	options    any
 	wantIds    []string
-	// wantFixedSource is "" when the case is reported and deliberately NOT repaired, which upstream
+	// wantFixedSource is "" when the case is reported and deliberately not repaired, which upstream
 	// records as `output: null`.
 	wantFixedSource string
 }
@@ -48,7 +48,7 @@ func runNoUnneededTernary(test *testing.T, testCase noUnneededTernaryCase) rule_
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
 //
 // `tests/lib/rules/no-unneeded-ternary.js` was loaded with its RuleTester stubbed so every case came
-// out as data, then replayed against the INSTALLED rule to record what it reports and what its fixer
+// out as data, then replayed against the installed rule to record what it reports and what its fixer
 // writes. All 47 findings and all 31 fix outcomes reproduced.
 //
 // Two of upstream's own cases are TypeScript (`foo as any ? false : true` and
@@ -134,7 +134,7 @@ func TestNoUnneededTernaryStaysSilent(test *testing.T) {
 	}
 }
 
-// What the fixer WRITES, which is half this rule.
+// What the fixer writes, which is half this rule.
 //
 // Every arm replaces the whole ternary with reconstructed text, so a repair that lands on the right
 // span with the wrong content passes every assertion above. Thirty of upstream's cases carry an
@@ -194,10 +194,10 @@ func TestNoUnneededTernaryDeclinesToDropACall(test *testing.T) {
 
 // TypeScript syntax inside the replaced span, which is what this fixer risks destroying.
 //
-// Every arm of this repair REPLACES THE WHOLE TERNARY with reconstructed text, which is the exact
+// Every arm of this repair replaces the whole ternary with reconstructed text, which is the exact
 // shape that widened eight declarations to `any` in `no-undef-init` and dropped a `: void` in
-// `no-arrow-function-lifecycle`. Both of those rebuilt their replacement from node FIELDS. This one
-// slices the source by RANGE, so anything inside the span survives verbatim, and these rows turn
+// `no-arrow-function-lifecycle`. Both of those rebuilt their replacement from node fields. This one
+// slices the source by range, so anything inside the span survives verbatim, and these rows turn
 // that argument into a measurement rather than leaving it as a claim in a doc comment.
 //
 // Upstream's corpus contains two TypeScript cases and cannot contain these: the gap between its
@@ -205,7 +205,7 @@ func TestNoUnneededTernaryDeclinesToDropACall(test *testing.T) {
 // through the TypeScript parser.
 //
 // The `as`/`satisfies` rows are the load-bearing ones. Upstream's precedence table has no entry for
-// either, so a port inheriting it unchanged gives them the TIGHTEST precedence and emits
+// either, so a port inheriting it unchanged gives them the tightest precedence and emits
 // `a || b as any`, which parses as `(a || b) as any` and asserts the type of the wrong expression.
 func TestNoUnneededTernaryPreservesTypeSyntax(test *testing.T) {
 	test.Parallel()
@@ -239,7 +239,7 @@ func TestNoUnneededTernaryPreservesTypeSyntax(test *testing.T) {
 			[]string{"unnecessaryConditionalExpression"},
 			"declare const a: unknown; const x = !!(<boolean>a);"},
 		// The default-assignment arm with an `as` alternate: parenthesized, because `as` binds
-		// LOOSER than the `||` the repair introduces.
+		// looser than the `||` the repair introduces.
 		{"declare const a: unknown; declare const b: unknown; const x = a ? a : b as any;",
 			defaultAssignmentOff, []string{"unnecessaryConditionalAssignment"},
 			"declare const a: unknown; declare const b: unknown; const x = a || (b as any);"},
@@ -248,7 +248,7 @@ func TestNoUnneededTernaryPreservesTypeSyntax(test *testing.T) {
 			defaultAssignmentOff, []string{"unnecessaryConditionalAssignment"},
 			"declare const a: unknown; declare const b: unknown; " +
 				"const x = a || (b satisfies unknown);"},
-		// The controls for those two: a `||` alternate is NOT parenthesized, because it binds at
+		// The controls for those two: a `||` alternate is not parenthesized, because it binds at
 		// the same precedence, while a `??` alternate is, because the grammar forbids mixing them.
 		// Without these rows a rule that parenthesized everything would look correct.
 		{"declare const a: unknown; declare const b: unknown; declare const c: unknown; " +
@@ -326,10 +326,10 @@ func TestNoUnneededTernaryPointsAtTheWholeConditional(test *testing.T) {
 	}
 }
 
-// The decoder, whose only option defaults to TRUE.
+// The decoder, whose only option defaults to `true`.
 //
 // A rule configured as a bare severity is handed nil, and `options.(T)` on nil yields the zero
-// value, whose false would switch the second judgment ON for everyone. Every fixture above reaches
+// value, whose false would switch the second judgment on for everyone. Every fixture above reaches
 // the rule through the decoder, so none of them can see that.
 func TestDecodeNoUnneededTernaryOptions(test *testing.T) {
 	test.Parallel()
@@ -365,7 +365,7 @@ func TestDecodeNoUnneededTernaryOptions(test *testing.T) {
 	})
 }
 
-// With nil options the default-assignment judgment stays OFF and the boolean one stays on.
+// With nil options the default-assignment judgment stays off and the boolean one stays on.
 func TestNoUnneededTernaryWithNilOptionsUsesTheDefault(test *testing.T) {
 	test.Parallel()
 
@@ -378,13 +378,13 @@ func TestNoUnneededTernaryWithNilOptionsUsesTheDefault(test *testing.T) {
 // The precedence question upstream asks, which our AST answers differently by default.
 //
 // Espree produces no node for parentheses, so upstream's `getPrecedence(node.test)` on `(a + b)` is
-// asking about the ADDITION and answers 12, which is below unary precedence, so the negation wraps
+// asking about the addition and answers 12, which is below unary precedence, so the negation wraps
 // it again and the output carries both pairs. Our parser gives the parentheses a node that
 // genuinely binds tightest, so the shared precedence table answers 20 and one pair is lost.
 //
 // And an unknown node type answers -1 upstream rather than 20, deliberately, so that a fixer wraps
 // what it does not recognise. `foo!` is a `TSNonNullExpression`, which is not in eslint's visitor
-// keys, so it takes that arm. The wrong answer here produces `!!foo!`, which PARSES, so nothing
+// keys, so it takes that arm. The wrong answer here produces `!!foo!`, which parses, so nothing
 // downstream would ever have complained.
 //
 // Both were found by a failing fixture rather than by reading the table, and neither can be reached
@@ -393,7 +393,7 @@ func TestNoUnneededTernaryAsksPrecedenceOfWhatTheParenthesesHold(test *testing.T
 	test.Parallel()
 
 	cases := []noUnneededTernaryCase{
-		// A parenthesized loose-binding test keeps its own pair AND gains one.
+		// A parenthesized loose-binding test keeps its own pair and gains one.
 		{"const x = (a + b) ? true : false;", nil,
 			[]string{"unnecessaryConditionalExpression"}, "const x = !!((a + b));"},
 		// A parenthesized tight-binding test keeps only its own pair, which is the control that

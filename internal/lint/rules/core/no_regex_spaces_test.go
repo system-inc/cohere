@@ -277,7 +277,7 @@ func TestNoRegexSpacesFixes(test *testing.T) {
 // TestNoRegexSpacesReportsOnlyTheFirstRun pins the behavior the upstream field name hides.
 //
 // oxc calls the accumulator `last_space_span`, and it does not hold the last run. Once a run of two
-// or more has latched, every later run is discarded, so the finding is on the FIRST such run. The
+// or more has latched, every later run is discarded, so the finding is on the first such run. The
 // single space bookkeeping exists only to step past lone spaces on the way to one.
 //
 // Upstream's corpus contains exactly one input that can tell the two readings apart
@@ -413,7 +413,7 @@ func TestNoRegexSpacesShapesOurCorpusDoesNotCover(test *testing.T) {
 // wrong on its first pass, and the one nothing in the imported corpus explains.
 //
 // Two of upstream's pass cases are `new RegExp(' \[   ')` and `new RegExp(' \[   \] ')`. Both hold
-// three adjacent spaces at what looks like depth zero, and a port that hands the RAW body to the
+// three adjacent spaces at what looks like depth zero, and a port that hands the raw body to the
 // walk reports them, because raw `\[` reads as a regex escape and no class opens. Cooked, the `\[`
 // is a JS string escape, the pattern is ` [   `, and that bracket opens a class running off the end
 // of the pattern. Upstream and ESLint are both silent for that reason, and the corpus records the
@@ -499,7 +499,7 @@ func TestNoRegexSpacesDropsAPatternItCannotMap(test *testing.T) {
 	test.Parallel()
 
 	// A real line continuation inside the argument, written as an actual newline in the source.
-	// Here it sits BEFORE the run, so the walk desynchronizes while cooked characters remain and
+	// Here it sits before the run, so the walk desynchronizes while cooked characters remain and
 	// the loop's own bail is what fires.
 	test.Run("a continuation before the run", func(test *testing.T) {
 		test.Parallel()
@@ -507,7 +507,7 @@ func TestNoRegexSpacesDropsAPatternItCannotMap(test *testing.T) {
 			"var foo = new RegExp('bar\\\n    baz');"))
 	})
 
-	// And here it sits AFTER the run, which is a different branch and the only input that reaches
+	// And here it sits after the run, which is a different branch and the only input that reaches
 	// the final length check. Cooked is exhausted while raw still holds the continuation, so the
 	// loop never notices: without the check the offsets look complete and well formed, and the rule
 	// reports a run whose position rests on a correspondence that stopped being true. A mutation
@@ -523,7 +523,7 @@ func TestNoRegexSpacesDropsAPatternItCannotMap(test *testing.T) {
 // width table unmeasured: changing `\x41` from four raw bytes to three, or `\u0041` from six to
 // five, left every imported fixture green.
 //
-// The corpus is why. It is full of `\\x20` and `\\u0020`, which are an escaped BACKSLASH followed
+// The corpus is why. It is full of `\\x20` and `\\u0020`, which are an escaped backslash followed
 // by ordinary characters, so they exercise the two-byte generic branch and never the hex or
 // unicode branches at all. A real single-backslash escape sitting before a run of spaces is a shape
 // upstream simply does not test, and it is the shape where a wrong width moves the finding: in

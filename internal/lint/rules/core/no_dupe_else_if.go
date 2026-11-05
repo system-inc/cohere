@@ -26,9 +26,9 @@ var messageUnexpectedDuplicateElseIf = rule.Message{
 // expression, because everything the second matches the first already matched.
 //
 // The algorithm is ESLint's and is worth stating in one line, since the nested loops obscure it: a
-// condition is written as an OR of AND-groups, and a branch is unreachable when every one of its
-// OR-groups has been covered by some earlier branch. A group is covered when an earlier group is a
-// subset of it, since a smaller AND is a weaker requirement and therefore matches more.
+// condition is written as an `OR` of `AND`-groups, and a branch is unreachable when every one of its
+// `OR`-groups has been covered by some earlier branch. A group is covered when an earlier group is a
+// subset of it, since a smaller `AND` is a weaker requirement and therefore matches more.
 //
 // Both operands of a commutative operator are tried when comparing, so `a && b` equals `b && a`.
 // That is only sound because these are conditions read for truthiness, where reordering cannot
@@ -55,7 +55,7 @@ var NoDupeElseIf = rule.Rule{
 					conditionsToCheck = append(conditionsToCheck, splitByOperator(test, ast.KindAmpersandAmpersandToken)...)
 				}
 
-				// Each condition becomes a list of OR-groups, each group a list of AND-operands.
+				// Each condition becomes a list of `OR`-groups, each group a list of `AND`-operands.
 				remaining := make([][][]*ast.Node, 0, len(conditionsToCheck))
 				for _, condition := range conditionsToCheck {
 					orGroups := splitByOperator(condition, ast.KindBarBarToken)
@@ -88,7 +88,7 @@ var NoDupeElseIf = rule.Rule{
 						earlierGroups = append(earlierGroups, splitByOperator(orGroup, ast.KindAmpersandAmpersandToken))
 					}
 
-					// Drop every OR-group this earlier condition covers.
+					// Drop every `OR`-group this earlier condition covers.
 					for conditionIndex, groups := range remaining {
 						kept := groups[:0]
 						for _, group := range groups {
@@ -112,9 +112,9 @@ var NoDupeElseIf = rule.Rule{
 	},
 }
 
-// anyGroupIsSubsetOf reports whether some earlier AND-group is a subset of this one.
+// anyGroupIsSubsetOf reports whether some earlier `AND`-group is a subset of this one.
 //
-// The direction is the part that reads backwards and is correct: a smaller AND is a weaker
+// The direction is the part that reads backwards and is correct: a smaller `AND` is a weaker
 // condition, so if an earlier branch required only `a` and this one requires `a && b`, everything
 // this one matches the earlier one already matched.
 func anyGroupIsSubsetOf(sourceFile *ast.SourceFile, earlierGroups [][]*ast.Node, group []*ast.Node) bool {
