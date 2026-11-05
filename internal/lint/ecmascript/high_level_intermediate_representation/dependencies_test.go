@@ -71,7 +71,7 @@ func TestDependenciesRequireScopeTerminals(test *testing.T) {
 		}
 	`
 	function, scopes := scopesFor(test, source)
-	if scopes.Len() == 0 {
+	if scopes.Length() == 0 {
 		test.Fatal("no scopes, so this test measured nothing")
 	}
 	aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
@@ -79,14 +79,14 @@ func TestDependenciesRequireScopeTerminals(test *testing.T) {
 
 	// Terminals not built: the table is populated but the graph carries no Scope terminal.
 	before := CollectScopeDependencies(function, identity)
-	if before.Len() != 0 {
+	if before.Length() != 0 {
 		test.Errorf("collected %d scopes' dependencies before terminals were built; this pass is "+
-			"supposed to read the graph", before.Len())
+			"supposed to read the graph", before.Length())
 	}
 
 	BuildReactiveScopeTerminals(function, scopes, identity)
 	after := CollectScopeDependencies(function, identity)
-	if after.Len() == 0 {
+	if after.Length() == 0 {
 		test.Fatal("collected nothing after terminals were built, so the pass never runs")
 	}
 }
@@ -526,12 +526,12 @@ func TestDependencyGapsAreDeclared(test *testing.T) {
 func TestDependenciesHandleANilFunction(test *testing.T) {
 	test.Parallel()
 
-	if got := CollectScopeDependencies(nil, MergedScopeIdentity{}); got.Len() != 0 {
-		test.Errorf("a nil function produced %d scopes", got.Len())
+	if got := CollectScopeDependencies(nil, MergedScopeIdentity{}); got.Length() != 0 {
+		test.Errorf("a nil function produced %d scopes", got.Length())
 	}
 	var empty *ScopeDependencies
 	if empty.DependenciesOf(1) != nil || empty.DeclarationsOf(1) != nil ||
-		empty.ReassignmentsOf(1) != nil || empty.Ids() != nil || empty.Len() != 0 {
+		empty.ReassignmentsOf(1) != nil || empty.Ids() != nil || empty.Length() != 0 {
 		test.Error("the nil table is not readable, but its zero value is documented as ready to read")
 	}
 }

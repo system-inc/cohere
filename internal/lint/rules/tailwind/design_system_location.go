@@ -28,10 +28,10 @@ import (
 // always has, and a rule given any of them follows upstream exactly. On a rule that never reads the
 // design system they change nothing, in upstream as here.
 type TailwindLocationOptions struct {
-	EntryPoint     string `json:"entryPoint"`
-	TailwindConfig string `json:"tailwindConfig"`
-	Cwd            string `json:"cwd"`
-	Tsconfig       string `json:"tsconfig"`
+	EntryPoint       string `json:"entryPoint"`
+	TailwindConfig   string `json:"tailwindConfig"`
+	WorkingDirectory string `json:"cwd"`
+	Tsconfig         string `json:"tsconfig"`
 
 	// anchor is the directory the config was written in, which stands for ESLint's working directory,
 	// set by the decoder from rule.OptionsBase.
@@ -45,10 +45,10 @@ func (options TailwindLocationOptions) Location() DesignSystemLocation {
 		configurationPath = options.TailwindConfig
 	}
 	return DesignSystemLocation{
-		Anchor:     options.anchor,
-		Cwd:        options.Cwd,
-		ConfigPath: configurationPath,
-		Tsconfig:   options.Tsconfig,
+		Anchor:           options.anchor,
+		WorkingDirectory: options.WorkingDirectory,
+		ConfigPath:       configurationPath,
+		Tsconfig:         options.Tsconfig,
 	}
 }
 
@@ -236,8 +236,8 @@ func ConfiguredEntryPoint(
 		anchor = projectRoot
 	}
 	cwd := anchor
-	if location.Cwd != "" {
-		cwd = resolvePath(anchor, location.Cwd)
+	if location.WorkingDirectory != "" {
+		cwd = resolvePath(anchor, location.WorkingDirectory)
 	}
 
 	packageRoot := findTailwindPackageRoot(cwd, fileExists)
@@ -277,10 +277,10 @@ func LocationInSettings(settings map[string]json.RawMessage, anchor string) (Des
 		return value
 	}
 	location := TailwindLocationOptions{
-		EntryPoint:     read("entryPoint"),
-		TailwindConfig: read("tailwindConfig"),
-		Cwd:            read("cwd"),
-		Tsconfig:       read("tsconfig"),
+		EntryPoint:       read("entryPoint"),
+		TailwindConfig:   read("tailwindConfig"),
+		WorkingDirectory: read("cwd"),
+		Tsconfig:         read("tsconfig"),
 	}
 	location.anchorAt(anchor)
 	named := location.Location()
@@ -337,8 +337,8 @@ func (location DesignSystemLocation) cwdFrom(projectRoot string) string {
 	if anchor == "" {
 		anchor = projectRoot
 	}
-	if location.Cwd != "" {
-		return resolvePath(anchor, location.Cwd)
+	if location.WorkingDirectory != "" {
+		return resolvePath(anchor, location.WorkingDirectory)
 	}
 	return anchor
 }

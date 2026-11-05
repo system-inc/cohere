@@ -67,7 +67,7 @@ type cssFixtureNode struct {
 	Kind         string            `json:"kind"`
 	Selector     string            `json:"selector"`
 	Name         string            `json:"name"`
-	Params       string            `json:"params"`
+	Parameters   string            `json:"params"`
 	Property     string            `json:"property"`
 	Value        *string           `json:"value"`
 	ValuePresent bool              `json:"valuePresent"`
@@ -108,7 +108,9 @@ func describeNodes(nodes []*Node, indent string) string {
 		case KindRule:
 			builder.WriteString("rule " + quoteForDiff(node.Selector) + "\n")
 		case KindAtRule:
-			builder.WriteString("at-rule " + quoteForDiff(node.Name) + " params=" + quoteForDiff(node.Params) + "\n")
+			builder.WriteString(
+				"at-rule " + quoteForDiff(node.Name) + " params=" + quoteForDiff(node.Parameters) + "\n",
+			)
 		case KindDeclaration:
 			value := "<absent>"
 			if node.ValuePresent {
@@ -162,7 +164,7 @@ func nodesFromFixture(fixtures []*cssFixtureNode) []*Node {
 			Kind:         NodeKind(fixture.Kind),
 			Selector:     fixture.Selector,
 			Name:         fixture.Name,
-			Params:       fixture.Params,
+			Parameters:   fixture.Parameters,
 			Property:     fixture.Property,
 			ValuePresent: fixture.ValuePresent,
 			Important:    fixture.Important,

@@ -85,8 +85,8 @@ func NodeStylesheetResolver(tailwindPackageRoot string) StylesheetResolver {
 type SkippedDirective struct {
 	// Name is the at-rule name, including its `@`.
 	Name string
-	// Params is the at-rule's parameters.
-	Params string
+	// Parameters is the at-rule's parameters.
+	Parameters string
 	// Path is the stylesheet it appeared in.
 	Path string
 }
@@ -169,9 +169,9 @@ func (loader *themeLoader) ingest(nodes []*Node, path string) error {
 
 		case node.Kind == KindAtRule && (node.Name == "@config" || node.Name == "@plugin"):
 			loader.skipped = append(loader.skipped, SkippedDirective{
-				Name:   node.Name,
-				Params: node.Params,
-				Path:   path,
+				Name:       node.Name,
+				Parameters: node.Parameters,
+				Path:       path,
 			})
 
 		case node.IsContainer():
@@ -194,7 +194,7 @@ func (loader *themeLoader) ingest(nodes []*Node, path string) error {
 // as a plain one produces a theme whose entries all lack ThemeOptionReference, which is a wrong
 // answer that looks exactly like a right one.
 func (loader *themeLoader) followImport(node *Node, path string) error {
-	parts := segment(text.TrimWhitespace(node.Params), ' ')
+	parts := segment(text.TrimWhitespace(node.Parameters), ' ')
 	if len(parts) == 0 || parts[0] == "" {
 		return fmt.Errorf("%s: @import with no specifier", path)
 	}
@@ -235,7 +235,7 @@ func (loader *themeLoader) followImport(node *Node, path string) error {
 // is reproduced: a stylesheet the engine rejects must not quietly produce a theme here, since any
 // theme built from input the engine refuses is one no repository can actually be using.
 func (loader *themeLoader) ingestThemeBlock(node *Node, path string) error {
-	options, prefix := parseThemeOptions(node.Params)
+	options, prefix := parseThemeOptions(node.Parameters)
 
 	if prefix != "" {
 		if !isValidThemePrefix(prefix) {

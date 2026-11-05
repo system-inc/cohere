@@ -87,8 +87,8 @@ type Node struct {
 
 	// Name is the at-keyword of a KindAtRule, including its leading `@`. `@media`, `@property`.
 	Name string
-	// Params is everything between a KindAtRule's name and its body.
-	Params string
+	// Parameters is everything between a KindAtRule's name and its body.
+	Parameters string
 
 	// Property is the property name of a KindDeclaration, including custom properties.
 	// `display`, `--tw-sort`.
@@ -124,7 +124,7 @@ func StyleRule(selector string, nodes ...*Node) *Node {
 
 // AtRule builds a KindAtRule node. name includes its leading `@`.
 func AtRule(name, parameters string, nodes ...*Node) *Node {
-	return &Node{Kind: KindAtRule, Name: name, Params: parameters, Nodes: nodes}
+	return &Node{Kind: KindAtRule, Name: name, Parameters: parameters, Nodes: nodes}
 }
 
 // Declaration builds a KindDeclaration node with a value present.

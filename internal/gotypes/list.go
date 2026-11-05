@@ -30,7 +30,7 @@ import (
 type listedPackage struct {
 	ImportPath string
 	Name       string
-	Dir        string
+	Directory  string `json:"Dir"`
 	Standard   bool
 	DepOnly    bool
 	GoFiles    []string
@@ -53,7 +53,7 @@ type listedPackage struct {
 type listedModule struct {
 	Path      string
 	Version   string
-	Dir       string
+	Directory string `json:"Dir"`
 	GoMod     string
 	GoVersion string
 	Replace   *listedModule

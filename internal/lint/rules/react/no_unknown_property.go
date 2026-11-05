@@ -929,7 +929,7 @@ func noUnknownPropertyUnknownPropWithStandardName(name string, standardName stri
 	}
 }
 
-func noUnknownPropertyUnknownProp(name string) rule.Message {
+func noUnknownPropertyUnknownProperty(name string) rule.Message {
 	return rule.Message{
 		Id:          "unknownProp",
 		Description: fmt.Sprintf("Unknown property '%s' found", name),
@@ -1290,7 +1290,7 @@ var NoUnknownProperty = rule.Rule[NoUnknownPropertyOptions]{
 					return
 				}
 
-				ruleContext.ReportNode(node, noUnknownPropertyUnknownProp(actualName))
+				ruleContext.ReportNode(node, noUnknownPropertyUnknownProperty(actualName))
 			},
 		}
 	},

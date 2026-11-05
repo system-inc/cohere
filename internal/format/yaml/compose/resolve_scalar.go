@@ -449,7 +449,7 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 }
 
 func parseBlockScalarHeader(scalar *cst.Token, strict bool, onError onErrorFunc) *blockScalarHeader {
-	offset, properties := scalar.Offset, scalar.Props
+	offset, properties := scalar.Offset, scalar.Properties
 	/* istanbul ignore if should not happen */
 	if properties[0].Type != "block-scalar-header" {
 		onError(properties[0], "IMPOSSIBLE", "Block scalar header not found", false)

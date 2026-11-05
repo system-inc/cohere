@@ -28,7 +28,7 @@ func TestRuleReferencesNameEveryRuleEveryDirectiveWrote(test *testing.T) {
 
 	got := []string{}
 	for _, reference := range Build(source).RuleReferences() {
-		got = append(got, reference.Name+"="+source[reference.Pos:reference.End])
+		got = append(got, reference.Name+"="+source[reference.Position:reference.End])
 	}
 	want := []string{
 		"no-unused-var=" + lines[0],

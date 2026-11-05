@@ -370,8 +370,8 @@ func checkVariantOrderIndices(
 	}
 
 	order := registry.BuildVariantOrder(variants)
-	if order.Len() != fixture.Size {
-		test.Errorf("%s: the port ordered %d variants and the engine ordered %d", name, order.Len(), fixture.Size)
+	if order.Length() != fixture.Size {
+		test.Errorf("%s: the port ordered %d variants and the engine ordered %d", name, order.Length(), fixture.Size)
 	}
 
 	compared := 0
@@ -1179,8 +1179,8 @@ func TestBitmaskExceedsSixtyFourBits(test *testing.T) {
 	}
 
 	order := registry.BuildVariantOrder(variants)
-	if order.Len() != 100 {
-		test.Fatalf("expected 100 distinct variants, got %d", order.Len())
+	if order.Length() != 100 {
+		test.Fatalf("expected 100 distinct variants, got %d", order.Length())
 	}
 
 	highest := variants[len(variants)-1]

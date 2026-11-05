@@ -212,11 +212,11 @@ func productKey(
 					path,
 				)
 			}
-			modulePath, version, directory := module.Path, module.Version, module.Dir
+			modulePath, version, directory := module.Path, module.Version, module.Directory
 			if module.Replace != nil {
 				modulePath, version = module.Replace.Path, module.Replace.Version
-				if module.Replace.Dir != "" {
-					directory = module.Replace.Dir
+				if module.Replace.Directory != "" {
+					directory = module.Replace.Directory
 				}
 			}
 			if version != "" {
@@ -236,7 +236,7 @@ func productKey(
 				}
 				field(packageHash, "go.mod", sum)
 				for _, name := range append(append([]string{}, listedPackage.GoFiles...), listedPackage.CgoFiles...) {
-					file := filepath.Join(listedPackage.Dir, name)
+					file := filepath.Join(listedPackage.Directory, name)
 					within, relativeError := relative(file)
 					if relativeError != nil {
 						return "", "", fmt.Errorf("%s: %w", path, relativeError)

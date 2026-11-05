@@ -100,7 +100,7 @@ func handleRemainingComment(context *commentContext) bool {
 		handleOnlyComments,
 		handleAssignmentLikeComments,
 		handleTsMappedTypeComments,
-		handleCommentAfterArrowParams,
+		handleCommentAfterArrowParameters,
 		handleFunctionNameComments,
 		handleTsFunctionTrailingComments,
 		handleParenthesizedExpressionTrailingComment,
@@ -326,8 +326,8 @@ func handleFunctionNameComments(context *commentContext) bool {
 	return false
 }
 
-// handleCommentAfterArrowParams is upstream's handleCommentAfterArrowParams.
-func handleCommentAfterArrowParams(context *commentContext) bool {
+// handleCommentAfterArrowParameters is upstream's handleCommentAfterArrowParameters.
+func handleCommentAfterArrowParameters(context *commentContext) bool {
 	comment, enclosingNode, text := context.Comment, context.Enclosing, context.Text
 	if !enclosingNode.Is("ArrowFunctionExpression") {
 		return false

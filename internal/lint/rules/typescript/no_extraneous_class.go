@@ -391,7 +391,7 @@ func noExtraneousClassIsConstructorSlot(ruleContext rule.Context, reference *ast
 	if contextual == nil || contextual == ruleContext.TypeChecker.GetTypeAtLocation(reference) {
 		return false
 	}
-	for part := range type_checking.UnionTypePartsSeq(contextual) {
+	for part := range type_checking.UnionTypePartsSequence(contextual) {
 		if len(type_checking.GetConstructSignatures(ruleContext.TypeChecker, part)) > 0 {
 			return true
 		}

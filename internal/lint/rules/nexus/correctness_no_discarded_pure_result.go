@@ -185,7 +185,7 @@ func correctnessNoDiscardedPureResultIsCallable(ruleContext rule.Context, argume
 	if argumentType == nil {
 		return true
 	}
-	for part := range type_checking.UnionTypePartsSeq(argumentType) {
+	for part := range type_checking.UnionTypePartsSequence(argumentType) {
 		if type_checking.IsTypeFlagSet(part, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
 			return true
 		}

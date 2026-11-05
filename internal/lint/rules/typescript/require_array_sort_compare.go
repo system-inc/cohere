@@ -177,7 +177,7 @@ var RequireArraySortCompare = rule.Rule[RequireArraySortCompareOptions]{
 		// isArrayOrUnionOfArrays answers upstream's `isTypeArrayTypeOrUnionOfArrayTypes`: every
 		// constituent of a union must be an array, and a non-union is its own single constituent.
 		isArrayOrUnionOfArrays := func(receiverType *checker.Type) bool {
-			for constituent := range type_checking.UnionTypePartsSeq(receiverType) {
+			for constituent := range type_checking.UnionTypePartsSequence(receiverType) {
 				if !checker.Checker_isArrayType(ruleContext.TypeChecker, constituent) {
 					return false
 				}

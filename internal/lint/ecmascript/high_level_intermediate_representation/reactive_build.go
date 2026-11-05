@@ -322,10 +322,10 @@ func BuildReactiveFunctionWithFlattenedScopes(function *Function,
 	measureBlock(body, 1, &result)
 
 	return &ReactiveFunction{
-		Name:   function.Name,
-		Kind:   function.Kind,
-		Params: function.Params,
-		Body:   body,
+		Name:       function.Name,
+		Kind:       function.Kind,
+		Parameters: function.Parameters,
+		Body:       body,
 	}, result
 }
 

@@ -355,8 +355,8 @@ func (dependencies *ScopeDependencies) Ids() []ScopeId {
 	return dependencies.order
 }
 
-// Len reports how many scopes carry an entry, for measurement.
-func (dependencies *ScopeDependencies) Len() int {
+// Length reports how many scopes carry an entry, for measurement.
+func (dependencies *ScopeDependencies) Length() int {
 	if dependencies == nil {
 		return 0
 	}
@@ -1127,7 +1127,7 @@ func CollectScopeDependencies(function *Function, identity ScopeIdentity) *Scope
 	// Parameters are declared before any instruction runs, so they are available to every scope.
 	// Upstream declares them with `id: UNSET`, which is zero here and compares below every scope
 	// start -- which is the intent: a parameter is always declared before the scope.
-	for _, parameter := range function.Params {
+	for _, parameter := range function.Parameters {
 		collector.declare(parameter.Identifier, declaration{})
 	}
 
@@ -1194,7 +1194,7 @@ func CollectScopeDependenciesWithHoistable(function *Function, scopes *ReactiveS
 		processedOptionalInstructions: optionalProcessedInstructions(optional),
 		processedOptionalTests:        optionalProcessedTests(optional),
 	}
-	for _, parameter := range function.Params {
+	for _, parameter := range function.Parameters {
 		collector.declare(parameter.Identifier, declaration{})
 	}
 	collector.walk(function, terminals)

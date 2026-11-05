@@ -582,12 +582,12 @@ func TestDesignSystemReportsSkippedDirectivesFromAnywhereInTheGraph(test *testin
 
 	var names []string
 	for _, skipped := range system.SkippedDirectives {
-		names = append(names, skipped.Name+" "+skipped.Params)
+		names = append(names, skipped.Name+" "+skipped.Parameters)
 		if filepath.Base(skipped.Path) != "settings.css" {
 			test.Errorf(
 				"%s %s was reported in %s, and it is written in settings.css",
 				skipped.Name,
-				skipped.Params,
+				skipped.Parameters,
 				skipped.Path,
 			)
 		}

@@ -285,7 +285,7 @@ var mergeTag = &Tag{
 // Ported from pairs.js: resolvePairs. createPairs serves createNode.
 
 func resolvePairs(seq *Node, onError func(message string)) *Node {
-	if IsSeq(seq) {
+	if IsSequence(seq) {
 		for index := 0; index < len(seq.Items); index++ {
 			item := seq.Items[index]
 			if IsPair(item) {

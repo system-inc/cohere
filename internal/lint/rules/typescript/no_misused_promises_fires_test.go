@@ -251,8 +251,8 @@ f = async () => {
   return 3;
 };
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{Variables: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{Variables: type_checking.Reference(true)},
 			)}),
 			wantIds: []string{"voidReturnVariable"},
 		},
@@ -301,8 +301,8 @@ const obj: O = {
   f: async () => 'foo',
 };
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{Properties: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{Properties: type_checking.Reference(true)},
 			)}),
 			wantIds: []string{"voidReturnProperty"},
 		},
@@ -367,8 +367,8 @@ function f(): () => void {
   return async () => 0;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{Returns: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{Returns: type_checking.Reference(true)},
 			)}),
 			wantIds: []string{"voidReturnReturnValue"},
 		},
@@ -1078,7 +1078,7 @@ array.every(() => Promise.resolve(true));
 const tuple: [number, number, number] = [1, 2, 3];
 tuple.find(() => Promise.resolve(false));
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(true)}),
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Reference(true)}),
 			wantIds: []string{"predicate"},
 		},
 		{

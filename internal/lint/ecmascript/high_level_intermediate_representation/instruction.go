@@ -170,7 +170,7 @@ type ComputedDelete struct {
 // CallExpression calls a value.
 type CallExpression struct {
 	Callee       Place
-	Args         []Argument
+	Arguments    []Argument
 	Optional     bool
 	CalleeOrigin ModuleExportOrigin
 }
@@ -183,7 +183,7 @@ type CallExpression struct {
 type MethodCall struct {
 	Receiver     Place
 	Property     Place
-	Args         []Argument
+	Arguments    []Argument
 	Optional     bool
 	CalleeOrigin ModuleExportOrigin
 }
@@ -195,8 +195,8 @@ type ModuleExportOrigin struct {
 
 // NewExpression constructs a value.
 type NewExpression struct {
-	Callee Place
-	Args   []Argument
+	Callee    Place
+	Arguments []Argument
 }
 
 // Argument is one argument to a call: a value, or a spread of one.
@@ -349,9 +349,9 @@ type NextPropertyOf struct{ Value Place }
 type JsxExpression struct {
 	// Tag is the element name. For a lowercase host element this is the literal string; for a
 	// component it is a Place naming the component value.
-	Tag      JsxTag
-	Props    []JsxAttribute
-	Children []Place
+	Tag        JsxTag
+	Properties []JsxAttribute
+	Children   []Place
 }
 
 // JsxTag is either a host element name or a component value.

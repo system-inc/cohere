@@ -549,11 +549,11 @@ func isValueDiscarded(call *ast.Node) bool {
 // driver: measured, `function use()` is clean under this rule. So the bare form is excluded here,
 // and the exclusion is written as an extra decline rather than by changing the shared predicate,
 // which several rules depend on.
-func isVoidUseMemoCompiledFunction(fn *ast.Node) bool {
-	if !isReactCompiledFunction(fn) {
+func isVoidUseMemoCompiledFunction(function *ast.Node) bool {
+	if !isReactCompiledFunction(function) {
 		return false
 	}
-	name, named := reactFunctionNameOf(fn)
+	name, named := reactFunctionNameOf(function)
 	if named && name == "use" {
 		return false
 	}

@@ -77,10 +77,10 @@ type Directive struct {
 	StartLine int
 	EndLine   int
 
-	// Pos and End are the comment's own byte range, so an unused directive can be reported where it
+	// Position and End are the comment's own byte range, so an unused directive can be reported where it
 	// actually sits rather than at the finding it failed to silence.
-	Pos int
-	End int
+	Position int
+	End      int
 
 	// applied counts the findings this directive actually withheld.
 	applied int
@@ -148,9 +148,9 @@ func matchesRuleName(named string, ruleName string) bool {
 // Enables are included because ESLint checks them too: `/* eslint-enable no-such-rule */` reports
 // the unknown name exactly as a disable does, measured on 10.8.1.
 type RuleReference struct {
-	Name string
-	Pos  int
-	End  int
+	Name     string
+	Position int
+	End      int
 }
 
 // Index is every directive in one file, ready to answer whether a finding is suppressed.
@@ -167,23 +167,26 @@ func Build(sourceText string) *Index {
 	references := []RuleReference{}
 
 	for _, comment := range scanComments(sourceText) {
-		commentText := sourceText[comment.pos:comment.end]
+		commentText := sourceText[comment.position:comment.end]
 		parsed := parseDirective(commentText)
 		if parsed == nil {
 			if names, isEnable := directives.ParseEnable(commentText); isEnable {
 				for _, name := range names {
-					references = append(references, RuleReference{Name: name, Pos: comment.pos, End: comment.end})
+					references = append(
+						references,
+						RuleReference{Name: name, Position: comment.position, End: comment.end},
+					)
 				}
 			}
 			continue
 		}
 		for _, name := range parsed.Rules {
-			references = append(references, RuleReference{Name: name, Pos: comment.pos, End: comment.end})
+			references = append(references, RuleReference{Name: name, Position: comment.position, End: comment.end})
 		}
 
-		parsed.Pos = comment.pos
+		parsed.Position = comment.position
 		parsed.End = comment.end
-		parsed.Line = lineOf(comment.pos)
+		parsed.Line = lineOf(comment.position)
 
 		switch parsed.Kind {
 		case KindNextLine:

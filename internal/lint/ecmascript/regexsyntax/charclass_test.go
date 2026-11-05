@@ -305,7 +305,7 @@ func TestParseRegexCharacterClassRange(test *testing.T) {
 		test.Fatalf("len=%d, want 1", len(els))
 	}
 	element := els[0]
-	if element.Kind != RegexCharRange || element.Value != 'a' || element.Max != 'z' {
+	if element.Kind != RegexCharRange || element.Value != 'a' || element.Maximum != 'z' {
 		test.Errorf("range = %+v", element)
 	}
 	if element.Start != 1 || element.End != 4 {
@@ -320,7 +320,7 @@ func TestParseRegexCharacterClassRangeWithEscape(test *testing.T) {
 	if len(els) != 1 {
 		test.Fatalf("len=%d, want 1", len(els))
 	}
-	if els[0].Kind != RegexCharRange || els[0].Value != 0x41 || els[0].Max != 0x5A {
+	if els[0].Kind != RegexCharRange || els[0].Value != 0x41 || els[0].Maximum != 0x5A {
 		test.Errorf("got %+v", els[0])
 	}
 }
@@ -619,7 +619,7 @@ func TestParseRegexCharacterClassRangeWithDashChain(test *testing.T) {
 	if len(els) != 3 {
 		test.Fatalf("len=%d (got %+v)", len(els), els)
 	}
-	if els[0].Kind != RegexCharRange || els[0].Value != 'a' || els[0].Max != 'b' {
+	if els[0].Kind != RegexCharRange || els[0].Value != 'a' || els[0].Maximum != 'b' {
 		test.Errorf("[0] = %+v", els[0])
 	}
 	if els[1].Kind != RegexCharSingle || els[1].Value != '-' {

@@ -57,8 +57,8 @@ func (usage *LastUsage) LastUsedAt(
 	return order, found
 }
 
-// Len reports how many declarations were seen, for measurement.
-func (usage *LastUsage) Len() int {
+// Length reports how many declarations were seen, for measurement.
+func (usage *LastUsage) Length() int {
 	if usage == nil {
 		return 0
 	}

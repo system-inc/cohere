@@ -135,11 +135,11 @@ func copyTag(tag *Tag) *Tag {
 
 // The tag names composing compares against.
 const (
-	mapTagName  = "tag:yaml.org,2002:map"
-	seqTagName  = "tag:yaml.org,2002:seq"
-	strTagName  = "tag:yaml.org,2002:str"
-	omapTagName = "tag:yaml.org,2002:omap"
-	setTagName  = "tag:yaml.org,2002:set"
+	mapTagName    = "tag:yaml.org,2002:map"
+	seqTagName    = "tag:yaml.org,2002:seq"
+	stringTagName = "tag:yaml.org,2002:str"
+	omapTagName   = "tag:yaml.org,2002:omap"
+	setTagName    = "tag:yaml.org,2002:set"
 )
 
 // Ported from dist/schema/common/: map.js, seq.js, string.js, null.js.
@@ -163,7 +163,7 @@ var seqTag = &Tag{
 	NodeClass:  "YAMLSeq",
 	Tag:        seqTagName,
 	resolveCollection: func(collection *Node, onError func(message string)) *Node {
-		if !IsSeq(collection) {
+		if !IsSequence(collection) {
 			onError("Expected a sequence for this tag")
 		}
 		return collection
@@ -172,7 +172,7 @@ var seqTag = &Tag{
 
 var stringTag = &Tag{
 	Default: defaultTrue,
-	Tag:     strTagName,
+	Tag:     stringTagName,
 	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
 		return unitsToString(value), nil
 	},

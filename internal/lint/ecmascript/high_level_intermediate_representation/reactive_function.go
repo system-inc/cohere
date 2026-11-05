@@ -86,8 +86,8 @@ type ReactiveFunction struct {
 	Name string
 	// Kind records the component/hook guess, carried from the source function.
 	Kind FunctionKind
-	// Params are the parameter values, in order.
-	Params []Place
+	// Parameters are the parameter values, in order.
+	Parameters []Place
 	// Body is the tree.
 	Body ReactiveBlock
 }

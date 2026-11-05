@@ -305,7 +305,7 @@ func correctnessRequireChildProcessErrorListenerNamesError(ruleContext rule.Cont
 	if eventType == nil {
 		return true
 	}
-	for part := range type_checking.UnionTypePartsSeq(eventType) {
+	for part := range type_checking.UnionTypePartsSequence(eventType) {
 		if !type_checking.IsTypeFlagSet(part, checker.TypeFlagsStringLiteral) {
 			return true
 		}

@@ -59,8 +59,8 @@ type token struct {
 
 	// Tokens exist as nodes in a double-linked-list amongst all tokens including ignored tokens.
 	// `<SOF>` is always the first node and `<EOF>` the last.
-	prev *token
-	next *token
+	previous *token
+	next     *token
 }
 
 func newToken(kind tokenKind, start int, end int, line int, column int, value ...string) *token {

@@ -188,7 +188,7 @@ func preferRegexpExecArgumentKind(
 	argumentType *checker.Type,
 ) preferRegexpExecArgumentClass {
 	sawString, sawRegExp := false, false
-	for constituent := range type_checking.UnionTypePartsSeq(argumentType) {
+	for constituent := range type_checking.UnionTypePartsSequence(argumentType) {
 		switch type_checking.GetTypeName(ruleContext.TypeChecker, constituent) {
 		case "string":
 			sawString = true

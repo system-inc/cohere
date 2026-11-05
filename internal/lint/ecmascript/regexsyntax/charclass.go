@@ -70,7 +70,7 @@ type RegexCharElement struct {
 	IsUBrace        bool
 	IsLoneSurrogate bool
 
-	Max         uint32
+	Maximum     uint32
 	MaxIsUBrace bool
 
 	Start int
@@ -292,7 +292,7 @@ func ParseRegexCharacterClass(pattern string, start int, flags RegexFlags) ([]Re
 	return parseRegexCharacterClass(pattern, start, flags, 0)
 }
 
-const maxRegexCharacterClassPreallocation = 16 << 10
+const maximumRegexCharacterClassPreallocation = 16 << 10
 
 // ParseRegexCharacterClassWithEnd is ParseRegexCharacterClass with a
 // previously discovered class end. Non-v callers use the known byte span as
@@ -310,8 +310,8 @@ func ParseRegexCharacterClassWithEnd(pattern string, start, end int, flags Regex
 		elementCapacity = end - start - 2
 		if elementCapacity < 0 {
 			elementCapacity = 0
-		} else if elementCapacity > maxRegexCharacterClassPreallocation {
-			elementCapacity = maxRegexCharacterClassPreallocation
+		} else if elementCapacity > maximumRegexCharacterClassPreallocation {
+			elementCapacity = maximumRegexCharacterClassPreallocation
 		}
 	}
 	elements, parsedEnd, ok := parseRegexCharacterClass(pattern, start, flags, elementCapacity)
@@ -402,7 +402,7 @@ func parseRegexCharacterClass(
 					return nil, start, false
 				}
 			} else {
-				nextEl, step, ok = readRawClassChar(pattern, index, flags)
+				nextEl, step, ok = readRawClassCharacter(pattern, index, flags)
 				if !ok {
 					return nil, start, false
 				}
@@ -418,7 +418,7 @@ func parseRegexCharacterClass(
 				Kind:        RegexCharRange,
 				Value:       minimumEl.Value,
 				IsUBrace:    minimumEl.IsUBrace,
-				Max:         nextEl.Value,
+				Maximum:     nextEl.Value,
 				MaxIsUBrace: nextEl.IsUBrace,
 				Start:       minimumEl.Start,
 				End:         nextEl.End,
@@ -432,7 +432,7 @@ func parseRegexCharacterClass(
 			pendingIndex = -1
 
 		default:
-			el, step, ok := readRawClassChar(pattern, index, flags)
+			el, step, ok := readRawClassCharacter(pattern, index, flags)
 			if !ok {
 				return nil, start, false
 			}
@@ -599,7 +599,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 	}, 1 + size, true
 }
 
-// readRawClassChar reads a non-`\`-prefixed character inside a class body
+// readRawClassCharacter reads a non-`\`-prefixed character inside a class body
 // (i.e. a raw character at pattern[index]). Raw astral in non-u/v mode emits
 // the high surrogate only: callers handle the low-surrogate companion by
 // inspecting IsLoneSurrogate and stepping via a subsequent call.
@@ -609,7 +609,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 // misleading-character-class rule accepts this because it gets raw astrals
 // only in string-literal contexts, where the layer-3 parser already does the
 // UTF-16 surrogate split.
-func readRawClassChar(pattern string, index int, flags RegexFlags) (RegexCharElement, int, bool) {
+func readRawClassCharacter(pattern string, index int, flags RegexFlags) (RegexCharElement, int, bool) {
 	character, size := utf8.DecodeRuneInString(pattern[index:])
 	if size == 0 {
 		return RegexCharElement{}, 0, false

@@ -386,7 +386,7 @@ func tokenizeResource(self *Self, effects *Effects, ok State, nok State) State {
 			TypeResourceDestinationLiteralMarker,
 			TypeResourceDestinationRaw,
 			TypeResourceDestinationString,
-			linkResourceDestinationBalanceMax,
+			linkResourceDestinationBalanceMaximum,
 		)(code)
 	}
 

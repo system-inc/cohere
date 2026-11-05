@@ -633,12 +633,12 @@ func TestNoUnderscoreDangleDecoderAcceptsTheShapesTheConfigLayerDelivers(test *t
 				}
 				// The three that default true arrive as nil and are resolved by the accessor, which
 				// is the distinction a plain bool cannot carry.
-				if options.AllowFunctionParams != nil || options.AllowInArrayDestructuring != nil ||
+				if options.AllowFunctionParameters != nil || options.AllowInArrayDestructuring != nil ||
 					options.AllowInObjectDestructuring != nil {
 					test.Error("an absent tri-state option must stay nil, so `explicitly false` and " +
 						"`absent, use upstream's true` remain distinguishable")
 				}
-				if !noUnderscoreDangleFlag(options.AllowFunctionParams, true) ||
+				if !noUnderscoreDangleFlag(options.AllowFunctionParameters, true) ||
 					!noUnderscoreDangleFlag(options.AllowInArrayDestructuring, true) ||
 					!noUnderscoreDangleFlag(options.AllowInObjectDestructuring, true) {
 					test.Error("these three default TRUE upstream, so parameters and destructured " +
@@ -666,7 +666,7 @@ func TestNoUnderscoreDangleDecoderAcceptsTheShapesTheConfigLayerDelivers(test *t
 				if !options.AllowAfterSuper || !options.AllowAfterThisConstructor || !options.EnforceInClassFields {
 					test.Errorf("a boolean key was dropped: %#v", options)
 				}
-				if !noUnderscoreDangleFlag(options.AllowFunctionParams, false) ||
+				if !noUnderscoreDangleFlag(options.AllowFunctionParameters, false) ||
 					!noUnderscoreDangleFlag(options.AllowInArrayDestructuring, false) ||
 					!noUnderscoreDangleFlag(options.AllowInObjectDestructuring, false) {
 					test.Errorf("a tri-state key was dropped: %#v", options)

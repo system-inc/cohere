@@ -107,7 +107,7 @@ func TestNoFloatingPromisesStaysSilent(test *testing.T) {
 		{
 			"upstream valid case 1",
 			"\nasync function test() {\n  void Promise.resolve('value');\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(true)}),
 		},
 		{
 			"upstream valid case 2",
@@ -212,32 +212,32 @@ func TestNoFloatingPromisesStaysSilent(test *testing.T) {
 		{
 			"upstream valid case 22",
 			"\n        (async () => {\n          await something();\n        })();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Reference(true)}),
 		},
 		{
 			"upstream valid case 23",
 			"\n        (async () => {\n          something();\n        })();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Reference(true)}),
 		},
 		{
 			"upstream valid case 24",
 			"(async function foo() {})();",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Reference(true)}),
 		},
 		{
 			"upstream valid case 25",
 			"\n        function foo() {\n          (async function bar() {})();\n        }\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Reference(true)}),
 		},
 		{
 			"upstream valid case 26",
 			"\n        const foo = () =>\n          new Promise(res => {\n            (async function () {\n              await res(1);\n            })();\n          });\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Reference(true)}),
 		},
 		{
 			"upstream valid case 27",
 			"\n        (async function () {\n          await res(1);\n        })();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Reference(true)}),
 		},
 		{
 			"upstream valid case 28",
@@ -247,7 +247,7 @@ func TestNoFloatingPromisesStaysSilent(test *testing.T) {
 		{
 			"upstream valid case 29",
 			"\nasync function foo() {\n  const myPromise = async () => void 0;\n  const condition = true;\n  await (condition && myPromise());\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 		},
 		{
 			"upstream valid case 30",
@@ -257,17 +257,17 @@ func TestNoFloatingPromisesStaysSilent(test *testing.T) {
 		{
 			"upstream valid case 31",
 			"\nasync function foo() {\n  const myPromise = async () => void 0;\n  const condition = true;\n  condition && (await myPromise());\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 		},
 		{
 			"upstream valid case 32",
 			"\nasync function foo() {\n  const myPromise = async () => void 0;\n  let condition = false;\n  condition && myPromise();\n  condition = true;\n  condition || myPromise();\n  condition ?? myPromise();\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 		},
 		{
 			"upstream valid case 33",
 			"\ndeclare const definitelyCallable: () => void;\nPromise.reject().catch(definitelyCallable);\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 		},
 		{
 			"upstream valid case 34",
@@ -277,7 +277,7 @@ func TestNoFloatingPromisesStaysSilent(test *testing.T) {
 		{
 			"upstream valid case 35",
 			"\nPromise.reject()\n  .catch(() => {})\n  .finally(() => {})\n  .finally(() => {});\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 		},
 		{
 			"upstream valid case 36",
@@ -297,7 +297,7 @@ func TestNoFloatingPromisesStaysSilent(test *testing.T) {
 		{
 			"upstream valid case 39",
 			"\n[1, 2, void Promise.reject(), 3];\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 		},
 		{
 			"upstream valid case 40",
@@ -503,7 +503,7 @@ func TestNoFloatingPromisesStaysSilent(test *testing.T) {
 				AllowForKnownSafePromises: []type_checking.TypeOrValueSpecifier{
 					{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"SafePromise"}},
 				},
-				CheckThenables: type_checking.Ref(true),
+				CheckThenables: type_checking.Reference(true),
 			}),
 		},
 		{
@@ -577,7 +577,7 @@ func TestNoFloatingPromisesFires(test *testing.T) {
 		{
 			"upstream invalid case 5",
 			"\nasync function test() {\n  Promise.resolve('value');\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(true)}),
 			[]string{"floatingVoid"},
 		},
 		{
@@ -613,37 +613,37 @@ func TestNoFloatingPromisesFires(test *testing.T) {
 		{
 			"upstream invalid case 11",
 			"\nasync function test() {\n  void Promise.resolve();\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floating"},
 		},
 		{
 			"upstream invalid case 12",
 			"\nasync function test() {\n  const promise = new Promise((resolve, reject) => resolve('value'));\n  promise;\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floating"},
 		},
 		{
 			"upstream invalid case 13",
 			"\nasync function returnsPromise() {\n  return 'value';\n}\nvoid returnsPromise();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floating"},
 		},
 		{
 			"upstream invalid case 14",
 			"\nasync function returnsPromise() {\n  return 'value';\n}\nvoid /* ... */ returnsPromise();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floating"},
 		},
 		{
 			"upstream invalid case 15",
 			"\nasync function returnsPromise() {\n  return 'value';\n}\n1, returnsPromise();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floating"},
 		},
 		{
 			"upstream invalid case 16",
 			"\nasync function returnsPromise() {\n  return 'value';\n}\nbool ? returnsPromise() : null;\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floating"},
 		},
 		{
@@ -685,7 +685,7 @@ func TestNoFloatingPromisesFires(test *testing.T) {
 		{
 			"upstream invalid case 23",
 			"\nasync function test() {\n  class CatchableThenable {\n    then(callback: () => void, callback: () => void): CatchableThenable {\n      return new CatchableThenable();\n    }\n  }\n  const thenable = new CatchableThenable();\n\n  thenable;\n  thenable.then(() => {});\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Reference(true)}),
 			[]string{"floatingVoid", "floatingVoid"},
 		},
 		{
@@ -733,13 +733,13 @@ func TestNoFloatingPromisesFires(test *testing.T) {
 		{
 			"upstream invalid case 31",
 			"\n        (async function () {\n          Promise.resolve();\n        })();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Reference(true)}),
 			[]string{"floatingVoid"},
 		},
 		{
 			"upstream invalid case 32",
 			"\ndeclare const promiseIntersection: Promise<number> & number;\n(async function () {\n  promiseIntersection;\n  promiseIntersection.then(() => {});\n  promiseIntersection.catch();\n  promiseIntersection.finally();\n})();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Reference(true)}),
 			[]string{"floatingVoid", "floatingVoid", "floatingVoid", "floatingVoid"},
 		},
 		{
@@ -751,7 +751,7 @@ func TestNoFloatingPromisesFires(test *testing.T) {
 		{
 			"upstream invalid case 34",
 			"\nasync function foo() {\n  const myPromise = async () => void 0;\n  const condition = true;\n\n  (await condition) && myPromise();\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floating"},
 		},
 		{
@@ -775,19 +775,19 @@ func TestNoFloatingPromisesFires(test *testing.T) {
 		{
 			"upstream invalid case 38",
 			"\nasync function foo() {\n  const myPromise = Promise.resolve(true);\n  let condition = true;\n  condition && myPromise;\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floating"},
 		},
 		{
 			"upstream invalid case 39",
 			"\nasync function foo() {\n  const myPromise = Promise.resolve(true);\n  let condition = false;\n  condition || myPromise;\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floating"},
 		},
 		{
 			"upstream invalid case 40",
 			"\nasync function foo() {\n  const myPromise = Promise.resolve(true);\n  let condition = null;\n  condition ?? myPromise;\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floating"},
 		},
 		{
@@ -820,19 +820,19 @@ func TestNoFloatingPromisesFires(test *testing.T) {
 		{
 			"upstream invalid case 44",
 			"\nvoid Promise.resolve().then(() => {}, undefined);\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floatingUselessRejectionHandler"},
 		},
 		{
 			"upstream invalid case 45",
 			"\ndeclare const maybeCallable: string | (() => void);\nPromise.resolve().then(() => {}, maybeCallable);\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floatingUselessRejectionHandler"},
 		},
 		{
 			"upstream invalid case 46",
 			"\ndeclare const maybeCallable: string | (() => void);\ndeclare const definitelyCallable: () => void;\nPromise.resolve().then(() => {}, undefined);\nPromise.resolve().then(() => {}, null);\nPromise.resolve().then(() => {}, 3);\nPromise.resolve().then(() => {}, maybeCallable);\nPromise.resolve().then(() => {}, definitelyCallable);\n\nPromise.resolve().catch(undefined);\nPromise.resolve().catch(null);\nPromise.resolve().catch(3);\nPromise.resolve().catch(maybeCallable);\nPromise.resolve().catch(definitelyCallable);\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{
 				"floatingUselessRejectionHandler",
 				"floatingUselessRejectionHandler",
@@ -847,7 +847,7 @@ func TestNoFloatingPromisesFires(test *testing.T) {
 		{
 			"upstream invalid case 47",
 			"\nPromise.reject() || 3;\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floating"},
 		},
 		{
@@ -859,7 +859,7 @@ func TestNoFloatingPromisesFires(test *testing.T) {
 		{
 			"upstream invalid case 49",
 			"\nPromise.reject()\n  .finally(() => {})\n  .finally(() => {});\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floating"},
 		},
 		{
@@ -925,13 +925,13 @@ func TestNoFloatingPromisesFires(test *testing.T) {
 		{
 			"upstream invalid case 60",
 			"\ndeclare const promiseArray: Array<Promise<unknown>>;\nvoid promiseArray;\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floatingPromiseArray"},
 		},
 		{
 			"upstream invalid case 61",
 			"\ndeclare const promiseArray: Array<Promise<unknown>>;\nasync function f() {\n  await promiseArray;\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[]string{"floatingPromiseArray"},
 		},
 		{
@@ -1011,7 +1011,7 @@ func TestNoFloatingPromisesFires(test *testing.T) {
 			"\ninterface UnsafeThenable<T> {\n  then<TResult1 = T, TResult2 = never>(\n    onfulfilled?:\n      | ((value: T) => TResult1 | UnsafeThenable<TResult1>)\n      | undefined\n      | null,\n    onrejected?:\n      | ((reason: any) => TResult2 | UnsafeThenable<TResult2>)\n      | undefined\n      | null,\n  ): UnsafeThenable<TResult1 | TResult2>;\n}\nlet promise: UnsafeThenable<number> = Promise.resolve(5);\npromise;\n      ",
 			rule.Configured(NoFloatingPromisesOptions{AllowForKnownSafePromises: []type_checking.TypeOrValueSpecifier{
 				{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"SafeThenable"}},
-			}, CheckThenables: type_checking.Ref(true)}),
+			}, CheckThenables: type_checking.Reference(true)}),
 			[]string{"floatingVoid"},
 		},
 		{
@@ -1117,13 +1117,13 @@ func TestNoFloatingPromisesFires(test *testing.T) {
 		{
 			"upstream invalid case 86",
 			"\ndeclare const createPromise: () => PromiseLike<number>;\ncreatePromise();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Reference(true)}),
 			[]string{"floatingVoid"},
 		},
 		{
 			"upstream invalid case 87",
 			"\ninterface MyThenable {\n  then(onFulfilled: () => void, onRejected: () => void): MyThenable;\n}\n\ndeclare function createMyThenable(): MyThenable;\n\ncreateMyThenable();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Reference(true)}),
 			[]string{"floatingVoid"},
 		},
 		{
@@ -1141,7 +1141,7 @@ func TestNoFloatingPromisesFires(test *testing.T) {
 		{
 			"upstream invalid case 90",
 			"\nclass MyPromise<T> extends Promise<T> {\n  additional: string;\n}\ndeclare const createMyPromise: () => MyPromise<number>;\ncreateMyPromise();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Reference(true)}),
 			[]string{"floatingVoid"},
 		},
 		{
@@ -1345,7 +1345,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 5",
 			"\nasync function test() {\n  Promise.resolve('value');\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(true)}),
 			[][]noFloatingPromisesSuggestion{{
 				{"floatingFixVoid", "\nasync function test() {\n  void Promise.resolve('value');\n}\n      "},
 				{"floatingFixAwait", "\nasync function test() {\n  await Promise.resolve('value');\n}\n      "},
@@ -1501,7 +1501,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 11",
 			"\nasync function test() {\n  void Promise.resolve();\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[][]noFloatingPromisesSuggestion{
 				{{"floatingFixAwait", "\nasync function test() {\n  await Promise.resolve();\n}\n      "}},
 			},
@@ -1509,7 +1509,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 12",
 			"\nasync function test() {\n  const promise = new Promise((resolve, reject) => resolve('value'));\n  promise;\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[][]noFloatingPromisesSuggestion{{{
 				"floatingFixAwait",
 				"\nasync function test() {\n  const promise = new Promise((resolve, reject) => resolve('value'));\n  await promise;\n}\n      ",
@@ -1518,7 +1518,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 13",
 			"\nasync function returnsPromise() {\n  return 'value';\n}\nvoid returnsPromise();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[][]noFloatingPromisesSuggestion{{{
 				"floatingFixAwait",
 				"\nasync function returnsPromise() {\n  return 'value';\n}\nawait returnsPromise();\n      ",
@@ -1527,7 +1527,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 14",
 			"\nasync function returnsPromise() {\n  return 'value';\n}\nvoid /* ... */ returnsPromise();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[][]noFloatingPromisesSuggestion{{{
 				"floatingFixAwait",
 				"\nasync function returnsPromise() {\n  return 'value';\n}\nawait /* ... */ returnsPromise();\n      ",
@@ -1536,7 +1536,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 15",
 			"\nasync function returnsPromise() {\n  return 'value';\n}\n1, returnsPromise();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[][]noFloatingPromisesSuggestion{{{
 				"floatingFixAwait",
 				"\nasync function returnsPromise() {\n  return 'value';\n}\nawait (1, returnsPromise());\n      ",
@@ -1545,7 +1545,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 16",
 			"\nasync function returnsPromise() {\n  return 'value';\n}\nbool ? returnsPromise() : null;\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[][]noFloatingPromisesSuggestion{{{
 				"floatingFixAwait",
 				"\nasync function returnsPromise() {\n  return 'value';\n}\nawait (bool ? returnsPromise() : null);\n      ",
@@ -1694,7 +1694,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 23",
 			"\nasync function test() {\n  class CatchableThenable {\n    then(callback: () => void, callback: () => void): CatchableThenable {\n      return new CatchableThenable();\n    }\n  }\n  const thenable = new CatchableThenable();\n\n  thenable;\n  thenable.then(() => {});\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Reference(true)}),
 			[][]noFloatingPromisesSuggestion{
 				{{
 					"floatingFixVoid",
@@ -1821,7 +1821,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 31",
 			"\n        (async function () {\n          Promise.resolve();\n        })();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Reference(true)}),
 			[][]noFloatingPromisesSuggestion{{
 				{
 					"floatingFixVoid",
@@ -1836,7 +1836,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 32",
 			"\ndeclare const promiseIntersection: Promise<number> & number;\n(async function () {\n  promiseIntersection;\n  promiseIntersection.then(() => {});\n  promiseIntersection.catch();\n  promiseIntersection.finally();\n})();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreIife: type_checking.Reference(true)}),
 			[][]noFloatingPromisesSuggestion{
 				{{
 					"floatingFixVoid",
@@ -1886,7 +1886,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 34",
 			"\nasync function foo() {\n  const myPromise = async () => void 0;\n  const condition = true;\n\n  (await condition) && myPromise();\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[][]noFloatingPromisesSuggestion{{{
 				"floatingFixAwait",
 				"\nasync function foo() {\n  const myPromise = async () => void 0;\n  const condition = true;\n\n  await ((await condition) && myPromise());\n}\n      ",
@@ -1940,7 +1940,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 38",
 			"\nasync function foo() {\n  const myPromise = Promise.resolve(true);\n  let condition = true;\n  condition && myPromise;\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[][]noFloatingPromisesSuggestion{{{
 				"floatingFixAwait",
 				"\nasync function foo() {\n  const myPromise = Promise.resolve(true);\n  let condition = true;\n  await (condition && myPromise);\n}\n      ",
@@ -1949,7 +1949,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 39",
 			"\nasync function foo() {\n  const myPromise = Promise.resolve(true);\n  let condition = false;\n  condition || myPromise;\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[][]noFloatingPromisesSuggestion{{{
 				"floatingFixAwait",
 				"\nasync function foo() {\n  const myPromise = Promise.resolve(true);\n  let condition = false;\n  await (condition || myPromise);\n}\n      ",
@@ -1958,7 +1958,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 40",
 			"\nasync function foo() {\n  const myPromise = Promise.resolve(true);\n  let condition = null;\n  condition ?? myPromise;\n}\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[][]noFloatingPromisesSuggestion{{{
 				"floatingFixAwait",
 				"\nasync function foo() {\n  const myPromise = Promise.resolve(true);\n  let condition = null;\n  await (condition ?? myPromise);\n}\n      ",
@@ -2054,7 +2054,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 44",
 			"\nvoid Promise.resolve().then(() => {}, undefined);\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[][]noFloatingPromisesSuggestion{
 				{{"floatingFixAwait", "\nawait Promise.resolve().then(() => {}, undefined);\n      "}},
 			},
@@ -2062,7 +2062,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 45",
 			"\ndeclare const maybeCallable: string | (() => void);\nPromise.resolve().then(() => {}, maybeCallable);\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[][]noFloatingPromisesSuggestion{{{
 				"floatingFixAwait",
 				"\ndeclare const maybeCallable: string | (() => void);\nawait Promise.resolve().then(() => {}, maybeCallable);\n      ",
@@ -2071,7 +2071,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 46",
 			"\ndeclare const maybeCallable: string | (() => void);\ndeclare const definitelyCallable: () => void;\nPromise.resolve().then(() => {}, undefined);\nPromise.resolve().then(() => {}, null);\nPromise.resolve().then(() => {}, 3);\nPromise.resolve().then(() => {}, maybeCallable);\nPromise.resolve().then(() => {}, definitelyCallable);\n\nPromise.resolve().catch(undefined);\nPromise.resolve().catch(null);\nPromise.resolve().catch(3);\nPromise.resolve().catch(maybeCallable);\nPromise.resolve().catch(definitelyCallable);\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[][]noFloatingPromisesSuggestion{
 				{{
 					"floatingFixAwait",
@@ -2110,7 +2110,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 47",
 			"\nPromise.reject() || 3;\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[][]noFloatingPromisesSuggestion{{{"floatingFixAwait", "\nawait (Promise.reject() || 3);\n      "}}},
 		},
 		{
@@ -2125,7 +2125,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 49",
 			"\nPromise.reject()\n  .finally(() => {})\n  .finally(() => {});\n      ",
-			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Ref(false)}),
+			rule.Configured(NoFloatingPromisesOptions{IgnoreVoid: type_checking.Reference(false)}),
 			[][]noFloatingPromisesSuggestion{
 				{{"floatingFixAwait", "\nawait Promise.reject()\n  .finally(() => {})\n  .finally(() => {});\n      "}},
 			},
@@ -2231,7 +2231,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 			"\ninterface UnsafeThenable<T> {\n  then<TResult1 = T, TResult2 = never>(\n    onfulfilled?:\n      | ((value: T) => TResult1 | UnsafeThenable<TResult1>)\n      | undefined\n      | null,\n    onrejected?:\n      | ((reason: any) => TResult2 | UnsafeThenable<TResult2>)\n      | undefined\n      | null,\n  ): UnsafeThenable<TResult1 | TResult2>;\n}\nlet promise: UnsafeThenable<number> = Promise.resolve(5);\npromise;\n      ",
 			rule.Configured(NoFloatingPromisesOptions{AllowForKnownSafePromises: []type_checking.TypeOrValueSpecifier{
 				{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"SafeThenable"}},
-			}, CheckThenables: type_checking.Ref(true)}),
+			}, CheckThenables: type_checking.Reference(true)}),
 			[][]noFloatingPromisesSuggestion{{
 				{
 					"floatingFixVoid",
@@ -2385,7 +2385,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 86",
 			"\ndeclare const createPromise: () => PromiseLike<number>;\ncreatePromise();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Reference(true)}),
 			[][]noFloatingPromisesSuggestion{{
 				{
 					"floatingFixVoid",
@@ -2400,7 +2400,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 87",
 			"\ninterface MyThenable {\n  then(onFulfilled: () => void, onRejected: () => void): MyThenable;\n}\n\ndeclare function createMyThenable(): MyThenable;\n\ncreateMyThenable();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Reference(true)}),
 			[][]noFloatingPromisesSuggestion{{
 				{
 					"floatingFixVoid",
@@ -2445,7 +2445,7 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 		{
 			"upstream invalid case 90",
 			"\nclass MyPromise<T> extends Promise<T> {\n  additional: string;\n}\ndeclare const createMyPromise: () => MyPromise<number>;\ncreateMyPromise();\n      ",
-			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Ref(true)}),
+			rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Reference(true)}),
 			[][]noFloatingPromisesSuggestion{{
 				{
 					"floatingFixVoid",
@@ -2803,7 +2803,7 @@ func TestNoFloatingPromisesThenableNeedsTwoFunctionParameters(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			result := runNoFloatingPromises(test, testCase.sourceText,
-				rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Ref(true)}))
+				rule.Configured(NoFloatingPromisesOptions{CheckThenables: type_checking.Reference(true)}))
 			if testCase.wantIds == nil {
 				rule_testing.ExpectClean(test, result)
 				return

@@ -225,8 +225,8 @@ func (scopes *ReactiveScopes) Ids() []ScopeId {
 	return scopes.order
 }
 
-// Len reports how many scopes exist, for measurement.
-func (scopes *ReactiveScopes) Len() int {
+// Length reports how many scopes exist, for measurement.
+func (scopes *ReactiveScopes) Length() int {
 	if scopes == nil {
 		return 0
 	}

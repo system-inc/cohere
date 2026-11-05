@@ -151,7 +151,7 @@ func collectInvocations(function *Function, candidates map[static_single_assignm
 				// Upstream: "assume arguments to all hooks are safe to invoke". This is what makes
 				// `useMemo(() => ..., deps)` descend at all, since the callback is an argument
 				// rather than a callee.
-				for _, argument := range value.Args {
+				for _, argument := range value.Arguments {
 					if held, ok := candidates[argument.Place.Identifier]; ok {
 						invoked[held.function] = true
 					}
@@ -160,7 +160,7 @@ func collectInvocations(function *Function, candidates map[static_single_assignm
 			case *JsxExpression:
 				// Upstream: "assume JSX attributes and children are safe to invoke". A spread is
 				// skipped because the value it holds is not one identifiable place.
-				for _, attribute := range value.Props {
+				for _, attribute := range value.Properties {
 					if attribute.Spread {
 						continue
 					}

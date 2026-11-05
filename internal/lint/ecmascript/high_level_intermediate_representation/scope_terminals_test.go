@@ -209,7 +209,7 @@ func TestScopeTerminalsDeclineOnUnnestedScopes(test *testing.T) {
 			return <div>{a}</div>;
 		}
 	`)
-	if scopes.Len() == 0 {
+	if scopes.Length() == 0 {
 		test.Skip("no scopes in this source")
 	}
 
@@ -266,7 +266,7 @@ func TestScopeTerminalsAreASinglePass(test *testing.T) {
 			return <div>{list}{other}</div>;
 		}
 	`)
-	if scopes.Len() == 0 {
+	if scopes.Length() == 0 {
 		test.Skip("no scopes in this source")
 	}
 	aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
@@ -661,7 +661,7 @@ func TestScopeTerminalsRecoverEveryScopeFromTheGraph(test *testing.T) {
 							scopes := AssignReactiveScopesWithSets(function, ranges, set)
 							aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 							identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
-							mergedTotal += merged.Len()
+							mergedTotal += merged.Length()
 
 							if ScopeTerminalsPrecondition(function, scopes, identity) != 0 {
 								declined++

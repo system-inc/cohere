@@ -88,13 +88,13 @@ func settingsOf(options *Options) *settings {
 // A nil *printArguments is passed to the core as an untyped nil, because the core caches only when
 // args is nil and a typed nil in an interface is not.
 type printArguments struct {
-	expandFirstArg   bool
-	expandLastArg    bool
-	assignmentLayout string
+	expandFirstArgument bool
+	expandLastArgument  bool
+	assignmentLayout    string
 }
 
-func argsOf(args any) *printArguments {
-	typed, _ := args.(*printArguments)
+func argumentsOf(arguments any) *printArguments {
+	typed, _ := arguments.(*printArguments)
 	return typed
 }
 

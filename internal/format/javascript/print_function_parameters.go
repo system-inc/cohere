@@ -107,7 +107,7 @@ func printFunctionParameters(
 			// Removing lines in this case leads to broken or ugly output
 			// Invariant: shouldExpandParameters comes from expandFirstArg or expandLastArg, set only by
 			// printCallArguments inside printCatchingArgExpansionBailout, whose recover catches this.
-			panic(argExpansionBailout{})
+			panic(argumentExpansionBailout{})
 		}
 		return groupIn(path, concatIn(path, doc.RemoveLines(typeParametersDoc),
 			"(",

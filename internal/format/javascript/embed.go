@@ -363,15 +363,15 @@ func isStyledComponents(path *Path) bool {
 	return false
 }
 
-// isCssProp is upstream's isCssProp: the css={`...`} JSX attribute.
-func isCssProp(path *Path) bool {
+// isCssProperty is upstream's isCssProperty: the css={`...`} JSX attribute.
+func isCssProperty(path *Path) bool {
 	parent, grandparent := parentOf(path), grandparentOf(path)
 	return grandparent.Is("JSXAttribute") && parent.Is("JSXExpressionContainer") &&
 		grandparent.Child("name").Is("JSXIdentifier") && grandparent.Child("name").String("name") == "css"
 }
 
 func isEmbedCss(path *Path) bool {
-	return isStyledJsx(path) || isStyledComponents(path) || isCssProp(path) || isAngularComponentStyles(path)
+	return isStyledJsx(path) || isStyledComponents(path) || isCssProperty(path) || isAngularComponentStyles(path)
 }
 
 // embed/html.js's test.

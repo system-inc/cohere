@@ -251,7 +251,7 @@ func (ssaGraph) SetTerminalOrder(block *BasicBlock, order static_single_assignme
 	setTerminalOrder(block.Terminal, order)
 }
 
-func (ssaGraph) Params(function *Function) []Place { return function.Params }
+func (ssaGraph) Params(function *Function) []Place { return function.Parameters }
 
 func (ssaGraph) Returns(function *Function) *Place { return &function.Returns }
 

@@ -83,9 +83,9 @@ func TestNoProtoReportsTheWholeAccess(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
-		sourceText string
-		wantPos    int
-		wantEnd    int
+		sourceText   string
+		wantPosition int
+		wantEnd      int
 	}{
 		{"var a = test.__proto__;", 8, 22},
 		{"var a = test['__proto__'];", 8, 25},
@@ -101,10 +101,10 @@ func TestNoProtoReportsTheWholeAccess(test *testing.T) {
 				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			got := result.Diagnostics[0].Range
-			if got.Pos() != testCase.wantPos || got.End() != testCase.wantEnd {
+			if got.Pos() != testCase.wantPosition || got.End() != testCase.wantEnd {
 				test.Fatalf("reported [%d:%d), wanted [%d:%d) which is %q",
-					got.Pos(), got.End(), testCase.wantPos, testCase.wantEnd,
-					testCase.sourceText[testCase.wantPos:testCase.wantEnd])
+					got.Pos(), got.End(), testCase.wantPosition, testCase.wantEnd,
+					testCase.sourceText[testCase.wantPosition:testCase.wantEnd])
 			}
 		})
 	}

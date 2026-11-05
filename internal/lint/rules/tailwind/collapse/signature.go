@@ -289,12 +289,12 @@ func printSignatureCss(printed *strings.Builder, node *Node, depth int) {
 		printed.WriteString(indent + "}\n")
 	case KindAtRule:
 		if len(node.Nodes) == 0 {
-			printed.WriteString(indent + node.Name + " " + node.Params + ";\n")
+			printed.WriteString(indent + node.Name + " " + node.Parameters + ";\n")
 			return
 		}
 		printed.WriteString(indent + node.Name)
-		if node.Params != "" {
-			printed.WriteString(" " + node.Params + " ")
+		if node.Parameters != "" {
+			printed.WriteString(" " + node.Parameters + " ")
 		} else {
 			printed.WriteString(" ")
 		}

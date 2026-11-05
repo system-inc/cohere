@@ -501,7 +501,7 @@ func ParseCss(input string) ([]*Node, error) {
 			}
 		case KindAtRule:
 			return nil, &CssSyntaxError{
-				Message: fmt.Sprintf("Missing closing } at %s %s", parent.Name, parent.Params),
+				Message: fmt.Sprintf("Missing closing } at %s %s", parent.Name, parent.Parameters),
 				Offset:  bufferStart,
 			}
 		}

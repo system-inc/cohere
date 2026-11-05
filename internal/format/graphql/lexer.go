@@ -137,7 +137,7 @@ func (lexer *lexer) lookahead() *token {
 				// Read the next token and form a link in the token linked-list.
 				nextToken := readNextToken(lexer, token.end)
 				token.next = nextToken
-				nextToken.prev = token
+				nextToken.previous = token
 				token = nextToken
 			}
 			if token.kind != tokenKindComment {

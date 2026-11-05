@@ -190,8 +190,8 @@ func (effects *AliasingEffects) Get(id InstructionId) []AliasingEffect {
 	return effects.byInstruction[id]
 }
 
-// Len is how many instructions carry at least one effect.
-func (effects *AliasingEffects) Len() int {
+// Length is how many instructions carry at least one effect.
+func (effects *AliasingEffects) Length() int {
 	if effects == nil {
 		return 0
 	}
@@ -871,7 +871,7 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 			instruction,
 			instructionValue.Callee,
 			instructionValue.Callee,
-			instructionValue.Args,
+			instructionValue.Arguments,
 			lvalue,
 			true,
 		)
@@ -883,7 +883,7 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 			instruction,
 			instructionValue.Receiver,
 			instructionValue.Property,
-			instructionValue.Args,
+			instructionValue.Arguments,
 			lvalue,
 			false,
 		)
@@ -895,7 +895,7 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 			instruction,
 			instructionValue.Callee,
 			instructionValue.Callee,
-			instructionValue.Args,
+			instructionValue.Arguments,
 			lvalue,
 			false,
 		)
@@ -904,9 +904,9 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 		// Upstream passes a Hole for the strings array then the subexpressions, and never trusts a
 		// primitive return type to mean the tag is pure. Reproduced by routing through the same
 		// unknown-callee default.
-		args := make([]Argument, 0, len(instructionValue.Subexprs))
+		arguments := make([]Argument, 0, len(instructionValue.Subexprs))
 		for _, sub := range instructionValue.Subexprs {
-			args = append(args, Argument{Place: sub})
+			arguments = append(arguments, Argument{Place: sub})
 		}
 		return effectsForCall(
 			function,
@@ -914,7 +914,7 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 			instruction,
 			instructionValue.Tag,
 			instructionValue.Tag,
-			args,
+			arguments,
 			lvalue,
 			true,
 		)
@@ -975,7 +975,7 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 				mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectFreeze, *instructionValue.Tag.Place),
 			)
 		}
-		for _, property := range instructionValue.Props {
+		for _, property := range instructionValue.Properties {
 			out = append(out, mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectFreeze, property.Value))
 			out = append(
 				out,
@@ -1134,7 +1134,7 @@ func effectsForCall(
 	instruction *Instruction,
 	receiver Place,
 	callee Place,
-	args []Argument,
+	arguments []Argument,
 	lvalue Place,
 	mutatesCallee bool,
 ) []AliasingEffect {
@@ -1162,20 +1162,20 @@ func effectsForCall(
 		// a load. Without this the call widened every captured load from `[n,n+1)` to `[n,14)`, so
 		// scope 1 spanned `[2,11)` and swallowed the `const x = propB.x.y` the developer wrote,
 		// while upstream's compiled output keeps that binding outside the scope in both twins.
-		if len(args) == 0 && mutatesCallee {
+		if len(arguments) == 0 && mutatesCallee {
 			if nested := nestedFunctionHeldBy(function, callee.Identifier); nested != nil &&
 				!mutatesOwnCapture(nested) {
-				out := effectsForUnknownCall(receiver, callee, args, lvalue, false)
-				return append(out, argumentMutationsFromCallbacks(function, receiver, args)...)
+				out := effectsForUnknownCall(receiver, callee, arguments, lvalue, false)
+				return append(out, argumentMutationsFromCallbacks(function, receiver, arguments)...)
 			}
 		}
-		out := effectsForUnknownCall(receiver, callee, args, lvalue, mutatesCallee)
-		return append(out, argumentMutationsFromCallbacks(function, receiver, args)...)
+		out := effectsForUnknownCall(receiver, callee, arguments, lvalue, mutatesCallee)
+		return append(out, argumentMutationsFromCallbacks(function, receiver, arguments)...)
 	}
 
 	if len(signature.Aliasing) > 0 {
-		if applied, ok := effectsFromAliasingSignature(signature, receiver, args, lvalue); ok {
-			return append(applied, argumentMutationsFromCallbacks(function, receiver, args)...)
+		if applied, ok := effectsFromAliasingSignature(signature, receiver, arguments, lvalue); ok {
+			return append(applied, argumentMutationsFromCallbacks(function, receiver, arguments)...)
 		}
 		// Upstream returns nil from `computeEffectsForSignature` when the arity does not fit and
 		// then falls through to the legacy path (`:1087`). Reproduced rather than raising.
@@ -1194,7 +1194,7 @@ func effectsForCall(
 	var captures []Place
 	out = visitSignatureOperand(out, receiver, signature.Receiver, lvalue, &stores, &captures)
 
-	for index, argument := range args {
+	for index, argument := range arguments {
 		effect := signature.Rest
 		if !argument.Spread && index < len(signature.Positional) {
 			effect = signature.Positional[index]
@@ -1231,7 +1231,7 @@ func effectsForCall(
 			}
 		}
 	}
-	return append(out, argumentMutationsFromCallbacks(function, receiver, args)...)
+	return append(out, argumentMutationsFromCallbacks(function, receiver, arguments)...)
 }
 
 // visitSignatureOperand is upstream's `visit` closure inside compute_effects_for_legacy_signature.
@@ -1301,18 +1301,18 @@ func visitSignatureOperand(
 func effectsForUnknownCall(
 	receiver Place,
 	callee Place,
-	args []Argument,
+	arguments []Argument,
 	lvalue Place,
 	mutatesCallee bool,
 ) []AliasingEffect {
 	out := []AliasingEffect{mutation_aliasing.CreateEffect(lvalue, mutation_aliasing.EffectValueMutable)}
 
-	operands := make([]Place, 0, len(args)+2)
+	operands := make([]Place, 0, len(arguments)+2)
 	operands = append(operands, receiver)
 	if callee.Identifier != receiver.Identifier {
 		operands = append(operands, callee)
 	}
-	for _, argument := range args {
+	for _, argument := range arguments {
 		operands = append(operands, argument.Place)
 	}
 
@@ -1570,7 +1570,7 @@ func ProjectEffects(
 // any of them: they are static two-effect signatures over a receiver, one argument and a result. An
 // entry that needs those must extend this rather than be added silently, which the arity check
 // enforces by declining any call whose argument count the signature does not name.
-func effectsFromAliasingSignature(signature effectSignature, receiver Place, args []Argument,
+func effectsFromAliasingSignature(signature effectSignature, receiver Place, arguments []Argument,
 	lvalue Place) ([]AliasingEffect, bool) {
 	positional := 0
 	for _, effect := range signature.Aliasing {
@@ -1582,11 +1582,11 @@ func effectsFromAliasingSignature(signature effectSignature, receiver Place, arg
 			}
 		}
 	}
-	if positional > len(args) {
+	if positional > len(arguments) {
 		return nil, false
 	}
 	for index := 0; index < positional; index++ {
-		if args[index].Spread {
+		if arguments[index].Spread {
 			// A spread makes the positional binding meaningless: the argument at that position is
 			// not one place. Upstream routes spreads to the rest param, which no transcribed entry
 			// has, so declining is the same answer.
@@ -1602,10 +1602,10 @@ func effectsFromAliasingSignature(signature effectSignature, receiver Place, arg
 			return lvalue, true
 		default:
 			index := int(operand - aliasingParam0)
-			if index >= len(args) {
+			if index >= len(arguments) {
 				return Place{}, false
 			}
-			return args[index].Place, true
+			return arguments[index].Place, true
 		}
 	}
 
@@ -1653,12 +1653,12 @@ func effectsFromAliasingSignature(signature effectSignature, receiver Place, arg
 //
 // Returns nil when nothing qualifies, which is the common case and costs one map lookup per call.
 func argumentMutationsFromCallbacks(function *Function, receiver Place,
-	args []Argument) []AliasingEffect {
-	if function == nil || len(args) == 0 || len(function.Functions) == 0 {
+	arguments []Argument) []AliasingEffect {
+	if function == nil || len(arguments) == 0 || len(function.Functions) == 0 {
 		return nil
 	}
 	var out []AliasingEffect
-	for _, argument := range args {
+	for _, argument := range arguments {
 		if argument.Spread {
 			continue
 		}
@@ -1764,7 +1764,7 @@ func mutatesOwnCapture(nested *Function) bool {
 		return false
 	}
 	effects := InferAliasingEffects(nested)
-	if effects == nil || effects.Len() == 0 {
+	if effects == nil || effects.Length() == 0 {
 		return false
 	}
 
@@ -1803,17 +1803,17 @@ func mutatesOwnCapture(nested *Function) bool {
 }
 
 func mutatesOwnParameter(nested *Function) bool {
-	if nested == nil || len(nested.Params) == 0 {
+	if nested == nil || len(nested.Parameters) == 0 {
 		return false
 	}
 	effects := InferAliasingEffects(nested)
-	if effects == nil || effects.Len() == 0 {
+	if effects == nil || effects.Length() == 0 {
 		return false
 	}
 
 	// Values reachable from a parameter by assignment or aliasing, seeded with the parameters.
 	reaches := map[static_single_assignment.IdentifierId]bool{}
-	for _, parameter := range nested.Params {
+	for _, parameter := range nested.Parameters {
 		reaches[parameter.Identifier] = true
 	}
 	var mutated []static_single_assignment.IdentifierId

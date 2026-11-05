@@ -153,7 +153,7 @@ func (parser *parser) combinator() {
 			sourceEdgeOf(node, "end")["column"] = parser.nextToken().at(3)
 			sourceEdgeOf(node, "end")["line"] = parser.nextToken().at(2)
 			node.Set("sourceIndex", parser.nextToken().at(4))
-		} else if parser.prevToken() != nil && parser.prevToken().kind == "combinator" {
+		} else if parser.previousToken() != nil && parser.previousToken().kind == "combinator" {
 			spacesOf(node)["after"] = parser.parseSpace(parser.currToken().value, "")
 		} else if parser.currToken().kind == "combinator" {
 			node.Set("value", parser.currToken().value)
@@ -210,8 +210,8 @@ func (parser *parser) missingSquareBracket() {
 func (parser *parser) namespace() {
 	// this.prevToken && this.prevToken[1] || true: a token's value is never empty.
 	var before any = true
-	if parser.prevToken() != nil && parser.prevToken().value != "" {
-		before = parser.prevToken().value
+	if parser.previousToken() != nil && parser.previousToken().value != "" {
+		before = parser.previousToken().value
 	}
 	if parser.nextToken() == nil {
 		throwTypeError("0")
@@ -331,7 +331,7 @@ func (parser *parser) pseudo() {
 func (parser *parser) space() {
 	token := parser.currToken()
 	// Handle space before and after the selector
-	if parser.position == 0 || parser.prevToken().kind == "," || parser.prevToken().kind == "(" {
+	if parser.position == 0 || parser.previousToken().kind == "," || parser.previousToken().kind == "(" {
 		parser.spaces = parser.parseSpace(token.value, "")
 		parser.position++
 	} else if parser.position == len(parser.tokens)-1 ||
@@ -550,9 +550,9 @@ func sourceEdgeOf(node *estree.Node, edge string) map[string]any {
 }
 
 // currToken, nextToken and prevToken are upstream's getters, nil past either end of the tokens.
-func (parser *parser) currToken() *token { return parser.tokenAt(parser.position) }
-func (parser *parser) nextToken() *token { return parser.tokenAt(parser.position + 1) }
-func (parser *parser) prevToken() *token { return parser.tokenAt(parser.position - 1) }
+func (parser *parser) currToken() *token     { return parser.tokenAt(parser.position) }
+func (parser *parser) nextToken() *token     { return parser.tokenAt(parser.position + 1) }
+func (parser *parser) previousToken() *token { return parser.tokenAt(parser.position - 1) }
 
 func (parser *parser) tokenAt(index int) *token {
 	if index < 0 || index >= len(parser.tokens) {

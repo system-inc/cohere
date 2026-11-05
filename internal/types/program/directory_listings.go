@@ -40,8 +40,8 @@ func (listings *DirectoryListings) Add(directory string, entries []os.DirEntry) 
 	listings.entries[filepath.ToSlash(filepath.Clean(directory))] = entries
 }
 
-// Len is how many directories are held.
-func (listings *DirectoryListings) Len() int {
+// Length is how many directories are held.
+func (listings *DirectoryListings) Length() int {
 	listings.mutex.RLock()
 	defer listings.mutex.RUnlock()
 	return len(listings.entries)

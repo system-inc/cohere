@@ -151,12 +151,12 @@ func (builder *Builder[E]) ifStatement(node *ast.Node) {
 
 	builder.enter(thenEntry)
 	builder.statement(stmt.ThenStatement)
-	builder.link(builder.cur, after)
+	builder.link(builder.current, after)
 
 	if stmt.ElseStatement != nil {
 		builder.enter(elseEntry)
 		builder.statement(stmt.ElseStatement)
-		builder.link(builder.cur, after)
+		builder.link(builder.current, after)
 	}
 
 	builder.enter(after)
@@ -165,7 +165,7 @@ func (builder *Builder[E]) ifStatement(node *ast.Node) {
 func (builder *Builder[E]) whileStatement(node *ast.Node) {
 	stmt := node.AsWhileStatement()
 	test := builder.newBlock()
-	builder.link(builder.cur, test)
+	builder.link(builder.current, test)
 	builder.enter(test)
 	after := builder.newBlock()
 	body := builder.newBlock()
@@ -179,7 +179,7 @@ func (builder *Builder[E]) whileStatement(node *ast.Node) {
 	builder.enter(body)
 	builder.statement(stmt.Statement)
 	builder.loop(node)
-	builder.link(builder.cur, test)
+	builder.link(builder.current, test)
 	builder.popJump()
 
 	builder.enter(after)
@@ -188,7 +188,7 @@ func (builder *Builder[E]) whileStatement(node *ast.Node) {
 func (builder *Builder[E]) doStatement(node *ast.Node) {
 	stmt := node.AsDoStatement()
 	body := builder.newBlock()
-	builder.link(builder.cur, body)
+	builder.link(builder.current, body)
 	test := builder.newBlock()
 	after := builder.newBlock()
 
@@ -197,15 +197,15 @@ func (builder *Builder[E]) doStatement(node *ast.Node) {
 	builder.pushJump(node, after, test, nil)
 	builder.enter(body)
 	builder.statement(stmt.Statement)
-	builder.link(builder.cur, test)
+	builder.link(builder.current, test)
 	builder.popJump()
 
 	builder.enter(test)
 	builder.expr(stmt.Expression)
 	builder.loop(node)
-	builder.link(builder.cur, body)
+	builder.link(builder.current, body)
 	if !isAlwaysTruthyTest(stmt.Expression) {
-		builder.link(builder.cur, after)
+		builder.link(builder.current, after)
 	}
 
 	builder.enter(after)
@@ -226,20 +226,20 @@ func (builder *Builder[E]) forStatement(node *ast.Node) {
 		// the top of the body stay on the repeated header, while a branch in the
 		// body still creates later blocks that cycle analysis can identify.
 		body := builder.newBlock()
-		builder.link(builder.cur, body)
+		builder.link(builder.current, body)
 		after := builder.newBlock()
 		builder.pushJump(node, after, body, node)
 		builder.enter(body)
 		builder.statement(stmt.Statement)
 		builder.loop(node)
-		builder.link(builder.cur, body)
+		builder.link(builder.current, body)
 		builder.popJump()
 		builder.enter(after)
 		return
 	}
 
 	test := builder.newBlock()
-	builder.link(builder.cur, test)
+	builder.link(builder.current, test)
 	builder.enter(test)
 	after := builder.newBlock()
 	body := builder.newBlock()
@@ -257,14 +257,14 @@ func (builder *Builder[E]) forStatement(node *ast.Node) {
 		update = builder.newBlock()
 		builder.enterDisconnected(update)
 		builder.expr(stmt.Incrementor)
-		builder.link(builder.cur, test)
+		builder.link(builder.current, test)
 	}
 
 	builder.pushJump(node, after, update, node)
 	builder.enter(body)
 	builder.statement(stmt.Statement)
 	builder.loop(node)
-	builder.link(builder.cur, update)
+	builder.link(builder.current, update)
 	builder.popJump()
 
 	builder.enter(after)
@@ -275,7 +275,7 @@ func (builder *Builder[E]) forInOfStatement(node *ast.Node) {
 	builder.expr(stmt.Expression)
 
 	head := builder.newBlock()
-	builder.link(builder.cur, head)
+	builder.link(builder.current, head)
 	builder.enter(head)
 
 	after := builder.newBlock()
@@ -302,7 +302,7 @@ func (builder *Builder[E]) forInOfStatement(node *ast.Node) {
 	}
 	builder.statement(stmt.Statement)
 	builder.loop(node)
-	builder.link(builder.cur, head)
+	builder.link(builder.current, head)
 	builder.popJump()
 
 	builder.enter(after)
@@ -320,7 +320,7 @@ func (builder *Builder[E]) switchStatement(node *ast.Node) {
 		}
 	}
 	if len(clauses) == 0 {
-		builder.link(builder.cur, after)
+		builder.link(builder.current, after)
 		builder.enter(after)
 		return
 	}
@@ -337,7 +337,7 @@ func (builder *Builder[E]) switchStatement(node *ast.Node) {
 
 	defaultIndex := -1
 	firstCaseIndex := -1
-	testCur := builder.cur
+	testCur := builder.current
 	for index, clause := range clauses {
 		if clause.Kind == ast.KindDefaultClause {
 			defaultIndex = index
@@ -346,14 +346,14 @@ func (builder *Builder[E]) switchStatement(node *ast.Node) {
 		if firstCaseIndex == -1 {
 			firstCaseIndex = index
 		}
-		builder.cur = testCur
+		builder.current = testCur
 		builder.expr(clause.AsCaseOrDefaultClause().Expression)
-		dispatchFrom[index] = builder.cur
-		dispatchEdge[index] = builder.linkWithCycleBarrier(builder.cur, bodies[index], false)
+		dispatchFrom[index] = builder.current
+		dispatchEdge[index] = builder.linkWithCycleBarrier(builder.current, bodies[index], false)
 		nextTest := builder.newBlock()
-		builder.link(builder.cur, nextTest)
+		builder.link(builder.current, nextTest)
 		builder.enter(nextTest)
-		testCur = builder.cur
+		testCur = builder.current
 	}
 	if defaultIndex >= 0 {
 		dispatchFrom[defaultIndex] = testCur
@@ -375,7 +375,7 @@ func (builder *Builder[E]) switchStatement(node *ast.Node) {
 		builder.linkWithCycleBarrier(fallthroughFrom, bodies[index], barrier)
 		builder.enter(bodies[index])
 		builder.statements(clause.AsCaseOrDefaultClause().Statements)
-		fallthroughFrom = builder.cur
+		fallthroughFrom = builder.current
 		if index >= firstCaseIndex && firstCaseIndex != -1 {
 			hadSwitchBreak = builder.jumps[switchJump].broken
 		}
@@ -391,7 +391,7 @@ func (builder *Builder[E]) tryStatement(node *ast.Node) {
 	hasCatch := stmt.CatchClause != nil
 	hasFinally := stmt.FinallyBlock != nil
 
-	frame := &tryFrame[E]{position: posTry, hasFinally: hasFinally}
+	frame := &tryFrame[E]{position: positionTry, hasFinally: hasFinally}
 	if hasCatch {
 		frame.catchEntry = builder.newBlock()
 	}
@@ -409,9 +409,9 @@ func (builder *Builder[E]) tryStatement(node *ast.Node) {
 	if hasCatch {
 		// ESLint routes the end of a `try` block into the `catch` block as well
 		// as past the statement.
-		builder.link(builder.cur, frame.catchEntry)
-		normalEnds = append(normalEnds, builder.cur)
-		frame.position = posCatch
+		builder.link(builder.current, frame.catchEntry)
+		normalEnds = append(normalEnds, builder.current)
+		frame.position = positionCatch
 		frame.thrownForked = false
 		builder.enter(frame.catchEntry)
 		catchClause := stmt.CatchClause.AsCatchClause()
@@ -420,7 +420,7 @@ func (builder *Builder[E]) tryStatement(node *ast.Node) {
 		}
 		builder.statement(catchClause.Block)
 	}
-	normalEnds = append(normalEnds, builder.cur)
+	normalEnds = append(normalEnds, builder.current)
 
 	builder.tryStack = builder.tryStack[:len(builder.tryStack)-1]
 
@@ -443,7 +443,7 @@ func (builder *Builder[E]) tryStatement(node *ast.Node) {
 	}
 	builder.enter(normalEntry)
 	builder.statement(stmt.FinallyBlock)
-	builder.link(builder.cur, after)
+	builder.link(builder.current, after)
 
 	if frame.finallyEntry.hasIncoming {
 		// The `finally` block also runs on the path that leaves the statement
@@ -452,7 +452,7 @@ func (builder *Builder[E]) tryStatement(node *ast.Node) {
 		builder.restoreForks(snapshot)
 		builder.enter(frame.finallyEntry)
 		builder.statement(stmt.FinallyBlock)
-		if builder.cur.Reachable {
+		if builder.current.Reachable {
 			// A `return` inside this `try`/`catch` still needs to run every
 			// enclosing `finally` on its way out, not just this one. So this
 			// second copy's own abrupt exit must keep propagating outward.
@@ -460,18 +460,18 @@ func (builder *Builder[E]) tryStatement(node *ast.Node) {
 				if index := builder.returnFrame(); index >= 0 {
 					outer := builder.tryStack[index]
 					outer.returnedAny = true
-					builder.link(builder.cur, outer.finallyEntry)
+					builder.link(builder.current, outer.finallyEntry)
 				} else {
-					builder.markFinal(builder.cur)
+					builder.markFinal(builder.current)
 				}
 			}
 			if frame.thrownAny {
 				if index := builder.throwFrame(); index >= 0 {
 					outer := builder.tryStack[index]
 					outer.thrownAny = true
-					builder.link(builder.cur, throwTarget(outer))
+					builder.link(builder.current, throwTarget(outer))
 				} else {
-					builder.markThrown(builder.cur)
+					builder.markThrown(builder.current)
 				}
 			}
 		}
@@ -492,7 +492,7 @@ func (builder *Builder[E]) labeledStatement(node *ast.Node) {
 	builder.jumps = append(builder.jumps, jumpTarget[E]{labels: []string{stmt.Label.Text()}, breakTo: after})
 	builder.statement(stmt.Statement)
 	builder.popJump()
-	builder.link(builder.cur, after)
+	builder.link(builder.current, after)
 	builder.enter(after)
 }
 
@@ -508,7 +508,7 @@ func (builder *Builder[E]) popJump() {
 }
 
 func (builder *Builder[E]) makeBreak(label *ast.Node) {
-	if !builder.cur.Reachable {
+	if !builder.current.Reachable {
 		return
 	}
 	name := ""
@@ -525,14 +525,14 @@ func (builder *Builder[E]) makeBreak(label *ast.Node) {
 			continue
 		}
 		builder.jumps[index].broken = true
-		builder.link(builder.cur, target.breakTo)
+		builder.link(builder.current, target.breakTo)
 		break
 	}
 	builder.makeUnreachable()
 }
 
 func (builder *Builder[E]) makeContinue(label *ast.Node) {
-	if !builder.cur.Reachable {
+	if !builder.current.Reachable {
 		return
 	}
 	name := ""
@@ -546,7 +546,7 @@ func (builder *Builder[E]) makeContinue(label *ast.Node) {
 		}
 		if name == "" || slices.Contains(target.labels, name) {
 			builder.loop(target.loop)
-			builder.link(builder.cur, target.continueTo)
+			builder.link(builder.current, target.continueTo)
 			break
 		}
 	}
@@ -554,29 +554,29 @@ func (builder *Builder[E]) makeContinue(label *ast.Node) {
 }
 
 func (builder *Builder[E]) makeReturn() {
-	if !builder.cur.Reachable {
+	if !builder.current.Reachable {
 		return
 	}
 	if index := builder.returnFrame(); index >= 0 {
 		frame := builder.tryStack[index]
 		frame.returnedAny = true
-		builder.link(builder.cur, frame.finallyEntry)
+		builder.link(builder.current, frame.finallyEntry)
 	} else {
-		builder.markFinal(builder.cur)
+		builder.markFinal(builder.current)
 	}
 	builder.makeUnreachable()
 }
 
 func (builder *Builder[E]) makeThrow() {
-	if !builder.cur.Reachable {
+	if !builder.current.Reachable {
 		return
 	}
 	if index := builder.throwFrame(); index >= 0 {
 		frame := builder.tryStack[index]
 		frame.thrownAny = true
-		builder.link(builder.cur, throwTarget(frame))
+		builder.link(builder.current, throwTarget(frame))
 	} else {
-		builder.markThrown(builder.cur)
+		builder.markThrown(builder.current)
 	}
 	builder.makeUnreachable()
 }
@@ -585,24 +585,24 @@ func (builder *Builder[E]) makeThrow() {
 // resume it with `.return()` or `.throw()`, so both leaving paths are recorded
 // before the normal continuation resumes in a fresh block.
 func (builder *Builder[E]) makeYield() {
-	if !builder.cur.Reachable {
+	if !builder.current.Reachable {
 		return
 	}
 	if index := builder.returnFrame(); index >= 0 {
 		frame := builder.tryStack[index]
 		frame.returnedAny = true
-		builder.link(builder.cur, frame.finallyEntry)
+		builder.link(builder.current, frame.finallyEntry)
 	} else {
-		builder.markFinal(builder.cur)
+		builder.markFinal(builder.current)
 	}
 	if index := builder.throwFrame(); index >= 0 {
 		frame := builder.tryStack[index]
 		frame.thrownAny = true
-		builder.link(builder.cur, throwTarget(frame))
+		builder.link(builder.current, throwTarget(frame))
 	} else {
-		builder.markThrown(builder.cur)
+		builder.markThrown(builder.current)
 	}
 	next := builder.newBlock()
-	builder.link(builder.cur, next)
+	builder.link(builder.current, next)
 	builder.enter(next)
 }

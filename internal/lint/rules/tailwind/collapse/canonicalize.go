@@ -170,7 +170,7 @@ func (canonicalizer *Canonicalizer) canonicalizeClass(className string) string {
 // A pass answers false when it cannot tell what upstream would do, and no pass after it runs.
 var utilityCanonicalizations = []func(*Canonicalizer, ParsedCandidate) (ParsedCandidate, bool){
 	(*Canonicalizer).bgGradientToLinear,
-	(*Canonicalizer).themeToVarUtilityGuard,
+	(*Canonicalizer).themeToVariableUtilityGuard,
 	(*Canonicalizer).calcToSpacingFunction,
 	(*Canonicalizer).optimizeArbitraryValueExpressions,
 	(*Canonicalizer).arbitraryUtilities,
@@ -463,7 +463,7 @@ func printNodesForComparison(printed *strings.Builder, nodes []*Node) {
 			printNodesForComparison(printed, node.Nodes)
 			printed.WriteString("}\n")
 		case KindAtRule:
-			printed.WriteString(node.Name + " " + node.Params + "{\n")
+			printed.WriteString(node.Name + " " + node.Parameters + "{\n")
 			printNodesForComparison(printed, node.Nodes)
 			printed.WriteString("}\n")
 		case KindDeclaration:

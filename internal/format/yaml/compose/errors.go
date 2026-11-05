@@ -16,18 +16,18 @@ type YamlError struct {
 	// Code is upstream's ErrorCode, such as "BAD_INDENT" or "MISSING_CHAR".
 	Code    string
 	Message string
-	// Pos is the [start, end] of the error in UTF-16 code units.
-	Pos [2]int
+	// Position is the [start, end] of the error in UTF-16 code units.
+	Position [2]int
 }
 
 func (yamlError *YamlError) Error() string { return yamlError.Message }
 
 func newYamlParseError(position [2]int, code string, message string) *YamlError {
-	return &YamlError{Name: "YAMLParseError", Code: code, Message: message, Pos: position}
+	return &YamlError{Name: "YAMLParseError", Code: code, Message: message, Position: position}
 }
 
 func newYamlWarning(position [2]int, code string, message string) *YamlError {
-	return &YamlError{Name: "YAMLWarning", Code: code, Message: message, Pos: position}
+	return &YamlError{Name: "YAMLWarning", Code: code, Message: message, Position: position}
 }
 
 // errorString is an Error upstream throws, whose message a caller catches and reports.

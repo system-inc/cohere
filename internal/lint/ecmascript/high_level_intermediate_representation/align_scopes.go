@@ -232,8 +232,8 @@ func (scopes *AlignedScopes) Ids() []ScopeId {
 	return scopes.order
 }
 
-// Len reports how many scopes exist, for measurement.
-func (scopes *AlignedScopes) Len() int {
+// Length reports how many scopes exist, for measurement.
+func (scopes *AlignedScopes) Length() int {
 	if scopes == nil {
 		return 0
 	}
@@ -315,7 +315,7 @@ type alignSweepState struct {
 // mistake -- which is exactly the shape that reads as coverage without being any.
 func AlignReactiveScopesToBlockScopes(function *Function, scopes *ReactiveScopes) *AlignedScopes {
 	result := &AlignedScopes{}
-	if function == nil || scopes == nil || scopes.Len() == 0 {
+	if function == nil || scopes == nil || scopes.Length() == 0 {
 		return result
 	}
 
@@ -375,7 +375,7 @@ func AlignReactiveScopesToBlockScopes(function *Function, scopes *ReactiveScopes
 func AlignThenMergeReactiveScopes(function *Function, scopes *ReactiveScopes) (*AlignedScopes,
 	*MergedScopes) {
 	aligned := AlignReactiveScopesToBlockScopes(function, scopes)
-	if function == nil || scopes == nil || scopes.Len() == 0 {
+	if function == nil || scopes == nil || scopes.Length() == 0 {
 		return aligned, &MergedScopes{}
 	}
 
@@ -384,7 +384,7 @@ func AlignThenMergeReactiveScopes(function *Function, scopes *ReactiveScopes) (*
 	// they are shared rather than copied, and the range table is the only new allocation.
 	widened := &ReactiveScopes{
 		byIdentifier: scopes.byIdentifier,
-		ranges:       make(map[ScopeId]mutation_aliasing.MutableRange, scopes.Len()),
+		ranges:       make(map[ScopeId]mutation_aliasing.MutableRange, scopes.Length()),
 		members:      scopes.members,
 		order:        scopes.order,
 	}

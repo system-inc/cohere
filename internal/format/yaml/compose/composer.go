@@ -12,9 +12,9 @@ import (
 // first two are read), a position ([2]int), or a CST token.
 type onErrorFunc func(source any, code string, message string, warning bool)
 
-// getErrorPos is upstream's: an offset is one character, a token is its source (or one character for a
+// getErrorPosition is upstream's: an offset is one character, a token is its source (or one character for a
 // token without one).
-func getErrorPos(source any) [2]int {
+func getErrorPosition(source any) [2]int {
 	switch src := source.(type) {
 	case int:
 		return [2]int{src, src + 1}
@@ -99,7 +99,7 @@ func NewComposer(options Options) *Composer {
 }
 
 func (composer *Composer) onError(source any, code string, message string, warning bool) {
-	position := getErrorPos(source)
+	position := getErrorPosition(source)
 	if warning {
 		composer.warnings = append(composer.warnings, newYamlWarning(position, code, message))
 	} else {
@@ -171,7 +171,7 @@ func (composer *Composer) next(token *cst.Token, yield func(*Document) bool) boo
 	switch token.Type {
 	case "directive":
 		composer.directives.add(token.Source, func(offset int, message string, warning bool) {
-			position := getErrorPos(token)
+			position := getErrorPosition(token)
 			position[0] += offset
 			composer.onError(position, "BAD_DIRECTIVE", message, warning)
 		})
@@ -198,7 +198,7 @@ func (composer *Composer) next(token *cst.Token, yield func(*Document) bool) boo
 		if len(token.Source) > 0 {
 			message = token.Message + ": " + jsonStringify(token.Source)
 		}
-		yamlError := newYamlParseError(getErrorPos(token), "UNEXPECTED_TOKEN", message)
+		yamlError := newYamlParseError(getErrorPosition(token), "UNEXPECTED_TOKEN", message)
 		if composer.atDirectives || composer.doc == nil {
 			composer.errors = append(composer.errors, yamlError)
 		} else {
@@ -209,7 +209,7 @@ func (composer *Composer) next(token *cst.Token, yield func(*Document) bool) boo
 			message := "Unexpected doc-end without preceding document"
 			composer.errors = append(
 				composer.errors,
-				newYamlParseError(getErrorPos(token), "UNEXPECTED_TOKEN", message),
+				newYamlParseError(getErrorPosition(token), "UNEXPECTED_TOKEN", message),
 			)
 			break
 		}
@@ -226,7 +226,7 @@ func (composer *Composer) next(token *cst.Token, yield func(*Document) bool) boo
 		}
 		composer.doc.Range[2] = end.offset
 	default:
-		composer.errors = append(composer.errors, newYamlParseError(getErrorPos(token), "UNEXPECTED_TOKEN",
+		composer.errors = append(composer.errors, newYamlParseError(getErrorPosition(token), "UNEXPECTED_TOKEN",
 			"Unsupported token "+token.Type))
 	}
 	return true

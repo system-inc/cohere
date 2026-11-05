@@ -930,7 +930,7 @@ func noInvalidThisCallDoesNotBindThis(call *ast.Node, current *ast.Node) bool {
 			noInvalidThisIsNullOrUndefined(arguments[2])
 	}
 
-	if noInvalidThisIsArrayMethodTakingThisArg(methodName) {
+	if noInvalidThisIsArrayMethodTakingThisArgument(methodName) {
 		return len(arguments) != 2 || arguments[0] != current ||
 			noInvalidThisIsNullOrUndefined(arguments[1])
 	}
@@ -938,7 +938,7 @@ func noInvalidThisCallDoesNotBindThis(call *ast.Node, current *ast.Node) bool {
 	return true
 }
 
-// noInvalidThisArrayMethodsTakingThisArg is upstream's `arrayMethodWithThisArgPattern`: the array
+// noInvalidThisArrayMethodsTakingThisArgument is upstream's `arrayMethodWithThisArgPattern`: the array
 // methods whose second argument becomes the callback's `this`.
 //
 // Upstream writes it as `/^(?:every|filter|find(?:Last)?(?:Index)?|flatMap|forEach|map|some)$/u`,
@@ -947,12 +947,12 @@ func noInvalidThisCallDoesNotBindThis(call *ast.Node, current *ast.Node) bool {
 //
 // The name is prefixed rather than bare because internal/lint/rules/core is one Go namespace shared
 // with every committed rule beside it, and a bare `arrayMethods` would collide with a sibling.
-var noInvalidThisArrayMethodsTakingThisArg = map[string]bool{
+var noInvalidThisArrayMethodsTakingThisArgument = map[string]bool{
 	"every": true, "filter": true, "find": true, "findIndex": true,
 	"findLast": true, "findLastIndex": true, "flatMap": true,
 	"forEach": true, "map": true, "some": true,
 }
 
-func noInvalidThisIsArrayMethodTakingThisArg(name string) bool {
-	return noInvalidThisArrayMethodsTakingThisArg[name]
+func noInvalidThisIsArrayMethodTakingThisArgument(name string) bool {
+	return noInvalidThisArrayMethodsTakingThisArgument[name]
 }

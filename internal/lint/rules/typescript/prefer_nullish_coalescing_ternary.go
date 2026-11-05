@@ -86,7 +86,7 @@ func preferNullishCoalescingJudgeTernary(ruleContext rule.Context, node *ast.Nod
 		nonNullishBranch, nullishBranch = conditional.WhenFalse, conditional.WhenTrue
 	}
 
-	subject, fixable := preferNullishCoalescingParams(ruleContext, node, test,
+	subject, fixable := preferNullishCoalescingParameters(ruleContext, node, test,
 		preferNullishCoalescingUnwrap(nonNullishBranch), reading, settings)
 	if !fixable {
 		return preferNullishCoalescingFinding{}, false
@@ -184,7 +184,7 @@ func preferNullishCoalescingJudgeIf(ruleContext rule.Context, node *ast.Node,
 	// shadows its `nullishCoalescingLeftNode` with the target here, so `if (foo?.a == null) foo.a = b`
 	// suggests `foo.a ??= b`: the left side of an assignment cannot carry `?.`, and the test's
 	// spelling would be a syntax error. Measured: two corpus cases differ only in this.
-	if _, fixable := preferNullishCoalescingParams(ruleContext, node, test, target, reading, settings); !fixable {
+	if _, fixable := preferNullishCoalescingParameters(ruleContext, node, test, target, reading, settings); !fixable {
 		return preferNullishCoalescingFinding{}, false
 	}
 	// Asked last, at a finding: the ancestor walk is paid only where the rule has something to say.
@@ -304,7 +304,7 @@ func preferNullishCoalescingReadTest(test *ast.Node) (preferNullishCoalescingTes
 	}}, true
 }
 
-// preferNullishCoalescingParams is upstream's `getNullishCoalescingParams`: given the test and the
+// preferNullishCoalescingParameters is upstream's `getNullishCoalescingParams`: given the test and the
 // branch that runs when the subject is present, find the subject and decide whether `??` would
 // mean the same thing.
 //
@@ -319,7 +319,7 @@ func preferNullishCoalescingReadTest(test *ast.Node) (preferNullishCoalescingTes
 //
 // and an `any` or `unknown` subject is never fixable on a one-sided strict check, since either
 // could be in it.
-func preferNullishCoalescingParams(ruleContext rule.Context, node *ast.Node, test *ast.Node,
+func preferNullishCoalescingParameters(ruleContext rule.Context, node *ast.Node, test *ast.Node,
 	nonNullish *ast.Node, reading preferNullishCoalescingTest,
 	settings PreferNullishCoalescingOptions) (*ast.Node, bool) {
 
@@ -533,7 +533,7 @@ func preferNullishCoalescingUnionFlags(subject *checker.Type) checker.TypeFlags 
 	if subject == nil {
 		return combined
 	}
-	for part := range type_checking.UnionTypePartsSeq(subject) {
+	for part := range type_checking.UnionTypePartsSequence(subject) {
 		if part != nil {
 			combined |= checker.Type_flags(part)
 		}

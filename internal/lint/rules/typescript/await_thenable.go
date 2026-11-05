@@ -191,7 +191,7 @@ var AwaitThenable = rule.Rule[rule.NoOptions]{
 					return
 				}
 
-				for typePart := range type_checking.UnionTypePartsSeq(exprType) {
+				for typePart := range type_checking.UnionTypePartsSequence(exprType) {
 					if type_checking.GetWellKnownSymbolPropertyOfType(
 						typePart,
 						"asyncIterator",
@@ -307,7 +307,7 @@ func awaitThenableIsPromiseAggregatorCall(ruleContext rule.Context, call *ast.No
 // awaitThenableIsAlwaysNonAwaitable is upstream's `isAlwaysNonAwaitableType`: every union part is
 // never awaitable.
 func awaitThenableIsAlwaysNonAwaitable(ruleContext rule.Context, node *ast.Node, subjectType *checker.Type) bool {
-	for part := range type_checking.UnionTypePartsSeq(subjectType) {
+	for part := range type_checking.UnionTypePartsSequence(subjectType) {
 		if type_checking.NeedsToBeAwaited(ruleContext.TypeChecker, node, part) != type_checking.TypeAwaitableNever {
 			return false
 		}
@@ -318,7 +318,7 @@ func awaitThenableIsAlwaysNonAwaitable(ruleContext rule.Context, node *ast.Node,
 // awaitThenableContainsNonAwaitable is upstream's `containsNonAwaitableType`: some union part is
 // never awaitable.
 func awaitThenableContainsNonAwaitable(ruleContext rule.Context, node *ast.Node, subjectType *checker.Type) bool {
-	for part := range type_checking.UnionTypePartsSeq(subjectType) {
+	for part := range type_checking.UnionTypePartsSequence(subjectType) {
 		if type_checking.NeedsToBeAwaited(ruleContext.TypeChecker, node, part) == type_checking.TypeAwaitableNever {
 			return true
 		}
@@ -332,12 +332,12 @@ func awaitThenableContainsNonAwaitable(ruleContext rule.Context, node *ast.Node,
 // A non-iterable argument is already a type error, so it is left to the checker. An iterable one
 // reports when any of its value types contains a part that is never awaitable.
 func awaitThenableIsInvalidAggregatorInput(ruleContext rule.Context, node *ast.Node, subjectType *checker.Type) bool {
-	for part := range type_checking.UnionTypePartsSeq(subjectType) {
+	for part := range type_checking.UnionTypePartsSequence(subjectType) {
 		if type_checking.GetWellKnownSymbolPropertyOfType(part, "iterator", ruleContext.TypeChecker) == nil {
 			return false
 		}
 	}
-	for part := range type_checking.UnionTypePartsSeq(subjectType) {
+	for part := range type_checking.UnionTypePartsSequence(subjectType) {
 		for _, valueType := range awaitThenableValueTypesOfArrayLike(ruleContext, part) {
 			if awaitThenableContainsNonAwaitable(ruleContext, node, valueType) {
 				return true
@@ -350,7 +350,7 @@ func awaitThenableIsInvalidAggregatorInput(ruleContext rule.Context, node *ast.N
 // awaitThenableIsAsyncDisposable answers whether some union part carries `Symbol.asyncDispose`, which
 // is what lets an `await using` declarator through.
 func awaitThenableIsAsyncDisposable(ruleContext rule.Context, initializerType *checker.Type) bool {
-	for part := range type_checking.UnionTypePartsSeq(initializerType) {
+	for part := range type_checking.UnionTypePartsSequence(initializerType) {
 		if type_checking.GetWellKnownSymbolPropertyOfType(part, "asyncDispose", ruleContext.TypeChecker) != nil {
 			return true
 		}

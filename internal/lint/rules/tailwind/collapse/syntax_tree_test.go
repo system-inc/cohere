@@ -68,7 +68,7 @@ type fixtureNode struct {
 	Kind         string            `json:"kind"`
 	Selector     string            `json:"selector"`
 	Name         string            `json:"name"`
-	Params       string            `json:"params"`
+	Parameters   string            `json:"params"`
 	Property     string            `json:"property"`
 	Value        *string           `json:"value"`
 	ValuePresent bool              `json:"valuePresent"`
@@ -85,7 +85,7 @@ func (fixture *fixtureNode) toNode(test *testing.T) *Node {
 	case KindRule:
 		node.Selector = fixture.Selector
 	case KindAtRule:
-		node.Name, node.Params = fixture.Name, fixture.Params
+		node.Name, node.Parameters = fixture.Name, fixture.Parameters
 	case KindDeclaration:
 		node.Property, node.Important, node.ValuePresent = fixture.Property, fixture.Important, fixture.ValuePresent
 		if fixture.Value != nil {

@@ -93,8 +93,8 @@ type Token struct {
 	// End is the tokens after a document, document end marker, flow scalar or flow collection; nil when
 	// absent.
 	End []*Token
-	// Props is a block scalar's header, and the comments and spaces on its line.
-	Props []*Token
+	// Properties is a block scalar's header, and the comments and spaces on its line.
+	Properties []*Token
 	// Items is a block map's, block sequence's or flow collection's items.
 	Items []*CollectionItem
 

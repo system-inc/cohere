@@ -235,7 +235,7 @@ func TestManualMemoMarkersFreezeTheirOperands(t *testing.T) {
 
 	test := func(source string, wantFreeze bool) {
 		function, _ := effectsFor(t, source)
-		value := function.Params[0]
+		value := function.Parameters[0]
 		finish := &Instruction{
 			LValue: Place{Identifier: function.NewIdentifier("", nil, 0).Id},
 			Value:  &FinishMemoize{ManualMemoId: 1, Value: value},
@@ -458,7 +458,7 @@ func TestFreezeTraversesPhiValuesAndFunctionCaptures(test *testing.T) {
 			return Place{Identifier: function.NewIdentifier(name, nil, 0).Id}
 		}
 		condition := newPlace("condition")
-		function.Params = []Place{condition}
+		function.Parameters = []Place{condition}
 		function.Returns = newPlace("")
 		entry.Terminal = &Branch{
 			Test: condition, Consequent: consequent.Id, Alternate: alternate.Id, Fallthrough: join.Id,
@@ -505,7 +505,7 @@ func TestFreezeTraversesPhiValuesAndFunctionCaptures(test *testing.T) {
 			return Place{Identifier: function.NewIdentifier(name, nil, 0).Id}
 		}
 		captured := newPlace("captured")
-		function.Params = []Place{captured}
+		function.Parameters = []Place{captured}
 		function.Returns = newPlace("")
 
 		closure := newPlace("closure")
@@ -791,7 +791,7 @@ function f(a: number[], o: { x: number }, p: Promise<number>, fn: (n: number) =>
 
 	// The control. Without it this test is satisfied by a pass that produces nothing at all, for
 	// every shape, since a table with no entries has no uncovered shapes either.
-	if table.Len() == 0 {
+	if table.Length() == 0 {
 		test.Fatal("the control failed: no instruction produced any effect, so the assertion above " +
 			"passed vacuously")
 	}

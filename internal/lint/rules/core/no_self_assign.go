@@ -19,14 +19,14 @@ var messageSelfAssignment = rule.Message{
 // Upstream's schema is a single object with one boolean, `props`, defaulting to true. Our config
 // layer unwraps the severity tuple before dispatch, so the decoder receives that object directly.
 type NoSelfAssignOptions struct {
-	// Props compares member expressions as well as names, so `a.b = a.b` and `a[b] = a[b]` report.
+	// Properties compares member expressions as well as names, so `a.b = a.b` and `a[b] = a[b]` report.
 	// Absent means true, which is upstream's default and the reason the decoder is hand-written.
-	Props bool `json:"props"`
+	Properties bool `json:"props"`
 }
 
 // DefaultNoSelfAssignOptions is the unconfigured answer.
 func DefaultNoSelfAssignOptions() NoSelfAssignOptions {
-	return NoSelfAssignOptions{Props: true}
+	return NoSelfAssignOptions{Properties: true}
 }
 
 // DecodeNoSelfAssignOptions reads this rule's configuration from the config layer.
@@ -78,9 +78,9 @@ func DecodeNoSelfAssignOptions(raw []byte) (NoSelfAssignOptions, error) {
 var NoSelfAssign = rule.Rule[NoSelfAssignOptions]{
 	Name: "no-self-assign",
 	Run: func(ruleContext rule.Context, options rule.Given[NoSelfAssignOptions]) rule.Listeners {
-		properties := DefaultNoSelfAssignOptions().Props
+		properties := DefaultNoSelfAssignOptions().Properties
 		if resolved, isNoSelfAssignOptions := options.Read(); isNoSelfAssignOptions {
-			properties = resolved.Props
+			properties = resolved.Properties
 		}
 
 		return rule.Listeners{

@@ -575,7 +575,7 @@ func characterSequences(
 			minimumEnd, maximumStart := rangeEndpointBounds(pattern, element, flags)
 			appendCharacter(element.Value, element.Start, minimumEnd, element.IsUBrace)
 			flush()
-			appendCharacter(element.Max, maximumStart, element.End, element.MaxIsUBrace)
+			appendCharacter(element.Maximum, maximumStart, element.End, element.MaxIsUBrace)
 		default:
 			appendCharacter(element.Value, element.Start, element.End, element.IsUBrace)
 		}

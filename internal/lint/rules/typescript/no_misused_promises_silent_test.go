@@ -48,7 +48,7 @@ if (true) {
 if (Promise.resolve()) {
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)}),
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Reference(false)}),
 		},
 		{
 			name:     "upstream valid 2",
@@ -69,7 +69,7 @@ if (Promise.resolve()) {
 } else {
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)}),
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Reference(false)}),
 		},
 		{
 			name:       "upstream valid 4",
@@ -85,7 +85,7 @@ if (Promise.resolve()) {
 			name:       "upstream valid 6 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `for (let i; Promise.resolve(); i++) {}`,
-			options:    rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)}),
+			options:    rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Reference(false)}),
 		},
 		{
 			name:       "upstream valid 7",
@@ -96,7 +96,7 @@ if (Promise.resolve()) {
 			name:       "upstream valid 8 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `do {} while (Promise.resolve());`,
-			options:    rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)}),
+			options:    rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Reference(false)}),
 		},
 		{
 			name:       "upstream valid 9",
@@ -107,7 +107,7 @@ if (Promise.resolve()) {
 			name:       "upstream valid 10 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `while (Promise.resolve()) {}`,
-			options:    rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)}),
+			options:    rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Reference(false)}),
 		},
 		{
 			name:       "upstream valid 11",
@@ -118,7 +118,7 @@ if (Promise.resolve()) {
 			name:       "upstream valid 12 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `Promise.resolve() ? 123 : 456;`,
-			options:    rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)}),
+			options:    rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Reference(false)}),
 		},
 		{
 			name:     "upstream valid 13",
@@ -135,7 +135,7 @@ if (!true) {
 if (!Promise.resolve()) {
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)}),
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Reference(false)}),
 		},
 		{
 			name:       "upstream valid 15",
@@ -146,7 +146,7 @@ if (!Promise.resolve()) {
 			name:       "upstream valid 16 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `Promise.resolve() || false;`,
-			options:    rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)}),
+			options:    rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Reference(false)}),
 		},
 		{
 			name:       "upstream valid 17",
@@ -157,7 +157,7 @@ if (!Promise.resolve()) {
 			name:       "upstream valid 18 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `(true && Promise.resolve()) || false;`,
-			options:    rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)}),
+			options:    rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Reference(false)}),
 		},
 		{
 			name:       "upstream valid 19",
@@ -221,7 +221,7 @@ if (value) {
 			name:       "upstream valid 26 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `[1, 2, 3].forEach(async val => {});`,
-			options:    rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturn: type_checking.Ref(false)}),
+			options:    rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturn: type_checking.Reference(false)}),
 		},
 		{
 			name:       "upstream valid 27",
@@ -232,7 +232,7 @@ if (value) {
 			name:       "upstream valid 28 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `new Promise(async (resolve, reject) => resolve());`,
-			options:    rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturn: type_checking.Ref(false)}),
+			options:    rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturn: type_checking.Reference(false)}),
 		},
 		{
 			name:     "upstream valid 29",
@@ -571,7 +571,7 @@ console.log([...(await Promise.resolve(42))]);
 			sourceText: `
 console.log({ ...Promise.resolve({ key: 42 }) });
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksSpreads: type_checking.Ref(false)}),
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksSpreads: type_checking.Reference(false)}),
 		},
 		{
 			name:     "upstream valid 61 [options]",
@@ -584,7 +584,7 @@ console.log({
   ...getData(),
 });
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksSpreads: type_checking.Ref(false)}),
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksSpreads: type_checking.Reference(false)}),
 		},
 		{
 			name:     "upstream valid 62 [options]",
@@ -597,7 +597,7 @@ console.log({ ...(condition || Promise.resolve({ key: 42 })) });
 console.log({ ...(condition ? {} : Promise.resolve({ key: 42 })) });
 console.log({ ...(condition ? Promise.resolve({ key: 42 }) : {}) });
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksSpreads: type_checking.Ref(false)}),
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksSpreads: type_checking.Reference(false)}),
 		},
 		{
 			name:     "upstream valid 63 [options]",
@@ -606,7 +606,7 @@ console.log({ ...(condition ? Promise.resolve({ key: 42 }) : {}) });
 // This is invalid Typescript, but it shouldn't trigger this linter specifically
 console.log([...Promise.resolve(42)]);
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksSpreads: type_checking.Ref(false)}),
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksSpreads: type_checking.Reference(false)}),
 		},
 		{
 			name:     "upstream valid 64",
@@ -745,8 +745,8 @@ class Bar extends Foo {
   [key: string]: Promise<void>;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -834,8 +834,8 @@ foo(bar);
 
         <ASTViewer onSelectNode={onSelectFn} />;
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{Attributes: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{Attributes: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -854,8 +854,8 @@ class MySubclassExtendsMyClass extends MyClass {
   }
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -874,8 +874,8 @@ class MySubclassExtendsMyClass extends MyClass {
   }
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -894,8 +894,8 @@ class MySubclassExtendsMyClass extends MyClass {
   }
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(false)},
 			)}),
 		},
 		{
@@ -912,8 +912,8 @@ abstract class MyAbstractClassExtendsMyClass extends MyClass {
   abstract setThing(): void;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -930,8 +930,8 @@ abstract class MyAbstractClassExtendsMyClass extends MyClass {
   abstract setThing(): Promise<void>;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(false)},
 			)}),
 		},
 		{
@@ -948,8 +948,8 @@ interface MyInterfaceExtendsMyClass extends MyClass {
   setThing(): void;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -966,8 +966,8 @@ interface MyInterfaceExtendsMyClass extends MyClass {
   setThing(): Promise<void>;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(false)},
 			)}),
 		},
 		{
@@ -984,8 +984,8 @@ class MySubclassExtendsMyAbstractClass extends MyAbstractClass {
   }
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1002,8 +1002,8 @@ class MySubclassExtendsMyAbstractClass extends MyAbstractClass {
   }
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(false)},
 			)}),
 		},
 		{
@@ -1018,8 +1018,8 @@ abstract class MyAbstractSubclassExtendsMyAbstractClass extends MyAbstractClass 
   abstract setThing(): void;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1034,8 +1034,8 @@ abstract class MyAbstractSubclassExtendsMyAbstractClass extends MyAbstractClass 
   abstract setThing(): Promise<void>;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(false)},
 			)}),
 		},
 		{
@@ -1050,8 +1050,8 @@ interface MyInterfaceExtendsMyAbstractClass extends MyAbstractClass {
   setThing(): void;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1066,8 +1066,8 @@ interface MyInterfaceExtendsMyAbstractClass extends MyAbstractClass {
   setThing(): Promise<void>;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(false)},
 			)}),
 		},
 		{
@@ -1082,8 +1082,8 @@ interface MySubInterfaceExtendsMyInterface extends MyInterface {
   setThing(): void;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1098,8 +1098,8 @@ interface MySubInterfaceExtendsMyInterface extends MyInterface {
   setThing(): Promise<void>;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(false)},
 			)}),
 		},
 		{
@@ -1116,8 +1116,8 @@ class MyClassImplementsMyInterface implements MyInterface {
   }
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1134,8 +1134,8 @@ class MyClassImplementsMyInterface implements MyInterface {
   }
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(false)},
 			)}),
 		},
 		{
@@ -1150,8 +1150,8 @@ abstract class MyAbstractClassImplementsMyInterface implements MyInterface {
   abstract setThing(): void;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1166,8 +1166,8 @@ abstract class MyAbstractClassImplementsMyInterface implements MyInterface {
   abstract setThing(): Promise<void>;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(false)},
 			)}),
 		},
 		{
@@ -1183,8 +1183,8 @@ class MyClass implements MyTypeLiteralsIntersection {
   }
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1200,8 +1200,8 @@ class MyClass implements MyTypeLiteralsIntersection {
   }
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(false)},
 			)}),
 		},
 		{
@@ -1216,8 +1216,8 @@ interface MyAsyncInterface extends MyGenericType {
   setThing(): Promise<void>;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1232,8 +1232,8 @@ interface MyAsyncInterface extends MyGenericType<false> {
   setThing(): Promise<void>;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(false)},
 			)}),
 		},
 		{
@@ -1252,8 +1252,8 @@ interface MyThirdInterface extends MyInterface, MyOtherInterface {
   setThing(): void;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1276,8 +1276,8 @@ interface MyInterface extends MyClass, MyOtherClass {
   setThing(): void;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1304,8 +1304,8 @@ class MySubclass extends MyClass implements MyInterface, MyOtherInterface {
   }
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1324,8 +1324,8 @@ const MyClassExpressionExtendsMyClass = class extends MyClass {
   }
 };
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1344,8 +1344,8 @@ class MyClassExtendsMyClassExpression extends MyClassExpression {
   }
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1363,8 +1363,8 @@ interface MyInterfaceExtendsMyClassExpression extends MyClassExpressionType {
   setThing(): void;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1380,8 +1380,8 @@ interface MyAsyncInterface extends MySyncCallSignatures {
   (arg: string): Promise<void>;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1397,8 +1397,8 @@ interface ThisIsADifferentIssue extends MySyncConstructSignatures {
   new (arg: string): Promise<void>;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1414,8 +1414,8 @@ interface ThisIsADifferentIssue extends MySyncIndexSignatures {
   [key: number]: Promise<void>;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1437,8 +1437,8 @@ interface MyAsyncInterface extends MySyncInterfaceSignatures {
   [key: number]: () => Promise<void>;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{
@@ -1477,8 +1477,8 @@ interface MyInterface extends MyCall, MyIndex, MyConstruct, MyMethods {
   syncMethodProperty: () => void;
 }
       `,
-			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
-				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Reference(
+				NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Reference(true)},
 			)}),
 		},
 		{

@@ -80,7 +80,7 @@ var spaceAtStartPattern = func(text string) bool {
 	return inClass(spaceSeparatorRanges, []rune(text)[0])
 }
 
-func prevOrNextWord(path *astPath) bool {
+func previousOrNextWord(path *astPath) bool {
 	previous, next := previousNode(path), nextNode(path)
 	return (previous != nil && previous.NodeType == "sentence" &&
 		len(previous.Children) > 0 && previous.Children[len(previous.Children)-1].NodeType == "word" &&
@@ -182,10 +182,10 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 		if len(node.Children) > 0 && isAutolink(node.Children[0]) {
 			style = options.OriginalText[node.Position.Start.Offset : node.Position.Start.Offset+1]
 		} else {
-			hasPrevOrNextWord := prevOrNextWord(path) // `1*2*3` is considered emphasis but `1_2_3` is not
+			hasPrevOrNextWord := previousOrNextWord(path) // `1*2*3` is considered emphasis but `1_2_3` is not
 			// `1***2***3` is considered strong emphasis but `1**_2_**3` is not
 			inStrongAndHasPrevOrNextWord := printing.CallParent(path, func(path *astPath) bool {
-				return currentNode(path).NodeType == "strong" && prevOrNextWord(path)
+				return currentNode(path).NodeType == "strong" && previousOrNextWord(path)
 			}, 0)
 			if hasPrevOrNextWord || inStrongAndHasPrevOrNextWord ||
 				path.HasAncestor(func(node *Node) bool { return node.NodeType == "emphasis" }) {

@@ -442,11 +442,11 @@ func TestMutatingMethodReceiverSurvivesArgumentControlFlow(test *testing.T) {
 					mutations)
 			}
 
-			if len(method.Args) != 1 {
-				test.Fatalf("push has %d arguments, want 1", len(method.Args))
+			if len(method.Arguments) != 1 {
+				test.Fatalf("push has %d arguments, want 1", len(method.Arguments))
 			}
 			argumentIsPhi := false
-			argument := method.Args[0].Place.Identifier
+			argument := method.Arguments[0].Place.Identifier
 			for _, block := range function.Blocks {
 				if block == nil {
 					continue
@@ -740,11 +740,11 @@ func unknownCallAndArgumentPhi(test *testing.T, function *Function,
 			continue
 		}
 		value, ok := instruction.Value.(*CallExpression)
-		if !ok || calleeName(function, instruction, value.Callee) != name || len(value.Args) != 1 {
+		if !ok || calleeName(function, instruction, value.Callee) != name || len(value.Arguments) != 1 {
 			continue
 		}
 		call = instruction
-		argument = value.Args[0].Place.Identifier
+		argument = value.Arguments[0].Place.Identifier
 		break
 	}
 	if call == nil {
@@ -1348,7 +1348,7 @@ export function f(p: number[]) {
 
 	var parameter static_single_assignment.IdentifierId
 	var found bool
-	for _, place := range function.Params {
+	for _, place := range function.Parameters {
 		for _, identifier := range function.Identifiers {
 			if identifier != nil && identifier.Id == place.Identifier && identifier.Name == "p" {
 				parameter = place.Identifier
@@ -1477,7 +1477,7 @@ export function f(seed: number[]) {
 
 	var seed static_single_assignment.IdentifierId
 	var found bool
-	for _, place := range function.Params {
+	for _, place := range function.Parameters {
 		for _, identifier := range function.Identifiers {
 			if identifier != nil && identifier.Id == place.Identifier && identifier.Name == "seed" {
 				seed, found = place.Identifier, true

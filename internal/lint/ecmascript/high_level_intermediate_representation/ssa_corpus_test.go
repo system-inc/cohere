@@ -67,12 +67,12 @@ func TestSsaOverRealCodebase(test *testing.T) {
 			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
-						forEachFunctionLike(node, func(fnNode *ast.Node) {
-							fn := Lower(fnNode, ruleContext.TypeChecker)
-							if fn == nil {
+						forEachFunctionLike(node, func(functionNode *ast.Node) {
+							function := Lower(functionNode, ruleContext.TypeChecker)
+							if function == nil {
 								return
 							}
-							Construct(fn)
+							Construct(function)
 							var each func(*Function)
 							each = func(f *Function) {
 								totalFns++
@@ -131,7 +131,7 @@ func TestSsaOverRealCodebase(test *testing.T) {
 									each(n)
 								}
 							}
-							each(fn)
+							each(function)
 						})
 					},
 				}

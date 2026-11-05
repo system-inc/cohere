@@ -904,7 +904,7 @@ func reportUnknownRuleReferences(sourceFile *ast.SourceFile, directives *suppres
 		}
 		report(rule.Diagnostic{
 			RuleName:   reference.Name,
-			Range:      core.NewTextRange(reference.Pos, reference.End),
+			Range:      core.NewTextRange(reference.Position, reference.End),
 			Message:    rule.Message{Id: "ruleNotFound", Description: description},
 			SourceFile: sourceFile,
 		})

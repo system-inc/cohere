@@ -176,7 +176,7 @@ func inlineInvokedFunctions(function *Function, includeMemoCallbacks bool) int {
 					forgetFunctionOperands(instruction.Value, functions)
 					continue
 				}
-				if !eligible || len(value.Args) != 0 {
+				if !eligible || len(value.Arguments) != 0 {
 					// Not a call of a local function expression, or a call with arguments this
 					// pass does not bind. Either way the callee is still a plain use of the
 					// function value, so it stops being an IIFE candidate.
@@ -184,7 +184,7 @@ func inlineInvokedFunctions(function *Function, includeMemoCallbacks bool) int {
 					continue
 				}
 				nested := nestedFunctionOf(function, expression)
-				if nested == nil || len(nested.Params) != 0 ||
+				if nested == nil || len(nested.Parameters) != 0 ||
 					nested.IsAsync || nested.IsGenerator {
 					forgetFunctionOperands(instruction.Value, functions)
 					continue

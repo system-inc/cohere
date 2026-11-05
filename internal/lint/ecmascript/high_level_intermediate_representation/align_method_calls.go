@@ -42,7 +42,7 @@ import (
 // and a mapping for the second, and the distinction matters because a merge changes a range while a
 // mapping changes membership.
 func AlignMethodCallScopes(function *Function, scopes *ReactiveScopes) *ReactiveScopes {
-	if function == nil || scopes == nil || scopes.Len() == 0 {
+	if function == nil || scopes == nil || scopes.Length() == 0 {
 		return scopes
 	}
 

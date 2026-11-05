@@ -23,25 +23,25 @@ func shouldPrintDirectly(node Node) bool {
 }
 
 // printWithoutParentheses is upstream's printWithoutParentheses.
-func printWithoutParentheses(path *Path, options *Options, print PrintFunc, args any) Doc {
+func printWithoutParentheses(path *Path, options *Options, print PrintFunc, arguments any) Doc {
 	if printed := printJsx(path, options, print); printed != nil {
 		return printed
 	}
-	if printed := printTypescript(path, options, print, args); printed != nil {
+	if printed := printTypescript(path, options, print, arguments); printed != nil {
 		return printed
 	}
-	return printEstreeNode(path, options, print, args)
+	return printEstreeNode(path, options, print, arguments)
 }
 
 // printEstree is upstream's print, print/index.js: the printer's entry for every node.
-func printEstree(path *Path, options *Options, print PrintFunc, args any) Doc {
+func printEstree(path *Path, options *Options, print PrintFunc, arguments any) Doc {
 	current := node(path)
 
 	var printed Doc
 	if isIgnored(path) {
 		printed = printIgnored(path, options)
 	} else {
-		printed = printWithoutParentheses(path, options, print, args)
+		printed = printWithoutParentheses(path, options, print, arguments)
 	}
 	if printed == nil || isEmptyString(printed) {
 		return emptyDoc
@@ -93,7 +93,7 @@ func printCommentsForFunction(path *Path, options *Options, printed Doc) Doc {
 var lowercaseLetterEnd = regexp.MustCompile(`[a-z]$`)
 
 // printEstreeNode is upstream's printEstree, print/estree.js.
-func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Doc {
+func printEstreeNode(path *Path, options *Options, print PrintFunc, arguments any) Doc {
 	current := node(path)
 
 	if isLiteral(current) {
@@ -146,9 +146,9 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 	case "RestElement":
 		return printRestElement(path, print)
 	case "FunctionDeclaration", "FunctionExpression":
-		return printFunction(path, options, print, argsOf(args))
+		return printFunction(path, options, print, argumentsOf(arguments))
 	case "ArrowFunctionExpression":
-		return printArrowFunction(path, options, print, argsOf(args))
+		return printArrowFunction(path, options, print, argumentsOf(arguments))
 	case "YieldExpression":
 		keyword := "yield"
 		if current.Bool("delegate") {
@@ -224,7 +224,7 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 		}
 		return concatIn(path, "", print("argument", nil), current.String("operator"))
 	case "ConditionalExpression":
-		return printTernary(path, options, print, argsOf(args))
+		return printTernary(path, options, print, argumentsOf(arguments))
 	case "VariableDeclaration":
 		return printVariableDeclaration(path, options, print)
 	case "IfStatement":
@@ -298,7 +298,7 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 
 // printTypescript is upstream's printTypescript, print/typescript.js. It returns nil for a node that
 // is not TypeScript, where upstream returns undefined.
-func printTypescript(path *Path, options *Options, print PrintFunc, args any) Doc {
+func printTypescript(path *Path, options *Options, print PrintFunc, arguments any) Doc {
 	current := node(path)
 	nodeType := current.Type()
 	if !strings.HasPrefix(nodeType, "TS") {
@@ -433,7 +433,7 @@ func printTypescript(path *Path, options *Options, print PrintFunc, args any) Do
 	case "TSIntersectionType":
 		return printIntersectionType(path, options, print)
 	case "TSUnionType":
-		return printUnionType(path, options, print, argsOf(args))
+		return printUnionType(path, options, print, argumentsOf(arguments))
 	case "TSFunctionType", "TSCallSignatureDeclaration", "TSConstructorType", "TSConstructSignatureDeclaration":
 		return printFunctionType(path, options, print)
 	case "TSTupleType":

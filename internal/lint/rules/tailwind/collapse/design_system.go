@@ -666,9 +666,9 @@ func (collector *stylesheetCollector) ingest(nodes []*Node, path string) error {
 
 		case "@config", "@plugin":
 			collector.skipped = append(collector.skipped, SkippedDirective{
-				Name:   node.Name,
-				Params: node.Params,
-				Path:   path,
+				Name:       node.Name,
+				Parameters: node.Parameters,
+				Path:       path,
 			})
 
 		default:
@@ -692,7 +692,7 @@ func (collector *stylesheetCollector) ingest(nodes []*Node, path string) error {
 // looks exactly like a right one. Same judgement as themeloader.go's followImport, and deliberately
 // the same error text so a repository hitting it finds one explanation rather than two.
 func (collector *stylesheetCollector) resolveImport(node *Node, path string) (string, error) {
-	parts := segment(text.TrimWhitespace(node.Params), ' ')
+	parts := segment(text.TrimWhitespace(node.Parameters), ' ')
 	if len(parts) == 0 || parts[0] == "" {
 		return "", fmt.Errorf("%s: @import with no specifier", path)
 	}
@@ -726,7 +726,7 @@ func (collector *stylesheetCollector) resolveImport(node *Node, path string) (st
 // reason themeloader.go states: a stylesheet the engine rejects must not quietly produce a theme
 // here, since any theme built from input the engine refuses is one no repository can be using.
 func (collector *stylesheetCollector) ingestThemeBlock(node *Node, path string) error {
-	options, prefix := parseThemeOptions(node.Params)
+	options, prefix := parseThemeOptions(node.Parameters)
 
 	if prefix != "" {
 		if !isValidThemePrefix(prefix) {
@@ -782,7 +782,7 @@ func (collector *stylesheetCollector) ingestThemeBlock(node *Node, path string) 
 // A block whose name is neither shape is an error rather than a skip. Upstream throws on it, and a
 // silently dropped `@utility` is a repository utility every rule then treats as an unknown class.
 func (collector *stylesheetCollector) ingestUtilityBlock(node *Node, path string) error {
-	name := text.TrimWhitespace(node.Params)
+	name := text.TrimWhitespace(node.Parameters)
 	if name == "" {
 		return fmt.Errorf("%s: `@utility` with no name", path)
 	}
@@ -849,7 +849,7 @@ func (collector *stylesheetCollector) ingestUtilityBlock(node *Node, path string
 // CSS and a variant's sort position does not depend on what it emits. See the file comment in
 // variant.go, where both corpus repositories redefine `dark` and keep the framework's position.
 func (collector *stylesheetCollector) ingestCustomVariant(node *Node) {
-	parts := segment(text.TrimWhitespace(node.Params), ' ')
+	parts := segment(text.TrimWhitespace(node.Parameters), ' ')
 	if len(parts) == 0 {
 		return
 	}

@@ -129,7 +129,7 @@ func substituteThemeFunctions(nodes []*Node, theme *Theme) bool {
 		case KindAtRule:
 			switch node.Name {
 			case "@media", "@custom-media", "@container", "@supports":
-				if themeFunctionInvocation.MatchString(node.Params) {
+				if themeFunctionInvocation.MatchString(node.Parameters) {
 					return false
 				}
 			}

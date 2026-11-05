@@ -113,7 +113,7 @@ func (context *context) position(node *Node) *position {
 
 // transformOffset is upstream's transformOffset: a new point.
 func (context *context) transformOffset(offset int) *point {
-	line, col := context.lineCounter.LinePos(offset)
+	line, col := context.lineCounter.LinePosition(offset)
 	return context.memory.points.New(point{line: line, column: col, offset: offset})
 }
 
@@ -215,6 +215,6 @@ func (context *context) newYamlSyntaxError(yamlError *compose.YamlError, offsets
 	return &SyntaxError{
 		Message:  yamlError.Message,
 		Code:     yamlError.Code,
-		Position: offsets.convert(context.transformRange(yamlError.Pos[0], yamlError.Pos[1])),
+		Position: offsets.convert(context.transformRange(yamlError.Position[0], yamlError.Position[1])),
 	}
 }

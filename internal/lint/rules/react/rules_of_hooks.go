@@ -590,22 +590,22 @@ func enclosingFunctionForHook(node *ast.Node) *ast.Node {
 //
 // A field initializer is an ordinary function whose parent is a property declaration, and a class is
 // the only place a property declaration appears.
-func isClassMemberFunction(fn *ast.Node) bool {
-	switch fn.Kind {
+func isClassMemberFunction(function *ast.Node) bool {
+	switch function.Kind {
 	case ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor,
 		ast.KindClassStaticBlockDeclaration:
 		return true
 	case ast.KindMethodDeclaration:
-		parent := fn.Parent
+		parent := function.Parent
 		return parent != nil && parent.Kind == ast.KindClassDeclaration ||
 			parent != nil && parent.Kind == ast.KindClassExpression
 	}
-	parent := fn.Parent
+	parent := function.Parent
 	return parent != nil && parent.Kind == ast.KindPropertyDeclaration
 }
 
-func isAsyncFunction(fn *ast.Node) bool {
-	return ast.HasSyntacticModifier(fn, ast.ModifierFlagsAsync)
+func isAsyncFunction(function *ast.Node) bool {
+	return ast.HasSyntacticModifier(function, ast.ModifierFlagsAsync)
 }
 
 // ownFunctionName returns a function's own declared name, which is a function declaration's
@@ -613,10 +613,10 @@ func isAsyncFunction(fn *ast.Node) bool {
 //
 // Empty for an arrow and for an anonymous function expression, whose names come from the syntax
 // around them instead.
-func ownFunctionName(fn *ast.Node) string {
-	switch fn.Kind {
+func ownFunctionName(function *ast.Node) string {
+	switch function.Kind {
 	case ast.KindFunctionDeclaration, ast.KindFunctionExpression:
-		name := fn.Name()
+		name := function.Name()
 		if name != nil && name.Kind == ast.KindIdentifier {
 			return name.Text()
 		}
@@ -630,21 +630,21 @@ func ownFunctionName(fn *ast.Node) string {
 // than resolved. The second result separates "no name is available" from "a name is available and
 // it is empty", which matters because the caller's verdict differs between them: an unnamed default
 // export is silent and a lowercase-named arrow reports.
-func declarationIdentifierOf(fn *ast.Node) (string, bool) {
+func declarationIdentifierOf(function *ast.Node) (string, bool) {
 	// An object-literal method is its own name-bearer rather than borrowing one from a parent: the
 	// function-like node is the `KindMethodDeclaration`, and there is no anonymous function nested
 	// inside it whose parent could be consulted. Every other shape below reads the parent, which is
 	// why this one has to be answered before the switch rather than inside it. Missed on the first
 	// pass, and upstream's case 101 hid it: that case reports nine findings and this rule reported
 	// nine, one of them from a different arm on a different line.
-	if fn.Kind == ast.KindMethodDeclaration {
-		if text, readable := ast.TryGetTextOfPropertyName(fn.Name()); readable {
+	if function.Kind == ast.KindMethodDeclaration {
+		if text, readable := ast.TryGetTextOfPropertyName(function.Name()); readable {
 			return text, true
 		}
 		return "", false
 	}
 
-	parent := fn.Parent
+	parent := function.Parent
 	if parent == nil {
 		return "", false
 	}
@@ -661,7 +661,7 @@ func declarationIdentifierOf(fn *ast.Node) (string, bool) {
 		if binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken {
 			return "", false
 		}
-		if binary.Right != fn {
+		if binary.Right != function {
 			return "", false
 		}
 		left := binary.Left
@@ -706,8 +706,8 @@ func declarationIdentifierOf(fn *ast.Node) (string, bool) {
 
 // isNonReactFunctionArgument reports whether a function is being handed to something as a callback,
 // excluding the two callers React itself renders.
-func isNonReactFunctionArgument(fn *ast.Node) bool {
-	parent := fn.Parent
+func isNonReactFunctionArgument(function *ast.Node) bool {
+	parent := function.Parent
 	if parent == nil {
 		return false
 	}
@@ -726,8 +726,8 @@ func isNonReactFunctionArgument(fn *ast.Node) bool {
 //
 // Bare and namespaced spellings both count, and unlike isNonReactFunctionArgument this looks all the
 // way up rather than at the immediate parent, matching oxc's `is_memo_or_forward_ref_callback`.
-func isMemoOrForwardRefCallback(fn *ast.Node) bool {
-	for current := fn.Parent; current != nil; current = current.Parent {
+func isMemoOrForwardRefCallback(function *ast.Node) bool {
+	for current := function.Parent; current != nil; current = current.Parent {
 		if current.Kind != ast.KindCallExpression {
 			continue
 		}
@@ -760,15 +760,15 @@ func calleeAccessedName(callee *ast.Node) string {
 }
 
 // isDirectlyInsideComponentOrHook asks whether this one function is itself a component or a Hook.
-func isDirectlyInsideComponentOrHook(fn *ast.Node) bool {
-	if name := ownFunctionName(fn); name != "" {
+func isDirectlyInsideComponentOrHook(function *ast.Node) bool {
+	if name := ownFunctionName(function); name != "" {
 		if isComponentOrHookName(name) {
 			return true
 		}
-	} else if name, named := declarationIdentifierOf(fn); named && isComponentOrHookName(name) {
+	} else if name, named := declarationIdentifierOf(function); named && isComponentOrHookName(name) {
 		return true
 	}
-	return isMemoOrForwardRefCallback(fn)
+	return isMemoOrForwardRefCallback(function)
 }
 
 // isSomewhereInsideComponentOrHook asks whether this function or any function enclosing it is a
@@ -777,8 +777,8 @@ func isDirectlyInsideComponentOrHook(fn *ast.Node) bool {
 // This is what separates a Hook in a callback inside a component, which reports, from a Hook in a
 // callback inside a plain function, which is silent, upstream's judgment being that the second is
 // somebody else's library code and not a React mistake.
-func isSomewhereInsideComponentOrHook(fn *ast.Node) bool {
-	for current := fn; current != nil; current = current.Parent {
+func isSomewhereInsideComponentOrHook(function *ast.Node) bool {
+	for current := function; current != nil; current = current.Parent {
 		if !ast.IsFunctionLike(current) {
 			continue
 		}

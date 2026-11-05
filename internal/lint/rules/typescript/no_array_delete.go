@@ -198,9 +198,12 @@ var NoArrayDelete = rule.Rule[rule.NoOptions]{
 
 				expression := deleteExpression.AsElementAccessExpression()
 
-				argType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, expression.Expression)
+				argumentType := type_checking.GetConstrainedTypeAtLocation(
+					ruleContext.TypeChecker,
+					expression.Expression,
+				)
 
-				if !isUnderlyingTypeArray(argType) {
+				if !isUnderlyingTypeArray(argumentType) {
 					return
 				}
 

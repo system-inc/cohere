@@ -709,16 +709,16 @@ func TestDecodeNoUnusedVarsOptionsModesAndShorthand(test *testing.T) {
 	test.Parallel()
 
 	accepted := map[string]NoUnusedVarsOptions{
-		`"local"`:                  {Vars: "local", Args: "after-used", CaughtErrors: "all"},
-		`"all"`:                    {Vars: "all", Args: "after-used", CaughtErrors: "all"},
-		`{"vars": "local"}`:        {Vars: "local", Args: "after-used", CaughtErrors: "all"},
-		`{"args": "none"}`:         {Vars: "all", Args: "none", CaughtErrors: "all"},
-		`{"caughtErrors": "none"}`: {Vars: "all", Args: "after-used", CaughtErrors: "none"},
+		`"local"`:                  {Variables: "local", Arguments: "after-used", CaughtErrors: "all"},
+		`"all"`:                    {Variables: "all", Arguments: "after-used", CaughtErrors: "all"},
+		`{"vars": "local"}`:        {Variables: "local", Arguments: "after-used", CaughtErrors: "all"},
+		`{"args": "none"}`:         {Variables: "all", Arguments: "none", CaughtErrors: "all"},
+		`{"caughtErrors": "none"}`: {Variables: "all", Arguments: "after-used", CaughtErrors: "none"},
 		`{"destructuredArrayIgnorePattern": "^_"}`: {
-			Vars: "all", Args: "after-used", CaughtErrors: "all", DestructuredArrayIgnorePattern: "^_",
+			Variables: "all", Arguments: "after-used", CaughtErrors: "all", DestructuredArrayIgnorePattern: "^_",
 		},
 		`{"ignoreClassWithStaticInitBlock": true, "ignoreUsingDeclarations": true, "reportUsedIgnorePattern": true}`: {
-			Vars: "all", Args: "after-used", CaughtErrors: "all",
+			Variables: "all", Arguments: "after-used", CaughtErrors: "all",
 			IgnoreClassWithStaticInitBlock: true, IgnoreUsingDeclarations: true, ReportUsedIgnorePattern: true,
 		},
 	}

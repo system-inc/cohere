@@ -36,8 +36,8 @@ func shouldAlwaysAddParens(node Node) bool { return node.Is("SequenceExpression"
 // printArrowFunction is upstream's printArrowFunction. Upstream defaults args to {}; a nil args is
 // replaced with an empty one, and that empty one is what reaches print("body", args), as upstream's {}
 // does.
-func printArrowFunction(path *Path, options *Options, print PrintFunc, args *printArguments) Doc {
-	resolvedArguments := args
+func printArrowFunction(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
+	resolvedArguments := arguments
 	if resolvedArguments == nil {
 		resolvedArguments = &printArguments{}
 	}
@@ -46,7 +46,7 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 	var bodyComments []Doc
 	shouldBreakChain := false
 	shouldPrintAsChain :=
-		!resolvedArguments.expandLastArg && node(path).Child("body").Is("ArrowFunctionExpression")
+		!resolvedArguments.expandLastArgument && node(path).Child("body").Is("ArrowFunctionExpression")
 	var functionBody Node
 
 	// upstream's immediately invoked `(function rec() { ... })()`, with path.call(rec, "body").
@@ -160,7 +160,7 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 }
 
 // printArrowFunctionSignature is upstream's printArrowFunctionSignature.
-func printArrowFunctionSignature(path *Path, options *Options, print PrintFunc, args *printArguments) Doc {
+func printArrowFunctionSignature(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
 	current := node(path)
 	var parts []any
 
@@ -171,13 +171,13 @@ func printArrowFunctionSignature(path *Path, options *Options, print PrintFunc, 
 	if shouldPrintParamsWithoutParens(path, options) {
 		parts = append(parts, print([]any{"params", 0}, nil))
 	} else {
-		shouldExpandParameters := args.expandLastArg || args.expandFirstArg
+		shouldExpandParameters := arguments.expandLastArgument || arguments.expandFirstArgument
 		returnTypeDoc := printReturnType(path, print)
 		if shouldExpandParameters {
 			if doc.WillBreak(returnTypeDoc) {
 				// Invariant: expandFirstArg and expandLastArg are set only by printCallArguments, inside
 				// printCatchingArgExpansionBailout, whose recover catches this, as upstream catches its throw.
-				panic(argExpansionBailout{})
+				panic(argumentExpansionBailout{})
 			}
 			returnTypeDoc = groupIn(path, doc.RemoveLines(returnTypeDoc))
 		}
@@ -224,7 +224,7 @@ func mayBreakAfterShortPrefix(functionBody Node, bodyDoc Doc, options *Options) 
 // { signatureDocs, shouldBreak } is two parameters.
 func printArrowFunctionSignatures(
 	path *Path,
-	args *printArguments,
+	arguments *printArguments,
 	signatureDocs []Doc,
 	shouldBreak bool,
 ) Doc {
@@ -246,7 +246,7 @@ func printArrowFunctionSignatures(
 
 	if (key == "callee" && isCallLikeExpression(parent)) ||
 		// isAssignmentRhs
-		args.assignmentLayout != "" {
+		arguments.assignmentLayout != "" {
 		return groupWithIn(
 			path,
 			join(concatIn(path, " =>", line), signatureDocs),
@@ -266,7 +266,7 @@ func printArrowFunctionSignatures(
 func printArrowFunctionBody(
 	path *Path,
 	options *Options,
-	args *printArguments,
+	arguments *printArguments,
 	bodyDoc Doc,
 	bodyComments []Doc,
 	functionBody Node,
@@ -276,7 +276,7 @@ func printArrowFunctionBody(
 	parent := parentOf(path)
 
 	var trailingComma Doc = emptyDoc
-	if args.expandLastArg {
+	if arguments.expandLastArgument {
 		trailingComma = printTrailingComma(options, "all")
 	}
 
@@ -285,7 +285,7 @@ func printArrowFunctionBody(
 	// with the opening (, or if it's inside a JSXExpression (e.g. an attribute)
 	// we should align the expression's closing } with the line with the opening {.
 	var trailingSpace Doc = emptyDoc
-	if (args.expandLastArg || parent.Is("JSXExpressionContainer")) &&
+	if (arguments.expandLastArgument || parent.Is("JSXExpressionContainer")) &&
 		!hasAnyComment(current) {
 		trailingSpace = softline
 	}

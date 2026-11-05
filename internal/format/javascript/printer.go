@@ -189,7 +189,7 @@ func printToDoc(
 		},
 		EmbeddedLanguageFormatting: "auto",
 		TextToDoc:                  textToDoc,
-		NodeCount:                  nodes.Len(),
+		NodeCount:                  nodes.Length(),
 	}
 	return printing.PrintAstToDoc(root, comments, printOptions)
 }

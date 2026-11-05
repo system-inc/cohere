@@ -29,13 +29,13 @@ import (
 
 // spec is a doc in a form both languages can build. Only the fields a kind uses are set.
 type spec struct {
-	Kind     string  `json:"k"`
-	Text     string  `json:"v,omitempty"`
-	Children []*spec `json:"c,omitempty"`
-	Number   int     `json:"n,omitempty"`
-	Flag     bool    `json:"f,omitempty"`
-	Id       string  `json:"id,omitempty"`
-	Ref      int     `json:"r,omitempty"`
+	Kind      string  `json:"k"`
+	Text      string  `json:"v,omitempty"`
+	Children  []*spec `json:"c,omitempty"`
+	Number    int     `json:"n,omitempty"`
+	Flag      bool    `json:"f,omitempty"`
+	Id        string  `json:"id,omitempty"`
+	Reference int     `json:"r,omitempty"`
 }
 
 type specGenerator struct {
@@ -130,8 +130,8 @@ func (generator *specGenerator) node() *spec {
 		}
 		if generator.random.Intn(5) == 0 {
 			generator.shared++
-			group.Ref = generator.shared
-			return &spec{Kind: "concat", Children: []*spec{group, {Kind: "sharedGroup", Ref: group.Ref}}}
+			group.Reference = generator.shared
+			return &spec{Kind: "concat", Children: []*spec{group, {Kind: "sharedGroup", Reference: group.Reference}}}
 		}
 		return group
 	case 9:
@@ -230,12 +230,12 @@ func buildSpecAs(root *spec, asSequences bool) Doc {
 			return DedentToRoot(build(node.Children[0]))
 		case "group":
 			group := NewGroup(build(node.Children[0]), GroupOptions{Id: id(node.Id), ShouldBreak: node.Flag})
-			if node.Ref != 0 {
-				groups[node.Ref] = group
+			if node.Reference != 0 {
+				groups[node.Reference] = group
 			}
 			return group
 		case "sharedGroup":
-			return groups[node.Ref]
+			return groups[node.Reference]
 		case "conditionalGroup":
 			return ConditionalGroup(children(node), GroupOptions{ShouldBreak: node.Flag})
 		case "fill":

@@ -600,7 +600,7 @@ func holdsAFunctionType(ruleContext rule.Context, name *ast.Node) bool {
 	if valueType == nil {
 		return false
 	}
-	for part := range type_checking.UnionTypePartsSeq(ruleContext.TypeChecker.GetNonNullableType(valueType)) {
+	for part := range type_checking.UnionTypePartsSequence(ruleContext.TypeChecker.GetNonNullableType(valueType)) {
 		callSignatures := ruleContext.TypeChecker.GetSignaturesOfType(part, checker.SignatureKindCall)
 		if len(callSignatures) == 0 {
 			return false
@@ -643,7 +643,7 @@ func mayReturnAnElement(typeChecker *checker.Checker, returnType *checker.Type) 
 	if type_checking.IsTypeFlagSet(returnType, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
 		return true
 	}
-	for part := range type_checking.UnionTypePartsSeq(returnType) {
+	for part := range type_checking.UnionTypePartsSequence(returnType) {
 		if !type_checking.IsObjectType(part) && !type_checking.IsIntersectionType(part) {
 			continue
 		}

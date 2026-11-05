@@ -156,8 +156,8 @@ type Hooks[E any] struct {
 type tryPosition uint8
 
 const (
-	posTry tryPosition = iota
-	posCatch
+	positionTry tryPosition = iota
+	positionCatch
 )
 
 // tryFrame tracks one enclosing `try` statement while its blocks are built.
@@ -197,7 +197,7 @@ type Builder[E any] struct {
 	hooks Hooks[E]
 
 	blocks      []*Block[E]
-	cur         *Block[E]
+	current     *Block[E]
 	finals      []*Block[E]
 	thrown      []*Block[E]
 	blockChunks []*blockChunk[E]
@@ -210,9 +210,9 @@ type Builder[E any] struct {
 // Build lays out the control-flow graph of one code path root.
 func Build[E any](root *ast.Node, hooks Hooks[E]) *Graph[E] {
 	builder := &Builder[E]{hooks: hooks, blocks: make([]*Block[E], 0, blockChunkSize)}
-	builder.cur = builder.newBlock()
-	builder.cur.hasIncoming = true
-	builder.cur.Reachable = true
+	builder.current = builder.newBlock()
+	builder.current.hasIncoming = true
+	builder.current.Reachable = true
 
 	switch root.Kind {
 	case ast.KindSourceFile:
@@ -240,9 +240,9 @@ func Build[E any](root *ast.Node, hooks Hooks[E]) *Graph[E] {
 		}
 	}
 
-	endReachable := builder.cur.Reachable
+	endReachable := builder.current.Reachable
 	if endReachable {
-		builder.markFinal(builder.cur)
+		builder.markFinal(builder.current)
 	}
 	return &Graph[E]{
 		Blocks:       builder.blocks,
@@ -270,15 +270,15 @@ func (builder *Builder[E]) parameter(node *ast.Node) {
 // Current returns the block being filled. Its Reachable field says whether the
 // position control is at is one control can arrive at.
 func (builder *Builder[E]) Current() *Block[E] {
-	return builder.cur
+	return builder.current
 }
 
 // Emit records one event in the current block and returns where it landed, so a
 // consumer can refer back to it.
 func (builder *Builder[E]) Emit(element E) (*Block[E], int) {
-	index := len(builder.cur.Events)
-	builder.cur.Events = append(builder.cur.Events, element)
-	return builder.cur, index
+	index := len(builder.current.Events)
+	builder.current.Events = append(builder.current.Events, element)
+	return builder.current, index
 }
 
 func (builder *Builder[E]) newBlock() *Block[E] {
@@ -377,7 +377,7 @@ func (builder *Builder[E]) setCycleBarrier(from *Block[E], index int, barrier bo
 // Mutates: blk entering is what settles the block's reachability
 func (builder *Builder[E]) enter(blk *Block[E]) {
 	blk.Reachable = blk.hasIncoming
-	builder.cur = blk
+	builder.current = blk
 }
 
 // makeUnreachable ends the path at the current block and carries the walk on in
@@ -387,11 +387,11 @@ func (builder *Builder[E]) enter(blk *Block[E]) {
 // block is never entered: its reachability is settled here, as false.
 func (builder *Builder[E]) makeUnreachable() {
 	next := builder.newBlock()
-	builder.appendSuccessor(builder.cur, next)
-	if builder.cur.cycleBarrier != nil {
-		builder.cur.cycleBarrier = append(builder.cur.cycleBarrier, false)
+	builder.appendSuccessor(builder.current, next)
+	if builder.current.cycleBarrier != nil {
+		builder.current.cycleBarrier = append(builder.current.cycleBarrier, false)
 	}
-	builder.cur = next
+	builder.current = next
 }
 
 // enterDisconnected makes blk current when the position the walk stands at is
@@ -401,7 +401,7 @@ func (builder *Builder[E]) makeUnreachable() {
 //
 // Mutates: blk the block gains the walk's reachability as if an edge led in, then is entered
 func (builder *Builder[E]) enterDisconnected(blk *Block[E]) {
-	blk.hasIncoming = blk.hasIncoming || builder.cur.Reachable
+	blk.hasIncoming = blk.hasIncoming || builder.current.Reachable
 	builder.enter(blk)
 }
 
@@ -438,7 +438,7 @@ func (builder *Builder[E]) loop(node *ast.Node) {
 func (builder *Builder[E]) throwFrame() int {
 	for index := len(builder.tryStack) - 1; index >= 0; index-- {
 		frame := builder.tryStack[index]
-		if frame.position == posTry || (frame.hasFinally && frame.position == posCatch) {
+		if frame.position == positionTry || (frame.hasFinally && frame.position == positionCatch) {
 			return index
 		}
 	}
@@ -446,7 +446,7 @@ func (builder *Builder[E]) throwFrame() int {
 }
 
 func throwTarget[E any](frame *tryFrame[E]) *Block[E] {
-	if frame.position == posTry && frame.catchEntry != nil {
+	if frame.position == positionTry && frame.catchEntry != nil {
 		return frame.catchEntry
 	}
 	return frame.finallyEntry
@@ -468,7 +468,7 @@ func (builder *Builder[E]) returnFrame() int {
 // a `try` that has a `finally`). Later throwable nodes in the same block reuse
 // that first fork, matching ESLint's approximation.
 func (builder *Builder[E]) firstThrowableFork() {
-	if !builder.cur.Reachable {
+	if !builder.current.Reachable {
 		return
 	}
 	index := builder.throwFrame()
@@ -481,9 +481,9 @@ func (builder *Builder[E]) firstThrowableFork() {
 	}
 	frame.thrownForked = true
 	frame.thrownAny = true
-	builder.link(builder.cur, throwTarget(frame))
+	builder.link(builder.current, throwTarget(frame))
 	next := builder.newBlock()
-	builder.link(builder.cur, next)
+	builder.link(builder.current, next)
 	builder.enter(next)
 }
 
