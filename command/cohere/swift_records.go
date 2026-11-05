@@ -738,7 +738,8 @@ func classifySwiftCoverage(record *swiftLintRecord) (coverageSummary, error) {
 	return summary, nil
 }
 
-// excludedNamedLimit is how many excluded files of one reason are named before they are counted.
+// excludedNamedLimit is how many excluded files of one reason are named before they are counted, for the
+// reasons nobody expects checked. A gap's files are always named.
 const excludedNamedLimit = 5
 
 // expectedExclusionReasons are the reasons the engine gives for files nobody expects a run to check, in the
@@ -763,7 +764,8 @@ var expectedExclusionReasons = map[string]bool{
 // A file under a directory this run yields is left out, whatever its reason: the run of the Swift project
 // there accounts for it, so on ahraos-presence the root's notes stop naming CapturePhone's and RigSimulator's
 // files as checked by nothing. What remains, for a reason other than the ones nobody expects checked, is the
-// run's gap, counted for the footer.
+// run's gap: listed for the footer and `--json`, and named here file by file however many share a reason,
+// since the limit is for one fact said a hundred times and each file of a gap is one to act on.
 func (r *swiftRun) writeExcluded() {
 	if r.excludedPrinted || r.project == nil {
 		return
@@ -778,7 +780,8 @@ func (r *swiftRun) writeExcluded() {
 		}
 		filesByReason[reason] = append(filesByReason[reason], file)
 	}
-	unexpected := 0
+	var gap []uncheckedSwiftFile
+	gapReasons := map[string]bool{}
 	for _, excluded := range r.project.Excluded {
 		// Resolved, since the engine standardizes its paths as Foundation spells them, `/tmp` where this
 		// process may hold `/private/tmp`, and the yielded directories are resolved too.
@@ -787,10 +790,11 @@ func (r *swiftRun) writeExcluded() {
 		}
 		add(excluded.File, excluded.Reason)
 		if !expectedExclusionReasons[excluded.Reason] {
-			unexpected++
+			gap = append(gap, uncheckedSwiftFile{File: excluded.File, Reason: excluded.Reason})
+			gapReasons[excluded.Reason] = true
 		}
 	}
-	activeSummary.Gaps.UncheckedSwift = unexpected
+	activeSummary.Gaps.UncheckedSwift = gap
 	// A file the engine could not read is printed the way an excluded file is, because to a reader it is
 	// the same fact: a file nothing checked, and why.
 	for _, unreadable := range r.unreadable {
@@ -799,7 +803,7 @@ func (r *swiftRun) writeExcluded() {
 	sort.Strings(reasons)
 	for _, reason := range reasons {
 		files := filesByReason[reason]
-		if len(files) > excludedNamedLimit {
+		if len(files) > excludedNamedLimit && !gapReasons[reason] {
 			fmt.Fprintf(accountOutput(r.out), "  not checked: %d files (%s)\n", len(files), reason)
 			continue
 		}

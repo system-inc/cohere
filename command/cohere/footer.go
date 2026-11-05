@@ -209,8 +209,8 @@ func uncheckedMarkers(summary runSummary) []string {
 	if len(gaps.UnclaimedSwift) > 0 {
 		markers = append(markers, unclaimedSwiftMarker(gaps.UnclaimedSwift))
 	}
-	if gaps.UncheckedSwift > 0 {
-		markers = append(markers, "⚠ "+counted(gaps.UncheckedSwift, "Swift file not checked", "Swift files not checked"))
+	if len(gaps.UncheckedSwift) > 0 {
+		markers = append(markers, "⚠ "+counted(len(gaps.UncheckedSwift), "Swift file not checked", "Swift files not checked"))
 	}
 	if gaps.ModifiedBuild {
 		markers = append(markers, "⚠ built from a modified tree")
