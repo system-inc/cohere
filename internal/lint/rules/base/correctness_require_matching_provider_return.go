@@ -36,12 +36,12 @@ const expectedReturnTypeBrand = "__expectedReturnType"
 // The brand is never a runtime value. Everything here happens in the type checker, which is why this
 // rule declares NeedsTypeChecker and why a syntax-only port of it would be silent on every input.
 //
-// # Undefined is NOT stripped here, and that is the difference from its sibling
+// # Undefined is not stripped here, and that is the difference from its sibling
 //
 // `api-phi-health` has two brand readers with deliberately different undefined handling.
 // `CorrectnessRequireMatchingInjectType` reads `__resolvedType` and strips `undefined`, because the brand
 // field is declared optional and the `undefined` in its type is an artifact of that declaration.
-// This rule reads `__expectedReturnType` and does NOT strip, because `Provider<T>`'s contract
+// This rule reads `__expectedReturnType` and does not strip, because `Provider<T>`'s contract
 // intrinsically includes `undefined` through its opt-out path. Stripping it would reject every valid
 // provider returning `X | undefined`, which is most of them.
 //
@@ -56,7 +56,7 @@ const expectedReturnTypeBrand = "__expectedReturnType"
 // # Where this port reads the return type
 //
 // The original resolves the `MethodDefinition`'s `value`, a FunctionExpression, and reads the return
-// type off its call signature. Our parser has no separate value node: a method declaration IS the
+// type off its call signature. Our parser has no separate value node: a method declaration is the
 // function, so the type at the method declaration carries the call signature directly. Measured, a
 // method declaration yields exactly one signature and its return type is what the method declares.
 // This is fidelity to the decision rather than to the tree shape, the same way the pagination rule's
@@ -121,7 +121,7 @@ func checkProviderReturn(ruleContext rule.Context, node *ast.Node) {
 
 	// A brand whose type argument is any or unknown carries no real contract.
 	//
-	// SUBSUMED rather than load bearing, and kept because it is the original's own line and it
+	// Subsumed rather than load bearing, and kept because it is the original's own line and it
 	// states the intent where a reader looks for it. Every type is assignable to `any` and to
 	// `unknown`, so `IsTypeAssignableTo` below already answers yes and this guard cannot change a
 	// verdict. Measured over six shapes under both spellings, including `void` and `never`, which
@@ -178,7 +178,7 @@ func declaredReturnTypeOfMethod(ruleContext rule.Context, method *ast.Node) *che
 // still renders. Both are reproduced.
 //
 // Every branch checks the node kind before reading text. `Text()` panics on a property access, and
-// the walk recovers per FILE rather than per rule, so one such call costs every rule in this package
+// the walk recovers per file rather than per rule, so one such call costs every rule in this package
 // every finding in that file while the run still prints a plausible summary.
 func decoratorNameOf(decorator *ast.Decorator) string {
 	expression := decorator.Expression

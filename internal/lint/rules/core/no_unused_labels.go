@@ -193,7 +193,8 @@ func commentLiesBetween(ruleContext rule.Context, start int, end int) bool {
 //
 // That changes which programs are legal rather than only how they read, which is why it disqualifies
 // a fix rather than merely looking untidy. A parenthesized string is not a directive under any
-// circumstances, so `A: ("use strict")` is refused for the ASI reason below rather than this one.
+// circumstances, so `A: ("use strict")` is refused for the automatic semicolon insertion reason below
+// rather than this one.
 func wouldBecomeADirective(labeled *ast.Node, statement *ast.LabeledStatement) bool {
 	// The immediate body, deliberately not the bottom of a label chain.
 	//
@@ -236,7 +237,8 @@ func wouldBecomeADirective(labeled *ast.Node, statement *ast.LabeledStatement) b
 	return ast.IsBlock(parent) && parent.Parent != nil && ast.IsFunctionLikeDeclaration(parent.Parent)
 }
 
-// wouldRejoinWithThePreviousLine says whether removing the label creates an ASI hazard.
+// wouldRejoinWithThePreviousLine says whether removing the label creates an automatic semicolon
+// insertion hazard.
 //
 // `foo()\nLABEL: [1].forEach(x => x)` becomes `foo()\n[1].forEach(x => x)`, which parses as
 // `foo()[1]` rather than as two statements: the label was the only thing keeping them apart. The

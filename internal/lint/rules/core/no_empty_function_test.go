@@ -32,10 +32,10 @@ func decodedEmptyFunctionOptions(test *testing.T, raw string) any {
 // The corpus is ESLint's own, at `tests/lib/rules/no-empty-function.js`, extracted by loading
 // that file with a stub rule tester rather than retyped.
 //
-// It is GENERATED upstream rather than written by hand, and the shape is worth knowing before
+// It is generated upstream rather than written by hand, and the shape is worth knowing before
 // reading the counts. Each seed shape expands into four clean patterns (a body with a statement,
 // a block comment, a line comment, and one per option that allows it) and fourteen reporting
-// ones (the bare case plus one for every UNRELATED allow value, proving it has no effect).
+// ones (the bare case plus one for every unrelated allow value, proving it has no effect).
 // So 132 reporting seeds become 1740 cases, and that repetition is the point: it is the full
 // cross product of every function kind against every allow value, which no hand-written fixture
 // set would ever contain.
@@ -2406,7 +2406,7 @@ func TestNoEmptyFunctionFires(test *testing.T) {
 			}
 
 			// The harness applies a fix but not a suggestion, so the applier is hand-rolled. The
-			// expectation is transformed the way `RunWithOptions` did NOT transform the input:
+			// expectation is transformed the way `RunWithOptions` did not transform the input:
 			// `Run` does not trim, so upstream's output is compared as written.
 			suggestions := result.Diagnostics[0].Suggestions
 			if len(suggestions) != 1 {
@@ -2448,7 +2448,7 @@ func applyEmptyFunctionSuggestion(test *testing.T, source string, suggestion rul
 
 // The span upstream reports, measured against the installed eslint at 10.8.1.
 //
-// It is the BODY BLOCK rather than the function: `function a() {}` reports columns 14 to 16,
+// It is the body block rather than the function: `function a() {}` reports columns 14 to 16,
 // which is the `{}`. Upstream reports the function node with an explicit `loc` of `node.body.loc`,
 // so a port reporting the function itself would pass every message-id fixture while pointing at
 // the wrong place on all 1740 of them.
@@ -2487,7 +2487,7 @@ func TestNoEmptyFunctionSpansTheBody(test *testing.T) {
 	}
 }
 
-// The decoder is the line with no upstream counterpart. `allow` defaults to an EMPTY LIST, so
+// The decoder is the line with no upstream counterpart. `allow` defaults to an empty list, so
 // the zero value happens to be right, and the fallback is written out anyway so a later default
 // change cannot silently switch every kind off.
 func TestDecodeNoEmptyFunctionOptions(test *testing.T) {
@@ -2527,7 +2527,7 @@ func TestDecodeNoEmptyFunctionOptions(test *testing.T) {
 //
 // Upstream gets that refusal from its schema before the rule runs; there is no schema layer here.
 // The kebab spellings are the interesting rows: `private-constructors` and
-// `protected-constructors` are what the typescript-eslint EXTENSION accepts, and core rejects
+// `protected-constructors` are what the typescript-eslint extension accepts, and core rejects
 // both. Measured: eslint 10.8.1 refuses to load a config naming either. This port is the core
 // rule, so it refuses them too, and the extension is where the kebab spellings belong.
 func TestDecodeNoEmptyFunctionOptionsRefusesAnUnknownKind(test *testing.T) {
@@ -2566,7 +2566,7 @@ func TestNoEmptyFunctionWithNilOptionsAllowsNothing(test *testing.T) {
 // string matches `getters`, `setters`, `methods`, `generatorMethods` and `asyncMethods`, and
 // `constructors` is not in that set, so `overrideMethods` does not exempt a constructor.
 //
-// Measured against the installed eslint at 10.8.1 with the TypeScript parser: this REPORTS, and the
+// Measured against the installed eslint at 10.8.1 with the TypeScript parser: this reports, and the
 // same class with `get foo()` in place of the constructor is clean.
 func TestNoEmptyFunctionOverrideDoesNotExemptAConstructor(test *testing.T) {
 	test.Parallel()
@@ -2576,7 +2576,7 @@ func TestNoEmptyFunctionOverrideDoesNotExemptAConstructor(test *testing.T) {
 	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoEmptyFunction, emptyFunctionFile,
 		"class A extends B { override constructor() {} }", allowOverride), "unexpected")
 
-	// The control, and the reason the row above is about the GATE rather than about `override`
+	// The control, and the reason the row above is about the gate rather than about `override`
 	// itself: the same modifier on a getter does exempt.
 	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoEmptyFunction, emptyFunctionFile,
 		"class A extends B { override get foo() {} }", allowOverride))

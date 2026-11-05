@@ -22,7 +22,7 @@ import (
 // already write an `export`; the other three are marked at the line.
 //
 // Options are routed through DecodeNoInnerDeclarationsOptions in every case, because the second
-// option defaults to TRUE and a fixture building the struct directly would leave that inversion
+// option defaults to true and a fixture building the struct directly would leave that inversion
 // untested.
 
 // decodeNoInnerDeclarationsForTest turns a fixture's JSON into options the way the config layer
@@ -247,7 +247,7 @@ func TestDecodeNoInnerDeclarationsOptions(test *testing.T) {
 }
 
 // A rule configured as a bare severity is handed nil, and the zero value of the options struct
-// carries a nil BlockScopedFunctions. Since that option defaults to TRUE, reading nil as false
+// carries a nil BlockScopedFunctions. Since that option defaults to true, reading nil as false
 // would invert the rule and report every block-scoped function in the tree. Every fixture above
 // routes through the decoder, so nothing there could see it.
 func TestNoInnerDeclarationsHandlesNilOptions(test *testing.T) {
@@ -261,7 +261,7 @@ func TestNoInnerDeclarationsHandlesNilOptions(test *testing.T) {
 	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoInnerDeclarations, "file.ts",
 		"if (test) { function doSomething() { } }", nil), "moveDeclToRoot")
 
-	// And `var` is NOT checked under the default, which is the other half of the nil path.
+	// And `var` is not checked under the default, which is the other half of the nil path.
 	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInnerDeclarations, "file.ts",
 		"if (test) { var foo; }", nil))
 }
@@ -271,7 +271,7 @@ func TestNoInnerDeclarationsHandlesNilOptions(test *testing.T) {
 // Every decoder path fills both pointers and the nil path falls back to the defaults, so the rule's
 // `BlockScopedFunctions == nil` reading is unreachable through the wiring as it stands. A mutant
 // inverting it survived the whole corpus for exactly that reason. It is still the line the brief
-// names as most likely to be wrong, because the option defaults to TRUE and the zero value of a
+// names as most likely to be wrong, because the option defaults to true and the zero value of a
 // bool is false, so a caller assembling the struct by hand and leaving that field alone would flip
 // the rule silently.
 //
@@ -333,7 +333,7 @@ func TestNoInnerDeclarationsStrictness(test *testing.T) {
 		// A directive that is not first is an ordinary expression statement and makes nothing
 		// strict. No upstream case writes this and getting it wrong is silent.
 		//
-		// Three spellings, because they exercise DIFFERENT guards in the prologue scan and a
+		// Three spellings, because they exercise different guards in the prologue scan and a
 		// fixture covering only the first leaves the other reachable. `foo();` is an expression
 		// statement whose expression is not a string, while `var a;` and `if(1){}` are not
 		// expression statements at all, and only the latter two can see a scan that fails to stop
@@ -342,7 +342,7 @@ func TestNoInnerDeclarationsStrictness(test *testing.T) {
 		{"nonDirectiveExpressionFirst", "foo();\n'use strict'\nif (test) { function f() { } }"},
 		{"variableStatementFirst", "var a;\n'use strict'\nif (test) { function f() { } }"},
 		{"ifStatementFirst", "if(1){}\n'use strict'\nif (test) { function f() { } }"},
-		// A directive inside a NESTED block is not a prologue either.
+		// A directive inside a nested block is not a prologue either.
 		{"directiveInsideABlockIsNotAPrologue", "if (test) { 'use strict'\n function f() { } }"},
 	}
 	for _, testCase := range reports {

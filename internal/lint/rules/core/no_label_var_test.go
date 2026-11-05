@@ -40,7 +40,7 @@ func TestNoLabelVarFires(test *testing.T) {
 
 // Both upstream clean cases are near misses, and each fails a different way.
 //
-// The first has a variable `q` in a DIFFERENT function, so the two scope chains never meet: a rule
+// The first has a variable `q` in a different function, so the two scope chains never meet: a rule
 // searching the whole file for the name reports it. The second has a variable in the same scope
 // whose name is not the label's, which is the ordinary case a rule that ignored the name would
 // report.
@@ -66,13 +66,13 @@ func TestNoLabelVarStaysSilent(test *testing.T) {
 // Cases upstream does not write, each measured against the installed eslint at 10.8.1 with
 // `sourceType: "script"` before being recorded here rather than reasoned about.
 //
-// The two globals are the reason this rule asks for VALUES rather than for variables. Upstream's
+// The two globals are the reason this rule asks for values rather than for variables. Upstream's
 // `getVariableByName` walks the scope chain to the global scope, where every standard library name
 // is a variable, so `Object:` and `undefined:` both report. That reads like a false positive and is
 // upstream's actual behaviour, reproduced rather than improved on.
 //
 // The function and class rows are the same point from the other side: a binding that is not a `var`
-// at all still clashes, because the clash is about the NAME being taken.
+// at all still clashes, because the clash is about the name being taken.
 func TestNoLabelVarFiresOnCasesBeyondTheCorpus(test *testing.T) {
 	test.Parallel()
 
@@ -134,7 +134,7 @@ func TestNoLabelVarStaysSilentOnCasesBeyondTheCorpus(test *testing.T) {
 //
 // `var x = foo; function bar() { x: for(;;) { break x; } }` asserts columns 31 through 54, one-based
 // and end-exclusive, which is the zero-based half-open range [30,53) and the text
-// `x: for(;;) { break x; }`. Reporting the LABEL instead would be a defensible reading of the same
+// `x: for(;;) { break x; }`. Reporting the label instead would be a defensible reading of the same
 // rule with an identical message id, and no id fixture could tell the two apart.
 func TestNoLabelVarSpansTheWholeLabeledStatement(test *testing.T) {
 	test.Parallel()
@@ -196,7 +196,7 @@ func TestNoLabelVarMessage(test *testing.T) {
 	}
 }
 
-// Block-scoped bindings inside a labeled BLOCK, which are what separate asking at the labeled
+// Block-scoped bindings inside a labeled block, which are what separate asking at the labeled
 // statement from asking at its body.
 //
 // A mutation moving the scope query onto the label's own statement survived every fixture above,
@@ -206,7 +206,7 @@ func TestNoLabelVarMessage(test *testing.T) {
 // initializer both do and a `for` with a body-level `let` does not.
 //
 // All five verdicts measured against the installed eslint at 10.8.1. The `var` case is the control
-// and belongs with them: it REPORTS, because a function-scoped declaration is hoisted out of the
+// and belongs with them: it reports, because a function-scoped declaration is hoisted out of the
 // block and is in scope at the label, so a rule that simply never looked inside would get the other
 // four right for the wrong reason.
 func TestNoLabelVarAsksAtTheLabelRatherThanInsideItsBody(test *testing.T) {
@@ -221,7 +221,7 @@ func TestNoLabelVarAsksAtTheLabelRatherThanInsideItsBody(test *testing.T) {
 		{"a function declaration inside a labeled block", "x: { function x() {} }", false},
 		{"a class inside a labeled block", "x: { class x {} }", false},
 		{"a let in a labeled for's initializer", "x: for (let x = 0;;) { break x; }", false},
-		// The control: hoisted out of the block, so it IS in scope at the label.
+		// The control: hoisted out of the block, so it is in scope at the label.
 		{"a var inside a labeled block", "x: { var x = 1; }", true},
 	}
 

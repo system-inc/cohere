@@ -24,7 +24,7 @@ var messageNoNegatedCondition = rule.Message{
 // # A negation alone is not the finding, and this is the whole rule
 //
 // `if (!a) {}` is clean. The complaint is a negated test paired with an else that the reader must
-// hold in their head as "the positive case", which is why the else has to be UNCONDITIONAL: an
+// hold in their head as "the positive case", which is why the else has to be unconditional: an
 // `else if` starts a new question rather than closing this one, so `if (!a) {} else if (b) {}` is
 // clean and `if (!a) {} else {}` is not. Upstream's `hasElseWithoutCondition` is exactly that test,
 // and its corpus writes both directions.
@@ -37,7 +37,7 @@ var messageNoNegatedCondition = rule.Message{
 // `!x`, `x != y`, `x !== y`. Upstream names them literally, and the omissions matter more than the
 // inclusions: `==` and `===` are clean, and so is any other operator. There is no attempt to see
 // through a negation written some other way, so `if (a === false)` and `if (!(a && b))`... the
-// second of those IS a `!` and does report, which is worth stating because it reads as a compound
+// second of those is a `!` and does report, which is worth stating because it reads as a compound
 // condition rather than as a negated one.
 //
 // # The span is the whole statement, not the test
@@ -91,7 +91,7 @@ func noNegatedConditionHasElseWithoutCondition(statement *ast.IfStatement) bool 
 // Upstream's parser folds parentheses away, so `if ((!a))` arrives at its test as a bare unary.
 // Ours keeps a `KindParenthesizedExpression`, so a port without this loop declines every
 // parenthesized form and loses the finding silently. Measured against the installed 10.8.1 build,
-// all four of these REPORT upstream:
+// all four of these report upstream:
 //
 //	if ((!a)) { f(); } else { g(); }          columns 1 to 33
 //	if ((a !== b)) { f(); } else { g(); }     columns 1 to 38

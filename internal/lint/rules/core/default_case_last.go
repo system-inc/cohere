@@ -58,7 +58,7 @@ var DefaultCaseLast = rule.Rule{
 					if clause.Kind != ast.KindDefaultClause {
 						continue
 					}
-					// Upstream takes the FIRST clause with no test and stops. A switch holding two
+					// Upstream takes the first clause with no test and stops. A switch holding two
 					// `default` clauses is a syntax error the parser still recovers from, so the
 					// shape is reachable here, and upstream would report it once rather than twice.
 					if index != len(clauses)-1 {
