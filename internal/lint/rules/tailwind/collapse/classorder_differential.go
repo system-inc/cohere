@@ -421,8 +421,8 @@ func (report Report) Trustworthy() (bool, []string) {
 func (report Report) RepositoriesDiverge() (bool, string) {
 	if report.SystemDivergence.UniqueToOneSystem == 0 && report.SystemDivergence.DivergentReadings == 0 {
 		return false, fmt.Sprintf(
-			"the two design systems agree on all %d shared registry classes and neither holds a class the other lacks, "+
-				"so this fixture no longer demonstrates that a per-repository table is required",
+			"the two design systems agree on all %d shared registry classes and neither holds a class the other "+
+				"lacks, so this fixture no longer demonstrates that a per-repository table is required",
 			report.SystemDivergence.SharedRegistryClasses,
 		)
 	}
@@ -643,6 +643,8 @@ func classify(aCase ClassCase, goReading Reading, goAnswered bool) Outcome {
 // The corrupted divergences are appended to the report marked Planted, so the evidence that
 // detection works is visible in the same table a reader is already reading, and the summary counts
 // them apart from observations.
+//
+// Mutates: report gains one planted divergence per control, the evidence the caller's table shows
 func runControl(systems []SystemCases, honest ReadingSource, control Control, report *Report) ControlResult {
 	corrupted := control.Corrupt(honest)
 	result := ControlResult{Control: control, Detail: control.Detail}

@@ -294,14 +294,15 @@ func (patterns *namePatterns) matchesUnremembered(name string) bool {
 	if name == "" || len(patterns.compiled) == 0 {
 		return false
 	}
+	compared := name
 	if patterns.lowercase {
-		name = strings.ToLower(name)
+		compared = strings.ToLower(name)
 	}
 	for _, pattern := range patterns.compiled {
 		// The first match, and only if it is the name: `exec(name)[0] === name`. A pattern whose
 		// first match is shorter does not match, though a longer match exists, exactly as upstream.
-		match, findStringMatchError := pattern.Unwrap().FindStringMatch(name)
-		if findStringMatchError == nil && match != nil && match.RuneIndex == 0 && match.String() == name {
+		match, findStringMatchError := pattern.Unwrap().FindStringMatch(compared)
+		if findStringMatchError == nil && match != nil && match.RuneIndex == 0 && match.String() == compared {
 			return true
 		}
 	}
@@ -747,15 +748,15 @@ func readSelector(selector compiledSelector, value *ast.Node, matched *matchedNo
 // readDirect is upstream's getLiteralsByESExpression and getLiteralsByJSXAttributeValue: a string or a
 // template, or one inside a JSX expression's braces, and nothing nested.
 func readDirect(value *ast.Node, matched *matchedNodes) {
-	value = skipOuter(value)
-	if value == nil {
+	inner := skipOuter(value)
+	if inner == nil {
 		return
 	}
-	switch value.Kind {
+	switch inner.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression:
-		matched.add(value)
+		matched.add(inner)
 	case ast.KindJsxExpression:
-		if expression := value.AsJsxExpression().Expression; expression != nil {
+		if expression := inner.AsJsxExpression().Expression; expression != nil {
 			readDirect(expression, matched)
 		}
 	}
@@ -845,18 +846,18 @@ func calleeName(callee *ast.Node) string {
 // chain joined by dots, present only when every link in it has a name. `this.cn` has the name `cn` and
 // no path, and `super.cn` has neither. A computed access counts when its key is a plain string.
 func calleeNameAndPath(callee *ast.Node) (string, string) {
-	callee = skipOuter(callee)
-	switch callee.Kind {
+	inner := skipOuter(callee)
+	switch inner.Kind {
 	case ast.KindIdentifier:
-		return callee.Text(), callee.Text()
+		return inner.Text(), inner.Text()
 
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-		property := calleeName(callee)
+		property := calleeName(inner)
 		var object *ast.Node
-		if callee.Kind == ast.KindPropertyAccessExpression {
-			object = callee.AsPropertyAccessExpression().Expression
+		if inner.Kind == ast.KindPropertyAccessExpression {
+			object = inner.AsPropertyAccessExpression().Expression
 		} else {
-			object = callee.AsElementAccessExpression().Expression
+			object = inner.AsElementAccessExpression().Expression
 		}
 		if property == "" {
 			return "", ""

@@ -69,10 +69,11 @@ func itoa(value int) string {
 	}
 	digits := [20]byte{}
 	position := len(digits)
-	for value > 0 {
+	remaining := value
+	for remaining > 0 {
 		position--
-		digits[position] = byte('0' + value%10)
-		value /= 10
+		digits[position] = byte('0' + remaining%10)
+		remaining /= 10
 	}
 	return string(digits[position:])
 }

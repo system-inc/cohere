@@ -403,7 +403,7 @@ func (canonicalizer *Canonicalizer) isDroppedNegativeZero(className string, sign
 // `theme()` call in an arbitrary value to `var()`, and is not ported, so a value holding one stops the
 // passes rather than reaching the ones after it in a form upstream's never have.
 func (canonicalizer *Canonicalizer) themeToVarUtilityGuard(candidate ParsedCandidate) (ParsedCandidate, bool) {
-	value, isArbitrary := arbitraryValueOf(&candidate)
+	value, isArbitrary := arbitraryValueOf(candidate)
 	if !isArbitrary {
 		return candidate, true
 	}
@@ -412,7 +412,7 @@ func (canonicalizer *Canonicalizer) themeToVarUtilityGuard(candidate ParsedCandi
 
 // arbitraryValueOf is the arbitrary value a candidate carries: an arbitrary property's value or a
 // functional utility's arbitrary value.
-func arbitraryValueOf(candidate *ParsedCandidate) (string, bool) {
+func arbitraryValueOf(candidate ParsedCandidate) (string, bool) {
 	switch {
 	case candidate.Kind == ParsedCandidateKindArbitrary:
 		return candidate.PropertyValue, true
@@ -425,6 +425,8 @@ func arbitraryValueOf(candidate *ParsedCandidate) (string, bool) {
 }
 
 // setArbitraryValue writes an arbitrary value back where arbitraryValueOf read it.
+//
+// Mutates: candidate is the caller's own copy of a reading, rewritten in place for the caller to sign and return
 func setArbitraryValue(candidate *ParsedCandidate, value string) {
 	if candidate.Kind == ParsedCandidateKindArbitrary {
 		candidate.PropertyValue = value
@@ -451,7 +453,7 @@ func holdsFunction(nodes []ValueNode, name string) bool {
 // calcToSpacingFunction is upstream's pass of the same name: `calc(var(--spacing) * n)` in an arbitrary
 // value becomes `--spacing(n)`.
 func (canonicalizer *Canonicalizer) calcToSpacingFunction(candidate ParsedCandidate) (ParsedCandidate, bool) {
-	value, isArbitrary := arbitraryValueOf(&candidate)
+	value, isArbitrary := arbitraryValueOf(candidate)
 	if !isArbitrary {
 		return candidate, true
 	}
@@ -461,15 +463,16 @@ func (canonicalizer *Canonicalizer) calcToSpacingFunction(candidate ParsedCandid
 	}
 	var walk func(nodes []ValueNode) []ValueNode
 	walk = func(nodes []ValueNode) []ValueNode {
-		for index := 0; index < len(nodes); {
-			node := &nodes[index]
+		walked := nodes
+		for index := 0; index < len(walked); {
+			node := &walked[index]
 			if node.Kind == ValueNodeKindFunction && node.Value == "calc" && len(node.Nodes) == 5 &&
 				node.Nodes[2].Kind == ValueNodeKindWord && node.Nodes[2].Value == "*" &&
 				node.Nodes[0].Kind == ValueNodeKindFunction && node.Nodes[0].Value == "var" &&
 				len(node.Nodes[0].Nodes) == 1 && node.Nodes[0].Nodes[0].Kind == ValueNodeKindWord &&
 				node.Nodes[0].Nodes[0].Value == spacingVariable {
 				replacement := ParseValue("--spacing(" + ValueToCss(node.Nodes[4:5]) + ")")
-				nodes = append(nodes[:index:index], append(replacement, nodes[index+1:]...)...)
+				walked = append(walked[:index:index], append(replacement, walked[index+1:]...)...)
 				continue
 			}
 			if len(node.Nodes) > 0 {
@@ -477,10 +480,11 @@ func (canonicalizer *Canonicalizer) calcToSpacingFunction(candidate ParsedCandid
 			}
 			index++
 		}
-		return nodes
+		return walked
 	}
-	setArbitraryValue(&candidate, ValueToCss(walk(ParseValue(value))))
-	return candidate, true
+	rewritten := candidate
+	setArbitraryValue(&rewritten, ValueToCss(walk(ParseValue(value))))
+	return rewritten, true
 }
 
 // optimizeArbitraryValueExpressions is upstream's pass of the same name for a functional utility's
@@ -494,40 +498,41 @@ func (canonicalizer *Canonicalizer) optimizeArbitraryValueExpressions(
 		candidate.Value.Kind != ParsedValueKindArbitrary {
 		return candidate, true
 	}
-	valueAst := ParseValue(candidate.Value.Value)
+	optimized := candidate
+	valueAst := ParseValue(optimized.Value.Value)
 	isLone := func(nodes []ValueNode, name string) bool {
 		return len(nodes) == 1 && nodes[0].Kind == ValueNodeKindFunction && nodes[0].Value == name
 	}
 
 	if isLone(valueAst, "calc") {
-		if folded, foldedAst := constantFoldDeclarationAst(ParseValue(candidate.Value.Value), nil, false); folded {
-			replacement := candidate
+		if folded, foldedAst := constantFoldDeclarationAst(ParseValue(optimized.Value.Value), nil, false); folded {
+			replacement := optimized
 			setArbitraryValue(&replacement, ValueToCss(foldedAst))
-			same, known := canonicalizer.hasSameSignature(candidate, replacement)
+			same, known := canonicalizer.hasSameSignature(optimized, replacement)
 			if !known {
-				return candidate, false
+				return optimized, false
 			}
 			if same {
-				candidate, valueAst = replacement, foldedAst
+				optimized, valueAst = replacement, foldedAst
 			}
 		}
 	}
 
-	if strings.HasPrefix(candidate.Root, "-") {
+	if strings.HasPrefix(optimized.Root, "-") {
 		if isLone(valueAst, "var") {
-			return candidate, true
+			return optimized, true
 		}
-		expression := ParseValue("calc(" + candidate.Value.Value + " * -1)")
+		expression := ParseValue("calc(" + optimized.Value.Value + " * -1)")
 		if folded, foldedAst := constantFoldDeclarationAst(expression, nil, false); folded {
-			replacement := candidate
-			replacement.Root = candidate.Root[1:]
+			replacement := optimized
+			replacement.Root = optimized.Root[1:]
 			setArbitraryValue(&replacement, ValueToCss(foldedAst))
-			same, known := canonicalizer.hasSameSignature(candidate, replacement)
+			same, known := canonicalizer.hasSameSignature(optimized, replacement)
 			if !known {
-				return candidate, false
+				return optimized, false
 			}
 			if same {
-				candidate, valueAst = replacement, foldedAst
+				optimized, valueAst = replacement, foldedAst
 			}
 		}
 	}
@@ -546,20 +551,20 @@ func (canonicalizer *Canonicalizer) optimizeArbitraryValueExpressions(
 				operand = &arguments[4]
 			}
 			if operand != nil {
-				replacement := candidate
-				replacement.Root = "-" + candidate.Root
+				replacement := optimized
+				replacement.Root = "-" + optimized.Root
 				setArbitraryValue(&replacement, ValueToCss([]ValueNode{*operand}))
-				same, known := canonicalizer.hasSameSignature(candidate, replacement)
+				same, known := canonicalizer.hasSameSignature(optimized, replacement)
 				if !known {
-					return candidate, false
+					return optimized, false
 				}
 				if same {
-					candidate = replacement
+					optimized = replacement
 				}
 			}
 		}
 	}
-	return candidate, true
+	return optimized, true
 }
 
 // hasSameSignature is upstream's comparison through the exact-equal relation: true only when both sign
@@ -584,7 +589,7 @@ func (canonicalizer *Canonicalizer) hasSameSignature(
 // arbitraryUtilities is upstream's pass of the same name, answered only when every class upstream would
 // weigh is known here.
 func (canonicalizer *Canonicalizer) arbitraryUtilities(candidate ParsedCandidate) (ParsedCandidate, bool) {
-	value, isArbitrary := arbitraryValueOf(&candidate)
+	value, isArbitrary := arbitraryValueOf(candidate)
 	if !isArbitrary {
 		return candidate, true
 	}
@@ -655,7 +660,7 @@ func (canonicalizer *Canonicalizer) replacedWith(
 	if len(readings) == 0 {
 		return candidate, false
 	}
-	if _, isArbitrary := arbitraryValueOf(&readings[0]); isArbitrary {
+	if _, isArbitrary := arbitraryValueOf(readings[0]); isArbitrary {
 		return candidate, false
 	}
 	return readings[0], true
@@ -838,7 +843,13 @@ func (canonicalizer *Canonicalizer) allVariablesAreUsed(value string, replacemen
 		if !cssVariableName.MatchString(variable) {
 			return false, false
 		}
-		if !regexp.MustCompile(`var\(`+variable+`[,)]`).MatchString(text) || strings.Contains(text, variable+":") {
+		// cssVariableName admits only characters a regular expression reads literally, so this compiles, and a
+		// pattern that somehow did not is a variable that cannot be searched for faithfully.
+		reference, compileError := regexp.Compile(`var\(` + variable + `[,)]`)
+		if compileError != nil {
+			return false, false
+		}
+		if !reference.MatchString(text) || strings.Contains(text, variable+":") {
 			return false, true
 		}
 	}
