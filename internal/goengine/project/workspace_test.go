@@ -41,6 +41,38 @@ func TestReadWorkspaceLeavesOutAModuleInsideASubmodule(test *testing.T) {
 	}
 }
 
+// A go.work in no repository, as a fresh `go work init` in a temporary directory is, has no index and so no
+// gitlinks: it reads its uses without asking git, which would refuse it as "not a git repository".
+func TestReadWorkspaceOutsideARepositoryReadsWithoutGit(test *testing.T) {
+	test.Parallel()
+	built := readFixture(test)
+	if repository := nearestRepository(built.outside); repository != "" {
+		test.Fatalf("the fixture's temporary directory is inside the repository at %s, so this proves nothing",
+			repository)
+	}
+	covered, readError := ReadWorkspace(built.outside)
+	if readError != nil {
+		test.Fatalf("a workspace in no repository was not read: %v", readError)
+	}
+	wantModules := []Module{{Directory: "."}, {Directory: "tool", Path: "example.com/outside/tool"}}
+	if !covered.FromWorkspace || !slices.Equal(covered.Modules, wantModules) || len(covered.Submodules) != 0 {
+		test.Errorf("read %+v, want a workspace of %v with no submodules", covered, wantModules)
+	}
+	if refusal := covered.RefuseUnlistedModules(); refusal != nil {
+		test.Errorf("a workspace using every module it holds was refused: %v", refusal)
+	}
+}
+
+// A root with a `.git` is in a repository whether or not git can read it, so a git that fails there is still
+// an error rather than read as no repository and no submodules.
+func TestReadWorkspaceInARepositoryGitCannotReadFails(test *testing.T) {
+	test.Parallel()
+	built := readFixture(test)
+	if _, readError := ReadWorkspace(built.broken); readError == nil {
+		test.Error("a workspace whose repository git cannot read was read, as if it had no submodules")
+	}
+}
+
 // A root without a go.work is its one module, with no git to ask and nothing to refuse.
 func TestReadWorkspaceOfALoneModuleIsThatModule(test *testing.T) {
 	test.Parallel()
