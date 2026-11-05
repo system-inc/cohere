@@ -32,7 +32,11 @@ func runArrowBodyStyle(test *testing.T, testCase arrowBodyStyleCase) rule_testin
 	if testCase.options == nil {
 		return rule_testing.Run(test, ArrowBodyStyle, arrowBodyStyleFile, testCase.sourceText)
 	}
-	decoded, err := DecodeArrowBodyStyleOptions([]byte(arrowBodyStyleUpstreamList(testCase.options.(ArrowBodyStyleOptions))))
+	options, ok := testCase.options.(ArrowBodyStyleOptions)
+	if !ok {
+		test.Fatalf("case options are not ArrowBodyStyleOptions: got %T", testCase.options)
+	}
+	decoded, err := DecodeArrowBodyStyleOptions([]byte(arrowBodyStyleUpstreamList(options)))
 	if err != nil {
 		test.Fatalf("could not decode options: %v", err)
 	}
@@ -323,8 +327,12 @@ func TestDecodeArrowBodyStyleOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("unexpected error: %v", err)
 		}
-		if mode := decoded.(ArrowBodyStyleOptions).Mode; mode != ArrowBodyStyleAsNeeded {
-			test.Errorf("mode came back %q, wanted AsNeeded", mode)
+		options, ok := decoded.(ArrowBodyStyleOptions)
+		if !ok {
+			test.Fatalf("decoded options are not ArrowBodyStyleOptions: got %T", decoded)
+		}
+		if options.Mode != ArrowBodyStyleAsNeeded {
+			test.Errorf("mode came back %q, wanted AsNeeded", options.Mode)
 		}
 	})
 
@@ -335,7 +343,10 @@ func TestDecodeArrowBodyStyleOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("unexpected error: %v", err)
 		}
-		options := decoded.(ArrowBodyStyleOptions)
+		options, ok := decoded.(ArrowBodyStyleOptions)
+		if !ok {
+			test.Fatalf("decoded options are not ArrowBodyStyleOptions: got %T", decoded)
+		}
 		if options.Mode != ArrowBodyStyleAsNeeded {
 			test.Errorf("mode came back %q, wanted AsNeeded", options.Mode)
 		}

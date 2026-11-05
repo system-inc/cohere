@@ -1289,11 +1289,7 @@ func isUsedBinding(ctx rule.Context, candidate candidateBinding, symbol *ast.Sym
 			return true
 		}
 	}
-	if isExportedBinding(candidate.declaration) {
-		return true
-	}
-
-	return false
+	return isExportedBinding(candidate.declaration)
 }
 
 // hasRestSiblingDeclarationOrWrite is upstream's `hasRestSpreadSibling`, which `ignoreRestSiblings`

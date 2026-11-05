@@ -396,7 +396,10 @@ func TestDecodeNoWarningCommentsOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("unexpected error: %v", err)
 		}
-		options := decoded.(NoWarningCommentsOptions)
+		options, ok := decoded.(NoWarningCommentsOptions)
+		if !ok {
+			test.Fatalf("decoded options are not NoWarningCommentsOptions: got %T", decoded)
+		}
 		if options.Terms != nil || options.Location != "" {
 			test.Errorf("nil input produced %+v, wanted the zero value so the rule applies its "+
 				"own defaults", options)
@@ -416,8 +419,12 @@ func TestDecodeNoWarningCommentsOptions(test *testing.T) {
 			if err != nil {
 				test.Fatalf("unexpected error: %v", err)
 			}
-			if decoded.(NoWarningCommentsOptions).Location != testCase.want {
-				test.Errorf("location = %q, wanted %q", decoded.(NoWarningCommentsOptions).Location, testCase.want)
+			options, ok := decoded.(NoWarningCommentsOptions)
+			if !ok {
+				test.Fatalf("decoded options are not NoWarningCommentsOptions: got %T", decoded)
+			}
+			if options.Location != testCase.want {
+				test.Errorf("location = %q, wanted %q", options.Location, testCase.want)
 			}
 		})
 	}
