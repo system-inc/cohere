@@ -164,7 +164,7 @@ func correctedImportantPosition(className string, position string) (string, bool
 	if position == importantPositionLegacy {
 		rebuilt = "!" + rebuilt
 	} else {
-		rebuilt = rebuilt + "!"
+		rebuilt += "!"
 	}
 
 	if prefix != "" {

@@ -202,7 +202,7 @@ func loadDesignSystemForProgram(program rule.Program, location DesignSystemLocat
 func loadDesignSystemThrough(program rule.Program, fileSystem *rule.RecordingFS, location DesignSystemLocation) DesignSystemResult {
 	projectRoot := projectRootOf(program)
 	if projectRoot == "" {
-		return DesignSystemResult{Err: fmt.Errorf("could not determine the project root from the program")}
+		return DesignSystemResult{Err: fmt.Errorf("determining the project root from the program")}
 	}
 	if !location.isDefault() {
 		return loadConfiguredDesignSystem(projectRoot, fileSystem, location)

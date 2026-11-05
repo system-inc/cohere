@@ -87,7 +87,7 @@ func constantFoldDeclarationAst(nodes []ValueNode, rem *float64, normalizeUnit b
 
 		if operator == "*" {
 			// Multiplying by a unitless `0` nullifies the whole expression, `calc(0 * 100vw)` to
-			// `0`. Upstream leaves a TODO here about checking that this is safe for the data types.
+			// `0`. Upstream leaves it as an open question whether this is safe for every data type.
 			if (lhs != nil && lhs.value == 0 && lhs.unit == "") || (rhs != nil && rhs.value == 0 && rhs.unit == "") {
 				folded = true
 				return valueWord("0"), true

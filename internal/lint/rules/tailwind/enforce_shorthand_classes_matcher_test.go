@@ -101,13 +101,13 @@ func TestShorthandMatcherAgreesWithTheExpressions(test *testing.T) {
 			perturbed := random.Intn(len(classNames))
 			switch random.Intn(8) {
 			case 0:
-				classNames[perturbed] = classNames[perturbed] + "0"
+				classNames[perturbed] += "0"
 			case 1:
 				classNames[perturbed] = "focus:" + classNames[perturbed]
 			case 2:
 				classNames[perturbed] = "-" + classNames[perturbed]
 			case 3:
-				classNames[perturbed] = classNames[perturbed] + "!"
+				classNames[perturbed] += "!"
 			case 4:
 				classNames = append(classNames[:perturbed], classNames[perturbed+1:]...)
 			}
