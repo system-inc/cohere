@@ -37,7 +37,9 @@ func constantCasingFingerprintWithOptions(
 		fingerprint = ConsistencyRequireConstantCasing.ProgramFingerprint(ruleContext.Program, options)
 		return nil
 	}
-	rule_testing.RunTypedFiles(test, probe, files, subject)
+	// Run under the options given, which the probe hands its fingerprint: the rule run unconfigured would compare
+	// a fingerprint with itself whatever the options were.
+	rule_testing.RunTypedFilesGiven(test, probe, files, subject, options)
 	if fingerprint == ([sha256.Size]byte{}) {
 		test.Fatal("the probe never ran, so no fingerprint was read")
 	}
