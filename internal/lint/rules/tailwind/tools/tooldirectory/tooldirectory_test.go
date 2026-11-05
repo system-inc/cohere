@@ -23,9 +23,9 @@ func TestOfFindsTheSourceDirectoryFromEitherForm(test *testing.T) {
 		filepath.Join(want, "tooldirectory_test.go"),
 		"github.com/system-inc/cohere/internal/lint/rules/tailwind/tools/tooldirectory/tooldirectory_test.go",
 	} {
-		got, tooldirectoryOfError := Of(form)
-		if tooldirectoryOfError != nil {
-			test.Fatalf("%s: %v", form, tooldirectoryOfError)
+		got, toolDirectoryOfError := Of(form)
+		if toolDirectoryOfError != nil {
+			test.Fatalf("%s: %v", form, toolDirectoryOfError)
 		}
 		if got != want {
 			test.Errorf("%s resolved to %s, want %s", form, got, want)
@@ -37,10 +37,10 @@ func TestOfFindsTheSourceDirectoryFromEitherForm(test *testing.T) {
 // chose, which is what filepath.Dir of a trimmed path used to be.
 func TestOfRefusesADirectoryWithoutTheFile(test *testing.T) {
 	test.Parallel()
-	if directory, tooldirectoryOfError := Of(filepath.Join(test.TempDir(), "caller.go")); tooldirectoryOfError == nil {
+	if directory, toolDirectoryOfError := Of(filepath.Join(test.TempDir(), "caller.go")); toolDirectoryOfError == nil {
 		test.Errorf("a directory without the caller's file was accepted: %s", directory)
 	}
-	if directory, tooldirectoryOfError := Of("github.com/system-inc/cohere/no/such/package/caller.go"); tooldirectoryOfError == nil {
+	if directory, toolDirectoryOfError := Of("github.com/system-inc/cohere/no/such/package/caller.go"); toolDirectoryOfError == nil {
 		test.Errorf("an import path that resolves nowhere was accepted: %s", directory)
 	}
 }
