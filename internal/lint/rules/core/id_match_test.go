@@ -17,22 +17,25 @@ const idMatchFile = "/repository/source/IdMatch.ts"
 // decoder is under test rather than bypassed by every fixture. The flags are passed as a map so a
 // case naming only `properties` decodes through the same absent-key path a real config would.
 func idMatchOf(pattern string, flags map[string]bool) IdMatchSettings {
-	// Each element is marshalled on its own and joined into the list, which is the same bytes as marshalling
-	// the list whole, without a slice that holds a string beside a map.
+	// Each element is marshalled on its own and the list of them marshalled whole, which is the same bytes as
+	// marshalling `[pattern, flags]`, without a slice that holds a string beside a map.
 	encodedPattern, err := json.Marshal(pattern)
 	if err != nil {
 		panic(err)
 	}
-	encoded := "[" + string(encodedPattern)
+	elements := []json.RawMessage{encodedPattern}
 	if flags != nil {
 		encodedFlags, encodeFlagsError := json.Marshal(flags)
 		if encodeFlagsError != nil {
 			panic(encodeFlagsError)
 		}
-		encoded += "," + string(encodedFlags)
+		elements = append(elements, encodedFlags)
 	}
-	encoded += "]"
-	settings, err := DecodeIdMatchOptions([]byte(encoded))
+	encoded, err := json.Marshal(elements)
+	if err != nil {
+		panic(err)
+	}
+	settings, err := DecodeIdMatchOptions(encoded)
 	if err != nil {
 		panic(err)
 	}
