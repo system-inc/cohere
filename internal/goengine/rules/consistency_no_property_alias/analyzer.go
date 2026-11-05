@@ -11,9 +11,11 @@
 // A Go field is never a getter, so the TypeScript rule's worry about computed properties is gone, but a field read
 // through a pointer can change under any call, any write and any channel operation, and a struct copied into a local
 // is a value the field no longer shares. Nothing in the syntax tells a snapshot taken on purpose from a rename, so
-// what is flagged is the case where the rewrite cannot change what the program does: the local is read exactly once,
+// what is flagged is the case where the reach reads the same field the local did: the local is read exactly once,
 // and nothing that could run code or write anything happens between its declaration and that read. Then the reach
-// is evaluated once either way, at a moment nothing could have changed. Each item below is silent on purpose:
+// is evaluated at most once, at a moment nothing could have changed the field. A nil root is the one difference:
+// the local panics at its declaration, and the reach at the read, or never, when a return lies between. Each item
+// below is silent on purpose:
 //
 //   - A declaration other than one name bound to one field read with no type: `name, port := ...` binds two, and
 //     `var name any = server.name` converts.
@@ -57,9 +59,10 @@ const Name = "cohere-go/consistency-no-property-alias"
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_property_alias",
 	Doc: "Flags a local inside a function that binds one name to a field read of the same name, name := " +
-		"server.name, and is read exactly once with nothing that could run code or write between, so writing the " +
-		"reach at the read changes nothing the program does. A local read again, in a closure or a loop, written " +
-		"through, or read after a call, may be a snapshot, so it is not judged.",
+		"server.name, and is read exactly once with nothing that could run code or write between, so the reach " +
+		"written at the read reads the same field, and a nil root panics there rather than at the declaration. A " +
+		"local read again, in a closure or a loop, written through, or read after a call, may be a snapshot, so " +
+		"it is not judged.",
 	Run: run,
 }
 
