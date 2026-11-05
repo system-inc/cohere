@@ -11,7 +11,7 @@ import (
 // The distinction is forced by the graph rather than chosen. `controlflow`'s Read hook fires for
 // every identifier assignment target, plain ones included: `patternReads` calls `b.read(node)` on a
 // `KindIdentifier` target before the assigned expression, because ESLint counts naming the target as
-// a point where an enclosing `try` can throw. Measured directly — `let v = 'a'; f(v); v = 'dead';`
+// a point where an enclosing `try` can throw. Measured directly: `let v = 'a'; f(v); v = 'dead';`
 // emits `R(v@3) W(v@3) R(f@12) R(v@15) R(v@18) W(v@18)`, and the `R(v@18)` is the dead store's own
 // target, not a read of it. Trusting the hook would make every write trivially live and the rule
 // would report nothing at all.
@@ -56,7 +56,7 @@ type deadStoreEvent struct {
 //
 // # Why this replaced an inverted walk over TypeScript's flow graph
 //
-// The question is forward — which reads follow this write — and `ast.FlowNode` carries only
+// The question is forward (which reads follow this write), and `ast.FlowNode` carries only
 // `Antecedent`/`Antecedents`, pointing backward, because it exists for type narrowing. The previous
 // implementation inverted the question rather than the graph, asking each read whether its own
 // antecedent chain passed back through the candidate write. That is the same predicate and it works,
@@ -225,7 +225,7 @@ func collectSymbolFacts(ruleContext rule.Context, sourceFile *ast.Node) (map[*as
 //
 // A loop back-edge makes a block its own transitive successor, so the live set at the loop header
 // depends on the live set at the loop bottom, which depends on the header. Upstream reaches this
-// with an explicit loop-header search plus a cached per-loop liveness set — `find_loop_start`,
+// with an explicit loop-header search plus a cached per-loop liveness set: `find_loop_start`,
 // `analyze_loop_recursive`, `merge_loop_liveness`, and their four scratch bitsets. Iterating the
 // whole transfer function to a fixed point instead reaches the same answer with none of that
 // machinery, because a fixed point is what those caches are approximating. The cost is bounded:
@@ -260,7 +260,7 @@ func analyzeRootLiveness(ruleContext rule.Context, root *ast.Node, exported map[
 	// The graph lays a `finally` block out twice, once for normal completion and once for the path
 	// leaving the `try` through `return`, `throw`, or a suspended `yield`. Both copies carry the
 	// same source positions. `unused_exports.FindUnreachable` hit this first and keyed liveness on source
-	// position rather than block identity, because for its question — can this statement run — any
+	// position rather than block identity, because for its question (can this statement run), any
 	// reachable copy settles it.
 	//
 	// That is not sufficient for this rule, and the difference cost a real false positive on an
@@ -391,7 +391,7 @@ func deadStoreGraph(ruleContext rule.Context, root *ast.Node, symbols map[*ast.S
 //
 // # The meet, and why union is the conservative choice here
 //
-// Upstream distinguishes six edge kinds — Normal, Jump, Backedge, Error, Finalize, Join — and unions
+// Upstream distinguishes six edge kinds (Normal, Jump, Backedge, Error, Finalize, Join) and unions
 // all but Unreachable into one of two sets, keeping the error set separate so a write bypassed by a
 // throw is not reported. Our graph carries no edge kinds, so the same conservatism is obtained by a
 // different route: the fork to a handler is a real successor edge, so the handler's live set is
@@ -403,7 +403,7 @@ func deadStoreGraph(ruleContext rule.Context, root *ast.Node, symbols map[*ast.S
 // # Bottom and Entry are both empty, and they mean different things
 //
 // Bottom is the identity for union, so it is the empty set. Entry is the claim that nothing is live
-// where the code path leaves — no symbol declared inside this root can be read after it returns —
+// where the code path leaves (no symbol declared inside this root can be read after it returns),
 // and it is also the empty set. They coincide numerically and not in meaning, which is why they are
 // written separately rather than sharing one constructor.
 type deadStoreLiveness struct {
@@ -498,8 +498,10 @@ func (set liveSymbols) withWords(words int) liveSymbols {
 // applyBlockTransfer walks one block's events backward, updating the live set and optionally
 // reporting each write it finds dead.
 //
+// Mutates: current the walk sets and clears its bits in place, so the caller reads the block's live-in set off it
+//
 // The order within a block is what makes `a = a + 1` work without upstream's deferred-write
-// reordering. The graph already emits the right-hand read before the store — measured on
+// reordering. The graph already emits the right-hand read before the store, as measured on
 // `let a = 42; f(a); a = 10; a = a + 1; f(a);`, which lays out `R(a@25) R(a@29) W(a@25)`, the
 // target's throwable read, the operand read, then the store. Upstream reaches the same ordering by
 // pushing a synthetic Read op before a deferred write and carries a `pending_assignment_lhs`
@@ -529,7 +531,7 @@ func applyBlockTransfer(
 			//
 			// Measured rather than argued, because the argument runs the wrong way round. A mutant
 			// replacing a set-live here with a clear survived the whole imported corpus and every
-			// fixture, and the first hypothesis — that no fixture wrote a compound assignment — was
+			// fixture, and the first hypothesis (that no fixture wrote a compound assignment) was
 			// wrong: three fixtures added for it did not kill the mutant either. The line was
 			// subsumed by the Read event, so no input could distinguish the two versions. The
 			// inverse mutation, forcing the store's verdict to dead, fails 23 lines, which is what
@@ -683,8 +685,8 @@ func occurrenceKindOf(identifier *ast.Node) occurrenceKind {
 
 	case ast.KindBindingElement:
 		// A destructured binding, `let [a, b] = arr` or `let { a } = obj`. The graph emits a real
-		// Write for it — measured on `let [a, b] = arr; a = 3; console.log(a, b);`, which lays out
-		// `W(a@24)` at the binding — and upstream reports the binding when a later write kills it.
+		// Write for it (measured on `let [a, b] = arr; a = 3; console.log(a, b);`, which lays out
+		// `W(a@24)` at the binding), and upstream reports the binding when a later write kills it.
 		// The previous implementation declined the whole shape because a pattern element's flow
 		// node did not line up with a single-identifier reachability question; the liveness pass
 		// has no such difficulty, since the graph already placed the write where it happens.

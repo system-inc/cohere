@@ -136,16 +136,17 @@ var NoUselessCatch = rule.Rule{
 // TypeScript's alone and erase to nothing. All three leave the thrown value identical to the caught
 // binding, which is the condition the rule is about.
 func unwrapErasedExpressions(expression *ast.Node) *ast.Node {
-	for expression != nil {
-		switch expression.Kind {
+	current := expression
+	for current != nil {
+		switch current.Kind {
 		case ast.KindParenthesizedExpression:
-			expression = expression.AsParenthesizedExpression().Expression
+			current = current.AsParenthesizedExpression().Expression
 		case ast.KindNonNullExpression:
-			expression = expression.AsNonNullExpression().Expression
+			current = current.AsNonNullExpression().Expression
 		case ast.KindAsExpression:
-			expression = expression.AsAsExpression().Expression
+			current = current.AsAsExpression().Expression
 		default:
-			return expression
+			return current
 		}
 	}
 	return nil

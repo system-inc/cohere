@@ -28,8 +28,8 @@ type FuncNameMatchingOptions struct {
 	// compare against the property being defined rather than against the literal key `value`.
 	ConsiderPropertyDescriptor bool `json:"considerPropertyDescriptor"`
 
-	// IncludeCommonJSModuleExports stops `module.exports = function foo(){}` from being exempt.
-	IncludeCommonJSModuleExports bool `json:"includeCommonJSModuleExports"`
+	// IncludeCommonJsModuleExports stops `module.exports = function foo(){}` from being exempt.
+	IncludeCommonJsModuleExports bool `json:"includeCommonJSModuleExports"`
 }
 
 // funcNameMatchingIsIdentifier answers upstream's `isIdentifier`, which routes through `esutils`.
@@ -217,7 +217,7 @@ var FuncNameMatching = rule.Rule{
 			ctx:                        ruleContext,
 			direction:                  direction,
 			considerPropertyDescriptor: resolved.ConsiderPropertyDescriptor,
-			includeModuleExports:       resolved.IncludeCommonJSModuleExports,
+			includeModuleExports:       resolved.IncludeCommonJsModuleExports,
 		}
 
 		return rule.Listeners{
@@ -623,7 +623,7 @@ func DecodeFuncNameMatchingOptions(list []byte) (any, error) {
 		return options, fmt.Errorf("func-name-matching options object: %w", unmarshalOptionsError)
 	}
 	options.ConsiderPropertyDescriptor = object.ConsiderPropertyDescriptor
-	options.IncludeCommonJSModuleExports = object.IncludeCommonJSModuleExports
+	options.IncludeCommonJsModuleExports = object.IncludeCommonJsModuleExports
 	return options, nil
 }
 

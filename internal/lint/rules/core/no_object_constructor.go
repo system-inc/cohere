@@ -401,9 +401,9 @@ func innermostNodeContaining(root *ast.Node, index int) *ast.Node {
 // wordBefore returns the identifier-or-keyword word ending at `index`, or "" when the character
 // there is not part of one.
 func wordBefore(text string, index int) (string, int) {
-	isWordByte := func(b byte) bool {
-		return b == '_' || b == '$' || (b >= '0' && b <= '9') ||
-			(b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+	isWordByte := func(character byte) bool {
+		return character == '_' || character == '$' || (character >= '0' && character <= '9') ||
+			(character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z')
 	}
 	if index < 0 || !isWordByte(text[index]) {
 		return "", -1

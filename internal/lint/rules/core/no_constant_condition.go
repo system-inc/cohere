@@ -153,8 +153,8 @@ var NoConstantCondition = rule.Rule{
 
 // isTrueLiteral reports the literal `true`, which is the exempt loop idiom.
 func isTrueLiteral(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	return node != nil && node.Kind == ast.KindTrueKeyword
+	unwrapped := ast.SkipParentheses(node)
+	return unwrapped != nil && unwrapped.Kind == ast.KindTrueKeyword
 }
 
 // isConstantExpression reports whether an expression's value cannot vary.
@@ -170,12 +170,12 @@ func isConstantExpression(node *ast.Node, inBooleanPosition bool) bool {
 	if node == nil {
 		return true
 	}
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return true
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
 		ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword,
 		ast.KindRegularExpressionLiteral, ast.KindNoSubstitutionTemplateLiteral,
@@ -189,10 +189,10 @@ func isConstantExpression(node *ast.Node, inBooleanPosition bool) bool {
 	case ast.KindIdentifier:
 		// `undefined` is the only identifier with a fixed value. See the rule comment on why this
 		// does not check that it is the global one.
-		return node.Text() == "undefined"
+		return unwrapped.Text() == "undefined"
 
 	case ast.KindTemplateExpression:
-		return isConstantTemplate(node, inBooleanPosition)
+		return isConstantTemplate(unwrapped, inBooleanPosition)
 
 	case ast.KindArrayLiteralExpression:
 		// Truthy whatever it holds, so constant as a condition. As a value it is constant only if
@@ -200,7 +200,7 @@ func isConstantExpression(node *ast.Node, inBooleanPosition bool) bool {
 		if inBooleanPosition {
 			return true
 		}
-		for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
+		for _, element := range unwrapped.AsArrayLiteralExpression().Elements.Nodes {
 			if !isConstantExpression(element, false) {
 				return false
 			}
@@ -208,7 +208,7 @@ func isConstantExpression(node *ast.Node, inBooleanPosition bool) bool {
 		return true
 
 	case ast.KindPrefixUnaryExpression:
-		unary := node.AsPrefixUnaryExpression()
+		unary := unwrapped.AsPrefixUnaryExpression()
 		switch unary.Operator {
 		case ast.KindExclamationToken:
 			// Negation reads its operand as a condition, so the flag flips to true rather than
@@ -226,20 +226,20 @@ func isConstantExpression(node *ast.Node, inBooleanPosition bool) bool {
 		if inBooleanPosition {
 			return true
 		}
-		return isConstantExpression(node.AsTypeOfExpression().Expression, false)
+		return isConstantExpression(unwrapped.AsTypeOfExpression().Expression, false)
 
 	case ast.KindNewExpression:
 		// A constructed object is truthy, and that is all that can be said about it.
 		return inBooleanPosition
 
 	case ast.KindBinaryExpression:
-		return isConstantBinaryExpression(node, inBooleanPosition)
+		return isConstantBinaryExpression(unwrapped, inBooleanPosition)
 
 	case ast.KindCallExpression:
-		return isConstantBooleanCall(node)
+		return isConstantBooleanCall(unwrapped)
 
 	case ast.KindSpreadElement:
-		return isConstantExpression(node.AsSpreadElement().Expression, inBooleanPosition)
+		return isConstantExpression(unwrapped.AsSpreadElement().Expression, inBooleanPosition)
 	}
 
 	return false
@@ -332,25 +332,25 @@ func isConstantBinaryExpression(node *ast.Node, inBooleanPosition bool) bool {
 // look: `a && false || b` has a left operand that is an identity for `&&` and not for `||`, so the
 // operator has to match at every level.
 func isLogicalIdentity(node *ast.Node, operator ast.Kind) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return false
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindTrueKeyword:
 		return operator == ast.KindBarBarToken
 	case ast.KindFalseKeyword, ast.KindNullKeyword:
 		return operator == ast.KindAmpersandAmpersandToken
 
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		if len(node.Text()) > 0 {
+		if len(unwrapped.Text()) > 0 {
 			return operator == ast.KindBarBarToken
 		}
 		return operator == ast.KindAmpersandAmpersandToken
 
 	case ast.KindNumericLiteral, ast.KindBigIntLiteral:
-		if numericLiteralSign(node.Text()) == 0 {
+		if numericLiteralSign(unwrapped.Text()) == 0 {
 			return operator == ast.KindAmpersandAmpersandToken
 		}
 		return operator == ast.KindBarBarToken
@@ -365,7 +365,7 @@ func isLogicalIdentity(node *ast.Node, operator ast.Kind) bool {
 		return operator == ast.KindAmpersandAmpersandToken
 
 	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken == nil {
 			return false
 		}

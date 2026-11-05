@@ -220,20 +220,21 @@ func markPrivateMemberUses(node *ast.Node, declared map[string]*privateClassMemb
 
 	// A nested class shadows the names it redeclares. Anything it does not redeclare stays visible,
 	// so the recursion continues with a narrowed map rather than stopping outright.
+	searched := declared
 	if node.Kind == ast.KindClassDeclaration || node.Kind == ast.KindClassExpression {
 		if narrowed := withoutShadowedNames(node, declared); narrowed != nil {
-			declared = narrowed
+			searched = narrowed
 			// Another short-circuit the sweep flagged as equivalent: with nothing left to look for,
 			// the walk below would descend the whole nested class and mark nothing. Stopping early
 			// is faster and cannot differ.
-			if len(declared) == 0 {
+			if len(searched) == 0 {
 				return
 			}
 		}
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
-		markPrivateMemberUses(child, declared)
+		markPrivateMemberUses(child, searched)
 		return false
 	})
 }

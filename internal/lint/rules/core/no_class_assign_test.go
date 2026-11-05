@@ -145,10 +145,10 @@ func TestNoClassAssignPointsAtTheWrite(test *testing.T) {
 			}
 			// The harness trims and appends a newline, so read positions against that same text.
 			source := strings.TrimSpace(testCase.sourceText) + "\n"
-			for i, want := range testCase.want {
-				reported := source[result.Diagnostics[i].Range.Pos():result.Diagnostics[i].Range.End()]
+			for index, want := range testCase.want {
+				reported := source[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != want {
-					test.Errorf("finding %d pointed at %q, wanted %q", i, reported, want)
+					test.Errorf("finding %d pointed at %q, wanted %q", index, reported, want)
 				}
 			}
 		})

@@ -113,11 +113,11 @@ var NoRegexSpaces = rule.Rule{
 		// checkConstructor handles both `RegExp(...)` and `new RegExp(...)`, which upstream treats
 		// identically and which differ here only in which node carries the arguments.
 		checkConstructor := func(callee *ast.Node, arguments *ast.NodeList) {
-			callee = ast.SkipParentheses(callee)
-			if callee == nil || callee.Kind != ast.KindIdentifier {
+			unwrapped := ast.SkipParentheses(callee)
+			if unwrapped == nil || unwrapped.Kind != ast.KindIdentifier {
 				return
 			}
-			if callee.AsIdentifier().Text != "RegExp" {
+			if unwrapped.AsIdentifier().Text != "RegExp" {
 				return
 			}
 			if arguments == nil || len(arguments.Nodes) == 0 {

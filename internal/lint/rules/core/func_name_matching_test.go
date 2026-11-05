@@ -1139,7 +1139,7 @@ func TestDecodeFuncNameMatchingOptions(test *testing.T) {
 		{`["never", {"considerPropertyDescriptor": true}]`,
 			FuncNameMatchingOptions{Direction: "never", ConsiderPropertyDescriptor: true}},
 		{`["always", {"includeCommonJSModuleExports": true}]`,
-			FuncNameMatchingOptions{Direction: "always", IncludeCommonJSModuleExports: true}},
+			FuncNameMatchingOptions{Direction: "always", IncludeCommonJsModuleExports: true}},
 		{`[{"considerPropertyDescriptor": true}]`,
 			FuncNameMatchingOptions{Direction: "always", ConsiderPropertyDescriptor: true}},
 	}

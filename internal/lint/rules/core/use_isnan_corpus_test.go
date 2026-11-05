@@ -21,7 +21,7 @@ import (
  * indexOfNaN: the option was decoded and never read until this task, so off and on looked the same.
  */
 
-func TestUseIsNaNAgreesWithESLintsCorpus(test *testing.T) {
+func TestUseIsNaNAgreesWithEsLintsCorpus(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {

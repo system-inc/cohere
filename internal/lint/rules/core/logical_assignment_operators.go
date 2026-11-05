@@ -385,10 +385,11 @@ func logicalAssignmentIsStrict(sourceFile *ast.SourceFile) bool {
 // A loop with its own nil check rather than `ast.SkipParentheses`, which dereferences its argument.
 // Several callers here can be handed a nil operand from a recovered parse.
 func logicalAssignmentUnwrapParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		current = current.AsParenthesizedExpression().Expression
 	}
-	return node
+	return current
 }
 
 // logicalAssignmentIsReference is upstream's `isReference`.
@@ -419,19 +420,19 @@ func logicalAssignmentIsReference(expression *ast.Node) bool {
 // as the complement the brief prescribes, because `resolvesToAGlobal` returns false for a symbol
 // with zero declarations and `undefined` is exactly that shape.
 func (state *logicalAssignmentState) isUndefined(expression *ast.Node) bool {
-	expression = logicalAssignmentUnwrapParentheses(expression)
-	if expression == nil {
+	unwrapped := logicalAssignmentUnwrapParentheses(expression)
+	if unwrapped == nil {
 		return false
 	}
 
-	if expression.Kind == ast.KindIdentifier && expression.Text() == "undefined" {
-		return !state.isShadowedInThisFile(expression)
+	if unwrapped.Kind == ast.KindIdentifier && unwrapped.Text() == "undefined" {
+		return !state.isShadowedInThisFile(unwrapped)
 	}
 
-	if expression.Kind != ast.KindVoidExpression {
+	if unwrapped.Kind != ast.KindVoidExpression {
 		return false
 	}
-	argument := logicalAssignmentUnwrapParentheses(expression.AsVoidExpression().Expression)
+	argument := logicalAssignmentUnwrapParentheses(unwrapped.AsVoidExpression().Expression)
 	return argument != nil && argument.Kind == ast.KindNumericLiteral && argument.Text() == "0"
 }
 
@@ -468,40 +469,40 @@ func (state *logicalAssignmentState) isShadowedInThisFile(identifier *ast.Node) 
 // judgments about which flag upstream passed, and a shared helper would have to carry the flag as a
 // parameter, which is one function two rules can silently disagree about the default of.
 func logicalAssignmentIsSameReference(left *ast.Node, right *ast.Node) bool {
-	left = logicalAssignmentUnwrapParentheses(left)
-	right = logicalAssignmentUnwrapParentheses(right)
-	if left == nil || right == nil {
+	unwrappedLeft := logicalAssignmentUnwrapParentheses(left)
+	unwrappedRight := logicalAssignmentUnwrapParentheses(right)
+	if unwrappedLeft == nil || unwrappedRight == nil {
 		return false
 	}
 
 	// An optional access is never the same reference as a plain one, which upstream gets for free
 	// from its ChainExpression wrapper and we have to state. See logicalAssignmentIsOptionalChain
 	// for the measurement; without this the rule reports four of upstream's clean cases.
-	if logicalAssignmentIsOptionalChain(left) != logicalAssignmentIsOptionalChain(right) {
+	if logicalAssignmentIsOptionalChain(unwrappedLeft) != logicalAssignmentIsOptionalChain(unwrappedRight) {
 		return false
 	}
 
 	// The static-key equivalence, checked before the kind comparison because it is exactly what
 	// lets a property access equal an element access.
-	if logicalAssignmentIsAccess(left) && logicalAssignmentIsAccess(right) {
-		if name, known := logicalAssignmentStaticPropertyName(left); known {
-			otherName, otherKnown := logicalAssignmentStaticPropertyName(right)
+	if logicalAssignmentIsAccess(unwrappedLeft) && logicalAssignmentIsAccess(unwrappedRight) {
+		if name, known := logicalAssignmentStaticPropertyName(unwrappedLeft); known {
+			otherName, otherKnown := logicalAssignmentStaticPropertyName(unwrappedRight)
 			return otherKnown && name == otherName &&
 				logicalAssignmentIsSameReference(
-					logicalAssignmentAccessObject(left), logicalAssignmentAccessObject(right))
+					logicalAssignmentAccessObject(unwrappedLeft), logicalAssignmentAccessObject(unwrappedRight))
 		}
 	}
 
-	if left.Kind != right.Kind {
+	if unwrappedLeft.Kind != unwrappedRight.Kind {
 		return false
 	}
 
-	switch left.Kind {
+	switch unwrappedLeft.Kind {
 	case ast.KindThisKeyword, ast.KindSuperKeyword:
 		return true
 
 	case ast.KindIdentifier, ast.KindPrivateIdentifier:
-		return left.Text() == right.Text()
+		return unwrappedLeft.Text() == unwrappedRight.Text()
 
 	case ast.KindNonNullExpression:
 		// TypeScript only, so upstream's switch has no arm for it and cannot: ESLint core's parser
@@ -515,25 +516,25 @@ func logicalAssignmentIsSameReference(left *ast.Node, right *ast.Node) bool {
 		// it. The alternative reading, that `!` makes two references distinct, would also make
 		// `a!.b = a!.b || c` unreportable while `a.b = a.b || c` reports, which is a difference in
 		// type syntax rather than in what the code does.
-		return logicalAssignmentIsSameReference(left.AsNonNullExpression().Expression,
-			right.AsNonNullExpression().Expression)
+		return logicalAssignmentIsSameReference(unwrappedLeft.AsNonNullExpression().Expression,
+			unwrappedRight.AsNonNullExpression().Expression)
 
 	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
 		ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword,
 		ast.KindNoSubstitutionTemplateLiteral, ast.KindRegularExpressionLiteral:
 		// Upstream compares cooked literal values, and `Text()` is the cooked value for a string
 		// and the canonical rendering for a number.
-		return left.Text() == right.Text()
+		return unwrappedLeft.Text() == unwrappedRight.Text()
 
 	case ast.KindPropertyAccessExpression:
-		leftAccess := left.AsPropertyAccessExpression()
-		rightAccess := right.AsPropertyAccessExpression()
+		leftAccess := unwrappedLeft.AsPropertyAccessExpression()
+		rightAccess := unwrappedRight.AsPropertyAccessExpression()
 		return logicalAssignmentIsSameReference(leftAccess.Name(), rightAccess.Name()) &&
 			logicalAssignmentIsSameReference(leftAccess.Expression, rightAccess.Expression)
 
 	case ast.KindElementAccessExpression:
-		leftAccess := left.AsElementAccessExpression()
-		rightAccess := right.AsElementAccessExpression()
+		leftAccess := unwrappedLeft.AsElementAccessExpression()
+		rightAccess := unwrappedRight.AsElementAccessExpression()
 		return logicalAssignmentIsSameReference(
 			leftAccess.ArgumentExpression, rightAccess.ArgumentExpression) &&
 			logicalAssignmentIsSameReference(leftAccess.Expression, rightAccess.Expression)
@@ -723,11 +724,11 @@ func (state *logicalAssignmentState) accessesSingleProperty(node *ast.Node) bool
 // Measured against the installed build: `(a).b || ((a).b = c)` is fixed there, so the parentheses
 // are transparent to this question and the unwrap reproduces upstream rather than widening it.
 func logicalAssignmentIsSimpleBase(object *ast.Node) bool {
-	object = logicalAssignmentUnwrapParentheses(object)
-	if object == nil {
+	unwrapped := logicalAssignmentUnwrapParentheses(object)
+	if unwrapped == nil {
 		return false
 	}
-	switch object.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier, ast.KindThisKeyword, ast.KindSuperKeyword:
 		return true
 	}
@@ -1135,11 +1136,11 @@ func (state *logicalAssignmentState) checkIfStatement(node *ast.Node) {
 // suggestion there, the same as the unparenthesized spelling, so not unwrapping would diverge.
 // Unwrapping reproduces it.
 func logicalAssignmentTestIsLogical(test *ast.Node) bool {
-	test = logicalAssignmentUnwrapParentheses(test)
-	if test == nil || test.Kind != ast.KindBinaryExpression {
+	unwrapped := logicalAssignmentUnwrapParentheses(test)
+	if unwrapped == nil || unwrapped.Kind != ast.KindBinaryExpression {
 		return false
 	}
-	return logicalAssignmentIsLogicalOperator(test.AsBinaryExpression().OperatorToken.Kind)
+	return logicalAssignmentIsLogicalOperator(unwrapped.AsBinaryExpression().OperatorToken.Kind)
 }
 
 // existence is upstream's `getExistence`: which reference does this condition test, and which
@@ -1162,15 +1163,15 @@ func (state *logicalAssignmentState) existence(expression *ast.Node) (*ast.Node,
 	// Unwrapped on the way in, because `if ((a)) a = b` reaches here as a parenthesized expression
 	// where upstream sees the identifier. Measured against the installed build: it reports and
 	// fixes to `a &&= b`, so the parentheses are transparent to the existence question.
-	expression = logicalAssignmentUnwrapParentheses(expression)
-	if expression == nil {
+	unwrapped := logicalAssignmentUnwrapParentheses(expression)
+	if unwrapped == nil {
 		return nil, "", false
 	}
 
-	isNegated := logicalAssignmentIsLogicalNot(expression)
-	base := expression
+	isNegated := logicalAssignmentIsLogicalNot(unwrapped)
+	base := unwrapped
 	if isNegated {
-		base = expression.AsPrefixUnaryExpression().Operand
+		base = unwrapped.AsPrefixUnaryExpression().Operand
 	}
 
 	if logicalAssignmentIsReference(base) {
@@ -1201,10 +1202,10 @@ func (state *logicalAssignmentState) existence(expression *ast.Node) (*ast.Node,
 
 	// The two nullish spellings are read off the original expression rather than off `base`,
 	// matching upstream, so a negated nullish comparison falls through to silence.
-	if reference, found := state.implicitNullishComparison(expression); found {
+	if reference, found := state.implicitNullishComparison(unwrapped); found {
 		return reference, "??", true
 	}
-	if reference, found := state.explicitNullishComparison(expression); found {
+	if reference, found := state.explicitNullishComparison(unwrapped); found {
 		return reference, "??", true
 	}
 	return nil, "", false
@@ -1329,8 +1330,8 @@ func logicalAssignmentIsStrictComparison(node *ast.Node) bool {
 
 // logicalAssignmentIsNullLiteral answers upstream's `astUtils.isNullLiteral`.
 func logicalAssignmentIsNullLiteral(node *ast.Node) bool {
-	node = logicalAssignmentUnwrapParentheses(node)
-	return node != nil && node.Kind == ast.KindNullKeyword
+	unwrapped := logicalAssignmentUnwrapParentheses(node)
+	return unwrapped != nil && unwrapped.Kind == ast.KindNullKeyword
 }
 
 // ifFix builds the third shape's repair: `if (a) a = b` becomes `a &&= b`.
@@ -1445,10 +1446,8 @@ func logicalAssignmentIsSpace(character byte) bool {
 
 // logicalAssignmentEndsWithSemicolon answers whether a semicolon sits between two offsets.
 func logicalAssignmentEndsWithSemicolon(text string, from int, to int) bool {
-	if to > len(text) {
-		to = len(text)
-	}
-	for index := from; index < to; index++ {
+	end := min(to, len(text))
+	for index := from; index < end; index++ {
 		if text[index] == ';' {
 			return true
 		}
