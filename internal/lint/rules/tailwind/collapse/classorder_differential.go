@@ -714,18 +714,19 @@ func acknowledgedKey(className string, outcome Outcome) string {
 
 // AcknowledgedIndex builds the lookup a run uses, and refuses an acknowledgement with no reason.
 //
-// The refusal is a panic rather than a silent skip because this list is source code reviewed like
-// any other, and an unreasoned entry in it is a defect in the review rather than in a run.
-func AcknowledgedIndex(acknowledged []AcknowledgedDivergence) map[string]AcknowledgedDivergence {
+// The refusal is an error rather than a silent skip because this list is source code reviewed like
+// any other, and an unreasoned entry in it is a defect in the review that the caller must see.
+func AcknowledgedIndex(acknowledged []AcknowledgedDivergence) (map[string]AcknowledgedDivergence, error) {
 	index := make(map[string]AcknowledgedDivergence, len(acknowledged))
 	for _, one := range acknowledged {
 		// Go whitespace: a reason written in cohere's own Go source, which no JavaScript tool reads.
 		if strings.TrimSpace(one.Reason) == "" {
-			panic("tailwind: acknowledged divergence for " +
-				one.ClassName +
-				" has no reason; an unreasoned acknowledgement is a suppression")
+			return nil, fmt.Errorf(
+				"acknowledged divergence for %s has no reason: an unreasoned acknowledgement is a suppression",
+				one.ClassName,
+			)
 		}
 		index[acknowledgedKey(one.ClassName, one.Outcome)] = one
 	}
-	return index
+	return index, nil
 }
