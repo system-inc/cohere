@@ -182,6 +182,8 @@ var NoConfusingVoidExpression = rule.Rule{
 }
 
 // checkConfusingVoidExpression judges one void-capable expression.
+//
+// Mutates: repairedArrows the run tracks across every check which arrows already carry their repair
 func checkConfusingVoidExpression(ruleContext rule.Context, node *ast.Node,
 	settings NoConfusingVoidExpressionSettings, repairedArrows map[*ast.Node]bool) {
 

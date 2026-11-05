@@ -605,6 +605,8 @@ func isReferencedOnlyAsType(
 //
 // The walk asks only when the option is on, which is the whole gate: without metadata no type position
 // reaches run time.
+//
+// Mutates: roots the scan's walk gathers one set of roots across every node it visits
 func markDecoratorMetadataRoots(current *ast.Node, roots map[*ast.Node]bool, metadata decoratorMetadataSettings) {
 	if !ast.CanHaveDecorators(current) || !ast.HasDecorators(current) || current.Modifiers() == nil ||
 		!ast.NodeCanBeDecorated(metadata.legacyDecorators, current, current.Parent, current.Parent.Parent) {

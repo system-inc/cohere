@@ -183,6 +183,8 @@ func redundantKeywordFlags(node *ast.Node) (checker.TypeFlags, bool) {
 //
 // Cached per node, because a member that is a type reference to a large union would otherwise be
 // re-resolved once for every sibling it is compared against.
+//
+// Mutates: cache the caller keeps one cache across every member it compares, so each resolves once
 func typePartsOf(ruleContext rule.Context, node *ast.Node, cache map[*ast.Node][]redundantTypePart) []redundantTypePart {
 	if existing, seen := cache[node]; seen {
 		return existing

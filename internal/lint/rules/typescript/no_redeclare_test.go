@@ -28,13 +28,17 @@ func noRedeclareTsconfig(test *testing.T, lib []string) string {
 		return noRedeclareCorpusTsconfig
 	}
 	var configuration struct {
-		CompilerOptions map[string]any `json:"compilerOptions"`
-		Include         []string       `json:"include"`
+		CompilerOptions map[string]json.RawMessage `json:"compilerOptions"`
+		Include         []string                   `json:"include"`
 	}
 	if decodeError := json.Unmarshal([]byte(noRedeclareCorpusTsconfig), &configuration); decodeError != nil {
 		test.Fatal(decodeError)
 	}
-	configuration.CompilerOptions["lib"] = lib
+	encodedLib, libEncodeError := json.Marshal(lib)
+	if libEncodeError != nil {
+		test.Fatal(libEncodeError)
+	}
+	configuration.CompilerOptions["lib"] = encodedLib
 	encoded, encodeError := json.Marshal(configuration)
 	if encodeError != nil {
 		test.Fatal(encodeError)

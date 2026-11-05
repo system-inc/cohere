@@ -706,6 +706,8 @@ func expressionSelfName(node *ast.Node) *ast.Node {
 // Through the enum symbol's Exports table rather than through Locals, because an enum declaration
 // is not a locals container and `ast.GetLocals` would panic on it. Measured: for `enum E { A }` the
 // symbol carries `exports=[A]` and `members=[]`.
+//
+// Mutates: scope the caller hands in the enclosing scope for the enum's members to join
 func collectEnumMembers(ruleContext rule.Context, enumDeclaration *ast.Node, scope *shadowScope) {
 	name := enumDeclaration.Name()
 	if name == nil {
