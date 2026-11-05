@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -151,31 +150,6 @@ func (summary *readinessSummary) segment() string {
 		text += "; tsconfig lacks " + joinedOptions(summary.OptionsMissing)
 	}
 	return text + ")"
-}
-
-// topFailingRules is the set rules by files failed, most first, for --verbose.
-func (summary *readinessSummary) topFailingRules(limit int) []string {
-	if summary == nil {
-		return nil
-	}
-	names := make([]string, 0, len(summary.FailingFilesByRule))
-	for name := range summary.FailingFilesByRule {
-		names = append(names, name)
-	}
-	sort.Slice(names, func(left, right int) bool {
-		if summary.FailingFilesByRule[names[left]] != summary.FailingFilesByRule[names[right]] {
-			return summary.FailingFilesByRule[names[left]] > summary.FailingFilesByRule[names[right]]
-		}
-		return names[left] < names[right]
-	})
-	if len(names) > limit {
-		names = names[:limit]
-	}
-	lines := make([]string, 0, len(names))
-	for _, name := range names {
-		lines = append(lines, fmt.Sprintf("%s %s", name, counted(summary.FailingFilesByRule[name], "file", "files")))
-	}
-	return lines
 }
 
 func joinedOptions(names []string) string {

@@ -192,8 +192,7 @@ var ReturnAwait = rule.Rule{
 		errorHandlingDisposition, ordinaryDisposition := dispositionsFor(settings.Mode)
 
 		// test is upstream's `test`, run once per possibly-returned expression.
-		var test func(node *ast.Node)
-		test = func(node *ast.Node) {
+		test := func(node *ast.Node) {
 			isAwait := node.Kind == ast.KindAwaitExpression
 
 			// Upstream types the await's OPERAND when there is one and the node itself otherwise,

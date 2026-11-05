@@ -941,6 +941,14 @@ func TestUnifiedSignaturesOptionsArriveThroughTheDecoder(test *testing.T) {
 			sourceText: "/** @deprecated */\ndeclare function f(x: number): unknown;\ndeclare function f(x: boolean): unknown;\n",
 			option:     "ignoreOverloadsWithDifferentJSDoc",
 		},
+		{
+			// The block comment still documents the first overload past the line comment after it, as
+			// upstream's `.reverse().find(...)` over every comment before the signature finds it.
+			name: "ignoreOverloadsWithDifferentJSDoc past a line comment",
+			sourceText: "/** @deprecated */ // kept for old callers\ndeclare function f(x: number): unknown;\n" +
+				"declare function f(x: boolean): unknown;\n",
+			option: "ignoreOverloadsWithDifferentJSDoc",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

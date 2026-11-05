@@ -1941,7 +1941,10 @@ func TestArrayTypeDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
 			test.Errorf("%s was refused: %v", accepted.wire, decodeArrayTypeOptionsError)
 			continue
 		}
-		options := decoded.(ArrayTypeOptions)
+		options, isType := decoded.(ArrayTypeOptions)
+		if !isType {
+			test.Fatalf("decoding the options gave %T, expected ArrayTypeOptions", decoded)
+		}
 		if options.Default != accepted.default_ || options.Readonly != accepted.readonly {
 			test.Errorf("%s decoded to %+v, want %s and %s", accepted.wire, options, accepted.default_, accepted.readonly)
 		}
