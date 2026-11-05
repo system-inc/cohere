@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -32,16 +33,21 @@ type noUnderscoreDangleCase struct {
 }
 
 // decodeNoUnderscoreDangleOptionsForTest routes a case's options through the shipped decoder.
-func decodeNoUnderscoreDangleOptionsForTest(test *testing.T, optionsJson string) any {
+//
+// An empty string is a rule configured as a bare severity, which runs it unconfigured.
+func decodeNoUnderscoreDangleOptionsForTest(
+	test *testing.T,
+	optionsJson string,
+) rule.Given[NoUnderscoreDangleOptions] {
 	test.Helper()
 	if optionsJson == "" {
-		return nil
+		return rule.Given[NoUnderscoreDangleOptions]{}
 	}
 	decoded, decodeNoUnderscoreDangleOptionsError := DecodeNoUnderscoreDangleOptions(json.RawMessage(optionsJson))
 	if decodeNoUnderscoreDangleOptionsError != nil {
 		test.Fatalf("the decoder refused %s: %v", optionsJson, decodeNoUnderscoreDangleOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 // noUnderscoreDangleOffsetOf converts a 1-based line and column into a byte offset.
@@ -60,7 +66,7 @@ func noUnderscoreDangleOffsetOf(test *testing.T, source string, line int, column
 
 func runNoUnderscoreDangle(test *testing.T, testCase noUnderscoreDangleCase) rule_testing.Result {
 	test.Helper()
-	return rule_testing.RunWithOptions(test, NoUnderscoreDangle, noUnderscoreDangleFile,
+	return rule_testing.RunGiven(test, NoUnderscoreDangle, noUnderscoreDangleFile,
 		testCase.source, decodeNoUnderscoreDangleOptionsForTest(test, testCase.optionsJson))
 }
 

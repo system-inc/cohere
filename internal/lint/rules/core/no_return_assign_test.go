@@ -3,6 +3,7 @@ package core
 import (
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -21,106 +22,121 @@ var exceptParensReturnOptions = NoReturnAssignOptions(NoReturnAssignExceptParens
 // encoder, so no escape sequence is ever typed on the way in. Four of these cases carry embedded
 // newlines and would have been the ones a heredoc cooked.
 //
-// A nil option is upstream's own `options: undefined`, which reaches the rule as no options at all
-// rather than as the string "except-parens". That distinction is the reason the rule has an
-// explicit fallback, and keeping the nil here rather than substituting the default keeps the
-// fallback under test through fourteen of these rows.
+// An unconfigured row is upstream's own `options: undefined`, which reaches the rule as no options at
+// all rather than as the string "except-parens". That distinction is the reason the rule has an
+// explicit fallback, and keeping those rows unconfigured rather than substituting the default keeps
+// the fallback under test through fourteen of these rows.
 func TestNoReturnAssignFires(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
 		name       string
 		sourceText string
-		options    any
+		options    rule.Given[NoReturnAssignOptions]
 		wantIds    []string
 	}{
-		{"bare assignment returned", "function x() { return result = a * b; };", nil, []string{"returnAssignment"}},
+		{
+			"bare assignment returned",
+			"function x() { return result = a * b; };",
+			rule.Given[NoReturnAssignOptions]{},
+			[]string{"returnAssignment"},
+		},
 		{
 			"parenthesized operands are not a parenthesized assignment",
 			"function x() { return (result) = (a * b); };",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 			[]string{"returnAssignment"},
 		},
 		{
 			"bare assignment returned, explicit except-parens",
 			"function x() { return result = a * b; };",
-			exceptParensReturnOptions,
+			rule.Configured(exceptParensReturnOptions),
 			[]string{"returnAssignment"},
 		},
 		{
 			"parenthesized operands, explicit except-parens",
 			"function x() { return (result) = (a * b); };",
-			exceptParensReturnOptions,
+			rule.Configured(exceptParensReturnOptions),
 			[]string{"returnAssignment"},
 		},
 		{
 			"bare assignment returned from an arrow block body",
 			"() => { return result = a * b; }",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 			[]string{"returnAssignment"},
 		},
-		{"bare assignment as an arrow body", "() => result = a * b", nil, []string{"arrowAssignment"}},
+		{
+			"bare assignment as an arrow body",
+			"() => result = a * b",
+			rule.Given[NoReturnAssignOptions]{},
+			[]string{"arrowAssignment"},
+		},
 		{
 			"bare assignment returned, always",
 			"function x() { return result = a * b; };",
-			alwaysReturnOptions,
+			rule.Configured(alwaysReturnOptions),
 			[]string{"returnAssignment"},
 		},
 		{
 			"parenthesized assignment returned, always",
 			"function x() { return (result = a * b); };",
-			alwaysReturnOptions,
+			rule.Configured(alwaysReturnOptions),
 			[]string{"returnAssignment"},
 		},
 		{
 			"assignment nested in a logical expression, always",
 			"function x() { return result || (result = a * b); };",
-			alwaysReturnOptions,
+			rule.Configured(alwaysReturnOptions),
 			[]string{"returnAssignment"},
 		},
 		{
 			"bare assignment returned across lines",
 			"function foo(){\n                return a = b\n            }",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 			[]string{"returnAssignment"},
 		},
 		{
 			"assignment of a logical expression returned",
 			"function doSomething() {\n                return foo = bar && foo > 0;\n            }",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 			[]string{"returnAssignment"},
 		},
 		{
 			"assignment of a function expression returned",
 			"function doSomething() {\n                return foo = function(){\n                    return (bar = bar1)\n                }\n            }",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 			[]string{"returnAssignment"},
 		},
 		{
 			"assignment of an arrow returned",
 			"function doSomething() {\n                return foo = () => a\n            }",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 			[]string{"returnAssignment"},
 		},
 		{
 			"arrow body assigning an arrow",
 			"function doSomething() {\n                return () => a = () => b\n            }",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 			[]string{"arrowAssignment"},
 		},
 		{
 			"assignment returned from a nested function expression",
 			"function foo(a){\n                return function bar(b){\n                    return a = b\n                }\n            }",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 			[]string{"returnAssignment"},
 		},
-		{"curried arrow body assigning", "const foo = (a) => (b) => a = b", nil, []string{"arrowAssignment"}},
+		{
+			"curried arrow body assigning",
+			"const foo = (a) => (b) => a = b",
+			rule.Given[NoReturnAssignOptions]{},
+			[]string{"arrowAssignment"},
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(
+			result := rule_testing.RunGiven(
 				test,
 				NoReturnAssign,
 				returnAssignFile,
@@ -143,52 +159,76 @@ func TestNoReturnAssignStaysSilent(test *testing.T) {
 	cases := []struct {
 		name       string
 		sourceText string
-		options    any
+		options    rule.Given[NoReturnAssignOptions]
 	}{
-		{"module exports object literal", "module.exports = {'a': 1};", nil},
-		{"plain assignment statement", "var result = a * b;", nil},
-		{"return of a variable", "function x() { var result = a * b; return result; }", nil},
-		{"parenthesized assignment returned", "function x() { return (result = a * b); }", nil},
+		{"module exports object literal", "module.exports = {'a': 1};", rule.Given[NoReturnAssignOptions]{}},
+		{"plain assignment statement", "var result = a * b;", rule.Given[NoReturnAssignOptions]{}},
+		{
+			"return of a variable",
+			"function x() { var result = a * b; return result; }",
+			rule.Given[NoReturnAssignOptions]{},
+		},
+		{
+			"parenthesized assignment returned",
+			"function x() { return (result = a * b); }",
+			rule.Given[NoReturnAssignOptions]{},
+		},
 		{
 			"return of a variable, explicit except-parens",
 			"function x() { var result = a * b; return result; }",
-			exceptParensReturnOptions,
+			rule.Configured(exceptParensReturnOptions),
 		},
 		{
 			"parenthesized assignment returned, explicit except-parens",
 			"function x() { return (result = a * b); }",
-			exceptParensReturnOptions,
+			rule.Configured(exceptParensReturnOptions),
 		},
-		{"return of a variable, always", "function x() { var result = a * b; return result; }", alwaysReturnOptions},
+		{
+			"return of a variable, always",
+			"function x() { var result = a * b; return result; }",
+			rule.Configured(alwaysReturnOptions),
+		},
 		{
 			"assignment inside a returned function expression, always",
 			"function x() { return function y() { result = a * b }; }",
-			alwaysReturnOptions,
+			rule.Configured(alwaysReturnOptions),
 		},
 		{
 			"parenthesized assignment in an arrow block body",
 			"() => { return (result = a * b); }",
-			exceptParensReturnOptions,
+			rule.Configured(exceptParensReturnOptions),
 		},
-		{"parenthesized assignment as an arrow body", "() => (result = a * b)", exceptParensReturnOptions},
-		{"parenthesized assignment inside a sequence arrow body", "const foo = (a,b,c) => ((a = b), c)", nil},
+		{
+			"parenthesized assignment as an arrow body",
+			"() => (result = a * b)",
+			rule.Configured(exceptParensReturnOptions),
+		},
+		{
+			"parenthesized assignment inside a sequence arrow body",
+			"const foo = (a,b,c) => ((a = b), c)",
+			rule.Given[NoReturnAssignOptions]{},
+		},
 		{
 			"parenthesized assignment returned across lines",
 			"function foo(){\n            return (a = b)\n        }",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 		},
 		{
 			"parenthesized assignment in a nested function expression",
 			"function bar(){\n            return function foo(){\n                return (a = b) && c\n            }\n        }",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 		},
-		{"parenthesized assignment as a curried arrow body", "const foo = (a) => (b) => (a = b)", nil},
+		{
+			"parenthesized assignment as a curried arrow body",
+			"const foo = (a) => (b) => (a = b)",
+			rule.Given[NoReturnAssignOptions]{},
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(
+			result := rule_testing.RunGiven(
 				test,
 				NoReturnAssign,
 				returnAssignFile,
@@ -216,13 +256,13 @@ func TestNoReturnAssignReportsTheEnclosingNode(test *testing.T) {
 	cases := []struct {
 		name       string
 		sourceText string
-		options    any
+		options    rule.Given[NoReturnAssignOptions]
 		want       string
 	}{
 		{
 			"the whole return statement, semicolon included",
 			"function x() { return result = a * b; }",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 			"return result = a * b;",
 		},
 		{
@@ -230,7 +270,7 @@ func TestNoReturnAssignReportsTheEnclosingNode(test *testing.T) {
 			// plus whatever follows".
 			"a return statement with no semicolon",
 			"function f(){ return a = b }",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 			"return a = b",
 		},
 		{
@@ -238,13 +278,13 @@ func TestNoReturnAssignReportsTheEnclosingNode(test *testing.T) {
 			// the same branch. The span still covers the statement rather than the parentheses.
 			"the whole return statement under always",
 			"function x() { return (result = a * b); }",
-			alwaysReturnOptions,
+			rule.Configured(alwaysReturnOptions),
 			"return (result = a * b);",
 		},
 		{
 			"the whole arrow function",
 			"() => result = a * b",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 			"() => result = a * b",
 		},
 		{
@@ -252,7 +292,7 @@ func TestNoReturnAssignReportsTheEnclosingNode(test *testing.T) {
 			// would point at `(a) => (b) => a = b` and pass every id fixture.
 			"the inner arrow of a curried pair",
 			"const foo = (a) => (b) => a = b",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 			"(b) => a = b",
 		},
 		{
@@ -261,14 +301,14 @@ func TestNoReturnAssignReportsTheEnclosingNode(test *testing.T) {
 			// span taken from the node's own Pos() would begin inside the comment.
 			"an arrow preceded by a comment",
 			"const f = /*c*/ () => a = b;",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 			"() => a = b",
 		},
 		{
 			// Same trivia question on the other message.
 			"a return statement whose value is preceded by a comment",
 			"function f(){ return /*c*/ a = b; }",
-			nil,
+			rule.Given[NoReturnAssignOptions]{},
 			"return /*c*/ a = b;",
 		},
 	}
@@ -276,7 +316,7 @@ func TestNoReturnAssignReportsTheEnclosingNode(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(
+			result := rule_testing.RunGiven(
 				test,
 				NoReturnAssign,
 				returnAssignFile,

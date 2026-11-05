@@ -17,17 +17,17 @@ const promiseExecutorFile = "/repository/source/PromiseExecutor.ts"
 // decoder rather than building the struct directly.
 //
 // An empty string means the rule is configured as bare "error", which is what the live config
-// does and what hands the rule nil.
-func decodedPromiseExecutorOptions(test *testing.T, raw string) any {
+// does and what runs the rule unconfigured.
+func decodedPromiseExecutorOptions(test *testing.T, raw string) rule.Given[NoPromiseExecutorReturnOptions] {
 	test.Helper()
 	if raw == "" {
-		return nil
+		return rule.Given[NoPromiseExecutorReturnOptions]{}
 	}
 	options, decodeNoPromiseExecutorReturnOptionsError := DecodeNoPromiseExecutorReturnOptions(json.RawMessage(raw))
 	if decodeNoPromiseExecutorReturnOptionsError != nil {
 		test.Fatalf("the decoder refused %s: %v", raw, decodeNoPromiseExecutorReturnOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // The corpus is ESLint's own, at `tests/lib/rules/no-promise-executor-return.js`, extracted
@@ -111,7 +111,7 @@ func TestNoPromiseExecutorReturnStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
+			rule_testing.ExpectClean(test, rule_testing.RunTypedGiven(test, NoPromiseExecutorReturn,
 				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(test, testCase.options)))
 		})
 	}
@@ -200,7 +200,7 @@ func TestNoPromiseExecutorReturnFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
+			result := rule_testing.RunTypedGiven(test, NoPromiseExecutorReturn,
 				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(test, testCase.options))
 			rule_testing.ExpectFindings(test, result, "returnsValue")
 			got := []string{}
@@ -249,7 +249,7 @@ func TestNoPromiseExecutorReturnSpans(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
+			result := rule_testing.RunTypedGiven(test, NoPromiseExecutorReturn,
 				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(test, testCase.options))
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
@@ -313,8 +313,8 @@ func TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress(test *testing.T) {
 			test.Parallel()
 			// Not asserted clean, because the surface that makes them clean upstream is absent here.
 			// Asserted only to run, so a later crash on one of these shapes fails loudly.
-			rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn, promiseExecutorFile,
-				testCase.sourceText, nil)
+			rule_testing.RunTyped(test, NoPromiseExecutorReturn, promiseExecutorFile,
+				testCase.sourceText)
 			test.Logf("upstream holds this clean, and reproducing that %s", testCase.reason)
 		})
 	}
@@ -354,16 +354,16 @@ func TestDecodeNoPromiseExecutorReturnOptions(test *testing.T) {
 	}
 }
 
-// A rule configured as bare "error" reaches Run with nil rather than with an options struct. No
+// A rule configured as bare "error" reaches Run with no options rather than an options struct. No
 // fixture routed through the decoder can see that path.
 func TestNoPromiseExecutorReturnWithNilOptionsDefaultsToDisallowingVoid(test *testing.T) {
 	test.Parallel()
 
 	// Under the default, `return void 0` still reports: allowVoid is what exempts it.
-	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
-		promiseExecutorFile, "new Promise(() => { return void 1; })", nil), "returnsValue")
-	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
-		promiseExecutorFile, "new Promise(function (resolve, reject) { return; })", nil))
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoPromiseExecutorReturn,
+		promiseExecutorFile, "new Promise(() => { return void 1; })"), "returnsValue")
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoPromiseExecutorReturn,
+		promiseExecutorFile, "new Promise(function (resolve, reject) { return; })"))
 }
 
 // The rule declares NeedsTypeChecker, so the plain harness hands it a nil checker and the guard
@@ -382,10 +382,10 @@ func TestNoPromiseExecutorReturnRequiresTheTypedHarness(test *testing.T) {
 	for _, sourceText := range cases {
 		test.Run(sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
-				promiseExecutorFile, sourceText, nil), "returnsValue")
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoPromiseExecutorReturn,
-				promiseExecutorFile, sourceText, nil))
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoPromiseExecutorReturn,
+				promiseExecutorFile, sourceText), "returnsValue")
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoPromiseExecutorReturn,
+				promiseExecutorFile, sourceText))
 		})
 	}
 }
@@ -396,7 +396,7 @@ func TestNoPromiseExecutorReturnRequiresTheTypedHarness(test *testing.T) {
 func TestNoPromiseExecutorReturnMessages(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn, promiseExecutorFile,
+	result := rule_testing.RunTypedGiven(test, NoPromiseExecutorReturn, promiseExecutorFile,
 		"new Promise(r => 1)", decodedPromiseExecutorOptions(test, `{"allowVoid": true}`))
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
@@ -560,7 +560,7 @@ func TestNoPromiseExecutorReturnSuggestionOutputs(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText+"/"+testCase.wantId, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
+			result := rule_testing.RunTypedGiven(test, NoPromiseExecutorReturn,
 				promiseExecutorFile, testCase.sourceText, decodedPromiseExecutorOptions(test, testCase.options))
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
@@ -639,8 +639,8 @@ func TestNoPromiseExecutorReturnStaysSilentOnOtherGlobalConstructors(test *testi
 	for _, sourceText := range cases {
 		test.Run(sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoPromiseExecutorReturn,
-				promiseExecutorFile, sourceText, nil))
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoPromiseExecutorReturn,
+				promiseExecutorFile, sourceText))
 		})
 	}
 }

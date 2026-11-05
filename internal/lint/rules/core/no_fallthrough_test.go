@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -25,37 +26,52 @@ func TestNoFallthroughFires(test *testing.T) {
 	cases := []struct {
 		name       string
 		sourceText string
-		options    any
+		options    rule.Given[NoFallthroughOptions]
 		wantIds    []string
 	}{
-		{"a bare fall into the next case", "switch(foo) { case 0: a();\ncase 1: b() }", nil, []string{"case"}},
-		{"a bare fall into default", "switch(foo) { case 0: a();\ndefault: b() }", nil, []string{"default"}},
-		{"a fall into default on one line", "switch(foo) { case 0: a(); default: b() }", nil, []string{"default"}},
+		{
+			"a bare fall into the next case",
+			"switch(foo) { case 0: a();\ncase 1: b() }",
+			rule.Given[NoFallthroughOptions]{},
+			[]string{"case"},
+		},
+		{
+			"a bare fall into default",
+			"switch(foo) { case 0: a();\ndefault: b() }",
+			rule.Given[NoFallthroughOptions]{},
+			[]string{"default"},
+		},
+		{
+			"a fall into default on one line",
+			"switch(foo) { case 0: a(); default: b() }",
+			rule.Given[NoFallthroughOptions]{},
+			[]string{"default"},
+		},
 		// An if with no else leaves a path through, so the break in the then arm is not enough.
 		{
 			"an if whose break is conditional",
 			"switch(foo) { case 0: if (a) { break; } default: b() }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default"},
 		},
 		// A catch that swallows the throw restores the fallthrough path.
 		{
 			"a try whose catch swallows the throw",
 			"switch(foo) { case 0: try { throw 0; } catch (err) {} default: b() }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default"},
 		},
 		// A break inside a loop breaks the loop, not the switch.
 		{
 			"a break belonging to a while",
 			"switch(foo) { case 0: while (a) { break; } default: b() }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default"},
 		},
 		{
 			"a break belonging to a do-while",
 			"switch(foo) { case 0: do { break; } while (a); default: b() }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default"},
 		},
 		// An empty clause separated by a blank line reads as a forgotten body rather than a
@@ -63,46 +79,51 @@ func TestNoFallthroughFires(test *testing.T) {
 		{
 			"an empty clause with a blank line before default",
 			"switch(foo) { case 0:\n\n default: b() }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default"},
 		},
-		{"an empty block body", "switch(foo) { case 0: {} default: b() }", nil, []string{"default"}},
+		{
+			"an empty block body",
+			"switch(foo) { case 0: {} default: b() }",
+			rule.Given[NoFallthroughOptions]{},
+			[]string{"default"},
+		},
 		// The comment is in a block that is not the clause's only statement, so it is not in the
 		// window a fallthrough comment may occupy.
 		{
 			"a fallthrough comment in a trailing block after a call",
 			"switch(foo) { case 0: a(); { /* falls through */ } default: b() }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default"},
 		},
 		{
 			"a fallthrough comment in a leading block",
 			"switch(foo) { case 0: { /* falls through */ } a(); default: b() }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default"},
 		},
 		{
 			"a fallthrough comment inside an if",
 			"switch(foo) { case 0: if (a) { /* falls through */ } default: b() }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default"},
 		},
 		{
 			"a fallthrough comment nested two blocks deep",
 			"switch(foo) { case 0: { { /* falls through */ } } default: b() }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default"},
 		},
 		{
 			"a block holding an unrelated comment",
 			"switch(foo) { case 0: { /* comment */ } default: b() }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default"},
 		},
 		{
 			"an unrelated line comment before default",
 			"switch(foo) { case 0:\n // comment\n default: b() }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default"},
 		},
 		// `falling through` is not one of the four accepted spellings, and oxc matches the set
@@ -110,13 +131,13 @@ func TestNoFallthroughFires(test *testing.T) {
 		{
 			"a comment reading falling through",
 			"switch(foo) { case 0: a(); /* falling through */ default: b() }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default"},
 		},
 		{
 			"a custom pattern the comment does not match",
 			"switch(foo) { case 0: a();\n/* no break */\ncase 1: b(); }",
-			NoFallthroughOptions{CommentPattern: "break omitted"},
+			rule.Configured(NoFallthroughOptions{CommentPattern: "break omitted"}),
 			[]string{"case"},
 		},
 		// #7mztrdd: the controls for the lookaround cases in the silent table. In Node,
@@ -125,13 +146,13 @@ func TestNoFallthroughFires(test *testing.T) {
 		{
 			"a custom lookahead pattern the comment does not match",
 			"switch(foo) { case 0: a(); /* no break here */ case 1: b(); }",
-			NoFallthroughOptions{CommentPattern: `^no break(?=:)`},
+			rule.Configured(NoFallthroughOptions{CommentPattern: `^no break(?=:)`}),
 			[]string{"case"},
 		},
 		{
 			"a custom lookbehind pattern the comment does not match",
 			"switch(foo) { case 0: a(); /* break */ case 1: b(); }",
-			NoFallthroughOptions{CommentPattern: `(?<=no )break`},
+			rule.Configured(NoFallthroughOptions{CommentPattern: `(?<=no )break`}),
 			[]string{"case"},
 		},
 		// The last comment before the next clause is the one that decides, so a matching comment
@@ -139,37 +160,37 @@ func TestNoFallthroughFires(test *testing.T) {
 		{
 			"a matching comment followed by another comment",
 			"switch(foo) { case 0: a();\n/* no break */\n/* todo: fix readability */\ndefault: b() }",
-			NoFallthroughOptions{CommentPattern: "no break"},
+			rule.Configured(NoFallthroughOptions{CommentPattern: "no break"}),
 			[]string{"default"},
 		},
 		{
 			"a matching comment followed by another comment inside a block",
 			"switch(foo) { case 0: { a();\n/* no break */\n/* todo: fix readability */ }\ndefault: b() }",
-			NoFallthroughOptions{CommentPattern: "no break"},
+			rule.Configured(NoFallthroughOptions{CommentPattern: "no break"}),
 			[]string{"default"},
 		},
 		{
 			"an empty clause with comments and a blank line",
 			"switch(foo) { case 0: \n /* with comments */  \ncase 1: b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"case"},
 		},
 		{
 			"an empty clause with a blank line, allowEmptyCase off explicitly",
 			"switch(foo) { case 0:\n\ncase 1: b(); }",
-			NoFallthroughOptions{},
+			rule.Configured(NoFallthroughOptions{}),
 			[]string{"case"},
 		},
 		{
 			"an empty clause with a blank line, an empty options object",
 			"switch(foo) { case 0:\n\ncase 1: b(); }",
-			NoFallthroughOptions{},
+			rule.Configured(NoFallthroughOptions{}),
 			[]string{"case"},
 		},
 		{
 			"an empty statement body across lines",
 			"switch (a) { case 1: \n ; case 2:  }",
-			NoFallthroughOptions{},
+			rule.Configured(NoFallthroughOptions{}),
 			[]string{"case"},
 		},
 		// The one input in this corpus that reports twice on its own. `allowEmptyCase` exempts a
@@ -178,7 +199,7 @@ func TestNoFallthroughFires(test *testing.T) {
 		{
 			"two empty-statement bodies with allowEmptyCase on",
 			"switch (a) { case 1: ; case 2: ; case 3: }",
-			NoFallthroughOptions{AllowEmptyCase: true},
+			rule.Configured(NoFallthroughOptions{AllowEmptyCase: true}),
 			[]string{"case", "case"},
 		},
 		// `eslint-enable` is a directive, and a directive never permits a fallthrough. The pair with
@@ -188,23 +209,28 @@ func TestNoFallthroughFires(test *testing.T) {
 		{
 			"a directive comment that is not a fallthrough comment",
 			"switch (foo) { case 0: a(); \n// eslint-enable no-fallthrough\n case 1: }",
-			NoFallthroughOptions{},
+			rule.Configured(NoFallthroughOptions{}),
 			[]string{"case"},
 		},
 		{
 			"a fallthrough comment on a clause that cannot fall through",
 			"switch(foo) { case 0: a(); break; /* falls through */ case 1: b(); }",
-			NoFallthroughOptions{ReportUnusedFallthroughComment: true},
+			rule.Configured(NoFallthroughOptions{ReportUnusedFallthroughComment: true}),
 			[]string{"unusedFallthroughComment"},
 		},
 		// A default clause falls into a following case exactly like a case does.
-		{"a default falling into a case", "switch(foo) { default: a(); case 1: b(); }", nil, []string{"case"}},
+		{
+			"a default falling into a case",
+			"switch(foo) { default: a(); case 1: b(); }",
+			rule.Given[NoFallthroughOptions]{},
+			[]string{"case"},
+		},
 		// The second input reporting twice: a default in the middle falls in from the case before it
 		// and out into the case after it.
 		{
 			"a default in the middle falling both directions",
 			"switch(foo) { case 0: a(); default: b(); case 1: c(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default", "case"},
 		},
 		// A logical operator in the discriminant test is still an ordinary case clause. Upstream
@@ -213,13 +239,13 @@ func TestNoFallthroughFires(test *testing.T) {
 		{
 			"a case whose test uses logical or",
 			"switch(true) { case x === 1 || x === 2: a(); case x === 3: b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"case"},
 		},
 		{
 			"a case whose test uses logical and",
 			"switch(true) { case x === 1 && y: a(); case x === 3: b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"case"},
 		},
 	}
@@ -227,13 +253,7 @@ func TestNoFallthroughFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			var result rule_testing.Result
-			if testCase.options == nil {
-				result = rule_testing.Run(test, NoFallthrough, fallthroughFile, testCase.sourceText)
-			} else {
-				result = rule_testing.RunWithOptions(test, NoFallthrough, fallthroughFile,
-					testCase.sourceText, testCase.options)
-			}
+			result := rule_testing.RunGiven(test, NoFallthrough, fallthroughFile, testCase.sourceText, testCase.options)
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
@@ -246,142 +266,226 @@ func TestNoFallthroughStaysSilent(test *testing.T) {
 	cases := []struct {
 		name       string
 		sourceText string
-		options    any
+		options    rule.Given[NoFallthroughOptions]
 	}{
-		{"a falls-through comment", "switch(foo) { case 0: a(); /* falls through */ case 1: b(); }", nil},
+		{
+			"a falls-through comment",
+			"switch(foo) { case 0: a(); /* falls through */ case 1: b(); }",
+			rule.Given[NoFallthroughOptions]{},
+		},
 		{
 			"a falls-through comment on its own line",
 			"switch(foo) { case 0: a()\n /* falls through */ case 1: b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
-		{"a fall-through comment", "switch(foo) { case 0: a(); /* fall through */ case 1: b(); }", nil},
-		{"a fallthrough comment", "switch(foo) { case 0: a(); /* fallthrough */ case 1: b(); }", nil},
-		{"an upper-case falls-through comment", "switch(foo) { case 0: a(); /* FALLS THROUGH */ case 1: b(); }", nil},
+		{
+			"a fall-through comment",
+			"switch(foo) { case 0: a(); /* fall through */ case 1: b(); }",
+			rule.Given[NoFallthroughOptions]{},
+		},
+		{
+			"a fallthrough comment",
+			"switch(foo) { case 0: a(); /* fallthrough */ case 1: b(); }",
+			rule.Given[NoFallthroughOptions]{},
+		},
+		{
+			"an upper-case falls-through comment",
+			"switch(foo) { case 0: a(); /* FALLS THROUGH */ case 1: b(); }",
+			rule.Given[NoFallthroughOptions]{},
+		},
 		// The block form: a clause whose only statement is a block may carry the comment inside it,
 		// before the closing brace, which is a second window the plain scan never looks at.
 		{
 			"a comment inside the clause's only block",
 			"switch(foo) { case 0: { a(); /* falls through */ } case 1: b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
 		{
 			"a comment inside a block on its own line",
 			"switch(foo) { case 0: { a()\n /* falls through */ } case 1: b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
 		{
 			"a fall-through comment inside a block",
 			"switch(foo) { case 0: { a(); /* fall through */ } case 1: b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
 		{
 			"a fallthrough comment inside a block",
 			"switch(foo) { case 0: { a(); /* fallthrough */ } case 1: b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
 		{
 			"an upper-case comment inside a block",
 			"switch(foo) { case 0: { a(); /* FALLS THROUGH */ } case 1: b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
-		{"a comment after the block", "switch(foo) { case 0: { a(); } /* falls through */ case 1: b(); }", nil},
+		{
+			"a comment after the block",
+			"switch(foo) { case 0: { a(); } /* falls through */ case 1: b(); }",
+			rule.Given[NoFallthroughOptions]{},
+		},
 		// The in-block window wins even when a later comment does not match, which is the pair with
 		// the fail case where the same shape has the non-matching comment *inside* the block.
 		{
 			"a matching in-block comment then an unrelated one",
 			"switch(foo) { case 0: { a(); /* falls through */ } /* comment */ case 1: b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
 		// The comment is the block's only content, so there is no statement to anchor a scan on.
 		// This is the case that proved the shared comment scan cannot see it.
 		{
 			"a comment alone in the clause's only block",
 			"switch(foo) { case 0: { /* falls through */ } case 1: b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
-		{"a return", "function foo() { switch(foo) { case 0: a(); return; case 1: b(); }; }", nil},
-		{"a throw", "switch(foo) { case 0: a(); throw 'foo'; case 1: b(); }", nil},
+		{
+			"a return",
+			"function foo() { switch(foo) { case 0: a(); return; case 1: b(); }; }",
+			rule.Given[NoFallthroughOptions]{},
+		},
+		{"a throw", "switch(foo) { case 0: a(); throw 'foo'; case 1: b(); }", rule.Given[NoFallthroughOptions]{}},
 		// `continue` targets the enclosing loop and so leaves the switch.
-		{"a continue inside a loop", "while (a) { switch(foo) { case 0: a(); continue; case 1: b(); } }", nil},
-		{"a break", "switch(foo) { case 0: a(); break; case 1: b(); }", nil},
-		{"a grouped empty clause", "switch(foo) { case 0: case 1: a(); break; case 2: b(); }", nil},
-		{"grouped empty clauses before a break", "switch(foo) { case 0: case 1: break; case 2: b(); }", nil},
-		{"grouped empty clauses before default", "switch(foo) { case 0: case 1: break; default: b(); }", nil},
+		{
+			"a continue inside a loop",
+			"while (a) { switch(foo) { case 0: a(); continue; case 1: b(); } }",
+			rule.Given[NoFallthroughOptions]{},
+		},
+		{"a break", "switch(foo) { case 0: a(); break; case 1: b(); }", rule.Given[NoFallthroughOptions]{}},
+		{
+			"a grouped empty clause",
+			"switch(foo) { case 0: case 1: a(); break; case 2: b(); }",
+			rule.Given[NoFallthroughOptions]{},
+		},
+		{
+			"grouped empty clauses before a break",
+			"switch(foo) { case 0: case 1: break; case 2: b(); }",
+			rule.Given[NoFallthroughOptions]{},
+		},
+		{
+			"grouped empty clauses before default",
+			"switch(foo) { case 0: case 1: break; default: b(); }",
+			rule.Given[NoFallthroughOptions]{},
+		},
 		// Nothing follows the last clause, so it cannot fall through into anything.
-		{"a last clause with a body", "switch(foo) { case 0: case 1: a(); }", nil},
-		{"a last clause with a break", "switch(foo) { case 0: case 1: a(); break; }", nil},
-		{"a last clause that is just a break", "switch(foo) { case 0: case 1: break; }", nil},
+		{"a last clause with a body", "switch(foo) { case 0: case 1: a(); }", rule.Given[NoFallthroughOptions]{}},
+		{
+			"a last clause with a break",
+			"switch(foo) { case 0: case 1: a(); break; }",
+			rule.Given[NoFallthroughOptions]{},
+		},
+		{
+			"a last clause that is just a break",
+			"switch(foo) { case 0: case 1: break; }",
+			rule.Given[NoFallthroughOptions]{},
+		},
 		// One newline is formatting; two are a blank line.
-		{"a grouped empty clause across one line", "switch(foo) { case 0:\n case 1: break; }", nil},
-		{"a grouped empty clause with a comment", "switch(foo) { case 0: // comment\n case 1: break; }", nil},
-		{"grouped empty clauses before a return", "function foo() { switch(foo) { case 0: case 1: return; } }", nil},
-		{"blocks that each return", "function foo() { switch(foo) { case 0: {return;}\n case 1: {return;} } }", nil},
-		{"a last clause whose block breaks", "switch(foo) { case 0: case 1: {break;} }", nil},
-		{"a switch with no clauses at all", "switch(foo) { }", nil},
+		{
+			"a grouped empty clause across one line",
+			"switch(foo) { case 0:\n case 1: break; }",
+			rule.Given[NoFallthroughOptions]{},
+		},
+		{
+			"a grouped empty clause with a comment",
+			"switch(foo) { case 0: // comment\n case 1: break; }",
+			rule.Given[NoFallthroughOptions]{},
+		},
+		{
+			"grouped empty clauses before a return",
+			"function foo() { switch(foo) { case 0: case 1: return; } }",
+			rule.Given[NoFallthroughOptions]{},
+		},
+		{
+			"blocks that each return",
+			"function foo() { switch(foo) { case 0: {return;}\n case 1: {return;} } }",
+			rule.Given[NoFallthroughOptions]{},
+		},
+		{
+			"a last clause whose block breaks",
+			"switch(foo) { case 0: case 1: {break;} }",
+			rule.Given[NoFallthroughOptions]{},
+		},
+		{"a switch with no clauses at all", "switch(foo) { }", rule.Given[NoFallthroughOptions]{}},
 		// The inner switch's break belongs to the inner switch, so the outer clause does fall
 		// through, and the comment is what makes this clean.
 		{
 			"a nested switch with a fallthrough comment",
 			"switch(foo) { case 0: switch(bar) { case 2: break; } /* falls through */ case 1: break; }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
 		// Statements after a return are unreachable, so the clause still exits.
-		{"code after a return", "function foo() { switch(foo) { case 1: return a; a++; }}", nil},
+		{
+			"code after a return",
+			"function foo() { switch(foo) { case 1: return a; a++; }}",
+			rule.Given[NoFallthroughOptions]{},
+		},
 		{
 			"a fallthrough comment before default with a trailing comment",
 			"switch (foo) { case 0: a(); /* falls through */ default:  b(); /* comment */ }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
 		{
 			"a fallthrough comment before a default whose body starts with a comment",
 			"switch (foo) { case 0: a(); /* falls through */ default: /* comment */ b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
 		// Both arms of the if leave the clause, so there is no path through.
 		{
 			"an if whose both arms exit",
 			"switch (foo) { case 0: if (a) { break; } else { throw 0; } default: b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
 		{
 			"a try that breaks with an empty finally",
 			"switch (foo) { case 0: try { break; } finally {} default: b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
-		{"a finally that breaks", "switch (foo) { case 0: try {} finally { break; } default: b(); }", nil},
+		{
+			"a finally that breaks",
+			"switch (foo) { case 0: try {} finally { break; } default: b(); }",
+			rule.Given[NoFallthroughOptions]{},
+		},
 		{
 			"a catch that breaks after a throw",
 			"switch (foo) { case 0: try { throw 0; } catch (err) { break; } default: b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
 		// A do-while runs its body at least once, so a throw inside it always happens.
-		{"a do-while whose body throws", "switch (foo) { case 0: do { throw 0; } while(a); default: b(); }", nil},
+		{
+			"a do-while whose body throws",
+			"switch (foo) { case 0: do { throw 0; } while(a); default: b(); }",
+			rule.Given[NoFallthroughOptions]{},
+		},
 		// A default in the middle that breaks does not fall out of itself.
-		{"a default in the middle that breaks", "switch(foo) { case 0: default: a(); break; case 1: b(); }", nil},
+		{
+			"a default in the middle that breaks",
+			"switch(foo) { case 0: default: a(); break; case 1: b(); }",
+			rule.Given[NoFallthroughOptions]{},
+		},
 		{
 			"a custom pattern matching the comment",
 			"switch(foo) { case 0: a(); /* no break */ case 1: b(); }",
-			NoFallthroughOptions{CommentPattern: "no break"},
+			rule.Configured(NoFallthroughOptions{CommentPattern: "no break"}),
 		},
 		{
 			"a custom pattern with a character class",
 			"switch(foo) { case 0: a(); /* no break: need to execute b() */ case 1: b(); }",
-			NoFallthroughOptions{CommentPattern: `no break:\s?\w+`},
+			rule.Configured(NoFallthroughOptions{CommentPattern: `no break:\s?\w+`}),
 		},
 		{
 			"a custom pattern matching the last of two line comments",
 			"switch(foo) { case 0: a();\n// need to execute b(), so\n// falling through\n case 1: b(); }",
-			NoFallthroughOptions{CommentPattern: "falling through"},
+			rule.Configured(NoFallthroughOptions{CommentPattern: "falling through"}),
 		},
 		{
 			"a custom pattern before default",
 			"switch(foo) { case 0: a(); /* break omitted */ default:  b(); /* comment */ }",
-			NoFallthroughOptions{CommentPattern: "break omitted"},
+			rule.Configured(NoFallthroughOptions{CommentPattern: "break omitted"}),
 		},
 		{
 			"a custom pattern matching two different comments",
 			"switch(foo) { case 0: a(); /* caution: break is omitted intentionally */ case 1: b(); /* break omitted */ default: c(); }",
-			NoFallthroughOptions{CommentPattern: `break[\s\w]+omitted`},
+			rule.Configured(NoFallthroughOptions{CommentPattern: `break[\s\w]+omitted`}),
 		},
 		// #7mztrdd: a pattern is read as JavaScript reads it, `new RegExp(pattern, "iu")`. RE2 refused a
 		// lookahead and a lookbehind, so these fell back to the default set and reported. In Node,
@@ -389,59 +493,67 @@ func TestNoFallthroughStaysSilent(test *testing.T) {
 		{
 			"a custom pattern with a lookahead",
 			"switch(foo) { case 0: a(); /* no break: b() needs it */ case 1: b(); }",
-			NoFallthroughOptions{CommentPattern: `^no break(?=:)`},
+			rule.Configured(NoFallthroughOptions{CommentPattern: `^no break(?=:)`}),
 		},
 		{
 			"a custom pattern with a lookbehind",
 			"switch(foo) { case 0: a(); /* no break */ case 1: b(); }",
-			NoFallthroughOptions{CommentPattern: `(?<=no )break`},
+			rule.Configured(NoFallthroughOptions{CommentPattern: `(?<=no )break`}),
 		},
 		// #7mztrdd: JavaScript's `\s` takes U+00A0 and RE2's did not. In Node, /no\sbreak/iu tests true on
 		// "no\u00a0break".
 		{
 			"a custom pattern whose \\s matches a no-break space",
 			"switch(foo) { case 0: a(); /* no\u00a0break */ case 1: b(); }",
-			NoFallthroughOptions{CommentPattern: `no\sbreak`},
+			rule.Configured(NoFallthroughOptions{CommentPattern: `no\sbreak`}),
 		},
 		{
 			"an empty clause with blank lines and allowEmptyCase on",
 			"switch(foo) { case 0: \n\n\n case 1: b(); }",
-			NoFallthroughOptions{AllowEmptyCase: true},
+			rule.Configured(NoFallthroughOptions{AllowEmptyCase: true}),
 		},
 		{
 			"an empty clause with comments and allowEmptyCase on",
 			"switch(foo) { case 0: \n /* with comments */  \n case 1: b(); }",
-			NoFallthroughOptions{AllowEmptyCase: true},
+			rule.Configured(NoFallthroughOptions{AllowEmptyCase: true}),
 		},
 		{
 			"an empty-statement clause that breaks, allowEmptyCase on",
 			"switch (a) {\n case 1: ; break; \n case 3: }",
-			NoFallthroughOptions{AllowEmptyCase: true},
+			rule.Configured(NoFallthroughOptions{AllowEmptyCase: true}),
 		},
 		{
 			"an empty-statement clause that breaks, allowEmptyCase off",
 			"switch (a) {\n case 1: ; break; \n case 3: }",
-			NoFallthroughOptions{},
+			rule.Configured(NoFallthroughOptions{}),
 		},
 		{
 			"an unused fallthrough comment with reporting off",
 			"switch(foo) { case 0: a(); break; /* falls through */ case 1: b(); }",
-			NoFallthroughOptions{ReportUnusedFallthroughComment: false},
+			rule.Configured(NoFallthroughOptions{ReportUnusedFallthroughComment: false}),
 		},
 		// Upstream issue 11340: a default in the middle whose body returns.
 		{
 			"a default in the middle that returns",
 			"function f(name) { switch(name) { case 'a': case 'b': default: return 'x'; case 'c': return 'y'; } }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
-		{"a default first that breaks", "switch(foo) { default: a(); break; case 1: b(); }", nil},
+		{
+			"a default first that breaks",
+			"switch(foo) { default: a(); break; case 1: b(); }",
+			rule.Given[NoFallthroughOptions]{},
+		},
 		// Upstream issue 6417: a logical operator in the test with a break present.
 		{
 			"a logical-or test with a break",
 			"switch(true) { case x === 1 || x === 2: a(); break; case x === 3: b(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
-		{"a logical-and test with a break", "switch(true) { case x === 1 && y: a(); break; case x === 3: b(); }", nil},
+		{
+			"a logical-and test with a break",
+			"switch(true) { case x === 1 && y: a(); break; case x === 3: b(); }",
+			rule.Given[NoFallthroughOptions]{},
+		},
 		{
 			"clauses whose blocks each return, in JSX",
 			`c.map(c => { switch (true) {
@@ -450,23 +562,21 @@ func TestNoFallthroughStaysSilent(test *testing.T) {
         case c.f === 'baz': { return arrayOfRecords.map(r => <td key={r.id}>{r.id}</td>); }
         default: { return <td>Bar</td>; }
       } });`,
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 		},
 		// Upstream issue 21320: a clause whose test spans lines. The blank-line test measures the
 		// gap between clauses, and a multi-line *test* is not a gap between clauses.
-		{"a multi-line case test", "switch(foo) {\n  case A\n    .B:\n  case B.A:\n    break;\n}", nil},
+		{
+			"a multi-line case test",
+			"switch(foo) {\n  case A\n    .B:\n  case B.A:\n    break;\n}",
+			rule.Given[NoFallthroughOptions]{},
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			var result rule_testing.Result
-			if testCase.options == nil {
-				result = rule_testing.Run(test, NoFallthrough, fallthroughFile, testCase.sourceText)
-			} else {
-				result = rule_testing.RunWithOptions(test, NoFallthrough, fallthroughFile,
-					testCase.sourceText, testCase.options)
-			}
+			result := rule_testing.RunGiven(test, NoFallthrough, fallthroughFile, testCase.sourceText, testCase.options)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -484,37 +594,52 @@ func TestNoFallthroughPointsAtTheClauseFallenInto(test *testing.T) {
 	cases := []struct {
 		name       string
 		sourceText string
-		options    any
+		options    rule.Given[NoFallthroughOptions]
 		wantTexts  []string
 	}{
-		{"a case on the next line", "switch(foo) { case 0: a();\ncase 1: b() }", nil, []string{"case 1: b()"}},
-		{"a default on one line", "switch(foo) { case 0: a(); default: b() }", nil, []string{"default: b()"}},
-		{"an empty block body", "switch(foo) { case 0: {} default: b() }", nil, []string{"default: b()"}},
+		{
+			"a case on the next line",
+			"switch(foo) { case 0: a();\ncase 1: b() }",
+			rule.Given[NoFallthroughOptions]{},
+			[]string{"case 1: b()"},
+		},
+		{
+			"a default on one line",
+			"switch(foo) { case 0: a(); default: b() }",
+			rule.Given[NoFallthroughOptions]{},
+			[]string{"default: b()"},
+		},
+		{
+			"an empty block body",
+			"switch(foo) { case 0: {} default: b() }",
+			rule.Given[NoFallthroughOptions]{},
+			[]string{"default: b()"},
+		},
 		// The blank line is trivia before the clause, so the finding must not start at it. This is
 		// the case that would catch a range built from Pos() rather than the first token.
 		{
 			"an empty clause with a blank line",
 			"switch(foo) { case 0:\n\n default: b() }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default: b()"},
 		},
 		{
 			"an unrelated line comment before default",
 			"switch(foo) { case 0:\n // comment\n default: b() }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default: b()"},
 		},
 		// Both findings, in source order, from the one input that reports in two directions.
 		{
 			"a default in the middle",
 			"switch(foo) { case 0: a(); default: b(); case 1: c(); }",
-			nil,
+			rule.Given[NoFallthroughOptions]{},
 			[]string{"default: b();", "case 1: c();"},
 		},
 		{
 			"two empty-statement bodies",
 			"switch (a) { case 1: ; case 2: ; case 3: }",
-			NoFallthroughOptions{AllowEmptyCase: true},
+			rule.Configured(NoFallthroughOptions{AllowEmptyCase: true}),
 			[]string{"case 2: ;", "case 3:"},
 		},
 		// The unused-comment finding points at the comment instead, because the comment is the
@@ -523,7 +648,7 @@ func TestNoFallthroughPointsAtTheClauseFallenInto(test *testing.T) {
 		{
 			"an unused fallthrough comment",
 			"switch(foo) { case 0: a(); break; /* falls through */ case 1: b(); }",
-			NoFallthroughOptions{ReportUnusedFallthroughComment: true},
+			rule.Configured(NoFallthroughOptions{ReportUnusedFallthroughComment: true}),
 			[]string{"/* falls through */"},
 		},
 	}
@@ -531,13 +656,7 @@ func TestNoFallthroughPointsAtTheClauseFallenInto(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			var result rule_testing.Result
-			if testCase.options == nil {
-				result = rule_testing.Run(test, NoFallthrough, fallthroughFile, testCase.sourceText)
-			} else {
-				result = rule_testing.RunWithOptions(test, NoFallthrough, fallthroughFile,
-					testCase.sourceText, testCase.options)
-			}
+			result := rule_testing.RunGiven(test, NoFallthrough, fallthroughFile, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				test.Fatalf("wanted %d findings, got %d", len(testCase.wantTexts), len(result.Diagnostics))
 			}

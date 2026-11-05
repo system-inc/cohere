@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -23,7 +24,7 @@ func noUnneededTernaryBoolean(value bool) *bool {
 // noUnneededTernaryCase is one imported corpus row.
 type noUnneededTernaryCase struct {
 	sourceText string
-	options    any
+	options    rule.Given[NoUnneededTernaryOptions]
 	wantIds    []string
 	// wantFixedSource is "" when the case is reported and deliberately not repaired, which upstream
 	// records as `output: null`.
@@ -33,10 +34,11 @@ type noUnneededTernaryCase struct {
 // runNoUnneededTernary drives one case through the rule's own exported decoder.
 func runNoUnneededTernary(test *testing.T, testCase noUnneededTernaryCase) rule_testing.Result {
 	test.Helper()
-	if testCase.options == nil {
+	options, configured := testCase.options.Read()
+	if !configured {
 		return rule_testing.Run(test, NoUnneededTernary, noUnneededTernaryFile, testCase.sourceText)
 	}
-	encoded, err := json.Marshal(testCase.options)
+	encoded, err := json.Marshal(options)
 	if err != nil {
 		test.Fatalf("could not encode options: %v", err)
 	}
@@ -60,134 +62,189 @@ func runNoUnneededTernary(test *testing.T, testCase noUnneededTernaryCase) rule_
 // JavaScript oracle's verdict for them would have recorded two confident parse failures as data.
 func noUnneededTernaryFiresCases() []noUnneededTernaryCase {
 	return []noUnneededTernaryCase{
-		{"var a = x === 2 ? true : false;", nil, []string{"unnecessaryConditionalExpression"}, "var a = x === 2;"},
-		{"var a = x >= 2 ? true : false;", nil, []string{"unnecessaryConditionalExpression"}, "var a = x >= 2;"},
-		{"var a = x ? true : false;", nil, []string{"unnecessaryConditionalExpression"}, "var a = !!x;"},
-		{"var a = x === 1 ? false : true;", nil, []string{"unnecessaryConditionalExpression"}, "var a = x !== 1;"},
-		{"var a = x != 1 ? false : true;", nil, []string{"unnecessaryConditionalExpression"}, "var a = x == 1;"},
-		{"var a = foo() ? false : true;", nil, []string{"unnecessaryConditionalExpression"}, "var a = !foo();"},
-		{"var a = !foo() ? false : true;", nil, []string{"unnecessaryConditionalExpression"}, "var a = !!foo();"},
+		{
+			"var a = x === 2 ? true : false;",
+			rule.Given[NoUnneededTernaryOptions]{},
+			[]string{"unnecessaryConditionalExpression"},
+			"var a = x === 2;",
+		},
+		{
+			"var a = x >= 2 ? true : false;",
+			rule.Given[NoUnneededTernaryOptions]{},
+			[]string{"unnecessaryConditionalExpression"},
+			"var a = x >= 2;",
+		},
+		{
+			"var a = x ? true : false;",
+			rule.Given[NoUnneededTernaryOptions]{},
+			[]string{"unnecessaryConditionalExpression"},
+			"var a = !!x;",
+		},
+		{
+			"var a = x === 1 ? false : true;",
+			rule.Given[NoUnneededTernaryOptions]{},
+			[]string{"unnecessaryConditionalExpression"},
+			"var a = x !== 1;",
+		},
+		{
+			"var a = x != 1 ? false : true;",
+			rule.Given[NoUnneededTernaryOptions]{},
+			[]string{"unnecessaryConditionalExpression"},
+			"var a = x == 1;",
+		},
+		{
+			"var a = foo() ? false : true;",
+			rule.Given[NoUnneededTernaryOptions]{},
+			[]string{"unnecessaryConditionalExpression"},
+			"var a = !foo();",
+		},
+		{
+			"var a = !foo() ? false : true;",
+			rule.Given[NoUnneededTernaryOptions]{},
+			[]string{"unnecessaryConditionalExpression"},
+			"var a = !!foo();",
+		},
 		{
 			"var a = foo + bar ? false : true;",
-			nil,
+			rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"},
 			"var a = !(foo + bar);",
 		},
 		{
 			"var a = x instanceof foo ? false : true;",
-			nil,
+			rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"},
 			"var a = !(x instanceof foo);",
 		},
-		{"var a = foo ? false : false;", nil, []string{"unnecessaryConditionalExpression"}, "var a = false;"},
-		{"var a = foo() ? false : false;", nil, []string{"unnecessaryConditionalExpression"}, ""},
+		{
+			"var a = foo ? false : false;",
+			rule.Given[NoUnneededTernaryOptions]{},
+			[]string{"unnecessaryConditionalExpression"},
+			"var a = false;",
+		},
+		{
+			"var a = foo() ? false : false;",
+			rule.Given[NoUnneededTernaryOptions]{},
+			[]string{"unnecessaryConditionalExpression"},
+			"",
+		},
 		{
 			"var a = x instanceof foo ? true : false;",
-			nil,
+			rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"},
 			"var a = x instanceof foo;",
 		},
-		{"var a = !foo ? true : false;", nil, []string{"unnecessaryConditionalExpression"}, "var a = !foo;"},
+		{
+			"var a = !foo ? true : false;",
+			rule.Given[NoUnneededTernaryOptions]{},
+			[]string{"unnecessaryConditionalExpression"},
+			"var a = !foo;",
+		},
 		{
 			"\n                var value = 'a'\n                var canSet = true\n                var result = value ? value : canSet ? 'unset' : 'can not set'\n            ",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"\n                var value = 'a'\n                var canSet = true\n                var result = value || (canSet ? 'unset' : 'can not set')\n            ",
 		},
 		{
 			"foo ? foo : (bar ? baz : qux)",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"foo || (bar ? baz : qux)",
 		},
 		{
 			"function* fn() { foo ? foo : yield bar }",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"function* fn() { foo || (yield bar) }",
 		},
 		{
 			"var a = foo ? foo : 'No';",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"var a = foo || 'No';",
 		},
 		{
 			"var a = ((foo)) ? (((((foo))))) : ((((((((((((((bar))))))))))))));",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"var a = ((foo)) || ((((((((((((((bar))))))))))))));",
 		},
 		{
 			"var a = b ? b : c => c;",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"var a = b || (c => c);",
 		},
 		{
 			"var a = b ? b : c = 0;",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"var a = b || (c = 0);",
 		},
 		{
 			"var a = b ? b : (c => c);",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"var a = b || (c => c);",
 		},
 		{
 			"var a = b ? b : (c = 0);",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"var a = b || (c = 0);",
 		},
 		{
 			"var a = b ? b : (c) => (c);",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"var a = b || ((c) => (c));",
 		},
 		{
 			"var a = b ? b : c, d; // this is ((b ? b : c), (d))",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"var a = b || c, d; // this is ((b ? b : c), (d))",
 		},
 		{
 			"var a = b ? b : (c, d);",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"var a = b || (c, d);",
 		},
 		{
 			"f(x ? x : 1);",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"f(x || 1);",
 		},
 		{
 			"x ? x : 1;",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"x || 1;",
 		},
 		{
 			"var a = foo ? foo : bar;",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"var a = foo || bar;",
 		},
 		{
 			"var a = foo ? foo : a ?? b;",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"var a = foo || (a ?? b);",
 		},
-		{"foo as any ? false : true", nil, []string{"unnecessaryConditionalExpression"}, "!(foo as any)"},
+		{
+			"foo as any ? false : true",
+			rule.Given[NoUnneededTernaryOptions]{},
+			[]string{"unnecessaryConditionalExpression"},
+			"!(foo as any)",
+		},
 		{
 			"foo ? foo : bar as any",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			[]string{"unnecessaryConditionalAssignment"},
 			"foo || (bar as any)",
 		},
@@ -196,32 +253,42 @@ func noUnneededTernaryFiresCases() []noUnneededTernaryCase {
 
 func noUnneededTernarySilentCases() []noUnneededTernaryCase {
 	return []noUnneededTernaryCase{
-		{"config.newIsCap = config.newIsCap !== false", nil, nil, ""},
-		{"var a = x === 2 ? 'Yes' : 'No';", nil, nil, ""},
-		{"var a = x === 2 ? true : 'No';", nil, nil, ""},
-		{"var a = x === 2 ? 'Yes' : false;", nil, nil, ""},
-		{"var a = x === 2 ? 'true' : 'false';", nil, nil, ""},
-		{"var a = foo ? foo : bar;", nil, nil, ""},
-		{"var value = 'a';var canSet = true;var result = value || (canSet ? 'unset' : 'can not set')", nil, nil, ""},
-		{"var a = foo ? bar : foo;", nil, nil, ""},
-		{"foo ? bar : foo;", nil, nil, ""},
-		{"var a = f(x ? x : 1)", nil, nil, ""},
-		{"f(x ? x : 1);", nil, nil, ""},
-		{"foo ? foo : bar;", nil, nil, ""},
-		{"var a = foo ? 'Yes' : foo;", nil, nil, ""},
+		{"config.newIsCap = config.newIsCap !== false", rule.Given[NoUnneededTernaryOptions]{}, nil, ""},
+		{"var a = x === 2 ? 'Yes' : 'No';", rule.Given[NoUnneededTernaryOptions]{}, nil, ""},
+		{"var a = x === 2 ? true : 'No';", rule.Given[NoUnneededTernaryOptions]{}, nil, ""},
+		{"var a = x === 2 ? 'Yes' : false;", rule.Given[NoUnneededTernaryOptions]{}, nil, ""},
+		{"var a = x === 2 ? 'true' : 'false';", rule.Given[NoUnneededTernaryOptions]{}, nil, ""},
+		{"var a = foo ? foo : bar;", rule.Given[NoUnneededTernaryOptions]{}, nil, ""},
+		{
+			"var value = 'a';var canSet = true;var result = value || (canSet ? 'unset' : 'can not set')",
+			rule.Given[NoUnneededTernaryOptions]{},
+			nil,
+			"",
+		},
+		{"var a = foo ? bar : foo;", rule.Given[NoUnneededTernaryOptions]{}, nil, ""},
+		{"foo ? bar : foo;", rule.Given[NoUnneededTernaryOptions]{}, nil, ""},
+		{"var a = f(x ? x : 1)", rule.Given[NoUnneededTernaryOptions]{}, nil, ""},
+		{"f(x ? x : 1);", rule.Given[NoUnneededTernaryOptions]{}, nil, ""},
+		{"foo ? foo : bar;", rule.Given[NoUnneededTernaryOptions]{}, nil, ""},
+		{"var a = foo ? 'Yes' : foo;", rule.Given[NoUnneededTernaryOptions]{}, nil, ""},
 		{
 			"var a = foo ? 'Yes' : foo;",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			nil,
 			"",
 		},
 		{
 			"var a = foo ? bar : foo;",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			nil,
 			"",
 		},
-		{"foo ? bar : foo;", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, nil, ""},
+		{
+			"foo ? bar : foo;",
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
+			nil,
+			"",
+		},
 	}
 }
 
@@ -328,37 +395,46 @@ func TestNoUnneededTernaryPreservesTypeSyntax(test *testing.T) {
 	}
 	cases := []noUnneededTernaryCase{
 		// A type annotation on the assignment target sits outside the replaced span and survives.
-		{"declare const foo: unknown; const x: boolean = foo ? true : false;", nil,
+		{"declare const foo: unknown; const x: boolean = foo ? true : false;", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"},
 			"declare const foo: unknown; const x: boolean = !!foo;"},
 		// `satisfies` inside the test, which must be parenthesized under the negation.
-		{"declare const foo: boolean; const x = foo satisfies boolean ? true : false;", nil,
+		{
+			"declare const foo: boolean; const x = foo satisfies boolean ? true : false;",
+			rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"},
-			"declare const foo: boolean; const x = !!(foo satisfies boolean);"},
+			"declare const foo: boolean; const x = !!(foo satisfies boolean);",
+		},
 		// A parenthesized `as`, whose own parentheses are kept as written.
-		{"declare const foo: unknown; const x = (foo as string) ? true : false;", nil,
+		{
+			"declare const foo: unknown; const x = (foo as string) ? true : false;",
+			rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"},
-			"declare const foo: unknown; const x = !!((foo as string));"},
+			"declare const foo: unknown; const x = !!((foo as string));",
+		},
 		// A non-null assertion, which our AST hangs off the operand as its own node.
-		{"declare const foo: string | undefined; const x = foo! ? true : false;", nil,
+		{
+			"declare const foo: string | undefined; const x = foo! ? true : false;",
+			rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"},
-			"declare const foo: string | undefined; const x = !!(foo!);"},
+			"declare const foo: string | undefined; const x = !!(foo!);",
+		},
 		// Explicit type arguments on a call, which a JavaScript parser reads as two comparisons.
-		{"declare function f<T>(): T; const x = f<number>() ? true : false;", nil,
+		{"declare function f<T>(): T; const x = f<number>() ? true : false;", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"},
 			"declare function f<T>(): T; const x = !!f<number>();"},
 		// An angle-bracket cast, which has no JavaScript equivalent at all.
-		{"declare const a: unknown; const x = <boolean>a ? true : false;", nil,
+		{"declare const a: unknown; const x = <boolean>a ? true : false;", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"},
 			"declare const a: unknown; const x = !!(<boolean>a);"},
 		// The default-assignment arm with an `as` alternate: parenthesized, because `as` binds
 		// looser than the `||` the repair introduces.
 		{"declare const a: unknown; declare const b: unknown; const x = a ? a : b as any;",
-			defaultAssignmentOff, []string{"unnecessaryConditionalAssignment"},
+			rule.Configured(defaultAssignmentOff), []string{"unnecessaryConditionalAssignment"},
 			"declare const a: unknown; declare const b: unknown; const x = a || (b as any);"},
 		{"declare const a: unknown; declare const b: unknown; " +
 			"const x = a ? a : b satisfies unknown;",
-			defaultAssignmentOff, []string{"unnecessaryConditionalAssignment"},
+			rule.Configured(defaultAssignmentOff), []string{"unnecessaryConditionalAssignment"},
 			"declare const a: unknown; declare const b: unknown; " +
 				"const x = a || (b satisfies unknown);"},
 		// The controls for those two: a `||` alternate is not parenthesized, because it binds at
@@ -366,18 +442,23 @@ func TestNoUnneededTernaryPreservesTypeSyntax(test *testing.T) {
 		// Without these rows a rule that parenthesized everything would look correct.
 		{"declare const a: unknown; declare const b: unknown; declare const c: unknown; " +
 			"const x = a ? a : b || c;",
-			defaultAssignmentOff, []string{"unnecessaryConditionalAssignment"},
+			rule.Configured(defaultAssignmentOff), []string{"unnecessaryConditionalAssignment"},
 			"declare const a: unknown; declare const b: unknown; declare const c: unknown; " +
 				"const x = a || b || c;"},
 		{"declare const a: unknown; declare const b: unknown; declare const c: unknown; " +
 			"const x = a ? a : b ?? c;",
-			defaultAssignmentOff, []string{"unnecessaryConditionalAssignment"},
+			rule.Configured(defaultAssignmentOff), []string{"unnecessaryConditionalAssignment"},
 			"declare const a: unknown; declare const b: unknown; declare const c: unknown; " +
 				"const x = a || (b ?? c);"},
 		// An `as` in a branch rather than in the test is not a boolean literal, so the rule
 		// declines entirely. This is the row that separates "sees through everything" from "reads
 		// the branch correctly".
-		{"declare const foo: unknown; const x = foo ? true : false as boolean;", nil, nil, ""},
+		{
+			"declare const foo: unknown; const x = foo ? true : false as boolean;",
+			rule.Given[NoUnneededTernaryOptions]{},
+			nil,
+			"",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -403,15 +484,15 @@ func TestNoUnneededTernaryPointsAtTheWholeConditional(test *testing.T) {
 
 	cases := []struct {
 		sourceText string
-		options    any
+		options    rule.Given[NoUnneededTernaryOptions]
 		wantSpan   string
 	}{
-		{"var a = x === 2 ? true : false;", nil, "x === 2 ? true : false"},
-		{"var a = x ? true : false;", nil, "x ? true : false"},
+		{"var a = x === 2 ? true : false;", rule.Given[NoUnneededTernaryOptions]{}, "x === 2 ? true : false"},
+		{"var a = x ? true : false;", rule.Given[NoUnneededTernaryOptions]{}, "x ? true : false"},
 		{"var a = foo ? foo : bar;",
-			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			rule.Configured(NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}),
 			"foo ? foo : bar"},
-		{"var a = f() ? true : true;", nil, "f() ? true : true"},
+		{"var a = f() ? true : true;", rule.Given[NoUnneededTernaryOptions]{}, "f() ? true : true"},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
@@ -441,7 +522,7 @@ func TestNoUnneededTernaryPointsAtTheWholeConditional(test *testing.T) {
 
 // The decoder, whose only option defaults to `true`.
 //
-// A rule configured as a bare severity is handed nil, and `options.(T)` on nil yields the zero
+// A rule configured as a bare severity is handed no options, and reading them yields the zero
 // value, whose false would switch the second judgment on for everyone. Every fixture above reaches
 // the rule through the decoder, so none of them can see that.
 func TestDecodeNoUnneededTernaryOptions(test *testing.T) {
@@ -472,7 +553,7 @@ func TestDecodeNoUnneededTernaryOptions(test *testing.T) {
 	})
 }
 
-// With nil options the default-assignment judgment stays off and the boolean one stays on.
+// With no options the default-assignment judgment stays off and the boolean one stays on.
 func TestNoUnneededTernaryWithNilOptionsUsesTheDefault(test *testing.T) {
 	test.Parallel()
 
@@ -501,16 +582,16 @@ func TestNoUnneededTernaryAsksPrecedenceOfWhatTheParenthesesHold(test *testing.T
 
 	cases := []noUnneededTernaryCase{
 		// A parenthesized loose-binding test keeps its own pair and gains one.
-		{"const x = (a + b) ? true : false;", nil,
+		{"const x = (a + b) ? true : false;", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"}, "const x = !!((a + b));"},
 		// A parenthesized tight-binding test keeps only its own pair, which is the control that
 		// separates "asks about the inside" from "always wraps a parenthesized test".
-		{"const x = (foo) ? true : false;", nil,
+		{"const x = (foo) ? true : false;", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"}, "const x = !!(foo);"},
-		{"const x = ((foo)) ? true : false;", nil,
+		{"const x = ((foo)) ? true : false;", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"}, "const x = !!((foo));"},
 		// The unparenthesized form of the first row, which needs exactly one pair.
-		{"const x = a + b ? true : false;", nil,
+		{"const x = a + b ? true : false;", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"}, "const x = !!(a + b);"},
 	}
 	for _, testCase := range cases {
@@ -539,27 +620,27 @@ func TestNoUnneededTernaryCoversEveryInverseAndParenthesizedBranch(test *testing
 
 	cases := []noUnneededTernaryCase{
 		// All four equality operators have a true inverse, and each row pins one direction.
-		{"var a = x == 2 ? false : true;", nil,
+		{"var a = x == 2 ? false : true;", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"}, "var a = x != 2;"},
-		{"var a = x != 2 ? false : true;", nil,
+		{"var a = x != 2 ? false : true;", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"}, "var a = x == 2;"},
-		{"var a = x === 2 ? false : true;", nil,
+		{"var a = x === 2 ? false : true;", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"}, "var a = x !== 2;"},
-		{"var a = x !== 2 ? false : true;", nil,
+		{"var a = x !== 2 ? false : true;", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"}, "var a = x === 2;"},
 		// A parenthesized boolean branch is still a boolean branch. Espree gives parentheses no
 		// node, so upstream reads the literal directly and the skip is fidelity rather than a
 		// widening -- the same correction `no-eq-null` documents for its operands.
-		{"var a = foo ? (true) : false;", nil,
+		{"var a = foo ? (true) : false;", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"}, "var a = !!foo;"},
-		{"var a = foo ? true : (false);", nil,
+		{"var a = foo ? true : (false);", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"}, "var a = !!foo;"},
-		{"var a = foo ? (true) : (true);", nil,
+		{"var a = foo ? (true) : (true);", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"}, "var a = true;"},
 		// `in` and `instanceof` always produce a boolean, so the test is emitted bare.
-		{"var a = x in y ? true : false;", nil,
+		{"var a = x in y ? true : false;", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"}, "var a = x in y;"},
-		{"var a = x instanceof y ? true : false;", nil,
+		{"var a = x instanceof y ? true : false;", rule.Given[NoUnneededTernaryOptions]{},
 			[]string{"unnecessaryConditionalExpression"}, "var a = x instanceof y;"},
 	}
 	for _, testCase := range cases {

@@ -92,20 +92,20 @@ func TestNoUnreachableLoopOptions(test *testing.T) {
 
 // TestNoUnreachableLoopHandlesNilOptions pins the bare-severity path, which no corpus case reaches.
 //
-// A rule configured as `"no-unreachable-loop": "error"` is handed nil, and `options.(T)` on nil
+// A rule configured as `"no-unreachable-loop": "error"` is handed no options, and reading them
 // yields the zero value rather than reporting failure. That is right here, since upstream's default
 // ignores nothing, but it is right by accident unless something asserts it: a rule whose defaults
-// inverted under nil would pass every option fixture in the table above, because each of those
+// inverted without options would pass every option fixture in the table above, because each of those
 // arrives through the decoder with a real value.
 func TestNoUnreachableLoopHandlesNilOptions(test *testing.T) {
 	test.Parallel()
 
 	rule_testing.ExpectFindings(test,
-		rule_testing.RunWithOptions(test, NoUnreachableLoop, unreachableLoopFile, "while (a) break;", nil),
+		rule_testing.Run(test, NoUnreachableLoop, unreachableLoopFile, "while (a) break;"),
 		"invalid")
 
 	rule_testing.ExpectClean(test,
-		rule_testing.RunWithOptions(test, NoUnreachableLoop, unreachableLoopFile, "while (a) { bar(); }", nil))
+		rule_testing.Run(test, NoUnreachableLoop, unreachableLoopFile, "while (a) { bar(); }"))
 }
 
 // TestNoUnreachableLoopSpans asserts where the finding points, which no message-id fixture can see.
