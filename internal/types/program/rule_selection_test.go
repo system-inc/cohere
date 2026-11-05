@@ -39,7 +39,7 @@ func TestFilesThatResolveAlikeShareOneSelectionAndStillCountPerFile(test *testin
 		}
 		rules = append(rules, entry)
 	}
-	selections := map[any]*ruleSelection{}
+	selections := map[*configuration.ResolutionIdentity]*ruleSelection{}
 	scopedOff, unconfigured := map[string]int{}, map[string]int{}
 
 	first, _ := graph.rulesFor("source/a.ts", rules, selections, scopedOff, unconfigured)
@@ -128,7 +128,7 @@ func TestSelectionsFingerprintADerivedRuleOncePerOptionsForTheWholeWalk(test *te
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			selections := map[any]*ruleSelection{}
+			selections := map[*configuration.ResolutionIdentity]*ruleSelection{}
 			scopedOff, unconfigured := map[string]int{}, map[string]int{}
 			for file, want := range map[string]string{
 				"source/a.ts":  "red",

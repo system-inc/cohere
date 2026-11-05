@@ -330,7 +330,7 @@ func (graph *Graph) Walk(callerContext context.Context, files []*ast.SourceFile,
 			localScopedOff := map[string]int{}
 			localUnconfigured := map[string]int{}
 			// The rule selection for each distinct resolution this worker has met. See rulesFor.
-			localSelections := map[any]*ruleSelection{}
+			localSelections := map[*configuration.ResolutionIdentity]*ruleSelection{}
 			localFailures := []error{}
 			localCrashes := []FileCrash{}
 			localRuleCrashes := []RuleCrash{}
@@ -1157,6 +1157,11 @@ func walk(node *ast.Node, listeners [][]func(node *ast.Node)) int {
 	return visited
 }
 
+// noConfiguration keys the one selection a walk with no configuration makes: every rule, with no options, so
+// each runs as its Unconfigured (boundIn). An identity of its own, which no Config's resolution can share, since
+// identities are compared by pointer.
+var noConfiguration = &configuration.ResolutionIdentity{}
+
 // rulesFor narrows the rule set to those the configuration enables for one file, and decodes each
 // one's options into the type that rule declares.
 //
@@ -1182,15 +1187,15 @@ func walk(node *ast.Node, listeners [][]func(node *ast.Node)) int {
 func (graph *Graph) rulesFor(
 	fileName string,
 	rules []rule.Entry,
-	selections map[any]*ruleSelection,
+	selections map[*configuration.ResolutionIdentity]*ruleSelection,
 	scopedOff map[string]int,
 	unconfigured map[string]int,
 ) (*ruleSelection, configuration.Resolved) {
 	if graph.LintConfig == nil {
-		selection, made := selections[noConfiguration{}]
+		selection, made := selections[noConfiguration]
 		if !made {
 			selection = &ruleSelection{applicable: rules}
-			selections[noConfiguration{}] = selection
+			selections[noConfiguration] = selection
 		}
 		return selection, configuration.Resolved{}
 	}
@@ -1220,10 +1225,6 @@ func (graph *Graph) rulesFor(
 	}
 	return selection, resolution
 }
-
-// noConfiguration keys the one selection a walk with no configuration makes: every rule, with no options, so
-// each runs as its Unconfigured (boundIn).
-type noConfiguration struct{}
 
 // ruleSelection is what one resolution decides about the rule set: the rules that apply, each bound to its
 // decoded options, and the rules left out and why.

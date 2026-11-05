@@ -24,12 +24,12 @@ type Resolved struct {
 	Rules map[string]RuleSetting
 
 	// identity is the memo entry this resolution came from, nil for one built by hand.
-	identity *resolutionIdentity
+	identity *ResolutionIdentity
 }
 
-// resolutionIdentity names one distinct resolution of one Config. A field of its own, because pointers to
-// zero-size values need not be distinct.
-type resolutionIdentity struct {
+// ResolutionIdentity names one distinct resolution of one Config, compared by pointer. A field of its own,
+// because pointers to zero-size values need not be distinct.
+type ResolutionIdentity struct {
 	match string
 }
 
@@ -37,10 +37,7 @@ type resolutionIdentity struct {
 // so a caller can derive what depends only on the resolution once per resolution rather than once per
 // file: which rules apply, and their decoded options. Nil for a resolution with no identity, an ignored
 // file or one built by hand, which a caller treats as unique.
-func (resolved Resolved) Identity() any {
-	if resolved.identity == nil {
-		return nil
-	}
+func (resolved Resolved) Identity() *ResolutionIdentity {
 	return resolved.identity
 }
 
@@ -344,7 +341,7 @@ func (c *Config) resolveMatch(match []byte) Resolved {
 		}
 	}
 
-	return Resolved{Rules: effective, identity: &resolutionIdentity{match: string(match)}}
+	return Resolved{Rules: effective, identity: &ResolutionIdentity{match: string(match)}}
 }
 
 // MatchedOverrideIndices returns the blocks applied to this resolution in precedence order.
