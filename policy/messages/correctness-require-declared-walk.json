@@ -5,6 +5,9 @@
   "messages": {
     "undeclaredWalk": {
       "text": "This path takes a directory walk outside its package, and nothing declares what the walk reads, so a change to those files won't rerun this package's tests: they stay green on a stale result and the red surfaces later on someone else's change. Declare it with a `// Reads: <glob>` comment on this line or just above it, one glob per comment, and a matching reads line in {{readsFile}}."
+    },
+    "readsWithoutGlob": {
+      "text": "This `// Reads:` comment names no glob, so it declares nothing, and the walk this path leads outside its package reads files no reads line names: a change to them won't rerun this package's tests, which stay green on a stale result. Write the glob after the colon, `// Reads: <glob>`, one glob per comment, and add a matching reads line in {{readsFile}}."
     }
   }
 }

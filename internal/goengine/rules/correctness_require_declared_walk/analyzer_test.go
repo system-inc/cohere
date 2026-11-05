@@ -44,10 +44,10 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 	}
 }
 
-// The flagged fixtures carry a // want on every source the rule must report, and analysistest fails on a finding no
-// want expects as much as on a want nothing found, so the allowed and lookalike fixtures prove the rule stays quiet on
-// a walk inside the package, an untraceable root, a declared walk, a fixed file, and a walk that isn't the standard
-// library's.
+// The flagged fixtures carry a // want on every source the rule must report, a marker with no glob under its own
+// message, and analysistest fails on a finding no want expects as much as on a want nothing found, so the allowed and
+// lookalike fixtures prove the rule stays quiet on a walk inside the package, an untraceable root, a declared walk,
+// one declared beside an empty marker, a fixed file, and a walk that isn't the standard library's.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(errorsOnly{test}, analysistest.TestData(), configured(test), "flagged", "allowed", "lookalike")

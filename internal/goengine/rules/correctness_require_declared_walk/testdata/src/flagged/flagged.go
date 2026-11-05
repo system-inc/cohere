@@ -157,9 +157,15 @@ func walkedInAClosure() {
 	_ = walk()
 }
 
+// A marker with no glob declares nothing, and its finding says the glob is missing, above the line or at its end.
 func emptyGlob() {
 	// Reads:
-	_ = filepath.WalkDir("../..", visit) // want `This path takes a directory walk outside its package`
+	_ = filepath.WalkDir("../..", visit) // want `^This .// Reads:. comment names no glob, so it declares nothing`
+}
+
+func emptyGlobAtTheEnd() {
+	// want +1 `names no glob`
+	_ = filepath.WalkDir("../..", visit) // Reads:
 }
 
 func twoGlobsInOneComment() {

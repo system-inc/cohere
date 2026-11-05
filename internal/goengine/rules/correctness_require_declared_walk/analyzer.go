@@ -64,6 +64,8 @@ var Rule = rule.Rule{
 
 var undeclaredWalkMessage = policy.MessageOf(Name, "undeclaredWalk")
 
+var readsWithoutGlobMessage = policy.MessageOf(Name, "readsWithoutGlob")
+
 // readsFileOption names the file of reads lines a planner holds each // Reads: glob against, such as Adamic's
 // cloud/fast-gate/executors.txt, which Adamic's rule hardcoded. It is the rule's switch as well as its message's
 // pointer: a repository with no such planner leaves it empty, and the rule reports nothing.
@@ -889,8 +891,10 @@ func (walker *walker) leavesPackage(path string) bool {
 // report flags each source that reaches a walk once, on the source, with the walk it reaches as related.
 func (walker *walker) report(readsFile string) {
 	declaredLines := map[*token.File]map[int]bool{}
+	globlessLines := map[*token.File]map[int]bool{}
 	for _, file := range walker.pass.Files {
-		declaredLines[walker.pass.Fset.File(file.Pos())] = readsLines(walker.pass.Fset, file)
+		tokenFile := walker.pass.Fset.File(file.Pos())
+		declaredLines[tokenFile], globlessLines[tokenFile] = readsLines(walker.pass.Fset, file)
 	}
 	walks := map[token.Pos]token.Pos{}
 	for _, declared := range walker.functions {
@@ -911,13 +915,20 @@ func (walker *walker) report(readsFile string) {
 	slices.Sort(sources)
 	for _, source := range sources {
 		file := walker.pass.Fset.File(source)
-		if file == nil || declaredLines[file][walker.pass.Fset.PositionFor(source, false).Line] {
+		line := walker.pass.Fset.PositionFor(source, false).Line
+		if file == nil || declaredLines[file][line] {
 			continue
+		}
+		// A marker with no glob after it declares nothing, as Adamic reads it, but its writer meant to declare the
+		// walk, so the finding names the missing glob rather than saying nothing was written.
+		message := undeclaredWalkMessage
+		if globlessLines[file][line] {
+			message = readsWithoutGlobMessage
 		}
 		walker.pass.Report(analysis.Diagnostic{
 			Pos:      source,
-			Category: undeclaredWalkMessage.Id,
-			Message:  undeclaredWalkMessage.Render(map[string]string{"readsFile": readsFile}),
+			Category: message.Id,
+			Message:  message.Render(map[string]string{"readsFile": readsFile}),
 			Related:  []analysis.RelatedInformation{{Pos: walks[source], Message: relatedWalkText}},
 		})
 	}
@@ -925,23 +936,37 @@ func (walker *walker) report(readsFile string) {
 
 // readsLines are the lines a // Reads: <glob> comment declares: its own, for a comment at the end of a line, and the
 // line just after its comment group, so a walk reading several globs carries a comment for each above the source.
-func readsLines(fileSet *token.FileSet, file *ast.File) map[int]bool {
-	lines := map[int]bool{}
+// globless are the lines a marker with nothing but spaces after it would have declared, so its finding can say the
+// glob is missing; a line another comment declares is declared all the same.
+func readsLines(fileSet *token.FileSet, file *ast.File) (declared map[int]bool, globless map[int]bool) {
+	declared = map[int]bool{}
+	globless = map[int]bool{}
 	for _, group := range file.Comments {
 		for _, comment := range group.List {
 			rest, isDeclaration := strings.CutPrefix(comment.Text, readsMarker)
 			if !isDeclaration {
 				continue
 			}
+			covered := []int{
+				fileSet.PositionFor(comment.Pos(), false).Line,
+				fileSet.PositionFor(group.End(), false).Line + 1,
+			}
 			glob, spaced := strings.CutPrefix(rest, " ")
 			// An empty glob names nothing for the planner to check, and a comment holds one glob, written as in
-			// the reads line, so anything else declares nothing.
+			// the reads line, so anything else declares nothing. Only the empty one gets its own finding: a glob
+			// written some other way is still a glob the planner won't read, which the plain finding covers.
 			if !spaced || glob == "" || strings.ContainsFunc(glob, unicode.IsSpace) {
+				if strings.TrimSpace(rest) == "" {
+					for _, line := range covered {
+						globless[line] = true
+					}
+				}
 				continue
 			}
-			lines[fileSet.PositionFor(comment.Pos(), false).Line] = true
-			lines[fileSet.PositionFor(group.End(), false).Line+1] = true
+			for _, line := range covered {
+				declared[line] = true
+			}
 		}
 	}
-	return lines
+	return declared, globless
 }
