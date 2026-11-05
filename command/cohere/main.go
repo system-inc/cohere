@@ -1629,6 +1629,14 @@ func configureLint(
 	if err != nil {
 		return nil, fmt.Errorf("loading the lint config: %w", err)
 	}
+	// The project's own file, which discovery may not have read: a run naming a directory, a tsconfig or a
+	// path discovers nothing. A file the command line named is the Swift engine's to read wherever it sits
+	// (see configuration.CheckSwiftBlockHasAReader), and a missing one is zero config, with no block.
+	if !location.LintConfigFileNameGiven && isRegularFile(location.LintConfigFileName) {
+		if checkSwiftBlockHasAReaderError := configuration.CheckSwiftBlockHasAReader(location.LintConfigFileName); checkSwiftBlockHasAReaderError != nil {
+			return nil, fmt.Errorf("loading the lint config: %w", checkSwiftBlockHasAReaderError)
+		}
+	}
 	// Validated against the whole program rather than against a narrowed scope. The question
 	// this check asks is whether a config override reaches any file at all, which is a property
 	// of the tree and not of one run: scoping to a single file legitimately leaves `modules/**`

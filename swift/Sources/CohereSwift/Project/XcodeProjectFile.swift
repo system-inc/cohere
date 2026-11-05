@@ -2,7 +2,7 @@ import Foundation
 
 /*
  An Xcode project as its project file describes it: its native targets, which Swift files each compiles, the
- Swift version and SDK each names, and the local packages it links. The counterpart of `PackageModel` for a
+ Swift version and SDK each names, the configurations each is built in, and the local packages it links. The counterpart of `PackageModel` for a
  project SwiftPM cannot describe.
 
  Read from `project.pbxproj` itself, with Apple's own property list parser, which reads the old-style format
@@ -29,13 +29,27 @@ public struct XcodeProjectFile: Equatable, Sendable {
         public var swiftVersion: String?
         /* `SDKROOT` the same way (`iphoneos`, `macosx`): the platform a build of the target is for. */
         public var sdkRoot: String?
+        /* The target's object identifier in the project file, which is how a finding finds the target's line there. */
+        public var identifier: String
+        /* The names of the target's build configurations (`Debug`, `Release`), in the order its list gives them. */
+        public var configurations: [String]
 
-        public init(name: String, productType: String, sources: [URL], swiftVersion: String?, sdkRoot: String?) {
+        public init(
+            name: String,
+            productType: String,
+            sources: [URL],
+            swiftVersion: String?,
+            sdkRoot: String?,
+            identifier: String = "",
+            configurations: [String] = [],
+        ) {
             self.name = name
             self.productType = productType
             self.sources = sources
             self.swiftVersion = swiftVersion
             self.sdkRoot = sdkRoot
+            self.identifier = identifier
+            self.configurations = configurations
         }
     }
 
@@ -210,10 +224,27 @@ private struct ProjectObjects {
                         ?? projectSwiftVersion,
                     sdkRoot: try setting("SDKROOT", configurationList: target["buildConfigurationList"])
                         ?? projectSdkRoot,
+                    identifier: targetIdentifier,
+                    configurations: try configurationNames(target["buildConfigurationList"]),
                 )
             )
         }
         return targets.sorted { $0.name < $1.name }
+    }
+
+    /* The names of the configurations a configuration list holds, in its order; none when the target names no list. */
+    func configurationNames(_ configurationList: Any?) throws -> [String] {
+        guard let configurationList else { return [] }
+        guard let listIdentifier = configurationList as? String else {
+            throw failure("a buildConfigurationList is not an identifier")
+        }
+        let list = try object(listIdentifier, as: "configuration list")
+        return try identifiers("buildConfigurations", of: list, "configuration list \(listIdentifier)").map {
+            guard let name = try object($0, as: "configuration of list \(listIdentifier)")["name"] as? String else {
+                throw failure("configuration \($0) of list \(listIdentifier) has no name")
+            }
+            return name
+        }
     }
 
     /*

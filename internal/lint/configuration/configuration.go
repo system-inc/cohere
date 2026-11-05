@@ -721,6 +721,9 @@ func readConfigLayers(path string, chain []string) ([]configLayer, error) {
 	for key := range keyed {
 		present[key] = true
 	}
+	if checkSwiftBlockPlacementError := checkSwiftBlockPlacement(absolute, chain, present); checkSwiftBlockPlacementError != nil {
+		return nil, checkSwiftBlockPlacementError
+	}
 
 	layer := configLayer{path: absolute, raw: raw, present: present}
 
@@ -1034,6 +1037,11 @@ var ignoredTopLevelKeys = map[string]string{
 	"go": "the Go engine's rules, read by internal/goengine/settings. A repository that holds both a tsconfig and " +
 		"a go.mod keeps one CohereSettings.json for both engines, so the TypeScript linter leaves the key alone on " +
 		"purpose: its rules are the Go engine's, not this linter's.",
+
+	swiftBlockKey: "the Swift engine's rules, read by cohere-swift itself " +
+		"(swift/Sources/CohereSwift/Command/RuleConfiguration.swift), which refuses what it does not read. " +
+		"One settings file configures every engine, so this loader leaves the block's insides to that engine, " +
+		"and refuses only a block no Swift run reads (swift_block.go).",
 }
 
 // checkTopLevelKeys refuses a config carrying a key the loader does not implement.

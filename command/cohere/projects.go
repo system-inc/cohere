@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/sentence"
 	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -77,6 +78,14 @@ func checkDiscoveredProjects(
 	patterns, err := rootIgnorePatterns(root)
 	if err != nil {
 		return 0, false, err
+	}
+	// Asked here because a Swift-only run loads no lint configuration, so this is the one read of the root's
+	// file that every run makes. A file the command line named is the Swift engine's to read wherever it
+	// sits, and the projects' runs are handed it (see configuration.CheckSwiftBlockHasAReader).
+	if settings := filepath.Join(root, "CohereSettings.json"); settings != lintConfigFileName && isRegularFile(settings) {
+		if checkSwiftBlockHasAReaderError := configuration.CheckSwiftBlockHasAReader(settings); checkSwiftBlockHasAReaderError != nil {
+			return 0, false, checkSwiftBlockHasAReaderError
+		}
 	}
 	found, err := discoverProjects(root, patterns)
 	if err != nil {

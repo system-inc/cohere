@@ -91,6 +91,7 @@ var keyFixtures = map[string]map[string]string{
 	"output":         {"CohereSettings.json": `{"output": {"phases": true}}`},
 	"go":             {"CohereSettings.json": `{"go": ` + examples["go"] + `}`},
 	FormatKey:        {"CohereSettings.json": `{"format": {"tabWidth": 4}}`},
+	SwiftKey:         {"Package.swift": "// swift-tools-version:6.0\n", "CohereSettings.json": `{"swift": {"rules": {"cohere-swift/file-length": "error"}}}`},
 }
 
 // TestTheSchemaHasExactlyTheKeysTheLoaderAccepts is the test the schema exists for, in both directions,
