@@ -74,7 +74,7 @@ struct SymbolProvider {
              */
             if let gone = command.files.first(where: { !FileManager.default.fileExists(atPath: $0) }) {
                 result.unavailable[file.url.path] =
-                    "the last build compiled its module with \(gone), which no longer exists, so that build's arguments describe another module; a run with types rebuilds it"
+                    "the last build compiled its module with \(gone), which no longer exists, so that build's arguments describe another module"
                 continue
             }
             do {

@@ -365,15 +365,10 @@ public struct Pipeline {
             return try writer.finish(complete: false)
         }
 
-        var typeErrors = 0
-        if !options.runTypes {
-            try writer.write(PhaseRecord(name: .types, outcome: .skipped, detail: "not requested"))
-        }
-        else {
-            /* The whole package, whatever the scope: a change in one file changes what the rest of its module means. */
-            let types: TypesPhase.Result
+        /* The whole package, whatever the scope: a change in one file changes what the rest of its module means. */
+        func build() throws -> TypesPhase.Result {
             if let xcodeProject {
-                types = try XcodeTypesPhase(
+                return try XcodeTypesPhase(
                     package: package,
                     project: xcodeProject,
                     files: fileSet.owned,
@@ -384,21 +379,49 @@ public struct Pipeline {
                 )
                 .run()
             }
-            else {
-                var typesPhase = TypesPhase(
-                    package: package,
-                    files: fileSet.owned,
-                    scratchPath: runScratch(for: root),
-                    resolutionAllowed: !options.noFix,
-                    toolchain: toolchain,
-                    runner: runner,
-                )
-                typesPhase.parsed = Dictionary(
-                    parsed.files.map { ($0.url.path, $0.tree) },
-                    uniquingKeysWith: { first, _ in first },
-                )
-                types = try typesPhase.run()
+            var typesPhase = TypesPhase(
+                package: package,
+                files: fileSet.owned,
+                scratchPath: runScratch(for: root),
+                resolutionAllowed: !options.noFix,
+                toolchain: toolchain,
+                runner: runner,
+            )
+            typesPhase.parsed = Dictionary(
+                parsed.files.map { ($0.url.path, $0.tree) },
+                uniquingKeysWith: { first, _ in first },
+            )
+            return try typesPhase.run()
+        }
+
+        var typeErrors = 0
+        var lintBuildFailure: String?
+        if !options.runTypes {
+            /*
+             A typed rule reads what names resolve to from the build's index and compile commands, so a `--lint` run
+             whose typed rules apply to a file still builds, the way TypeScript's lint still loads the checker. What
+             the compiler said is not this run's to report, and the build is skipped when no input changed since the
+             last one. Without it, a tree no run had built marked every such file crashed (@ahra_os_presence_motion,
+             2026-11-05: 1,251 files at ahraos-presence's root under `--lint --no-fix`).
+             */
+            let typedRulesApply = parsed.files.contains { file in
+                RuleRegistry.typedRules.contains { configuration.severity(of: $0.name) != .off && $0.applies(to: file) }
             }
+            if options.runLint && typedRulesApply {
+                do {
+                    /* A build that failed after compiling something is said by a `buildFailed` finding rather than thrown. */
+                    lintBuildFailure = try build().findings.first { $0.messageId == "buildFailed" }?.message
+                }
+                catch let failure as TypesPhase.TypesFailure {
+                    /* Lint still runs: the rules that need no build judge every file, and each file the typed rules cannot judge says this build is why. */
+                    lintBuildFailure = failure.description
+                }
+            }
+            /* Exactly `not requested`, the one detail the contract reads as nobody asking: the build is lint's input, not a types phase. */
+            try writer.write(PhaseRecord(name: .types, outcome: .skipped, detail: "not requested"))
+        }
+        else {
+            let types = try build()
             for finding in types.findings {
                 try writer.write(finding)
             }
@@ -445,6 +468,11 @@ public struct Pipeline {
             )
             symbolProvider.ownedModules = Self.ownedModules(of: package)
             linter.symbols = symbolProvider.symbols(for: typedCandidates)
+            if let lintBuildFailure {
+                linter.symbols.unavailable = linter.symbols.unavailable.mapValues {
+                    "\($0), since the build this run made for the typed rules failed: \(lintBuildFailure)"
+                }
+            }
             let lint = await linter.run(
                 package: package,
                 manifests: await manifests(of: package),
