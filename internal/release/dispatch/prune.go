@@ -213,6 +213,7 @@ func planStaleDirectories(parent string, current string, now time.Time) ([]Prune
 // counts as nothing, since the number reports what was reclaimed and decides nothing.
 func directoryBytes(directory string) int64 {
 	total := int64(0)
+	// Ignored: the callback skips every path it cannot read and never returns an error, so the walk has none.
 	filepath.WalkDir(directory, func(_ string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() {
 			return nil
@@ -324,7 +325,13 @@ func RecordPrune(paths Paths, plan PrunePlan, removed []PrunedFile, now time.Tim
 	if err != nil {
 		return fmt.Errorf("opening the prune log: %w", err)
 	}
-	defer log.Close()
-	_, err = log.WriteString(entry.String())
-	return err
+	_, writeError := log.WriteString(entry.String())
+	closeError := log.Close()
+	if writeError != nil {
+		return writeError
+	}
+	if closeError != nil {
+		return fmt.Errorf("closing the prune log: %w", closeError)
+	}
+	return nil
 }

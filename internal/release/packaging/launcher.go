@@ -4,31 +4,6 @@ import (
 	"strings"
 )
 
-// DispatcherLauncher returns the Node script published as the `cohere` command.
-//
-// The launcher is Node rather than Go, which is a deliberate reversal of the obvious design. A Go
-// dispatcher would have to be cross-compiled per platform, which makes it a seventh platform
-// package rather than one package everyone installs — and the whole point of the dispatcher package
-// is that a consumer runs one `pnpm add -D @system-inc/cohere` and gets the right binary. Node is
-// already present by construction (this is an npm install), and `require.resolve` asks the package
-// manager where a package actually is, which is more reliable than any filesystem walk: it
-// understands pnpm's isolated store, npm's hoisting, and yarn's layouts without having to model any
-// of them.
-//
-// The script embeds here rather than living as a checked-in `.js` file so that the platform names,
-// the package prefix, and the binary names have exactly one definition. A launcher whose idea of the
-// package name drifted from the manifest's would resolve nothing on every machine, and that failure
-// looks identical to an unsupported platform.
-func DispatcherLauncher() string {
-	replacements := []string{
-		"__PLATFORM_PACKAGE_PREFIX__", PlatformPackagePrefix,
-		"__PACKAGE_SCOPE__", PackageScope,
-		"__OVERRIDE_VARIABLE__", BinaryOverrideVariable,
-		"__CHECKSUMS_FILE_NAME__", ChecksumsFileName,
-	}
-	return strings.NewReplacer(replacements...).Replace(launcherSource)
-}
-
 // launcherSource is the dispatcher script, with placeholders filled in by DispatcherLauncher.
 //
 // It is CommonJS rather than an ES module because a `bin` script has no package.json of its own to
@@ -306,3 +281,28 @@ if (result.status === null) {
 
 process.exit(result.status);
 `
+
+// DispatcherLauncher returns the Node script published as the `cohere` command.
+//
+// The launcher is Node rather than Go, which is a deliberate reversal of the obvious design. A Go
+// dispatcher would have to be cross-compiled per platform, which makes it a seventh platform
+// package rather than one package everyone installs — and the whole point of the dispatcher package
+// is that a consumer runs one `pnpm add -D @system-inc/cohere` and gets the right binary. Node is
+// already present by construction (this is an npm install), and `require.resolve` asks the package
+// manager where a package actually is, which is more reliable than any filesystem walk: it
+// understands pnpm's isolated store, npm's hoisting, and yarn's layouts without having to model any
+// of them.
+//
+// The script embeds here rather than living as a checked-in `.js` file so that the platform names,
+// the package prefix, and the binary names have exactly one definition. A launcher whose idea of the
+// package name drifted from the manifest's would resolve nothing on every machine, and that failure
+// looks identical to an unsupported platform.
+func DispatcherLauncher() string {
+	replacements := []string{
+		"__PLATFORM_PACKAGE_PREFIX__", PlatformPackagePrefix,
+		"__PACKAGE_SCOPE__", PackageScope,
+		"__OVERRIDE_VARIABLE__", BinaryOverrideVariable,
+		"__CHECKSUMS_FILE_NAME__", ChecksumsFileName,
+	}
+	return strings.NewReplacer(replacements...).Replace(launcherSource)
+}

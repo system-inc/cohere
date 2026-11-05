@@ -166,8 +166,10 @@ const stampedCommit = "0123456789abcdef0123456789abcdef01234567"
 // exit 2.
 func speaksContract(contract string) string {
 	return `if [ "$1" != --contract ] || [ "$3" != --version ]; then exit 9; fi
-if [ "$2" != ` + contract + ` ]; then echo "cohere-swift speaks contract ` + contract + `, and the front door asked for $2" >&2; exit 2; fi
-echo '{"kind":"provenance","contract":` + contract + `,"engine":"cohere-swift","version":"0.1.0","commit":"` + stampedCommit + `"}'`
+if [ "$2" != ` + contract + ` ]; then ` +
+		`echo "cohere-swift speaks contract ` + contract + `, and the front door asked for $2" >&2; exit 2; fi
+echo '{"kind":"provenance","contract":` + contract +
+		`,"engine":"cohere-swift","version":"0.1.0","commit":"` + stampedCommit + `"}'`
 }
 
 // TestSwiftContractAcceptsAMatchingPair is the positive half. Without it, a check that refused every pair

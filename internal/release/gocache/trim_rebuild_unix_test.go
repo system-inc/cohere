@@ -61,17 +61,20 @@ func TestARebuildAfterATrimRecomputesOnlyWhatWasTrimmed(test *testing.T) {
 	entries := func() map[string]uint64 {
 		test.Helper()
 		found := map[string]uint64{}
-		filepath.WalkDir(cache, func(path string, entry os.DirEntry, err error) error {
+		walkError := filepath.WalkDir(cache, func(path string, entry os.DirEntry, err error) error {
 			if err != nil || entry.IsDir() || !(strings.HasSuffix(path, "-a") || strings.HasSuffix(path, "-d")) {
 				return err
 			}
-			information, err := os.Stat(path)
-			if err != nil {
-				return err
+			information, statError := os.Stat(path)
+			if statError != nil {
+				return statError
 			}
 			found[path] = inode(information)
 			return nil
 		})
+		if walkError != nil {
+			test.Fatalf("listing the cache's entries: %v", walkError)
+		}
 		return found
 	}
 
@@ -84,7 +87,10 @@ func TestARebuildAfterATrimRecomputesOnlyWhatWasTrimmed(test *testing.T) {
 		if changeTimesError := os.Chtimes(path, old, old); changeTimesError != nil {
 			test.Fatal(changeTimesError)
 		}
-		information, _ := os.Stat(path)
+		information, statError := os.Stat(path)
+		if statError != nil {
+			test.Fatal(statError)
+		}
 		size += information.Size()
 	}
 	trimmed, trimError := Trim(cache, Limit{Cap: size / 2, Target: size / 2, Spare: 10 * time.Minute}, time.Now())

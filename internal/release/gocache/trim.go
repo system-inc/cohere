@@ -141,7 +141,7 @@ func readNames(directory string) ([]string, error) {
 	if openError != nil {
 		return nil, openError
 	}
-	defer file.Close()
+	defer file.Close() // Ignored: the directory was only read, so a failed close loses nothing.
 	return file.Readdirnames(-1)
 }
 

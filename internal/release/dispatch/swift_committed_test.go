@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -143,7 +144,11 @@ func TestACommittedSwiftEngineReportingAModifiedTreeIsNotCached(test *testing.T)
 		!strings.Contains(resolveCommittedSwiftEngineError.Error(), "modified source tree") {
 		test.Fatalf("an engine reporting a modified tree was accepted: %v", resolveCommittedSwiftEngineError)
 	}
-	entries, _ := os.ReadDir(fixture.paths.BinaryDirectory())
+	// A cache that was never created holds nothing a refused engine could have left.
+	entries, readDirectoryError := os.ReadDir(fixture.paths.BinaryDirectory())
+	if readDirectoryError != nil && !errors.Is(readDirectoryError, os.ErrNotExist) {
+		test.Fatalf("reading the binary cache: %v", readDirectoryError)
+	}
 	for _, entry := range entries {
 		test.Errorf("a refused engine left %s in the cache", entry.Name())
 	}

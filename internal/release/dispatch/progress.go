@@ -58,6 +58,7 @@ func (progress *Progress) Step(format string, arguments ...any) {
 	switch {
 	case progress.verbose:
 		progress.clearLocked()
+		// Ignored: progress has nowhere left to say a failed write, and no run's result rests on it.
 		fmt.Fprintln(progress.out, text)
 	case progress.terminal:
 		if utf8.RuneCountInString(text) > stepWidth {
@@ -67,6 +68,7 @@ func (progress *Progress) Step(format string, arguments ...any) {
 		if progress.color {
 			text = "\x1b[2m" + text + "\x1b[22m"
 		}
+		// Ignored: progress has nowhere left to say a failed write, and no run's result rests on it.
 		fmt.Fprint(progress.out, "\r\x1b[2K"+text)
 		progress.showing = true
 	}
@@ -78,6 +80,7 @@ func (progress *Progress) Note(format string, arguments ...any) {
 	defer progress.lock.Unlock()
 	if progress.verbose {
 		progress.clearLocked()
+		// Ignored: progress has nowhere left to say a failed write, and no run's result rests on it.
 		fmt.Fprintf(progress.out, format+"\n", arguments...)
 	}
 }
@@ -87,6 +90,8 @@ func (progress *Progress) Fail(format string, arguments ...any) {
 	progress.lock.Lock()
 	defer progress.lock.Unlock()
 	progress.clearLocked()
+	// Ignored: stderr is the last place left to say it, and a failure that ends the run is said again by its exit
+	// code whether or not this lands.
 	fmt.Fprintf(progress.out, format+"\n", arguments...)
 }
 
@@ -112,6 +117,7 @@ func (progress *Progress) Clear() {
 
 func (progress *Progress) clearLocked() {
 	if progress.showing {
+		// Ignored: progress has nowhere left to say a failed write, and no run's result rests on it.
 		fmt.Fprint(progress.out, "\r\x1b[2K")
 		progress.showing = false
 	}

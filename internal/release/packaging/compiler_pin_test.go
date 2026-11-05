@@ -35,6 +35,7 @@ var compilerTemplate struct {
 func TestMain(m *testing.M) {
 	code := m.Run()
 	if compilerTemplate.root != "" {
+		// Ignored: the template is under the system's temporary directory, and one left there decides no test.
 		os.RemoveAll(compilerTemplate.root)
 	}
 	os.Exit(code)
@@ -275,7 +276,8 @@ func TestCompilerUpstreamFromGitmodules(test *testing.T) {
 		want       string
 	}{
 		{"the fork, after another submodule, over ssh",
-			"[submodule \"libraries/other\"]\n\tpath = libraries/other\n\turl = https://github.com/someone/other.git\n" +
+			"[submodule \"libraries/other\"]\n\tpath = libraries/other\n" +
+				"\turl = https://github.com/someone/other.git\n" +
 				"[submodule \"compiler\"]\n\tpath = TypeScript\n\turl = git@github.com:system-inc/TypeScript.git\n",
 			"system-inc/TypeScript"},
 		{

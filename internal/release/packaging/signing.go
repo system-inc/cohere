@@ -3,6 +3,7 @@ package release
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -150,7 +151,10 @@ func VerifySignature(binaryPath string) error {
 // check against Apple's service on first launch instead. This is a real limitation rather than an
 // oversight: a machine that is entirely offline the first time it runs a quarantined cohere will be
 // blocked. The npm install path does not set quarantine at all, so this does not affect it.
-func Notarize(binaryPath string, signing Signing) error {
+//
+// Each submission is announced to progress as it starts and as it is accepted, since it waits minutes on Apple's
+// service; a nil progress announces nothing, and an announcement that cannot be written stops the release.
+func Notarize(binaryPath string, signing Signing, progress io.Writer) error {
 	if !signing.CanNotarize() {
 		return fmt.Errorf("no notarytool keychain profile configured")
 	}
@@ -159,6 +163,8 @@ func Notarize(binaryPath string, signing Signing) error {
 	if err != nil {
 		return fmt.Errorf("making a directory for the notary archive: %w", err)
 	}
+	// Ignored: the directory is under the system's temporary directory, and an archive left there is a copy of a
+	// signed binary that nothing reads again.
 	defer os.RemoveAll(directory)
 	zipPath := filepath.Join(directory, filepath.Base(binaryPath)+".zip")
 	// ditto rather than zip, as Apple's notarization guide uses: it keeps the signature's extended
@@ -174,7 +180,9 @@ func Notarize(binaryPath string, signing Signing) error {
 		return fmt.Errorf("archiving %s for the notary service: %w\n%s", binaryPath, outputError, output)
 	}
 
-	fmt.Printf("notarizing %s\n", binaryPath)
+	if announceError := announce(progress, "notarizing %s\n", binaryPath); announceError != nil {
+		return announceError
+	}
 	arguments := append([]string{"notarytool", "submit", zipPath},
 		notaryCredentials(signing)...)
 	// Without --wait the command returns as soon as the upload finishes, and a release would
@@ -194,11 +202,25 @@ func Notarize(binaryPath string, signing Signing) error {
 	if verdict.Status != "Accepted" {
 		// Apple's log names each problem by file and reason, which is the only place the cause is.
 		logArguments := append([]string{"notarytool", "log", verdict.Identifier}, notaryCredentials(signing)...)
-		notaryLog, _ := exec.Command("xcrun", logArguments...).CombinedOutput()
+		notaryLog, logError := exec.Command("xcrun", logArguments...).CombinedOutput()
+		if logError != nil {
+			return fmt.Errorf("the notary service answered %q for %s (submission %s), and its log was not read: %w\n%s",
+				verdict.Status, binaryPath, verdict.Identifier, logError, notaryLog)
+		}
 		return fmt.Errorf("the notary service answered %q for %s (submission %s)\n%s",
 			verdict.Status, binaryPath, verdict.Identifier, notaryLog)
 	}
-	fmt.Printf("notarized %s: Accepted, submission %s\n", binaryPath, verdict.Identifier)
+	return announce(progress, "notarized %s: Accepted, submission %s\n", binaryPath, verdict.Identifier)
+}
+
+// announce writes one line of a release's progress, or nothing to a nil progress.
+func announce(progress io.Writer, format string, arguments ...any) error {
+	if progress == nil {
+		return nil
+	}
+	if _, writeError := fmt.Fprintf(progress, format, arguments...); writeError != nil {
+		return fmt.Errorf("announcing the notarization: %w", writeError)
+	}
 	return nil
 }
 

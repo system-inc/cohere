@@ -50,6 +50,12 @@ func (paths Paths) SwiftEngineBinaryPath(hash string) string {
 	)
 }
 
+// buildSwiftProduct builds the engine package at packageDirectory and copies the product to binaryPath.
+//
+// A variable so a test can stand in for SwiftPM: a cold build compiles swift-syntax and swift-format,
+// measured at 225s, and the decisions worth testing are which tree is built and when, not SwiftPM.
+var buildSwiftProduct = buildSwiftProductWithSwiftPM
+
 // ResolveSwiftEngine returns the path to a cohere-swift binary matching the engine's sources and the
 // installed toolchain, building it when there is none.
 //
@@ -171,12 +177,6 @@ func swiftEngineHash(engineDirectory string, toolchain string) (string, error) {
 	return hex.EncodeToString(digest.Sum(nil))[:hashLength], nil
 }
 
-// buildSwiftProduct builds the engine package at packageDirectory and copies the product to binaryPath.
-//
-// A variable so a test can stand in for SwiftPM: a cold build compiles swift-syntax and swift-format,
-// measured at 225s, and the decisions worth testing are which tree is built and when, not SwiftPM.
-var buildSwiftProduct = buildSwiftProductWithSwiftPM
-
 // lastLines is a tool's kept output for an error: its last count lines, on lines of their own after the
 // error's, or nothing when it printed nothing.
 func lastLines(output string, count int) string {
@@ -212,6 +212,9 @@ func runBuildTool(command *exec.Cmd) error {
 
 // runBuildToolUntil is runBuildTool with the signals given, so a test can send one without signaling
 // itself.
+//
+// Mutates: command its process group and wait delay are set here, before it starts, so the caller hands it
+// over unstarted
 func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
 	startInOwnGroup(command)
 	command.WaitDelay = buildToolWaitDelay
@@ -307,7 +310,7 @@ func copyExecutable(source string, destination string) error {
 	if err != nil {
 		return err
 	}
-	defer input.Close()
+	defer input.Close() // Ignored: the source was only read, so a failed close loses nothing.
 
 	temporary, err := os.CreateTemp(filepath.Dir(destination), filepath.Base(destination)+".partial-*")
 	if err != nil {
@@ -315,13 +318,17 @@ func copyExecutable(source string, destination string) error {
 	}
 	// Removed on every failure path below. After the rename the name no longer exists and the call
 	// does nothing.
+	// Ignored: after the rename it fails by design, and on a failure path the error returned is the one that says
+	// what went wrong.
 	defer os.Remove(temporary.Name())
 
 	if _, copyError := io.Copy(temporary, input); copyError != nil {
+		// Ignored: the copy failed and its error is the one returned, and the partial file is removed above.
 		temporary.Close()
 		return copyError
 	}
 	if chmodError := temporary.Chmod(0o755); chmodError != nil {
+		// Ignored: the chmod failed and its error is the one returned, and the partial file is removed above.
 		temporary.Close()
 		return chmodError
 	}

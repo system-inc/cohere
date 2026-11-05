@@ -19,8 +19,15 @@ import (
 func TestASignalDuringABuildEndsTheToolAndWhatItStarted(test *testing.T) {
 	test.Parallel()
 	compilerPID := filepath.Join(test.TempDir(), "compiler.pid")
-	tool := exec.Command("/bin/sh", "-c",
-		"sleep 300 & echo $! > '"+compilerPID+".partial' && mv '"+compilerPID+".partial' '"+compilerPID+"'; wait")
+	// The path is the script's $1, so the shell never parses it; the script's own syntax, a job started in the
+	// background and waited on, is the tool being stood in for.
+	tool := exec.Command(
+		"/bin/sh",
+		"-c",
+		`sleep 300 & echo $! > "$1.partial" && mv "$1.partial" "$1"; wait`,
+		"sh",
+		compilerPID,
+	)
 
 	signals := make(chan os.Signal, 1)
 	result := make(chan error, 1)
@@ -29,7 +36,12 @@ func TestASignalDuringABuildEndsTheToolAndWhatItStarted(test *testing.T) {
 	compiler := 0
 	for deadline := time.Now().Add(time.Minute); compiler == 0 && time.Now().Before(deadline); {
 		if contents, readError := os.ReadFile(compilerPID); readError == nil {
-			compiler, _ = strconv.Atoi(strings.TrimSpace(string(contents)))
+			// The file is written whole under another name and moved into place, so what is read is all of it.
+			parsed, parseError := strconv.Atoi(strings.TrimSpace(string(contents)))
+			if parseError != nil {
+				test.Fatalf("reading the compiler's process id from %q: %v", contents, parseError)
+			}
+			compiler = parsed
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
@@ -52,7 +64,9 @@ func TestASignalDuringABuildEndsTheToolAndWhatItStarted(test *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	if syscall.Kill(compiler, 0) == nil {
-		_ = syscall.Kill(compiler, syscall.SIGKILL)
+		if killError := syscall.Kill(compiler, syscall.SIGKILL); killError != nil {
+			test.Errorf("ending the compiler %d after the test: %v", compiler, killError)
+		}
 		test.Error("the compiler the tool started outlived the signal")
 	}
 }

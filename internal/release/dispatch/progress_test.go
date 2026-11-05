@@ -33,7 +33,9 @@ func TestProgressOffATerminalSaysOnlyFailures(test *testing.T) {
 // Not parallel: it sets and clears NO_COLOR with test.Setenv, which a parallel test may not call.
 func TestProgressOnATerminalIsOneLineThatClears(test *testing.T) {
 	test.Setenv("NO_COLOR", "")
-	os.Unsetenv("NO_COLOR")
+	if unsetError := os.Unsetenv("NO_COLOR"); unsetError != nil {
+		test.Fatal(unsetError)
+	}
 	var out bytes.Buffer
 	progress := NewProgress(&out, false, true)
 	progress.Step("cohere: building from commit %s", "abc")
