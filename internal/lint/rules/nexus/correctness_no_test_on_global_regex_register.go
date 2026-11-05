@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // purpose, and an option widening them would let a configuration silence the shared-regex case this
 // rule exists for.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessNoTestOnGlobalRegex})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessNoTestOnGlobalRegex})
 }

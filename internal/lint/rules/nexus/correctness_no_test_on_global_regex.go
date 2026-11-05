@@ -86,7 +86,7 @@ func correctnessNoTestOnGlobalRegexMessage() rule.Message {
 //
 // Dropping `g` is right only when no other use of the same regex needs it, and the regex is often
 // shared with a `replace` (the AhraOsWisdom case). Splitting it is the author's edit.
-var CorrectnessNoTestOnGlobalRegex = rule.Rule{
+var CorrectnessNoTestOnGlobalRegex = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-test-on-global-regex",
 
 	// Symbol identity ties the receiver to its declaration and `test` to RegExp's.
@@ -95,7 +95,7 @@ var CorrectnessNoTestOnGlobalRegex = rule.Rule{
 	// Whether `test` and `RegExp` are the default library's, through type_checking.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

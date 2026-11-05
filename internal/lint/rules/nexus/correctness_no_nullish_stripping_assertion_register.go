@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // `@typescript-eslint/non-nullable-type-assertion-style` is fixed by that rule's predicate, and an
 // option widening or narrowing this one would let the two report the same cast.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessNoNullishStrippingAssertion})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessNoNullishStrippingAssertion})
 }

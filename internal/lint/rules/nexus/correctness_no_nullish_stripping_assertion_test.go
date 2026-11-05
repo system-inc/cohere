@@ -59,7 +59,7 @@ func correctnessNoNullishStrippingAssertionSource(lines ...string) string {
 // that rule's doc comment records.
 func correctnessNoNullishStrippingAssertionRunRule(
 	test *testing.T,
-	subject rule.Rule,
+	subject rule.Rule[rule.NoOptions],
 	sourceText string,
 ) rule_testing.Result {
 	test.Helper()

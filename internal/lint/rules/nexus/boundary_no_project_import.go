@@ -53,14 +53,14 @@ type BoundaryNoProjectImportOptions struct {
 // configuration with an empty LibraryDirectory declines everything. That last case matters: it is
 // how a rule registered without its required option fails closed rather than guarding the whole
 // tree by accident.
-var BoundaryNoProjectImport = rule.Rule{
+var BoundaryNoProjectImport = rule.Rule[BoundaryNoProjectImportOptions]{
 	Name: "nexus/boundary-no-project-import",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[BoundaryNoProjectImportOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
-		settings, hasSettings := rule.OptionsAs[BoundaryNoProjectImportOptions](options)
+		settings, hasSettings := options.Read()
 		if !hasSettings || settings.LibraryDirectory == "" {
 			// Failing closed is right, and silent is not: a rule enabled without the directory it guards
 			// checks nothing, so the skip names the missing option (#pa7k7zv).

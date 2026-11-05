@@ -74,7 +74,7 @@ func correctnessNoUnclearedRaceTimeoutMessage() rule.Message {
 //
 // The repair needs a binding declared outside the race and a `finally` around the statement that
 // awaits it, whose extent depends on the surrounding `try`. That is the author's edit.
-var CorrectnessNoUnclearedRaceTimeout = rule.Rule{
+var CorrectnessNoUnclearedRaceTimeout = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-uncleared-race-timeout",
 
 	// Symbol identity is what tells the default library's `Promise.race` from a local `race`, the global
@@ -84,7 +84,7 @@ var CorrectnessNoUnclearedRaceTimeout = rule.Rule{
 	// Whether `race` and `Promise` are the default library's, through type_checking.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

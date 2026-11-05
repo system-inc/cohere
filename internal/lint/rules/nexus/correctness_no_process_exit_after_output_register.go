@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // symbols `@types/node` declares, and an option widening either would let a configuration name a
 // logger that writes to a file, which is the false positive the doc comment declines on purpose.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessNoProcessExitAfterOutput})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessNoProcessExitAfterOutput})
 }

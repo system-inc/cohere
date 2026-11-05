@@ -91,14 +91,14 @@ func correctnessNoCallbackInParseTryMessage() rule.Message {
 //
 // Moving the callback out of the `try` changes which errors propagate, and the caller may have come
 // to rely on the swallowing. Each site is the author's call.
-var CorrectnessNoCallbackInParseTry = rule.Rule{
+var CorrectnessNoCallbackInParseTry = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-callback-in-parse-try",
 
 	// Symbol identity tells the platform's `JSON.parse` from a local `parse`, nexus's
 	// `parseJsonOrThrow` from any function of that name, and a parameter from a local of its name.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

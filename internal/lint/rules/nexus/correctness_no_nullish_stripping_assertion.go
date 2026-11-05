@@ -116,7 +116,7 @@ func correctnessNoNullishStrippingAssertionMessage() rule.Message {
 //
 // Whether a missing value should throw, default, return early, or stay in the type is the author's
 // call, and a fixer choosing one would be wrong for most sites.
-var CorrectnessNoNullishStrippingAssertion = rule.Rule{
+var CorrectnessNoNullishStrippingAssertion = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-nullish-stripping-assertion",
 
 	// Every finding is decided by the types on both sides of the assertion; there is no syntactic
@@ -125,7 +125,7 @@ var CorrectnessNoNullishStrippingAssertion = rule.Rule{
 	// The rule asks only for the types at the assertion itself, never into an imported body.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

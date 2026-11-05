@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // name heuristic its doc comment declines, and an option widening it to lowercase keywords would
 // reach the English prose it stays out of.
 func init() {
-	rule.Register(rule.Registration{Rule: SecurityNoInterpolatedSqlString})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: SecurityNoInterpolatedSqlString})
 }

@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // `() => void promise()` callback idiom the ruling left alone, and one narrowing it would be an
 // allowance.
 func init() {
-	rule.Register(rule.Registration{Rule: ConsistencyNoReturnVoid})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: ConsistencyNoReturnVoid})
 }

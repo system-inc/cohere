@@ -64,11 +64,11 @@ func messageScreamingSnakeCaseLocal(name string, suggestion string) rule.Message
 // No fix. The suggested name is offered in the message rather than applied, because the right name
 // depends on whether the value is exported and may collide with a binding already in scope, and
 // because MAX_RETRY_COUNT to maximumRetryCount is a rename the casing conversion cannot do.
-var ConsistencyNoScreamingSnakeCase = rule.Rule{
+var ConsistencyNoScreamingSnakeCase = rule.Rule[ConsistencyNoScreamingSnakeCaseOptions]{
 	Name: "nexus/consistency-no-screaming-snake-case",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistencyNoScreamingSnakeCaseOptions]) rule.Listeners {
 		allowed := map[string]bool{}
-		if settings, hasSettings := rule.OptionsAs[ConsistencyNoScreamingSnakeCaseOptions](options); hasSettings {
+		if settings, hasSettings := options.Read(); hasSettings {
 			for _, name := range settings.Allow {
 				allowed[name] = true
 			}

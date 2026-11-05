@@ -167,7 +167,7 @@ func correctnessNoCallerDataMutationMessage() rule.Message {
 //
 // The repair is a contract change: return the new value, build a copy, or rename the parameter to say
 // it is an out-parameter and suppress with that reason. Which one is the author's call.
-var CorrectnessNoCallerDataMutation = rule.Rule{
+var CorrectnessNoCallerDataMutation = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-caller-data-mutation",
 
 	// Symbol identity ties the chain's root to a parameter through shadowing, and says where each
@@ -178,7 +178,7 @@ var CorrectnessNoCallerDataMutation = rule.Rule{
 	// type_checking.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

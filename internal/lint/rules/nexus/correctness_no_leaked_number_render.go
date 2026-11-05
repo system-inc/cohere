@@ -100,7 +100,7 @@ func correctnessNoLeakedNumberRenderMessage() rule.Message {
 // Whether a `0` should render nothing or "0 records" is the author's call: `PaginationControls`
 // arguably wants the count shown, and `!!count`, `count > 0` and `count !== undefined` each mean
 // something different at a different site.
-var CorrectnessNoLeakedNumberRender = rule.Rule{
+var CorrectnessNoLeakedNumberRender = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-leaked-number-render",
 
 	// The whole rule is a question about the operand's type; without the checker it would be
@@ -109,7 +109,7 @@ var CorrectnessNoLeakedNumberRender = rule.Rule{
 	// The rule asks only for the operand's type, never into an imported body.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

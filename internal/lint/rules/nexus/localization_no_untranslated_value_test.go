@@ -59,7 +59,7 @@ func runOnTranslations(test *testing.T, files map[string]string, subjectRelative
 		},
 	}
 
-	listeners := LocalizationNoUntranslatedValue.Run(context, nil)
+	listeners := LocalizationNoUntranslatedValue.Run(context, rule.Given[rule.NoOptions]{})
 	if listeners != nil {
 		walkForTest(subject.AsNode(), listeners)
 	}

@@ -134,7 +134,7 @@ func messageRequireCamelCaseInstance(name string, suggestion string) rule.Messag
 // instead of being told to PascalCase, since then the export is the mistake. "Nothing imports it"
 // is read from every module specifier in the program and refuses on any doubt; see
 // `constant_casing_importers.go`.
-var ConsistencyRequireConstantCasing = rule.Rule{
+var ConsistencyRequireConstantCasing = rule.Rule[ConsistencyRequireConstantCasingOptions]{
 	Name: "nexus/consistency-require-constant-casing",
 	// For the rename fix, which resolves references through the checker, and only at a finding.
 	NeedsTypeChecker: true,
@@ -146,9 +146,9 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 	// and whether it is a root, so the index and the roots are the fingerprint (#f96cnry). See
 	// constantCasingFingerprint.
 	ProgramFingerprint: constantCasingFingerprint,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistencyRequireConstantCasingOptions]) rule.Listeners {
 		frameworkConstantNames := map[string]bool{}
-		if settings, hasSettings := rule.OptionsAs[ConsistencyRequireConstantCasingOptions](options); hasSettings {
+		if settings, hasSettings := options.Read(); hasSettings {
 			for _, name := range settings.FrameworkConstantNames {
 				frameworkConstantNames[name] = true
 			}

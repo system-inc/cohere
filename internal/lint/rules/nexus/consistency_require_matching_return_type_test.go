@@ -575,7 +575,10 @@ func TestConsistencyRequireReturnMatchingTypeDeclinesWithoutAChecker(test *testi
 	if !ConsistencyRequireMatchingReturnType.NeedsTypeChecker {
 		test.Fatal("the rule must declare NeedsTypeChecker")
 	}
-	if listeners := ConsistencyRequireMatchingReturnType.Run(rule.Context{}, nil); listeners != nil {
+	if listeners := ConsistencyRequireMatchingReturnType.Run(
+		rule.Context{},
+		rule.Given[rule.NoOptions]{},
+	); listeners != nil {
 		test.Errorf("with no checker the rule must register no listeners, got %d", len(listeners))
 	}
 }

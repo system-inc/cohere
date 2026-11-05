@@ -114,12 +114,12 @@ func correctnessNoIdenticalBranchesMessage() rule.Message {
 //
 // Which branch was meant is the author's call: the KlingApi site needed `'std'` on one side, and
 // deleting the conditional would have kept the bug.
-var CorrectnessNoIdenticalBranches = rule.Rule{
+var CorrectnessNoIdenticalBranches = rule.Rule[rule.NoOptions]{
 	Name:             "nexus/correctness-no-identical-branches",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			// The narrowing guard needs types. Reporting without it would report the overload
 			// pattern above, so with no checker the rule declines the file.

@@ -7,5 +7,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // No decoder: the rule takes no options. Whether a read runs at load is a fact of the syntax, and the
 // one exempt shape, the main-module guard, is exempt because it is harmless everywhere.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessNoLoadTimeImportMetaPath})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessNoLoadTimeImportMetaPath})
 }

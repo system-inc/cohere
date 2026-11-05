@@ -81,13 +81,13 @@ var consistencyNoPropertyAliasText = policy.MessageOf("nexus/consistency-no-prop
 // **An annotation that does work.** `const value: unknown = event.data` over a DOM `any`, or a
 // `readonly` view of a mutable list, gives the local a type the reach does not have. Exempt when the
 // local's annotated type differs from its initializer's (3 sites).
-var ConsistencyNoPropertyAlias = rule.Rule{
+var ConsistencyNoPropertyAlias = rule.Rule[rule.NoOptions]{
 	Name: "nexus/consistency-no-property-alias",
 	// Asked whether a link is a getter, what a link's declared and narrowed types are, and what an
 	// annotation names. The getter question reads an imported declaration, so the findings key on the
 	// closure's contents, the default; the release guard refuses a shapes claim here.
 	NeedsTypeChecker: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				declaration := node.AsVariableDeclaration()

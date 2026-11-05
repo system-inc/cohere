@@ -25,7 +25,10 @@ func constantCasingFingerprintWithOptions(
 	test.Helper()
 	var fingerprint [sha256.Size]byte
 	probe := ConsistencyRequireConstantCasing
-	probe.Run = func(ruleContext rule.Context, options any) rule.Listeners {
+	probe.Run = func(
+		ruleContext rule.Context,
+		options rule.Given[ConsistencyRequireConstantCasingOptions],
+	) rule.Listeners {
 		fingerprint = ConsistencyRequireConstantCasing.ProgramFingerprint(ruleContext.Program, options)
 		return nil
 	}

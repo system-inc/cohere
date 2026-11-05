@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // read and confirmed to return a child with no `'error'` listener of its own, and an option adding to
 // them could name `execFile`, which attaches one, and make every use of it a false finding.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessRequireChildProcessErrorListener})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessRequireChildProcessErrorListener})
 }

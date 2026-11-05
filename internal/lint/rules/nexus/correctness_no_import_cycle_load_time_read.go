@@ -120,7 +120,7 @@ var correctnessNoImportCycleLoadTimeReadText = policy.MessageOf(
 // Breaking the cycle is the fix, and where to cut it is a design decision: move the shared piece to a
 // file both sides import, move the read into a function, or drop the back import. A fixer would pick
 // one blindly.
-var CorrectnessNoImportCycleLoadTimeRead = rule.Rule{
+var CorrectnessNoImportCycleLoadTimeRead = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-import-cycle-load-time-read",
 
 	// Symbol identity is what tells an import from a shadowing local, a value use from a type use,
@@ -137,7 +137,7 @@ var CorrectnessNoImportCycleLoadTimeRead = rule.Rule{
 	// Only a file inside a runtime import cycle can hold a finding, and most files are in none.
 	NoListener: rule.NoListenerDeclinesIrrelevantFiles,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.Program == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -376,7 +376,10 @@ func correctnessNoImportCycleLoadTimeReadBuildSyntacticGraph(
 // and which declaration a binding lands on. What this adds is the shape of the cycles themselves, so
 // an import that opens or closes a cycle anywhere moves it, and an edit that touches no cycle's
 // imports leaves it, and the findings replay. The rule takes no options, so none reach it.
-func correctnessNoImportCycleLoadTimeReadFingerprint(program rule.Program, _ any) [sha256.Size]byte {
+func correctnessNoImportCycleLoadTimeReadFingerprint(
+	program rule.Program,
+	_ rule.Given[rule.NoOptions],
+) [sha256.Size]byte {
 	syntactic := correctnessNoImportCycleLoadTimeReadSyntacticGraphFor(program)
 	// The edges inside cycles are the whole shape: they name every file on a cycle, and which files share
 	// one is their strongly connected components.

@@ -17,58 +17,58 @@ import (
 // rules that vanished rather than as a quieter run.
 func init() {
 	rule.Register(
-		rule.Registration{Rule: BoundaryNoInternalImport},
-		rule.Registration{Rule: BoundaryNoNexusOutsideImport},
-		rule.Registration{
+		rule.Registration[rule.NoOptions]{Rule: BoundaryNoInternalImport},
+		rule.Registration[rule.NoOptions]{Rule: BoundaryNoNexusOutsideImport},
+		rule.Registration[BoundaryNoProjectImportOptions]{
 			Rule:            BoundaryNoProjectImport,
 			Decode:          rule.DecodeOptionsInto[BoundaryNoProjectImportOptions](),
 			RequiresOptions: true,
 		},
-		rule.Registration{
+		rule.Registration[ConsistencyNoAbbreviatedIdentifierOptions]{
 			Rule:   ConsistencyNoAbbreviatedIdentifier,
 			Decode: rule.DecodeOptionsInto[ConsistencyNoAbbreviatedIdentifierOptions](),
 		},
-		rule.Registration{Rule: ConsistencyNoAmbiguousIdentifier},
-		rule.Registration{
+		rule.Registration[rule.NoOptions]{Rule: ConsistencyNoAmbiguousIdentifier},
+		rule.Registration[ConsistencyNoBooleanOutcomeOptions]{
 			Rule:   ConsistencyNoBooleanOutcome,
 			Decode: rule.DecodeOptionsInto[ConsistencyNoBooleanOutcomeOptions](),
 		},
-		rule.Registration{Rule: ConsistencyNoEnum},
-		rule.Registration{
+		rule.Registration[rule.NoOptions]{Rule: ConsistencyNoEnum},
+		rule.Registration[ConsistencyNoLongLineCommentOptions]{
 			Rule:   ConsistencyNoLongLineComment,
 			Decode: rule.DecodeOptionsInto[ConsistencyNoLongLineCommentOptions](),
 		},
-		rule.Registration{Rule: ConsistencyNoMultilineArrowFunction},
-		rule.Registration{
+		rule.Registration[rule.NoOptions]{Rule: ConsistencyNoMultilineArrowFunction},
+		rule.Registration[ConsistencyNoScreamingSnakeCaseOptions]{
 			Rule:   ConsistencyNoScreamingSnakeCase,
 			Decode: rule.DecodeOptionsInto[ConsistencyNoScreamingSnakeCaseOptions](),
 		},
-		rule.Registration{
+		rule.Registration[ConsistencyNoShoutingOptions]{
 			Rule:   ConsistencyNoShouting,
 			Decode: rule.DecodeOptionsInto[ConsistencyNoShoutingOptions](),
 		},
-		rule.Registration{Rule: ConsistencyNoSingleLineJsDoc},
-		rule.Registration{
+		rule.Registration[rule.NoOptions]{Rule: ConsistencyNoSingleLineJsDoc},
+		rule.Registration[ConsistencyNoStutteringNameOptions]{
 			Rule:   ConsistencyNoStutteringName,
 			Decode: rule.DecodeOptionsInto[ConsistencyNoStutteringNameOptions](),
 		},
-		rule.Registration{Rule: ConsistencyNoUtilsFolder},
-		rule.Registration{
+		rule.Registration[rule.NoOptions]{Rule: ConsistencyNoUtilsFolder},
+		rule.Registration[ConsistencyRequireConstantCasingOptions]{
 			Rule:   ConsistencyRequireConstantCasing,
 			Decode: rule.DecodeOptionsInto[ConsistencyRequireConstantCasingOptions](),
 		},
-		rule.Registration{Rule: ConsistencyRequireTypeSuffix},
-		rule.Registration{Rule: ImportNoForbiddenSource},
-		rule.Registration{
+		rule.Registration[rule.NoOptions]{Rule: ConsistencyRequireTypeSuffix},
+		rule.Registration[rule.NoOptions]{Rule: ImportNoForbiddenSource},
+		rule.Registration[ImportRequireModuleAliasOptions]{
 			Rule:   ImportRequireModuleAlias,
 			Decode: rule.DecodeOptionsInto[ImportRequireModuleAliasOptions](),
 		},
-		rule.Registration{Rule: ImportRequireNodeNamespace},
-		rule.Registration{
+		rule.Registration[rule.NoOptions]{Rule: ImportRequireNodeNamespace},
+		rule.Registration[ImportRequirePathAliasOptions]{
 			Rule:            ImportRequirePathAlias,
 			DecodeAt:        decodeImportRequirePathAliasOptions,
 			RequiresOptions: true,
 		},
-		rule.Registration{Rule: LocalizationNoUntranslatedValue},
+		rule.Registration[rule.NoOptions]{Rule: LocalizationNoUntranslatedValue},
 	)
 }

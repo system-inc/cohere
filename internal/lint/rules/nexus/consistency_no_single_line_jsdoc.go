@@ -36,9 +36,9 @@ func messageUseSimpleComment() rule.Message {
 // after it on its line, `createQueryClient(/** options */);` or `[a, b /**, c */] = values`, would
 // comment that code out: the fix did not parse on trpc (#kq9vtva). None of them is a repair a rule
 // should make unattended.
-var ConsistencyNoSingleLineJsDoc = rule.Rule{
+var ConsistencyNoSingleLineJsDoc = rule.Rule[rule.NoOptions]{
 	Name: "nexus/consistency-no-single-line-jsdoc",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

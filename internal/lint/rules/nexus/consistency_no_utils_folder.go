@@ -34,10 +34,10 @@ func messageNoUtils() rule.Message {
 //
 // This rule reads only the path, so it is the cheapest kind of rule there is: it decides on a
 // string and declines the file before any node is visited.
-var ConsistencyNoUtilsFolder = rule.Rule{
+var ConsistencyNoUtilsFolder = rule.Rule[rule.NoOptions]{
 	Name:       "nexus/consistency-no-utils-folder",
 	NoListener: rule.NoListenerDeclinesIrrelevantFiles,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
