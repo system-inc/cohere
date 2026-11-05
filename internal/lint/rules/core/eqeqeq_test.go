@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -29,7 +30,7 @@ const (
 // eqeqeqCase is one imported corpus row.
 type eqeqeqCase struct {
 	sourceText string
-	options    any
+	options    rule.Given[EqeqeqOptions]
 	// wantRepairs is one entry per expected finding, in order. nil means the case is clean.
 	wantRepairs []eqeqeqRepair
 	// wantFixedSource is what the fix phase writes, or "" when every finding is suggestion-only
@@ -45,12 +46,9 @@ type eqeqeqCase struct {
 // counterpart to inherit correctness from.
 func runEqeqeq(test *testing.T, testCase eqeqeqCase) rule_testing.Result {
 	test.Helper()
-	if testCase.options == nil {
+	options, configured := testCase.options.Read()
+	if !configured {
 		return rule_testing.Run(test, Eqeqeq, eqeqeqFile, testCase.sourceText)
-	}
-	options, ok := testCase.options.(EqeqeqOptions)
-	if !ok {
-		test.Fatalf("the case carries %T options, not EqeqeqOptions", testCase.options)
 	}
 	decoded, decodeEqeqeqOptionsError := DecodeEqeqeqOptions([]byte(eqeqeqUpstreamList(options)))
 	if decodeEqeqeqOptionsError != nil {
@@ -87,163 +85,183 @@ func eqeqeqUpstreamList(options EqeqeqOptions) string {
 // `Null: Ignore`, and `TestDecodeEqeqeqOptions` pins that it decodes to the same.
 func eqeqeqFiresCases() []eqeqeqCase {
 	return []eqeqeqCase{
-		{"a == b", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"a != b", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"typeof a == 'number'", nil, []eqeqeqRepair{eqeqeqRepairFix}, "typeof a === 'number'"},
+		{"a == b", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"a != b", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"typeof a == 'number'", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairFix}, "typeof a === 'number'"},
 		{
 			"typeof a == 'number'",
-			EqeqeqOptions{Mode: EqeqeqAlways},
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways}),
 			[]eqeqeqRepair{eqeqeqRepairFix},
 			"typeof a === 'number'",
 		},
-		{"'string' != typeof a", nil, []eqeqeqRepair{eqeqeqRepairFix}, "'string' !== typeof a"},
-		{"true == true", nil, []eqeqeqRepair{eqeqeqRepairFix}, "true === true"},
-		{"2 == 3", nil, []eqeqeqRepair{eqeqeqRepairFix}, "2 === 3"},
-		{"2 == 3", EqeqeqOptions{Mode: EqeqeqAlways}, []eqeqeqRepair{eqeqeqRepairFix}, "2 === 3"},
-		{"'hello' != 'world'", nil, []eqeqeqRepair{eqeqeqRepairFix}, "'hello' !== 'world'"},
+		{"'string' != typeof a", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairFix}, "'string' !== typeof a"},
+		{"true == true", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairFix}, "true === true"},
+		{"2 == 3", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairFix}, "2 === 3"},
+		{"2 == 3", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways}), []eqeqeqRepair{eqeqeqRepairFix}, "2 === 3"},
+		{"'hello' != 'world'", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairFix}, "'hello' !== 'world'"},
 		{
 			"'hello' != 'world'",
-			EqeqeqOptions{Mode: EqeqeqAlways},
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways}),
 			[]eqeqeqRepair{eqeqeqRepairFix},
 			"'hello' !== 'world'",
 		},
-		{"`hello` == `world`", nil, []eqeqeqRepair{eqeqeqRepairFix}, "`hello` === `world`"},
-		{"`hello` != 'world'", nil, []eqeqeqRepair{eqeqeqRepairFix}, "`hello` !== 'world'"},
-		{"a == null", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"a == null", EqeqeqOptions{Mode: EqeqeqAlways}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"null != a", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"true == 1", EqeqeqOptions{Mode: EqeqeqSmart}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"0 != '1'", EqeqeqOptions{Mode: EqeqeqSmart}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"'wee' == /wee/", EqeqeqOptions{Mode: EqeqeqSmart}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"`hello${world}` == `hello`", EqeqeqOptions{Mode: EqeqeqSmart}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"`hello` == `world`", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairFix}, "`hello` === `world`"},
+		{"`hello` != 'world'", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairFix}, "`hello` !== 'world'"},
+		{"a == null", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"a == null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways}), []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"null != a", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"true == 1", rule.Configured(EqeqeqOptions{Mode: EqeqeqSmart}), []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"0 != '1'", rule.Configured(EqeqeqOptions{Mode: EqeqeqSmart}), []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{
+			"'wee' == /wee/",
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqSmart}),
+			[]eqeqeqRepair{eqeqeqRepairSuggestion},
+			"",
+		},
+		{
+			"`hello${world}` == `hello`",
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqSmart}),
+			[]eqeqeqRepair{eqeqeqRepairSuggestion},
+			"",
+		},
 		{
 			"typeof a == 'number'",
-			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore},
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}),
 			[]eqeqeqRepair{eqeqeqRepairFix},
 			"typeof a === 'number'",
 		},
 		{
 			"'string' != typeof a",
-			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore},
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}),
 			[]eqeqeqRepair{eqeqeqRepairFix},
 			"'string' !== typeof a",
 		},
 		{
 			"'hello' != 'world'",
-			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore},
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}),
 			[]eqeqeqRepair{eqeqeqRepairFix},
 			"'hello' !== 'world'",
 		},
 		{
 			"2 == 3",
-			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore},
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}),
 			[]eqeqeqRepair{eqeqeqRepairFix},
 			"2 === 3",
 		},
 		{
 			"true == true",
-			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore},
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}),
 			[]eqeqeqRepair{eqeqeqRepairFix},
 			"true === true",
 		},
 		{
 			"true == null",
-			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways},
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}),
 			[]eqeqeqRepair{eqeqeqRepairSuggestion},
 			"",
 		},
 		{
 			"true != null",
-			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways},
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}),
 			[]eqeqeqRepair{eqeqeqRepairSuggestion},
 			"",
 		},
 		{
 			"null == null",
-			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways},
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}),
 			[]eqeqeqRepair{eqeqeqRepairFix},
 			"null === null",
 		},
 		{
 			"null != null",
-			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways},
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}),
 			[]eqeqeqRepair{eqeqeqRepairFix},
 			"null !== null",
 		},
 		{
 			"true === null",
-			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever},
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}),
 			[]eqeqeqRepair{eqeqeqRepairSuggestion},
 			"",
 		},
 		{
 			"true !== null",
-			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever},
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}),
 			[]eqeqeqRepair{eqeqeqRepairSuggestion},
 			"",
 		},
 		{
 			"null === null",
-			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever},
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}),
 			[]eqeqeqRepair{eqeqeqRepairFix},
 			"null == null",
 		},
 		{
 			"null !== null",
-			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever},
+			rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}),
 			[]eqeqeqRepair{eqeqeqRepairFix},
 			"null != null",
 		},
-		{"a\n==\nb", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"(a) == b", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"(a) != b", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"a == (b)", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"a != (b)", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"(a) == (b)", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"(a) != (b)", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"(a == b) == (c)", nil, []eqeqeqRepair{eqeqeqRepairSuggestion, eqeqeqRepairSuggestion}, ""},
-		{"(a != b) != (c)", nil, []eqeqeqRepair{eqeqeqRepairSuggestion, eqeqeqRepairSuggestion}, ""},
-		{"a == b;", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"a!=b;", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"(a + b) == c;", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"(a + b)  !=  c;", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"((1) )  ==  (2);", nil, []eqeqeqRepair{eqeqeqRepairFix}, "((1) )  ===  (2);"},
+		{"a\n==\nb", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"(a) == b", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"(a) != b", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"a == (b)", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"a != (b)", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"(a) == (b)", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"(a) != (b)", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{
+			"(a == b) == (c)",
+			rule.Given[EqeqeqOptions]{},
+			[]eqeqeqRepair{eqeqeqRepairSuggestion, eqeqeqRepairSuggestion},
+			"",
+		},
+		{
+			"(a != b) != (c)",
+			rule.Given[EqeqeqOptions]{},
+			[]eqeqeqRepair{eqeqeqRepairSuggestion, eqeqeqRepairSuggestion},
+			"",
+		},
+		{"a == b;", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"a!=b;", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"(a + b) == c;", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"(a + b)  !=  c;", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
+		{"((1) )  ==  (2);", rule.Given[EqeqeqOptions]{}, []eqeqeqRepair{eqeqeqRepairFix}, "((1) )  ===  (2);"},
 	}
 }
 
 func eqeqeqSilentCases() []eqeqeqCase {
 	return []eqeqeqCase{
-		{"a === b", nil, nil, ""},
-		{"a !== b", nil, nil, ""},
-		{"a === b", EqeqeqOptions{Mode: EqeqeqAlways}, nil, ""},
-		{"typeof a == 'number'", EqeqeqOptions{Mode: EqeqeqSmart}, nil, ""},
-		{"'string' != typeof a", EqeqeqOptions{Mode: EqeqeqSmart}, nil, ""},
-		{"'hello' != 'world'", EqeqeqOptions{Mode: EqeqeqSmart}, nil, ""},
-		{"`hello` != `world`", EqeqeqOptions{Mode: EqeqeqSmart}, nil, ""},
-		{"`hello` == 'hello'", EqeqeqOptions{Mode: EqeqeqSmart}, nil, ""},
-		{"2 == 3", EqeqeqOptions{Mode: EqeqeqSmart}, nil, ""},
-		{"true == true", EqeqeqOptions{Mode: EqeqeqSmart}, nil, ""},
-		{"null == a", EqeqeqOptions{Mode: EqeqeqSmart}, nil, ""},
-		{"a == null", EqeqeqOptions{Mode: EqeqeqSmart}, nil, ""},
-		{"null == a", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}, nil, ""},
-		{"a == null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}, nil, ""},
-		{"a == null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}, nil, ""},
-		{"a != null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}, nil, ""},
-		{"a !== null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}, nil, ""},
-		{"a === null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}, nil, ""},
-		{"a !== null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}, nil, ""},
-		{"null === null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}, nil, ""},
-		{"null !== null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}, nil, ""},
-		{"a == null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}, nil, ""},
-		{"a != null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}, nil, ""},
-		{"null == null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}, nil, ""},
-		{"null != null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}, nil, ""},
-		{"a >= null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}, nil, ""},
-		{"a + null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}, nil, ""},
-		{"null + null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}, nil, ""},
-		{"null instanceof Foo", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}, nil, ""},
-		{"foo === /abc/u", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}, nil, ""},
-		{"foo === 1n", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}, nil, ""},
+		{"a === b", rule.Given[EqeqeqOptions]{}, nil, ""},
+		{"a !== b", rule.Given[EqeqeqOptions]{}, nil, ""},
+		{"a === b", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways}), nil, ""},
+		{"typeof a == 'number'", rule.Configured(EqeqeqOptions{Mode: EqeqeqSmart}), nil, ""},
+		{"'string' != typeof a", rule.Configured(EqeqeqOptions{Mode: EqeqeqSmart}), nil, ""},
+		{"'hello' != 'world'", rule.Configured(EqeqeqOptions{Mode: EqeqeqSmart}), nil, ""},
+		{"`hello` != `world`", rule.Configured(EqeqeqOptions{Mode: EqeqeqSmart}), nil, ""},
+		{"`hello` == 'hello'", rule.Configured(EqeqeqOptions{Mode: EqeqeqSmart}), nil, ""},
+		{"2 == 3", rule.Configured(EqeqeqOptions{Mode: EqeqeqSmart}), nil, ""},
+		{"true == true", rule.Configured(EqeqeqOptions{Mode: EqeqeqSmart}), nil, ""},
+		{"null == a", rule.Configured(EqeqeqOptions{Mode: EqeqeqSmart}), nil, ""},
+		{"a == null", rule.Configured(EqeqeqOptions{Mode: EqeqeqSmart}), nil, ""},
+		{"null == a", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}), nil, ""},
+		{"a == null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}), nil, ""},
+		{"a == null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}), nil, ""},
+		{"a != null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}), nil, ""},
+		{"a !== null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}), nil, ""},
+		{"a === null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}), nil, ""},
+		{"a !== null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}), nil, ""},
+		{"null === null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}), nil, ""},
+		{"null !== null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}), nil, ""},
+		{"a == null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}), nil, ""},
+		{"a != null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}), nil, ""},
+		{"null == null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}), nil, ""},
+		{"null != null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}), nil, ""},
+		{"a >= null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}), nil, ""},
+		{"a + null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}), nil, ""},
+		{"null + null", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}), nil, ""},
+		{"null instanceof Foo", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}), nil, ""},
+		{"foo === /abc/u", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}), nil, ""},
+		{"foo === 1n", rule.Configured(EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}), nil, ""},
 	}
 }
 
@@ -402,28 +420,28 @@ func TestEqeqeqPreservesTypeSyntax(test *testing.T) {
 
 	cases := []struct {
 		sourceText string
-		options    any
+		options    rule.Given[EqeqeqOptions]
 		wantRepair eqeqeqRepair
 		// wantFixedSource is asserted only on the fix arm; a suggestion is never applied.
 		wantFixedSource string
 	}{
 		// A type annotation sits between the binding name and the initializer in our AST. The
 		// repair never goes near it, so the annotation survives.
-		{"declare const a: unknown; typeof a == 'string'", nil, eqeqeqRepairFix,
+		{"declare const a: unknown; typeof a == 'string'", rule.Given[EqeqeqOptions]{}, eqeqeqRepairFix,
 			"declare const a: unknown; typeof a === 'string'"},
 		// An `as` expression on the left of the comparison.
-		{"const x = 1 as number; typeof x == 'number'", nil, eqeqeqRepairFix,
+		{"const x = 1 as number; typeof x == 'number'", rule.Given[EqeqeqOptions]{}, eqeqeqRepairFix,
 			"const x = 1 as number; typeof x === 'number'"},
 		// Explicit type arguments on a call, which is syntax the JavaScript parser reads as two
 		// comparisons and ours reads as one call.
-		{"declare function f<T>(): T; typeof f<number>() == 'number'", nil, eqeqeqRepairFix,
+		{"declare function f<T>(): T; typeof f<number>() == 'number'", rule.Given[EqeqeqOptions]{}, eqeqeqRepairFix,
 			"declare function f<T>(): T; typeof f<number>() === 'number'"},
 		// The suggestion arm, where nothing is applied at all: a union-typed operand against null.
-		{"declare const a: string | undefined; a == null", nil, eqeqeqRepairSuggestion, ""},
+		{"declare const a: string | undefined; a == null", rule.Given[EqeqeqOptions]{}, eqeqeqRepairSuggestion, ""},
 		// A parenthesized `as` expression, which is the shape closest to a span-building mistake.
-		{"declare const a: unknown; (a as string) == 'x'", nil, eqeqeqRepairSuggestion, ""},
+		{"declare const a: unknown; (a as string) == 'x'", rule.Given[EqeqeqOptions]{}, eqeqeqRepairSuggestion, ""},
 		// A non-null assertion, which our AST hangs off the operand as its own node.
-		{"declare const a: number; a! == 1", nil, eqeqeqRepairSuggestion, ""},
+		{"declare const a: number; a! == 1", rule.Given[EqeqeqOptions]{}, eqeqeqRepairSuggestion, ""},
 	}
 
 	for _, testCase := range cases {

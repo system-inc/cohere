@@ -16,17 +16,17 @@ const emptyFunctionFile = "/repository/source/EmptyFunction.ts"
 // decodedEmptyFunctionOptions routes a fixture's options through the rule's own decoder.
 //
 // An empty string means the rule is configured as bare "error", which is what the live config
-// does and what hands the rule nil.
-func decodedEmptyFunctionOptions(test *testing.T, raw string) any {
+// does and what hands the rule no options.
+func decodedEmptyFunctionOptions(test *testing.T, raw string) rule.Given[NoEmptyFunctionOptions] {
 	test.Helper()
 	if raw == "" {
-		return nil
+		return rule.Given[NoEmptyFunctionOptions]{}
 	}
 	options, decodeNoEmptyFunctionOptionsError := DecodeNoEmptyFunctionOptions(json.RawMessage(raw))
 	if decodeNoEmptyFunctionOptionsError != nil {
 		test.Fatalf("the decoder refused %s: %v", raw, decodeNoEmptyFunctionOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // The corpus is ESLint's own, at `tests/lib/rules/no-empty-function.js`, extracted by loading
@@ -835,7 +835,7 @@ func TestNoEmptyFunctionStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText+"|"+testCase.options, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoEmptyFunction,
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(test, NoEmptyFunction,
 				emptyFunctionFile, testCase.sourceText, decodedEmptyFunctionOptions(test, testCase.options)))
 		})
 	}
@@ -11101,7 +11101,7 @@ func TestNoEmptyFunctionFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText+"|"+testCase.options, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoEmptyFunction, emptyFunctionFile,
+			result := rule_testing.RunGiven(test, NoEmptyFunction, emptyFunctionFile,
 				testCase.sourceText, decodedEmptyFunctionOptions(test, testCase.options))
 			rule_testing.ExpectFindings(test, result, "unexpected")
 
@@ -11186,8 +11186,8 @@ func TestNoEmptyFunctionSpansTheBody(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoEmptyFunction, emptyFunctionFile,
-				testCase.sourceText, nil)
+			result := rule_testing.Run(test, NoEmptyFunction, emptyFunctionFile,
+				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
@@ -11259,14 +11259,14 @@ func TestDecodeNoEmptyFunctionOptionsRefusesAnUnknownKind(test *testing.T) {
 	}
 }
 
-// A rule configured as bare "error" reaches Run with nil rather than with an options struct.
+// A rule configured as bare "error" reaches Run unconfigured rather than with an options struct.
 func TestNoEmptyFunctionWithNilOptionsAllowsNothing(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoEmptyFunction,
-		emptyFunctionFile, "function a() {}", nil), "unexpected")
-	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoEmptyFunction,
-		emptyFunctionFile, "function a() { /* empty */ }", nil))
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoEmptyFunction,
+		emptyFunctionFile, "function a() {}"), "unexpected")
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoEmptyFunction,
+		emptyFunctionFile, "function a() { /* empty */ }"))
 }
 
 // A constructor carrying `override`, which upstream's corpus never writes.
@@ -11284,11 +11284,11 @@ func TestNoEmptyFunctionOverrideDoesNotExemptAConstructor(test *testing.T) {
 
 	allowOverride := decodedEmptyFunctionOptions(test, `{"allow": ["overrideMethods"]}`)
 
-	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoEmptyFunction, emptyFunctionFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunGiven(test, NoEmptyFunction, emptyFunctionFile,
 		"class A extends B { override constructor() {} }", allowOverride), "unexpected")
 
 	// The control, and the reason the row above is about the gate rather than about `override`
 	// itself: the same modifier on a getter does exempt.
-	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoEmptyFunction, emptyFunctionFile,
+	rule_testing.ExpectClean(test, rule_testing.RunGiven(test, NoEmptyFunction, emptyFunctionFile,
 		"class A extends B { override get foo() {} }", allowOverride))
 }

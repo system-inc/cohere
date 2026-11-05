@@ -15,7 +15,7 @@ const idDenylistFile = "/repository/source/IdDenylist.ts"
 //
 // Routed through the rule's own exported decoder rather than filling the struct, so a defect in
 // the decoder is under test rather than bypassed by every fixture.
-func idDenylistOf(names ...string) any {
+func idDenylistOf(names ...string) IdDenylistSettings {
 	encoded, err := json.Marshal(names)
 	if err != nil {
 		panic(err)
@@ -62,7 +62,7 @@ func TestIdDenylistFires(test *testing.T) {
 	cases := []struct {
 		source string
 		// settings is what the rule's own decoder produces for this case's options.
-		settings any
+		settings IdDenylistSettings
 		// findings is one message id per expected finding, in report order, taken from what the
 		// installed rule produced rather than assumed: the private-name cases report through a
 		// different id and no count could tell them apart.
@@ -514,7 +514,7 @@ func TestIdDenylistStaysSilent(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings IdDenylistSettings
 	}{
 		{source: "foo = \"bar\"", settings: idDenylistOf("bar")},
 		{source: "bar = \"bar\"", settings: idDenylistOf("foo")},
@@ -616,7 +616,7 @@ func TestIdDenylistDivergesOnTheEslintGlobalsSurface(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings IdDenylistSettings
 		findings int
 		upstream int
 		why      string
@@ -720,7 +720,7 @@ func TestIdDenylistSpansAndMessages(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings IdDenylistSettings
 		spans    []string
 		messages []string
 	}{
@@ -815,7 +815,7 @@ func TestIdDenylistDecoderReadsTheNameArray(test *testing.T) {
 	}
 
 	// A rule handed nil options denies nothing rather than reading a nil map as "everything".
-	result := rule_testing.RunTypedWithOptions(test, IdDenylist, idDenylistFile, "var data = 1;", nil)
+	result := rule_testing.RunTyped(test, IdDenylist, idDenylistFile, "var data = 1;")
 	if len(result.Diagnostics) != 0 {
 		test.Errorf("expected an unconfigured rule to report nothing, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())

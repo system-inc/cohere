@@ -16,7 +16,7 @@ const consistentThisFile = "/repository/source/ConsistentThis.ts"
 // where this rule's two most dangerous lines live: the default of ["that"] rather than the zero
 // value, and reading upstream's variadic list, one alias per element. A struct built by hand passes
 // every fixture while an inverted default ships.
-func consistentThisOptions(test *testing.T, aliases ...string) any {
+func consistentThisOptions(test *testing.T, aliases ...string) ConsistentThisSettings {
 	test.Helper()
 	raw, err := json.Marshal(aliases)
 	if err != nil {
@@ -278,13 +278,13 @@ func TestDecodeConsistentThisOptions(test *testing.T) {
 
 	test.Run("a bare severity leaves the rule on its default", func(test *testing.T) {
 		test.Parallel()
-		// A rule configured as "error" is handed nil options, which arrives at Run as an untyped
-		// nil rather than as settings. Asserting through the rule rather than the decoder is what
+		// A rule configured as "error" is handed no options, which arrives at Run unconfigured
+		// rather than as settings. Asserting through the rule rather than the decoder is what
 		// covers the fallback inside Run, which no decoder test can reach.
-		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, ConsistentThis,
-			consistentThisFile, "var context = this", nil), "unexpectedAlias")
-		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, ConsistentThis,
-			consistentThisFile, "var that = this", nil))
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, ConsistentThis,
+			consistentThisFile, "var context = this"), "unexpectedAlias")
+		rule_testing.ExpectClean(test, rule_testing.Run(test, ConsistentThis,
+			consistentThisFile, "var that = this"))
 	})
 
 	test.Run("one element is one alias", func(test *testing.T) {

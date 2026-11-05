@@ -3,6 +3,7 @@ package core
 import (
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -73,13 +74,13 @@ var noContinueSilentCases = []noContinueCase{
 
 // decodedNoContinue routes a row's raw JSON through the rule's own exported decoder.
 // no-continue has no option surface (upstream's schema is []), so there is no decoder to route
-// through and the harness is handed nil, which is what the config layer passes for a bare "error".
-func decodedNoContinue(test *testing.T, raw string) any {
+// through and the harness is handed no options, which is what the config layer passes for a bare "error".
+func decodedNoContinue(test *testing.T, raw string) rule.Given[rule.NoOptions] {
 	test.Helper()
 	if raw != "" {
 		test.Fatalf("no-continue takes no options, got %q", raw)
 	}
-	return nil
+	return rule.Given[rule.NoOptions]{}
 }
 
 func TestNoContinueFires(test *testing.T) {
@@ -87,7 +88,7 @@ func TestNoContinueFires(test *testing.T) {
 	for _, testCase := range noContinueFiresCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoContinue, noContinueFile, testCase.source,
+			result := rule_testing.RunGiven(test, NoContinue, noContinueFile, testCase.source,
 				decodedNoContinue(test, testCase.options))
 			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
@@ -99,7 +100,7 @@ func TestNoContinueStaysSilent(test *testing.T) {
 	for _, testCase := range noContinueSilentCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoContinue, noContinueFile, testCase.source,
+			result := rule_testing.RunGiven(test, NoContinue, noContinueFile, testCase.source,
 				decodedNoContinue(test, testCase.options))
 			rule_testing.ExpectClean(test, result)
 		})
