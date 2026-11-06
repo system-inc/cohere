@@ -120,12 +120,30 @@ struct NamingRuleTests {
      `TestFindNamesEveryMeaningOfAWordWithMore`, `resultPos` beside `resultNeg` among them, where it means positive.
      */
     @Test(arguments: [
-        ("policy", "pos", #"Identifier "pos" should not be abbreviated. Use "position" or "positive", whichever it means, or a more descriptive name."#),
-        ("policy", "posLabel", #"Identifier "posLabel" should not be abbreviated. Use "positionLabel" or "positiveLabel", whichever it means."#),
-        ("policy", "resultPos", #"Identifier "resultPos" abbreviates "Pos". Use "resultPosition" or "resultPositive", whichever it means."#),
-        ("listed", "neg", #"Identifier "neg" should not be abbreviated. Use "negative" or "negation", whichever it means."#),
-        ("listed", "resultNeg", #"Identifier "resultNeg" should not end with "Neg". Use "resultNegative" or "resultNegation", whichever it means."#),
-        ("listed", "readRelPath", #"Identifier "readRelPath" abbreviates "Rel". Use "readRelativePath", "readRelationPath" or "readReleasePath", whichever it means."#),
+        (
+            "policy", "pos",
+            #"Identifier "pos" should not be abbreviated. Use "position" or "positive", whichever it means, or a more descriptive name."#,
+        ),
+        (
+            "policy", "posLabel",
+            #"Identifier "posLabel" should not be abbreviated. Use "positionLabel" or "positiveLabel", whichever it means."#,
+        ),
+        (
+            "policy", "resultPos",
+            #"Identifier "resultPos" abbreviates "Pos". Use "resultPosition" or "resultPositive", whichever it means."#,
+        ),
+        (
+            "listed", "neg",
+            #"Identifier "neg" should not be abbreviated. Use "negative" or "negation", whichever it means."#,
+        ),
+        (
+            "listed", "resultNeg",
+            #"Identifier "resultNeg" should not end with "Neg". Use "resultNegative" or "resultNegation", whichever it means."#,
+        ),
+        (
+            "listed", "readRelPath",
+            #"Identifier "readRelPath" abbreviates "Rel". Use "readRelativePath", "readRelationPath" or "readReleasePath", whichever it means."#,
+        ),
     ])
     func aWordWithMoreThanOneMeaningNamesThemAll(vocabularyName: String, name: String, want: String) throws {
         /* The plain whole form, the suffix form and three meanings, which no word in policy's file has yet. */
@@ -150,7 +168,7 @@ struct NamingRuleTests {
         ("sbBottom", "prefix", #"Identifier "sb" should not be abbreviated. Spell out what it holds."#),
         ("scrollSbOffset", "segment", #"Identifier "scrollSbOffset" abbreviates "Sb". Spell out what it holds."#),
     ])
-    func sbAsksWhatItHolds(name: String, form: String, want: String) throws {
+    func unlistableWordAsksWhatItHolds(name: String, form: String, want: String) throws {
         let finding = try #require(try Self.vocabulary().find(name))
         #expect(finding.form == form)
         #expect(finding.message == want + " " + Self.reasoning)

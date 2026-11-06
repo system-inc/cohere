@@ -142,7 +142,7 @@ func TestFindNamesEveryMeaningOfAWordWithMore(test *testing.T) {
 
 // `sb` is Go's habit for a strings.Builder, but a census found it naming a scroll region's bottom, and its letters
 // fit more words than a list could hold. So no form suggests a word: each asks what it holds.
-func TestFindAsksWhatSbHolds(test *testing.T) {
+func TestFindAsksWhatAnUnlistableWordHolds(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
 		name string
