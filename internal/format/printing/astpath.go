@@ -88,7 +88,9 @@ func (path *AstPath[N, S]) siblings() Value[N] {
 	return path.stack[len(path.stack)-2].Value
 }
 
-// Siblings is upstream's path.siblings as nodes: the list of nodes holding the current value, or nil.
+// Siblings is upstream's path.siblings as nodes: the list of nodes holding the current value, or nil. A nil
+// result does not mean the value is outside a list: inside a mixed list (css's groups) IsInArray is true and
+// Siblings is nil, so ask IsInArray for that.
 func (path *AstPath[N, S]) Siblings() []N {
 	nodes, _ := path.siblings().Nodes()
 	return nodes
