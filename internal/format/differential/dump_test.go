@@ -154,7 +154,10 @@ func TestDumpDifferences(test *testing.T) {
 			if result.Outcome != Different && result.Outcome != CandidateRefused {
 				continue
 			}
-			relative, _ := filepath.Rel(root, result.Path)
+			relative, relativeError := filepath.Rel(root, result.Path)
+			if relativeError != nil {
+				test.Fatalf("naming %s under %s: %v", result.Path, root, relativeError)
+			}
 			fmt.Fprintf(&summary, "%s\t%s\t%s\n", result.Outcome, relative, firstLine(result.Detail))
 			if result.Outcome != Different {
 				continue

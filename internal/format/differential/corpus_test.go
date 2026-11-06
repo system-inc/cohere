@@ -72,7 +72,8 @@ func TestCorpora(test *testing.T) {
 	seen := map[string]bool{}
 	// Every corpus measured, and every one skipped, logged together at the end, so a run that measures
 	// fewer repositories than the last one says so in one place rather than in a smaller total.
-	var measured, skipped []string
+	var measured []string
+	var skipped []string
 	offeredTotal := 0
 	for len(pending) > 0 {
 		root := expandHome(strings.TrimSpace(pending[0]))
