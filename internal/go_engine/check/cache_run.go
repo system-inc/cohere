@@ -35,9 +35,12 @@ type CacheCounts struct {
 	// Written is the misses whose entry was written.
 	Written int
 
-	// Unstorable is the misses with a fact an entry cannot hold, an object with no objectpath or a value gob
-	// refuses, which therefore got no entry.
+	// Unstorable is the misses with a fact an entry cannot hold, a value gob refuses, which therefore got no entry.
 	Unstorable int
+
+	// FactsDropped is the facts the written entries left out because nothing outside their package can name their
+	// object, which has no objectpath (see encodeEntry).
+	FactsDropped int
 
 	// WriteFailed is the misses whose entry could not be written, the first reason among Problems.
 	WriteFailed int
@@ -150,7 +153,7 @@ func (opened *cacheRun) save(graph *checker.Graph, ruleOf map[*analysis.Analyzer
 		if !keyed || !finishedClean(actionsOf[reached]) {
 			continue
 		}
-		entry, encodeError := encodeEntry(opened.known, ruleOf, actionsOf[reached])
+		entry, dropped, encodeError := encodeEntry(opened.known, ruleOf, actionsOf[reached])
 		if errors.Is(encodeError, errorUnstorable) {
 			opened.counts.Unstorable++
 			continue
@@ -159,6 +162,7 @@ func (opened *cacheRun) save(graph *checker.Graph, ruleOf map[*analysis.Analyzer
 			opened.counts.Problems = append(opened.counts.Problems, encodeError.Error())
 			continue
 		}
+		opened.counts.FactsDropped += dropped
 		if putError := opened.caching.Store.Put(key, entry); putError != nil {
 			if opened.counts.WriteFailed == 0 {
 				opened.counts.Problems = append(opened.counts.Problems, putError.Error())

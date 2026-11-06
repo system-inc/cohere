@@ -404,9 +404,10 @@ func lineAt(lines []string, index int) string {
 var (
 	elapsedPattern = regexp.MustCompile(`"elapsedMilliseconds":\d+`)
 	packagesLoaded = regexp.MustCompile(`type-checked from source: \d+ packages`)
-	// The packages the findings cache missed, wrote and could not store count the toolchain's own packages, which a
-	// Go release changes, as it changes the packages loaded. Hit stays, since a fresh copy hits nothing.
-	cachePackagesPattern = regexp.MustCompile(`"(missed|written|unstorable)":\d+`)
+	// The packages the findings cache missed, wrote and could not store, and the facts it dropped, count the
+	// toolchain's own packages, which a Go release changes, as it changes the packages loaded. Hit stays, since a
+	// fresh copy hits nothing.
+	cachePackagesPattern = regexp.MustCompile(`"(missed|written|unstorable|factsDropped)":\d+`)
 	panicFramesPattern   = regexp.MustCompile(`, at [^"]*"`)
 	hostTarget           = " on " + runtime.GOOS + "/" + runtime.GOARCH
 	normalizedProvenance = contract.ProvenanceRecord{

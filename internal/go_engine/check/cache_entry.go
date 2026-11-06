@@ -80,12 +80,14 @@ func factTypeName(factType reflect.Type) string {
 }
 
 // encodeEntry is the entry of one package that missed, from every action on it, each of which finished without an
-// error. It returns errorUnstorable, wrapped, when a fact the package exported has no objectpath or gob refuses it.
+// error, and how many facts it left out because their object has no objectpath. It returns errorUnstorable, wrapped,
+// when gob refuses a fact the package exported.
 func encodeEntry(
 	known *cacheAnalyzers,
 	ruleOf map[*analysis.Analyzer]rule.Rule,
 	actions []*checker.Action,
-) ([]byte, error) {
+) ([]byte, int, error) {
+	dropped := 0
 	entry := cacheEntry{Version: CacheFormatVersion, Analyzers: map[string]storedAnalysis{}}
 	var encoder objectpath.Encoder
 	for _, action := range actions {
@@ -103,12 +105,20 @@ func encodeEntry(
 		for _, objectFact := range objectFacts {
 			path, pathError := encoder.For(objectFact.Object)
 			if pathError != nil {
-				return nil, fmt.Errorf("storing %s's %T fact on %s: %w: %w", action.Analyzer.Name, objectFact.Fact,
-					objectFact.Object, errorUnstorable, pathError)
+				// An object with no objectpath is one no other package can name, such as the local closure printf
+				// marks as a wrapper in `fail := func(format string, arguments ...any)`, which exportedFrom passes
+				// since it cannot tell a local from a parameter. Its fact reaches an importer by two roads only.
+				// ImportObjectFact needs the object, which the importer never holds. AllObjectFacts returns only the
+				// calling analyzer's own fact type, and among our analyzers only staticcheck's purity, nilness and
+				// deprecated call it: purity and nilness hold facts only on functions, which are package-level and
+				// have a path, and deprecated keys by the declared objects an importer meets. So leaving the fact
+				// out changes no finding. A new caller of AllObjectFacts is a reason to look at this again.
+				dropped++
+				continue
 			}
 			fact, factError := encodeFact(objectFact.Fact)
 			if factError != nil {
-				return nil, fmt.Errorf("storing %s's fact on %s: %w", action.Analyzer.Name, objectFact.Object,
+				return nil, 0, fmt.Errorf("storing %s's fact on %s: %w", action.Analyzer.Name, objectFact.Object,
 					factError)
 			}
 			stored.ObjectFacts = append(stored.ObjectFacts, storedObjectFact{Path: path, Fact: fact})
@@ -116,7 +126,7 @@ func encodeEntry(
 		for _, packageFact := range packageFacts {
 			fact, factError := encodeFact(packageFact.Fact)
 			if factError != nil {
-				return nil, fmt.Errorf("storing %s's package fact: %w", action.Analyzer.Name, factError)
+				return nil, 0, fmt.Errorf("storing %s's package fact: %w", action.Analyzer.Name, factError)
 			}
 			stored.PackageFacts = append(stored.PackageFacts, fact)
 		}
@@ -124,9 +134,9 @@ func encodeEntry(
 	}
 	var encoded bytes.Buffer
 	if encodeError := gob.NewEncoder(&encoded).Encode(entry); encodeError != nil {
-		return nil, fmt.Errorf("encoding the entry: %w: %w", errorUnstorable, encodeError)
+		return nil, 0, fmt.Errorf("encoding the entry: %w: %w", errorUnstorable, encodeError)
 	}
-	return encoded.Bytes(), nil
+	return encoded.Bytes(), dropped, nil
 }
 
 // encodeFact is one fact as an entry holds it.

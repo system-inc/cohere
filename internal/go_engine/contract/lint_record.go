@@ -34,13 +34,15 @@ type LintRecord struct {
 
 // LintCache counts, by package, what the per-package findings cache did: every package an action reached was hit,
 // restored from an entry with nothing run on it, or missed, analyzed from source. Of the misses, written got an
-// entry and unstorable held a fact no entry can hold. On is false, and every count 0, under `--no-cache`.
+// entry and unstorable held a fact no entry can hold. FactsDropped counts the facts the written entries left out
+// because nothing outside their package can name their object. On is false, and every count 0, under `--no-cache`.
 type LintCache struct {
-	On         bool `json:"on"`
-	Hit        int  `json:"hit"`
-	Missed     int  `json:"missed"`
-	Written    int  `json:"written"`
-	Unstorable int  `json:"unstorable"`
+	On           bool `json:"on"`
+	Hit          int  `json:"hit"`
+	Missed       int  `json:"missed"`
+	Written      int  `json:"written"`
+	Unstorable   int  `json:"unstorable"`
+	FactsDropped int  `json:"factsDropped"`
 }
 
 func (LintRecord) kind() Kind { return KindLint }

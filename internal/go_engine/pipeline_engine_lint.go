@@ -117,11 +117,12 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error) {
 	record.WithheldAsGenerated = result.WithheldAsGenerated
 	record.WithheldAsCopied = result.WithheldAsCopied
 	record.Cache = contract.LintCache{
-		On:         result.Cache.On,
-		Hit:        result.Cache.Hit,
-		Missed:     result.Cache.Missed,
-		Written:    result.Cache.Written,
-		Unstorable: result.Cache.Unstorable,
+		On:           result.Cache.On,
+		Hit:          result.Cache.Hit,
+		Missed:       result.Cache.Missed,
+		Written:      result.Cache.Written,
+		Unstorable:   result.Cache.Unstorable,
+		FactsDropped: result.Cache.FactsDropped,
 	}
 	for _, problem := range result.Cache.Problems {
 		engine.note("the findings cache: %s", problem)
