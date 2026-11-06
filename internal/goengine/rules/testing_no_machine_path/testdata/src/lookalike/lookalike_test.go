@@ -18,7 +18,7 @@ const noTrailingSlash = "/Users/someone"
 // A Users segment a word runs into is part of another path.
 const runInto = "relative/Users/someone/x"
 
-// The expression is case-sensitive, as testpolicy's is.
+// The expression is case-sensitive.
 const lowerCaseUsers = "/users/someone/x"
 
 // A name with a space in it is not one path segment.
