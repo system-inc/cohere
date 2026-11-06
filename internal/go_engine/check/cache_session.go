@@ -80,6 +80,10 @@ type CacheSession struct {
 	counts       CacheCounts
 	factsSkipped atomic.Int64
 
+	// exportDataReads counts the export data read from the store, which the load asks only of a package something
+	// that missed imports.
+	exportDataReads atomic.Int64
+
 	// problemsLock guards counts.Problems, which the load's goroutines never write but Run's may.
 	problemsLock sync.Mutex
 }
@@ -143,7 +147,7 @@ func (session *CacheSession) Restore(
 		if !stored {
 			continue
 		}
-		restored, decodeError := decodeEntry(session.known, keyed, contents)
+		restored, decodeError := decodeEntry(session.known, keyed, contents, session.exportDataReader(keyed, key))
 		if decodeError != nil {
 			continue
 		}
@@ -159,6 +163,18 @@ func (session *CacheSession) Restore(
 		restoring[hit] = restored.types
 	}
 	return restoring
+}
+
+// exportDataReader reads the export data of the package under key from the store, for the load.
+func (session *CacheSession) exportDataReader(keyed *packages.Package, key cache.Key) func() ([]byte, error) {
+	return func() ([]byte, error) {
+		session.exportDataReads.Add(1)
+		exportData, stored := session.caching.Store.Get(exportDataKey(key))
+		if !stored {
+			return nil, fmt.Errorf("the store holds no export data for %s", keyed.ID)
+		}
+		return exportData, nil
+	}
 }
 
 // dropShortHits makes a miss of every hit that does not hold what the run can ask of it, and reports whether there
@@ -295,10 +311,14 @@ func (session *CacheSession) save(
 		go func() {
 			defer group.Done()
 			defer func() { <-slots }()
-			entry, dropped, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
-				withheld[saved], files[saved])
+			entry, exportData, dropped, encodeError := encodeEntry(session.known, session.ruleOf, saved,
+				actionsOf[saved], withheld[saved], files[saved])
 			var putError error
-			if encodeError == nil {
+			// The export data goes first, so an entry is never in the store before what it needs to be read.
+			if encodeError == nil && exportData != nil {
+				putError = session.caching.Store.Put(exportDataKey(session.keys[saved]), exportData)
+			}
+			if encodeError == nil && putError == nil {
 				putError = session.caching.Store.Put(session.keys[saved], entry)
 			}
 			countsLock.Lock()
