@@ -43,6 +43,7 @@ func newLandFixture(test *testing.T) *landFixture {
 	fixture.log = filepath.Join(bin, "gates")
 	stand := "#!/bin/sh\n[ \"$1\" = vet ] && exit 0\n" +
 		"echo \"start $(basename \"$PWD\") $(ls | tr '\\n' ' ')tree=$(git rev-parse HEAD^{tree}) " +
+		"handed=$" + landWorktreeVariable + " " +
 		"flags=$GOFLAGS\" >> '" +
 		fixture.log + "'\nsleep 1\n" +
 		"echo \"end $(basename \"$PWD\")\" >> '" + fixture.log + "'\n"
@@ -857,6 +858,12 @@ func TestALandingWhoseLandDiffersFromMainsRunsMains(test *testing.T) {
 	if len(ran) != 1 || len(fields) != 2 || resolved(fields[0]) != resolved(fixture.repository) ||
 		resolved(fields[1]) != resolved(worktreeA) {
 		test.Errorf("main's land ran %q, want once, in the main checkout, handed %s", ran, worktreeA)
+	}
+	// Main's land was handed the worktree, and nothing it started was: its gate's commands saw no variable.
+	for _, line := range fixture.gates() {
+		if strings.HasPrefix(line, "start ") && !strings.Contains(line, " handed= ") {
+			test.Errorf("a gate command inherited the handed worktree: %s", line)
+		}
 	}
 	if count := strings.Count(string(output), "differs from main's, so main's land runs"); count != 1 {
 		test.Errorf("the landing said %d times that main's land runs, want once:\n%s", count, output)

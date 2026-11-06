@@ -33,6 +33,7 @@ const landAttempts = 3
 
 // land lands the commit the working directory's worktree is at onto main, and returns its exit code.
 func land(arguments []string) int {
+	takeHandedWorktree()
 	options, parseLandingOptionsError := parseLandingOptions(arguments)
 	if parseLandingOptionsError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", parseLandingOptionsError)

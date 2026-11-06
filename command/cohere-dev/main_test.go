@@ -345,8 +345,13 @@ func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 func outsideThePool(environment []string) []string {
 	kept := make([]string, 0, len(environment))
 	for _, variable := range environment {
+		// Land's own variables too: a test run inside a land gate would otherwise hand its fixture's landing the
+		// real worktree being landed, or a stand-in meant for another test.
 		if !strings.HasPrefix(variable, heldTokenVariable+"=") && !strings.HasPrefix(variable, "GOMAXPROCS=") &&
-			!strings.HasPrefix(variable, "GOFLAGS=") && !strings.HasPrefix(variable, homeVariable+"=") {
+			!strings.HasPrefix(variable, "GOFLAGS=") && !strings.HasPrefix(variable, homeVariable+"=") &&
+			!strings.HasPrefix(variable, landWorktreeVariable+"=") &&
+			!strings.HasPrefix(variable, mainLandVariable+"=") &&
+			!strings.HasPrefix(variable, gateCohereVariable+"=") {
 			kept = append(kept, variable)
 		}
 	}
