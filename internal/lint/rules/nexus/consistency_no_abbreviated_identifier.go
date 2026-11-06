@@ -69,6 +69,7 @@ var (
 //	invalid: const idx = 0
 //	invalid: const durationMs = 500
 //	invalid: const originalInitCwd = process.cwd()
+//	invalid: function join(...args: string[])   (once, at the rest, not at its reads)
 //
 // The exemptions carry the judgment, and they divide into two kinds. Some names are not ours: a
 // property read, an import specifier, a member of a qualified type name, a JSX tag or attribute. Renaming any of those
@@ -87,11 +88,11 @@ var (
 // travels in the message instead, where a reader applies it with the scope in front of them. Four
 // other ported rules made the same call for the same reason.
 //
-// The original's scope walk also kept it silent on every reference to an imported name, and this
-// port reported those until api-phi-health's parity sweep counted six (#dx1vrfm). It now skips a
-// reference to a name an import binds and nothing else in the file declares, which agrees with the
-// scope walk everywhere but a file that shadows an import; there it keeps reporting, erring toward a
-// finding. The rule judges names the code declares, never names it reads from elsewhere.
+// A name is judged where it is declared, and its reads are not reported again (#2wgkyfn, the text
+// rules' first principle). One `msg` read twice was three findings for one defect, the noise that
+// pushes people toward suppressions, and a read of an imported name was the other module's spelling
+// reported here (#dx1vrfm). With no fix there is nothing a read's finding carried that the
+// declaration's does not: the declaration is where the name is chosen, and where it is renamed.
 var ConsistencyNoAbbreviatedIdentifier = rule.Rule[ConsistencyNoAbbreviatedIdentifierOptions]{
 	Name:             "nexus/consistency-no-abbreviated-identifier",
 	NeedsTypeChecker: true,
@@ -102,10 +103,6 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule[ConsistencyNoAbbreviatedIdent
 		isFrameworkParameterFile := matchesAnyFilePattern(fileName, settings.FrameworkParameterFilePatterns)
 		isFrameworkConstantFile := matchesAnyFilePattern(fileName, settings.FrameworkConstantFilePatterns)
 		routeContract := nextjs.RouteContractExports(fileName)
-		// Built on the first candidate identifier, so a file with no abbreviated name never walks.
-		var importedNames map[string]bool
-		// Answered on the first `args`, so no other file walks for it.
-		argumentsNameRestOnly, argumentsBindingsRead := false, false
 
 		judge := func(node *ast.Node) {
 			name := node.Text()
@@ -125,23 +122,10 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule[ConsistencyNoAbbreviatedIdent
 				if !abbreviatedOwnsProperty(ruleContext, node) {
 					return
 				}
-			} else if node.Kind != ast.KindIdentifier || binding.IsForeignName(node) ||
-				(node.Parent != nil &&
-					node.Parent.Kind == ast.KindPropertyAccessExpression &&
-					node.Parent.Name() == node) {
-				return
-			}
-
-			// A reference to an imported name is the other module's spelling, as the import
-			// specifier is: `loadConfig(directory)` and drizzle's `char(name)` read names this
-			// file does not own (#dx1vrfm). The original skips them through a scope walk; this
-			// port has none, so a name counts as imported when an import binds it and nothing
-			// else in the file declares it. A file that shadows an import keeps reporting the
-			// name everywhere, which errs toward a finding rather than away from one.
-			if importedNames == nil {
-				importedNames = importedNamesNeverRedeclared(ruleContext.SourceFile)
-			}
-			if !property && importedNames[name] {
+			} else if node.Kind != ast.KindIdentifier || !declaresName(node) || binding.IsForeignName(node) {
+				// A read, a write and a type reference are uses of a name chosen at its
+				// declaration, which is judged there, once. Of the declarations, the foreign
+				// ones are imports, export specifiers and JSX attributes, named elsewhere.
 				return
 			}
 
@@ -152,16 +136,16 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule[ConsistencyNoAbbreviatedIdent
 			// shape of the rename that cost five phi web routes their prerendering, so the
 			// floor comes from `nextjs.IsRouteContractExport` whatever the consumer passes.
 			//
-			// Every occurrence of the spelling is exempt, the export and its references alike,
-			// except a nested binding that shadows it: a `const config` inside a function is
-			// this file's own name again and is judged on its merits.
+			// The module-scope declaration is exempt, but not a nested binding that shares
+			// its spelling: a `const config` inside a function is this file's own name again
+			// and is judged on its merits.
 			if !property && routeContract[name] && !declaresNestedBinding(node) {
 				return
 			}
 
 			// The vocabulary says what the word is; policy/Abbreviations.json holds it, and Swift
 			// compiles in the same file. What follows is policy, which stays here.
-			finding, found := findAbbreviation(name)
+			finding, found := findAbbreviation(name, !property)
 			if !found {
 				return
 			}
@@ -189,29 +173,10 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule[ConsistencyNoAbbreviatedIdent
 				if !property && isFrameworkConstantFile {
 					return
 				}
-			case "whole args":
-				// A rest parameter in a variadic or framework function keeps the conventional
-				// spelling: `...args` is the shape everyone reads.
-				//
-				// Its uses have to agree with it. The name was chosen once, at the exempt rest,
-				// so reporting `target(...args)` put the finding away from where anyone could act
-				// on it, and only there (#e000k8d). Without scope analysis a use cannot be traced
-				// to its binding, so the question is asked of the file, the same way imported
-				// names are: when every `args` the file binds is a rest, every `args` is exempt.
-				// A file that also binds a plain parameter or catch binding named `args` keeps
-				// reporting all of them, erring toward a finding. The ESLint twin asks the file
-				// the same question, so the two engines agree.
-				if isRestElement(node) {
-					return
-				}
-				if !argumentsBindingsRead {
-					argumentsNameRestOnly = nameBoundOnlyAsRest(ruleContext.SourceFile, "args")
-					argumentsBindingsRead = true
-				}
-				if !property && argumentsNameRestOnly {
-					return
-				}
 			}
+			// A rest `...args` is judged like any other `args`: strict code cannot bind its
+			// expansion, so its advice names a descriptive name ending in it, and no spelling of
+			// it is exempt (#2wgkyfn). See findAbbreviation.
 
 			// The identifier's own text, not its leading trivia.
 			//
@@ -236,22 +201,27 @@ func matchesAnyFilePattern(fileName string, patterns []string) bool {
 	return false
 }
 
-// isRestElement reports whether an identifier is the name bound by a rest parameter or a rest
-// binding element, the `...args` shape.
-func isRestElement(node *ast.Node) bool {
+// declaresName reports whether an identifier is the name a declaration binds: a variable, a
+// parameter or destructured element, a function, class, interface, type, enum or namespace, a type
+// parameter, or a statement label. A read, a write or a type reference is a use, and is not.
+//
+// The compiler's own `IsDeclarationName` answers for every declaration but the label, which the
+// grammar gives a statement rather than a declaration node, and which `break` and `continue` read.
+// An import-equals alias is a declaration the compiler counts, and an import, the one spelling of
+// import that `binding.IsForeignName` does not cover, so it is answered here as the other four are
+// there.
+func declaresName(node *ast.Node) bool {
 	parent := node.Parent
 	if parent == nil {
 		return false
 	}
 	switch parent.Kind {
-	case ast.KindParameter:
-		parameter := parent.AsParameterDeclaration()
-		return parameter != nil && parameter.DotDotDotToken != nil && parameter.Name() == node
-	case ast.KindBindingElement:
-		element := parent.AsBindingElement()
-		return element != nil && element.DotDotDotToken != nil && element.Name() == node
+	case ast.KindLabeledStatement:
+		return parent.AsLabeledStatement().Label == node
+	case ast.KindImportEqualsDeclaration:
+		return false
 	}
-	return false
+	return ast.IsDeclarationName(node)
 }
 
 // isReactReferencePropertyContext reports whether a `ref` identifier is participating in React 19's
@@ -451,74 +421,6 @@ func declaresNestedBinding(node *ast.Node) bool {
 		return statement.Parent == nil || statement.Parent.Kind != ast.KindSourceFile
 	}
 	return false
-}
-
-// nameBoundOnlyAsRest reports whether a file binds a name at least once and only ever as a rest:
-// `...args` in a parameter list or `[first, ...args]` in a destructuring pattern.
-//
-// A binding is counted by the same test importedNamesNeverRedeclared uses, an identifier that is its
-// parent's name, less the members and keys that bind nothing in scope. An import counts as a binding
-// that is not a rest, though the import skip has already answered for an imported name.
-func nameBoundOnlyAsRest(sourceFile *ast.SourceFile, name string) bool {
-	bound, onlyRest := false, true
-	var visit func(node *ast.Node) bool
-	visit = func(node *ast.Node) bool {
-		if !onlyRest {
-			return true
-		}
-		if node.Kind == ast.KindIdentifier && node.Text() == name && node.Parent != nil && node.Parent.Name() == node {
-			switch node.Parent.Kind {
-			case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment, ast.KindPropertyAccessExpression,
-				ast.KindPropertySignature, ast.KindPropertyDeclaration, ast.KindMethodDeclaration,
-				ast.KindMethodSignature, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindExportSpecifier,
-				ast.KindEnumMember, ast.KindJsxAttribute:
-				// Members and keys bind no name in scope.
-			default:
-				bound = true
-				if !isRestElement(node) {
-					onlyRest = false
-					return true
-				}
-			}
-		}
-		node.ForEachChild(visit)
-		return !onlyRest
-	}
-	sourceFile.AsNode().ForEachChild(visit)
-	return bound && onlyRest
-}
-
-// importedNamesNeverRedeclared returns the names an import in this file binds, less any name the
-// file also declares somewhere: a variable, a parameter, a destructured element, a function, a class
-// or any other named declaration. Such a name may be shadowed, and without scope analysis a reference
-// cannot be told apart, so it is left to be judged.
-func importedNamesNeverRedeclared(sourceFile *ast.SourceFile) map[string]bool {
-	imported := map[string]bool{}
-	declared := map[string]bool{}
-	var visit func(node *ast.Node) bool
-	visit = func(node *ast.Node) bool {
-		if node.Kind == ast.KindIdentifier && node.Parent != nil && node.Parent.Name() == node {
-			switch node.Parent.Kind {
-			case ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportSpecifier,
-				ast.KindImportEqualsDeclaration:
-				imported[node.Text()] = true
-			case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment, ast.KindPropertyAccessExpression,
-				ast.KindPropertySignature, ast.KindPropertyDeclaration, ast.KindMethodDeclaration,
-				ast.KindMethodSignature, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindExportSpecifier,
-				ast.KindEnumMember, ast.KindJsxAttribute:
-				// Members and keys bind no name in scope.
-			default:
-				declared[node.Text()] = true
-			}
-		}
-		node.ForEachChild(visit)
-		return false
-	}
-	sourceFile.AsNode().ForEachChild(visit)
-	for name := range declared {
-		delete(imported, name)
-	}
-	return imported
 }
 
 // abbreviatedPropertyMember separates property declarations from reads and binding names.

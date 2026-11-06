@@ -13,30 +13,6 @@
     },
     {
         "engine": "typescript",
-        "family": "abbreviated-identifier",
-        "case": "ab01",
-        "kind": "verdict",
-        "task": "2wgkyfn",
-        "reason": "reports `msg`'s two reads as well as its declaration"
-    },
-    {
-        "engine": "typescript",
-        "family": "abbreviated-identifier",
-        "case": "ab03",
-        "kind": "verdict",
-        "task": "2wgkyfn",
-        "reason": "silent, since it exempts a rest parameter named `args`"
-    },
-    {
-        "engine": "typescript",
-        "family": "abbreviated-identifier",
-        "case": "ab04",
-        "kind": "verdict",
-        "task": "2wgkyfn",
-        "reason": "reports each name's reads as well as its declaration"
-    },
-    {
-        "engine": "typescript",
         "family": "ambiguous-identifier",
         "case": "am01",
         "kind": "verdict",
