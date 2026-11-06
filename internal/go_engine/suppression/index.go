@@ -11,6 +11,7 @@
 package suppression
 
 import (
+	"bytes"
 	"go/scanner"
 	"go/token"
 	"slices"
@@ -56,9 +57,16 @@ type directive struct {
 	malformed bool
 }
 
+// directiveMark is in every directive, well formed or not: both keywords open with it, and a comment's text is
+// bytes of the source, so a file without it holds no directive and is not scanned.
+var directiveMark = []byte("cohere:")
+
 // Build scans one file's source for directives. Source that does not scan cleanly still yields the comments
 // the scanner reaches, since the types phase is what reports why a file does not compile.
 func Build(file string, source []byte) *Index {
+	if !bytes.Contains(source, directiveMark) {
+		return &Index{File: file}
+	}
 	fileSet := token.NewFileSet()
 	tokenFile := fileSet.AddFile(file, -1, len(source))
 	var sourceScanner scanner.Scanner

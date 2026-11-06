@@ -30,6 +30,7 @@ struct RuleConfigurationOptionsTests {
         let rules = RuleRegistry.fileRules(
             vocabulary: AbbreviationVocabulary(),
             shoutingVocabulary: ShoutingVocabulary(),
+            brandVocabulary: BrandVocabulary(),
             configuration: configuration,
         )
         return rules.filter { $0.name == FileLength().name }.flatMap { $0.findings(in: file) }

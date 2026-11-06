@@ -972,23 +972,33 @@ struct UnusedDeclarations {
         }
         var removalStart = lineStart
         var cursor = start
-        scan: for piece in node.leadingTrivia.pieces.reversed() {
+        /* Walked back from the declaration, until a blank line, a `MARK`, or anything but spaces, line breaks and comments ends it. */
+        for piece in node.leadingTrivia.pieces.reversed() {
+            let keepsScanning: Bool
             switch piece {
                 case .spaces, .tabs:
+                    keepsScanning = true
                     cursor -= piece.sourceLength.utf8Length
                 case .newlines(let count), .carriageReturnLineFeeds(let count):
-                    guard count == 1 else { break scan }
-                    cursor -= piece.sourceLength.utf8Length
+                    keepsScanning = count == 1
+                    if keepsScanning {
+                        cursor -= piece.sourceLength.utf8Length
+                    }
                 case .lineComment(let text), .blockComment(let text), .docLineComment(let text),
                     .docBlockComment(let text):
-                    guard !text.hasPrefix("// MARK") else { break scan }
-                    cursor -= piece.sourceLength.utf8Length
-                    removalStart = cursor
-                    while removalStart > 0 && utf8[removalStart - 1] != UInt8(ascii: "\n") {
-                        removalStart -= 1
+                    keepsScanning = !text.hasPrefix("// MARK")
+                    if keepsScanning {
+                        cursor -= piece.sourceLength.utf8Length
+                        removalStart = cursor
+                        while removalStart > 0 && utf8[removalStart - 1] != UInt8(ascii: "\n") {
+                            removalStart -= 1
+                        }
                     }
                 default:
-                    break scan
+                    keepsScanning = false
+            }
+            if !keepsScanning {
+                break
             }
         }
         var removalEnd = min(lineEnd + 1, utf8.count)

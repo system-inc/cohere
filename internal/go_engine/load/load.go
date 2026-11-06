@@ -70,6 +70,10 @@ type Loaded struct {
 	// findings cache saves; a package it restored has what it had when it was checked.
 	Withheld map[*packages.Package]PackageWithheld
 
+	// ListingKept is set when go list's answer was the one kept from an earlier run, since nothing it reads had moved
+	// (see cachedList).
+	ListingKept bool
+
 	// FilesParsed counts the files the load parsed, and PackagesFromExportData the packages whose types it read
 	// from the findings cache's export data rather than checking them; both are 0 on the go/packages load, which
 	// counts neither.
@@ -104,22 +108,28 @@ type Loaded struct {
 // files: each comes back held by a package, in Excluded, or in Unseen. It returns an error only when
 // nothing could be loaded at all; what the packages themselves get wrong is Loaded.Diagnostics.
 func Packages(directory string, patterns []string, environment []string, census []string) (*Loaded, error) {
-	return loadWorkspace(directory, patterns, environment, census, true, nil)
+	return loadWorkspace(directory, patterns, environment, census, true, Caching{})
 }
 
-// PackagesRestoring is Packages with the findings cache: the load from source parses and type-checks none of the
-// packages restorer holds (see Restorer).
-func PackagesRestoring(
+// Caching is what the findings cache gives a load: a Restorer, whose packages the load from source parses and
+// type-checks none of, and a store for go list's answer, kept until something it reads moves. Either may be nil.
+type Caching struct {
+	Restorer Restorer
+	Listings ListingStore
+}
+
+// PackagesCached is Packages with the findings cache.
+func PackagesCached(
 	directory string,
 	patterns []string,
 	environment []string,
 	census []string,
-	restorer Restorer,
+	caching Caching,
 ) (*Loaded, error) {
-	return loadWorkspace(directory, patterns, environment, census, true, restorer)
+	return loadWorkspace(directory, patterns, environment, census, true, caching)
 }
 
-// loadWorkspace is PackagesRestoring. With translateOwnCgo unset it loads from source even a project with cgo files
+// loadWorkspace is PackagesCached. With translateOwnCgo unset it loads from source even a project with cgo files
 // of its own, which only the tests ask for, to judge the load from source on such a package.
 func loadWorkspace(
 	directory string,
@@ -127,7 +137,7 @@ func loadWorkspace(
 	environment []string,
 	census []string,
 	translateOwnCgo bool,
-	restorer Restorer,
+	caching Caching,
 ) (*Loaded, error) {
 	started := time.Now()
 	workspace, absoluteError := filepath.Abs(directory)
@@ -142,7 +152,7 @@ func loadWorkspace(
 	if contextError != nil {
 		return nil, contextError
 	}
-	listed, listError := list(workspace, fullEnvironment, patterns)
+	listed, listingKept, listError := cachedList(workspace, fullEnvironment, patterns, caching.Listings)
 	if listError != nil {
 		return nil, fmt.Errorf("loading %s from %s: %w", strings.Join(patterns, " "), workspace, listError)
 	}
@@ -151,18 +161,19 @@ func loadWorkspace(
 	var loadError error
 	if translateOwnCgo && hasOwnCgo(listed, workspace) {
 		translationStarted := time.Now()
-		roots, loaded, loadError = translated(workspace, patterns, environment, restorer)
+		roots, loaded, loadError = translated(workspace, patterns, environment, caching.Restorer)
 		if loadError == nil {
 			loaded.CgoTranslationElapsed = time.Since(translationStarted)
 			loaded.CgoTranslatedPackages = withCgoFiles(listed)
 		}
 	} else {
-		roots, loaded, loadError = fromSource(workspace, listed, buildContext, restorer)
+		roots, loaded, loadError = fromSource(workspace, listed, buildContext, caching.Restorer)
 	}
 	if loadError != nil {
 		return nil, loadError
 	}
 
+	loaded.ListingKept = listingKept
 	loaded.Roots = withoutTestMain(roots)
 	loaded.PackagesInWorkspace = len(loaded.Packages)
 	loaded.Diagnostics = diagnostics(workspace, roots, loaded.Packages)

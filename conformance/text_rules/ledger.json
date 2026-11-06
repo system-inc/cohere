@@ -111,20 +111,6 @@
     },
     {
         "engine": "swift",
-        "family": "casing",
-        "case": "us12",
-        "kind": "verdict",
-        "task": "e0vttmb",
-        "reason": "the type walk reports `iMessageThing`, since it reads no brand list and judges every lowercase first letter"
-    },
-    {
-        "engine": "swift",
-        "family": "labels",
-        "task": "tb2jk7k",
-        "reason": "Swift has no label rule"
-    },
-    {
-        "engine": "swift",
         "family": "separated-folder-words",
         "task": "2fnqe2h",
         "reason": "Swift has no separated-folder-words rule"

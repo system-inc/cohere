@@ -218,9 +218,13 @@ func (loader *loader) readExportData(current *node, restored *Restored) error {
 		}
 	}
 	collect(loaded)
+	exportData, exportError := restored.ReadExportData()
+	if exportError != nil {
+		return fmt.Errorf("reading the export data of %s: %w", loaded.ID, exportError)
+	}
 	own := types.NewPackage(loaded.PkgPath, loaded.Name)
 	imports[loaded.PkgPath] = own
-	read, readError := gcexportdata.Read(bytes.NewReader(restored.ExportData), loader.fileSet, imports, loaded.PkgPath)
+	read, readError := gcexportdata.Read(bytes.NewReader(exportData), loader.fileSet, imports, loaded.PkgPath)
 	if readError != nil {
 		return fmt.Errorf("reading the export data of %s: %w", loaded.ID, readError)
 	}

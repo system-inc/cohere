@@ -36,6 +36,7 @@ struct RulesJsonTests {
         let fileRows = RuleRegistry.fileRules(
             vocabulary: AbbreviationVocabulary(),
             shoutingVocabulary: ShoutingVocabulary(),
+            brandVocabulary: BrandVocabulary(),
         )
         .map { rule in
             Row(name: rule.name, origin: rule.origin, upstreamName: rule.upstreamName, typeAware: false)

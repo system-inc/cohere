@@ -101,9 +101,12 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 		cold.counts.Written+cold.counts.Unstorable > cold.counts.Missed {
 		test.Fatalf("want a cold run that hit nothing and wrote what it missed, got %+v", cold.counts)
 	}
+	// Each entry has its export data beside it, but unsafe's, whose types are the type checker's own, and go list's
+	// answer and gofmt's verdicts are kept beside them.
 	written := entriesIn(test, root)
-	if len(written) != cold.counts.Written {
-		test.Fatalf("want the %d entries written in the store, found %d", cold.counts.Written, len(written))
+	if len(written) != 2*cold.counts.Written+1 {
+		test.Fatalf("want the %d entries written in the store with their export data, found %d files",
+			cold.counts.Written, len(written))
 	}
 
 	warm := runCachedEngine(test, root)
@@ -222,5 +225,28 @@ func TestTheBuildContextNamesTheProcessVariablesAnAnalyzerReads(test *testing.T)
 	}
 	if !slices.Contains(unset, "process BURNTSUSHI_TOML_110 unset") {
 		test.Errorf("want BURNTSUSHI_TOML_110 named unset in %q", unset)
+	}
+}
+
+// The inputs record, which the front door's replay keys on, is byte for byte the same whether the load asked go list
+// or kept its answer from an earlier run: the cached run that keeps it writes the record a --no-cache run writes.
+func TestTheInputsRecordIsTheSameWithAKeptListing(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "vet-finding"))
+	inputsLine := func(run cachedRun) string {
+		for line := range strings.Lines(run.stream) {
+			if strings.HasPrefix(line, `{"kind":"inputs"`) {
+				return line
+			}
+		}
+		test.Fatalf("no inputs record in\n%s", run.stream)
+		return ""
+	}
+	asked := inputsLine(runCachedEngine(test, root))
+	kept := inputsLine(runCachedEngine(test, root))
+	fresh := inputsLine(runCachedEngine(test, root, "--no-cache"))
+	if kept != fresh || asked != fresh {
+		test.Fatalf("the inputs record\nwith a kept listing %s\nasking go list     %s", kept, fresh)
 	}
 }

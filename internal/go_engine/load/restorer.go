@@ -21,9 +21,10 @@ type Restorer interface {
 
 // Restored is what the load needs of a package the findings cache holds, in place of its source.
 type Restored struct {
-	// ExportData is the package's types as gcexportdata.Write wrote them, empty for unsafe, whose types are the
-	// type checker's own.
-	ExportData []byte
+	// ReadExportData reads the package's types as gcexportdata.Write wrote them, which the load asks only of a
+	// package whose types it needs, and never of unsafe, whose types are the type checker's own. An error is export
+	// data the load cannot have, and the package is checked from source instead.
+	ReadExportData func() ([]byte, error)
 
 	// Imports are the paths of the packages its types import, in the order its type check left them, which export
 	// data does not keep: a package read from it imports every package its export data names.

@@ -28,9 +28,7 @@
     "labels": {
         "typescript": "no-labels",
         "go": "cohere-go/consistency-no-label",
-        "swift": {
-            "missing": true
-        }
+        "swift": "cohere-swift/consistency-no-label"
     },
     "long-file": {
         "typescript": "max-lines",
