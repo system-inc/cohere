@@ -27,6 +27,10 @@ import (
 type Options struct {
 	// SingleThreaded runs one action at a time, for `--single-threaded`; the findings are the same either way.
 	SingleThreaded bool
+
+	// Cache is the per-package findings cache the run reads and writes, or nil for a run that does neither, as
+	// under `--no-cache`. The findings are the same either way.
+	Cache *Caching
 }
 
 // Finding is one diagnostic of one rule. Positions are of the file as the engine read it, not as a `//line`
@@ -120,6 +124,9 @@ type Result struct {
 	// A file both generated and copied is counted as generated.
 	WithheldAsCopied map[string]int
 
+	// Cache is what the per-package findings cache did, all zero on a run without it.
+	Cache CacheCounts
+
 	Elapsed time.Duration
 }
 
@@ -136,6 +143,11 @@ type findingKey struct {
 // from source. The rules are the enabled ones. It returns an error only when the rules cannot be run at all;
 // what a rule gets wrong on a package is a Crash. The packages below analyzed come back without their syntax and
 // type information, which the run let go once their facts were learned.
+//
+// With options.Cache, a package whose key has an entry that decodes whole is restored rather than analyzed: its
+// findings come from the entry, into the same dedupe and withholding as live ones, and its facts reach its
+// importers as a run's would. Every package that missed, and on which every action finished without an error, is
+// written once the graph has finished.
 func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Result, error) {
 	started := time.Now()
 	ruleOf := make(map[*analysis.Analyzer]rule.Rule, len(rules))
@@ -154,7 +166,13 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	if wrapError := wrapRuns(analyzers); wrapError != nil {
 		return nil, wrapError
 	}
-	graph, analyzeError := checker.Analyze(analyzers, analyzed, &checker.Options{Sequential: options.SingleThreaded})
+	checkerOptions := &checker.Options{Sequential: options.SingleThreaded}
+	var cached *cacheRun
+	if options.Cache != nil {
+		cached = openCache(options.Cache, ruleOf, analyzers, analyzed)
+		checkerOptions.Restored, checkerOptions.Restore = cached.restored, cached.restore
+	}
+	graph, analyzeError := checker.Analyze(analyzers, analyzed, checkerOptions)
 	if analyzeError != nil {
 		return nil, fmt.Errorf("analyzing %d packages: %w", len(analyzed), analyzeError)
 	}
@@ -189,8 +207,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 			}
 			continue
 		}
-		for _, diagnostic := range action.Diagnostics {
-			found := newFinding(actionRule, action.Package.Fset, diagnostic)
+		for _, found := range actionFindings(cached, actionRule, action) {
 			key := findingKey{found.Rule, found.File, found.Line, found.Column, found.Message}
 			if seenFindings[key] {
 				continue
@@ -223,8 +240,27 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	})
 	slices.Sort(result.CrashedRules)
 	result.FilesWalked, result.NodesVisited = walk(analyzed)
+	if cached != nil {
+		cached.save(graph, ruleOf)
+		result.Cache = cached.counts
+	}
 	result.Elapsed = time.Since(started)
 	return result, nil
+}
+
+// actionFindings is what action found, as newFinding makes it: from the cache's entry when its package was
+// restored, else from its diagnostics.
+func actionFindings(cached *cacheRun, actionRule rule.Rule, action *checker.Action) []Finding {
+	if cached != nil {
+		if restored, hit := cached.findings(action); hit {
+			return restored
+		}
+	}
+	found := make([]Finding, 0, len(action.Diagnostics))
+	for _, diagnostic := range action.Diagnostics {
+		found = append(found, newFinding(actionRule, action.Package.Fset, diagnostic))
+	}
+	return found
 }
 
 // newFinding is diagnostic as the rule that reported it.
