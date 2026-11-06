@@ -360,35 +360,6 @@ func judgeIdentifierCasingCapital(ruleContext rule.Context, name *ast.Node, decl
 	ruleContext.ReportNode(name, messageIdentifierCasing(identifierCasingCapitalText, declaration, text, suggestion))
 }
 
-// isUpperCamelCaseName reports a name the rule reads as UpperCamelCase: one opening on a capital, or on a
-// brand policy/Brands.json lists, spelled exactly as listed, with nothing after it or an UpperCamelCase
-// rest. The rest opens on its capital, never on an underscore, which the converter's own predicate would
-// skip, so `iMessage_Thing` is not read as `iMessageThing`.
-func isUpperCamelCaseName(name string) bool {
-	if isPascalCase(name) {
-		return true
-	}
-	brand, opensOnBrand := policy.Brands.LeadingBrand(name)
-	if !opensOnBrand {
-		return false
-	}
-	rest := strings.TrimPrefix(name, brand)
-	return rest == "" || (!strings.HasPrefix(rest, "_") && isPascalCase(rest))
-}
-
-// upperCamelCaseSuggestion is the UpperCamelCase form the advice names. A name opening on a listed brand
-// keeps the brand as its owner spells it, so `iMessagecommandLineInterface` is told
-// `iMessageCommandLineInterface` rather than to respell the brand, and any other name is the converter's.
-func upperCamelCaseSuggestion(name string) string {
-	if brand, opensOnBrand := policy.Brands.LeadingBrand(name); opensOnBrand {
-		rest := strings.TrimLeft(strings.TrimPrefix(name, brand), "_")
-		if suggestion := brand + constantNameToPascalCase(rest); isUpperCamelCaseName(suggestion) {
-			return suggestion
-		}
-	}
-	return constantNameToPascalCase(name)
-}
-
 // isJudgedCasing reports a name whose casing is this rule's to judge. A leading or a trailing underscore
 // is a taste call pending with Kirk, so `_cache`, `event_` and `__meta__` are left alone whatever else
 // they spell, and the bare `_` with them. A reserved word's escape belongs to the keyword it escapes.
