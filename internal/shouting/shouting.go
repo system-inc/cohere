@@ -461,12 +461,33 @@ func TokensIn(body string) []string {
 func TokensInMasked(masked string) []string {
 	var tokens []string
 	seen := map[string]bool{}
-	for _, token := range uppercaseToken.FindAllString(masked, -1) {
-		if seen[token] || !isShoutedToken(token) {
+	for _, shouted := range ShoutedTokensInMasked(masked) {
+		if seen[shouted.Text] {
 			continue
 		}
-		seen[token] = true
-		tokens = append(tokens, token)
+		seen[shouted.Text] = true
+		tokens = append(tokens, shouted.Text)
+	}
+	return tokens
+}
+
+// ShoutedToken is one shouted word in a masked text, and the byte offset it starts at.
+type ShoutedToken struct {
+	Text   string
+	Offset int
+}
+
+// ShoutedTokensInMasked returns every shouted token in text MaskCodeAndCommands has already masked, each occurrence
+// where it sits, in order. It is for a caller that reports each word at the word: masking keeps every byte's place,
+// so an offset into the masked text is the same byte offset into the text it masked, multi-byte runes before the
+// word, or inside code masked before it, included.
+func ShoutedTokensInMasked(masked string) []ShoutedToken {
+	var tokens []ShoutedToken
+	for _, location := range uppercaseToken.FindAllStringIndex(masked, -1) {
+		token := masked[location[0]:location[1]]
+		if isShoutedToken(token) {
+			tokens = append(tokens, ShoutedToken{Text: token, Offset: location[0]})
+		}
 	}
 	return tokens
 }

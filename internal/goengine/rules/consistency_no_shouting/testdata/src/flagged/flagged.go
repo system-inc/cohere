@@ -1,7 +1,8 @@
 // Package flagged holds comments the rule must report. Each case is its own comment group, a blank line apart, so
-// no case lends another its context. A want rides on the line the finding is reported at: after a line comment, or
-// inside a block comment on its own line, since a block comment reports at its opening line. Its pattern is in
-// backticks, which the rule masks, so the want never adds a token of its own.
+// no case lends another its context. Each shouted word is its own finding, at the word, and a want rides on the
+// line the word is on: after a line comment, or inside a block comment on its own line, where analysistest reads it
+// at the comment's opening line, so a +N names how many lines below that the word sits. Its pattern is in backticks,
+// which the rule masks, so the want never adds a token of its own.
 package flagged
 
 // The TypeScript rule's firing cases, verbatim.
@@ -10,7 +11,7 @@ package flagged
 
 /* this is REALLY important */ // want `^"REALLY" in a comment`
 
-// DO NOT EDIT // want `^"DO", "NOT", "EDIT" in a comment`
+// DO NOT EDIT // want `^"DO" in a comment` `^"NOT" in a comment` `^"EDIT" in a comment`
 
 // this IS the one // want `^"IS" in a comment`
 
@@ -24,27 +25,27 @@ package flagged
 
 /*
  * wake and a delivery to a reader-less pipe already fails ENXIO and shrugs. Idempotent,
- * // want `^"ENXIO" in a comment`
+ * // want +1 `^"ENXIO" in a comment`
  */
 
 /*
  * safe while watchers are armed BECAUSE the pipe is only the fast-path poke: the durable
- * // want `^"BECAUSE" in a comment`
+ * // want +1 `^"BECAUSE" in a comment`
  */
 
 /**
  * This YIELDS. It makes no claim about what finished, because it cannot know
- * // want `^"YIELDS" in a comment`
+ * // want +1 `^"YIELDS" in a comment`
  */
 
 /*
  * OUTPUT MUST BE VALID INPUT. The name is printed in FULL, never fit() to the column width: a
- * // want `^"OUTPUT", "MUST", "BE", "VALID" in a comment`
+ * // want +1 `^"OUTPUT" in` `^"MUST" in` `^"BE" in` `^"VALID" in` `^"INPUT" in` `^"FULL" in`
  */
 
 /*
  * DO NOT rename this symbol to `positionsMissingPortrait` with the rest of the
- * // want `^"DO", "NOT" in a comment`
+ * // want +1 `^"DO" in a comment` `^"NOT" in a comment`
  */
 
 // straight back in. A miss is a LOUD failure with near misses named by ID, never a silent // want `^"LOUD" in a`
@@ -55,9 +56,9 @@ package flagged
 
 // don't EVER cache what isn't yours // want `^"EVER" in a comment`
 
-// the BOSS'S ORDERS' wording // want `^"BOSS", "ORDERS" in a comment`
+// the BOSS'S ORDERS' wording // want `^"BOSS" in a comment` `^"ORDERS" in a comment`
 
-// a 'RENAME COLUMN'd table is NEVER safe // want `^"RENAME", "COLUMN", "NEVER" in a comment`
+// a 'RENAME COLUMN'd table is NEVER safe // want `^"RENAME" in` `^"COLUMN" in` `^"NEVER" in`
 
 // the '90s were LOUD and the users' data was quiet // want `^"LOUD" in a comment`
 
@@ -70,7 +71,7 @@ package flagged
 /*
 This is prose
     and you must NEVER do it
-// want `^"NEVER" in a comment`
+// want +2 `^"NEVER" in a comment`
 */
 
 /**
@@ -79,13 +80,13 @@ This is prose
  *     HOME=/x run
  *
  * Then ALWAYS check.
- * // want `^"ALWAYS" in a comment`
+ * // want +5 `^"ALWAYS" in a comment`
  */
 
 func run() int {
 	/**
 	 * You must NEVER do this.
-	 * // want `^"NEVER" in a comment`
+	 * // want +1 `^"NEVER" in a comment`
 	 */
 	return 1
 }
@@ -95,25 +96,25 @@ func run() int {
 /*
  * the "quiet
  * phrase" is NEVER loud
- * // want `^"NEVER" in a comment`
+ * // want +2 `^"NEVER" in a comment`
  */
 
 /*
  * a 5" board
  * is NEVER warped
- * // want `^"NEVER" in a comment`
+ * // want +2 `^"NEVER" in a comment`
  */
 
 /*
  * the "first
  * line is NEVER
  * closed" here
- * // want `^"NEVER" in a comment`
+ * // want +2 `^"NEVER" in a comment`
  */
 
-// The finding names every token it saw, verbatim.
+// Each shouted word is a finding of its own, at the word.
 
-// NEVER cache this, it is REALLY bad // want `^"NEVER", "REALLY" in a comment`
+// NEVER cache this, it is REALLY bad // want `^"NEVER" in a comment` `^"REALLY" in a comment`
 
 // Go's notations are exempt only in their own shape.
 
@@ -121,7 +122,7 @@ func run() int {
 
 //lint:IGNORE this check // want `^"IGNORE" in a comment`
 
-// the BUG(kirk) note is LOUD // want `^"BUG", "LOUD" in a comment`
+// the BUG(kirk) note is LOUD // want `^"BUG" in a comment` `^"LOUD" in a comment`
 
 // BUG: the cache is stale after a fork // want `^"BUG" in a comment`
 
@@ -157,3 +158,16 @@ func run() int {
 func ExampleLoud() {
 	// Output: LOUD // want `^"LOUD" in a comment`
 }
+
+// A block comment reports each word on the line it sits on, and multi-byte text before it, on an earlier line or on
+// its own, in masked code or in prose, moves no finding off its word.
+
+/*
+ * the café's `naïve` cache
+ * is NEVER warm, and the crème is ALWAYS cold
+ * // want +2 `^"NEVER" in a comment` `^"ALWAYS" in a comment`
+ */
+
+// A word said twice is two findings, one at each.
+
+// NEVER, and I mean NEVER // want `^"NEVER" in a comment` `^"NEVER" in a comment`

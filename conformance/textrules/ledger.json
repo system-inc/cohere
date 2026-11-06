@@ -237,30 +237,6 @@
     },
     {
         "engine": "go",
-        "family": "shouting",
-        "case": "sh01",
-        "kind": "span",
-        "task": "rv17qp3",
-        "reason": "covers the whole comment rather than the shouted word"
-    },
-    {
-        "engine": "go",
-        "family": "shouting",
-        "case": "sh11",
-        "kind": "span",
-        "task": "rv17qp3",
-        "reason": "covers the whole comment rather than the shouted word"
-    },
-    {
-        "engine": "go",
-        "family": "shouting",
-        "case": "sh12",
-        "kind": "span",
-        "task": "rv17qp3",
-        "reason": "covers the whole comment rather than the shouted word"
-    },
-    {
-        "engine": "go",
         "family": "utils-folder",
         "case": "uf01",
         "kind": "span",

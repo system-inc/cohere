@@ -9,12 +9,13 @@
 // masked as one text, each // line's slashes and the one space after them set aside the way a block comment's
 // gutter is. A fence, an indented code block, or a quote or backtick pair that wraps across a group's lines is then
 // code here as it is inside a block comment, and a command line on a // line is masked. Each comment still reports
-// only its own tokens, at itself. Go's own notations are not prose and are not read: directives, go/doc notes, an
-// example's output, and the marker a generated file opens with.
+// only its own words, each at the word. Go's own notations are not prose and are not read: directives, go/doc notes,
+// an example's output, and the marker a generated file opens with.
 package consistency_no_shouting
 
 import (
 	"go/ast"
+	"go/token"
 	"regexp"
 	"strings"
 	"unicode"
@@ -102,8 +103,9 @@ type commentSpan struct {
 	end     int
 }
 
-// judgeGroup masks a comment group as one text, then reports each comment whose own span of it still holds a shout.
-// marker is the file's generated-code marker, or nil.
+// judgeGroup masks a comment group as one text, then reports each shout left in each comment's own span of it, one
+// finding per word covering the word's bytes, so a fix lands on what shouted rather than the whole comment. marker is
+// the file's generated-code marker, or nil.
 func judgeGroup(pass *analysis.Pass, group *ast.CommentGroup, marker *ast.Comment) {
 	var joined strings.Builder
 	spans := []commentSpan{}
@@ -127,16 +129,22 @@ func judgeGroup(pass *analysis.Pass, group *ast.CommentGroup, marker *ast.Commen
 	}
 	masked := shouting.MaskCodeAndCommands(text)
 	for _, span := range spans {
-		tokens := shouting.TokensInMasked(masked[span.start:span.end])
-		if len(tokens) == 0 {
-			continue
+		// The body is a suffix of the comment's text, so where it starts is what bodyOf cut from the front. Masking
+		// keeps every byte's place, so a word's offset in the span is its offset in the body, and the text's bytes
+		// are the file's: go/scanner changes a comment's text only by dropping a carriage return, which gofmt never
+		// writes.
+		bodyStart := len(span.comment.Text) - (span.end - span.start)
+		for _, shouted := range shouting.ShoutedTokensInMasked(masked[span.start:span.end]) {
+			start := span.comment.Pos() + token.Pos(bodyStart+shouted.Offset)
+			pass.Report(analysis.Diagnostic{
+				Pos:      start,
+				End:      start + token.Pos(len(shouted.Text)),
+				Category: shoutingInCommentMessage.Id,
+				Message: shoutingInCommentMessage.Render(map[string]string{
+					"tokens": shouting.QuotedTokenList([]string{shouted.Text}),
+				}),
+			})
 		}
-		pass.Report(analysis.Diagnostic{
-			Pos:      span.comment.Pos(),
-			End:      span.comment.End(),
-			Category: shoutingInCommentMessage.Id,
-			Message:  shoutingInCommentMessage.Render(map[string]string{"tokens": shouting.QuotedTokenList(tokens)}),
-		})
 	}
 }
 
