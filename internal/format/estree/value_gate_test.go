@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/goengine/load"
 )
 
 // The gate holds format to one promise of the typed property values: an estree value never travels as an
@@ -29,11 +31,6 @@ import (
 const valueMarker = "isValue"
 
 const estreePackagePath = "github.com/system-inc/cohere/internal/format/estree"
-
-// gateLoadMode is what the scan reads: each package's syntax and the types of its expressions, its imports'
-// types coming from export data.
-const gateLoadMode = packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes |
-	packages.NeedTypesInfo
 
 // testingPrinters are testing's methods that format their arguments with fmt.
 var testingPrinters = []string{"Error", "Errorf", "Fatal", "Fatalf", "Log", "Logf", "Skip", "Skipf"}
@@ -92,20 +89,20 @@ func TestTheGateFindsEveryPlantedConversion(test *testing.T) {
 	}
 }
 
-// loadForGate loads the packages the patterns name, tests included, from directory, and fails on any error,
-// since a package that did not type-check would hide its conversions.
+// loadForGate loads the packages the patterns name from directory, each with the test variants go test builds of
+// it, and fails on any error, since a package that did not type-check would hide its conversions. It loads through
+// the Go engine's load from source, which runs only go env and go list -deps -json -e, so the gate runs where a
+// runner of prebuilt tests refuses go/packages' compiling queries; go test's synthesized main, generated and none
+// of format's own, is the one package go/packages gave that it does not.
 func loadForGate(test *testing.T, directory string, patterns ...string) []*packages.Package {
-	loaded, loadError := packages.Load(
-		&packages.Config{Mode: gateLoadMode, Dir: directory, Tests: true},
-		patterns...,
-	)
+	loaded, loadError := load.Packages(directory, patterns, nil, nil)
 	if loadError != nil {
 		test.Fatalf("loading %v: %v", patterns, loadError)
 	}
-	if len(loaded) == 0 {
+	if len(loaded.Roots) == 0 {
 		test.Fatalf("loading %v found no packages", patterns)
 	}
-	for _, loadedPackage := range loaded {
+	for _, loadedPackage := range loaded.Roots {
 		for _, problem := range loadedPackage.Errors {
 			test.Errorf("loading %s: %v", loadedPackage.ID, problem)
 		}
@@ -113,7 +110,7 @@ func loadForGate(test *testing.T, directory string, patterns ...string) []*packa
 	if test.Failed() {
 		test.FailNow()
 	}
-	return loaded
+	return loaded.Roots
 }
 
 // conversion is one Value converted to an empty interface: where, and what into what.
