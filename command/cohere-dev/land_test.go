@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -896,5 +897,84 @@ func TestALandingOntoAMainThatCannotTakeItRunsItsOwnLand(test *testing.T) {
 	}
 	if ran := readMaybeMissing(test, log); len(ran) > 0 {
 		test.Errorf("the stand-in for main's land ran:\n%s", ran)
+	}
+}
+
+// The gate's fifth step refuses a landing unless cohere on the tree reads 0 (#06g3f7x): a finding is refused
+// with the finding printed, a run that passes but names a gap is refused naming it, and a clean run lands.
+// Before, the gate never ran cohere on cohere, and two landings that each read green brought main 8 findings.
+// The stand-in prints what a bare `cohere --no-fix --json` would.
+func TestTheGateRefusesALandingCohereDoesNotReadZeroOn(test *testing.T) {
+	test.Parallel()
+	clean := `{"kind":"summary","schemaVersion":1,"label":".","verdict":"pass","findings":0,"typeErrors":0,` +
+		`"gaps":{"programFiles":0,"crashedFiles":0,"formattingNotChecked":false,"crashes":[]}}`
+	for _, gate := range []struct {
+		name   string
+		output string
+		exit   int
+		lands  bool
+		want   []string
+	}{
+		{name: "a clean tree", output: clean, lands: true, want: []string{"cohere on the tree reads 0"}},
+		{
+			name: "one finding",
+			output: `{"kind":"finding","path":"/repo/a.go","line":3,"column":7,"severity":"error",` +
+				`"rule":"cohere-go/consistency-no-long-line","message":"This line is 121 columns"}` + "\n" +
+				`{"kind":"summary","label":".","verdict":"fail","findings":1,"typeErrors":0,"gaps":{}}`,
+			exit: 1,
+			want: []string{"/repo/a.go:3:7 cohere-go/consistency-no-long-line This line is 121 columns",
+				".: verdict fail; 1 findings"},
+		},
+		{
+			name:   "a gap",
+			output: `{"kind":"summary","label":"swift","verdict":"pass","findings":0,"typeErrors":0,"gaps":{"crashedFiles":2}}`,
+			want:   []string{"swift: gaps: crashedFiles=2"},
+		},
+		{name: "no summary", output: "", want: []string{"cohere printed no summary"}},
+	} {
+		test.Run(gate.name, func(test *testing.T) {
+			test.Parallel()
+			fixture := newLandFixture(test)
+			records := filepath.Join(test.TempDir(), "records.jsonl")
+			if writeError := os.WriteFile(records, []byte(gate.output+"\n"), 0o644); writeError != nil {
+				test.Fatal(writeError)
+			}
+			standIn := filepath.Join(test.TempDir(), "cohere")
+			script := fmt.Sprintf(
+				"#!/bin/sh\n[ \"$*\" = '--no-fix --json' ] || exit 9\ngrep . '%s'\nexit %d\n",
+				records,
+				gate.exit,
+			)
+			if writeError := os.WriteFile(standIn, []byte(script), 0o755); writeError != nil {
+				test.Fatal(writeError)
+			}
+			before := fixture.git(fixture.repository, "rev-parse", "main")
+			landing := exec.Command(fixture.wrapper, "land")
+			landing.Dir = fixture.worktree("a")
+			landing.Env = append(fixture.environment, gateCohereVariable+"="+standIn)
+			output, outputError := landing.CombinedOutput()
+			for _, want := range gate.want {
+				if !strings.Contains(string(output), want) {
+					test.Errorf("the landing's output lacks %q:\n%s", want, output)
+				}
+			}
+			after := fixture.git(fixture.repository, "rev-parse", "main")
+			if gate.lands {
+				if outputError != nil || after == before {
+					test.Errorf("a clean tree did not land (%v):\n%s", outputError, output)
+				}
+				if body := fixture.git(fixture.repository, "log", "-1", "--format=%b", "main"); !strings.Contains(
+					body,
+					"cohere on the tree, 0 findings and no gaps",
+				) {
+					test.Errorf("the landing's body does not say cohere ran:\n%s", body)
+				}
+				return
+			}
+			refused := strings.Contains(string(output), "did not read 0, so nothing landed")
+			if outputError == nil || after != before || !refused {
+				test.Errorf("the landing was not refused (%v, main %s to %s):\n%s", outputError, before, after, output)
+			}
+		})
 	}
 }
