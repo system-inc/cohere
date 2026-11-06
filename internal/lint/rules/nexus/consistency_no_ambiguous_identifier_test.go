@@ -250,3 +250,91 @@ func TestConsistencyNoAmbiguousIdentifierJudgesThisProperty(test *testing.T) {
 		test.Errorf("expected the class's `e` once, at its declaration (offset %d), got %v", declaration, starts)
 	}
 }
+
+// TestConsistencyNoAmbiguousIdentifierJudgesAJavaScriptThisProperty pins the declaration JavaScript
+// has and TypeScript does not: a class may create a property by assigning it, and that assignment is
+// the property's declaration. Judging declarations only would otherwise leave a property made that way
+// unreported anywhere. Each want is the text that starts where a finding should, so a finding on the
+// wrong `e` fails as surely as a missing one.
+func TestConsistencyNoAmbiguousIdentifierJudgesAJavaScriptThisProperty(test *testing.T) {
+	test.Parallel()
+
+	for _, testCase := range []struct {
+		name       string
+		fileName   string
+		sourceText string
+		want       []string
+	}{
+		{
+			"an assignment in the constructor reports once, at the first",
+			"/repository/source/Thing.js",
+			"export class Thing {\n    constructor() {\n        this.e = 1;\n    }\n" +
+				"    reset() {\n        this.e = 2;\n        return this.e;\n    }\n}\n",
+			[]string{"e = 1;"},
+		},
+		{
+			"a declared field is the declaration, and the assignment is not",
+			"/repository/source/Thing.js",
+			"export class Thing {\n    e = 0;\n    constructor() {\n        this.e = 1;\n    }\n}\n",
+			[]string{"e = 0;"},
+		},
+		{
+			"a declared method is the declaration, and the assignment is not",
+			"/repository/source/Thing.js",
+			"export class Thing {\n    constructor() {\n        this.e = run;\n    }\n    e() {}\n}\n",
+			[]string{"e() {}"},
+		},
+		// An arrow function keeps the class's `this`, and a function expression has its own, which
+		// the binder does not bind onto the class.
+		{
+			"an arrow in the constructor keeps the class's this",
+			"/repository/source/Thing.js",
+			"export class Thing {\n    constructor() {\n        run(() => {\n            this.e = 1;\n        });\n    }\n}\n",
+			[]string{"e = 1;"},
+		},
+		{
+			"a function expression's this is not the class's",
+			"/repository/source/Thing.js",
+			"export class Thing {\n    constructor() {\n        run(function () {\n            this.e = 1;\n        });\n    }\n}\n",
+			nil,
+		},
+		// A static member's `this` is the class, so its property is a different name from the
+		// instance's, as the binder keeps them apart.
+		{
+			"a static property and an instance property are two names",
+			"/repository/source/Thing.js",
+			"export class Thing {\n    static create() {\n        this.e = 1;\n    }\n" +
+				"    constructor() {\n        this.e = 2;\n    }\n}\n",
+			[]string{"e = 1;", "e = 2;"},
+		},
+		// TypeScript requires the member, so the assignment declares nothing and is a write.
+		{
+			"the same assignment in TypeScript reports nothing",
+			"/repository/source/Thing.ts",
+			"export class Thing {\n    constructor() {\n        this.e = 1;\n    }\n" +
+				"    reset() {\n        this.e = 2;\n        return this.e;\n    }\n}\n",
+			nil,
+		},
+	} {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoAmbiguousIdentifier, testCase.fileName, testCase.sourceText)
+			var got []int
+			for _, diagnostic := range result.Diagnostics {
+				got = append(got, diagnostic.Range.Pos())
+			}
+			var want []int
+			for _, text := range testCase.want {
+				want = append(want, strings.Index(testCase.sourceText, text))
+			}
+			if len(got) != len(want) {
+				test.Fatalf("expected findings at %v, got %v", want, got)
+			}
+			for index := range want {
+				if got[index] != want[index] {
+					test.Fatalf("expected findings at %v, got %v", want, got)
+				}
+			}
+		})
+	}
+}
