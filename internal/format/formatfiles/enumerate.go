@@ -402,6 +402,7 @@ func lstatEntries(directory string) ([]os.FileInfo, error) {
 		return nil, openError
 	}
 	names, readdirnamesError := opened.Readdirnames(-1)
+	// Ignored: the directory was opened only to read its names, and a failed close loses nothing already read.
 	opened.Close()
 	if readdirnamesError != nil {
 		return nil, readdirnamesError
@@ -409,6 +410,7 @@ func lstatEntries(directory string) ([]os.FileInfo, error) {
 	sort.Strings(names)
 	information := make([]os.FileInfo, len(names))
 	for index, name := range names {
+		// Ignored: an entry gone since the listing is left nil, and skipped, as the doc comment above says.
 		information[index], _ = os.Lstat(filepath.Join(directory, name))
 	}
 	return information, nil
@@ -453,9 +455,9 @@ func hasOwnRepositoryListed(directory string, listing gitignore.Listing) bool {
 // options still apply, the house formats one way, but its ignorePatterns describe its own tree, and
 // `projects/**` in ahra's list would otherwise leave a repository under projects/ offering nothing.
 func repositoryBoundaryBetween(root string, settingsDirectory string) bool {
-	root = filepath.Clean(root)
-	settingsDirectory = filepath.Clean(settingsDirectory)
-	for directory := root; directory != settingsDirectory; directory = filepath.Dir(directory) {
+	cleanRoot := filepath.Clean(root)
+	cleanSettingsDirectory := filepath.Clean(settingsDirectory)
+	for directory := cleanRoot; directory != cleanSettingsDirectory; directory = filepath.Dir(directory) {
 		if HasOwnRepository(directory) {
 			return true
 		}
@@ -532,10 +534,10 @@ func HasOwnRepository(directory string) bool {
 // in libraries/structure/libraries/nexus is reported under libraries/structure, the repository a run
 // in the parent would have had to name.
 func NestedRepositoryContaining(root string, fileName string) string {
-	root = filepath.Clean(root)
+	cleanRoot := filepath.Clean(root)
 	nested := ""
 	for directory := filepath.Dir(filepath.Clean(fileName)); ; directory = filepath.Dir(directory) {
-		relative, relativePathError := filepath.Rel(root, directory)
+		relative, relativePathError := filepath.Rel(cleanRoot, directory)
 		if relativePathError != nil ||
 			relative == "." ||
 			relative == ".." ||
