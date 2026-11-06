@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -286,5 +287,40 @@ func TestAModuleAGoWorkUsesThroughASymbolicLinkIsRead(test *testing.T) {
 	if strings.Join(edited, "\n") != strings.Join(fresh, "\n") {
 		test.Fatalf("after the edit\n%s\nwithout a kept answer\n%s", strings.Join(edited, "\n"),
 			strings.Join(fresh, "\n"))
+	}
+}
+
+// A load that keeps go list's answer reads what one that asks go list reads: its Inputs, which the engine writes as
+// the inputs record the front door's replay keys on, are the same paths, so the replay cannot tell the two apart. A
+// kept answer that lost a package's directory would name other files and directories.
+func TestAKeptListingReadsTheInputsGoListsAnswerReads(test *testing.T) {
+	test.Parallel()
+
+	root, resolveError := filepath.EvalSymlinks(test.TempDir())
+	if resolveError != nil {
+		test.Fatalf("resolving the temporary directory: %v", resolveError)
+	}
+	writeListingFiles(test, root, listingFiles)
+	project := filepath.Join(root, "project")
+	environment := []string{"GOWORK=off"}
+	inputsOf := func(listings ListingStore) (Inputs, bool) {
+		loaded, loadError := PackagesCached(project, []string{"./..."}, environment, nil, Caching{Listings: listings})
+		if loadError != nil {
+			test.Fatalf("loading %s: %v", project, loadError)
+		}
+		return loaded.Inputs, loaded.ListingKept
+	}
+	listings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
+	asked, _ := inputsOf(listings)
+	kept, wasKept := inputsOf(listings)
+	if !wasKept {
+		test.Fatalf("want the second load to keep go list's answer")
+	}
+	fresh, _ := inputsOf(nil)
+	if !reflect.DeepEqual(kept, fresh) || !reflect.DeepEqual(asked, fresh) {
+		test.Fatalf("a kept answer's inputs\n%+v\ngo list's\n%+v", kept, fresh)
+	}
+	if len(fresh.Files) == 0 || len(fresh.Directories) == 0 {
+		test.Fatalf("want inputs to compare, got %+v", fresh)
 	}
 }

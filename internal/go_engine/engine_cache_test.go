@@ -227,3 +227,26 @@ func TestTheBuildContextNamesTheProcessVariablesAnAnalyzerReads(test *testing.T)
 		test.Errorf("want BURNTSUSHI_TOML_110 named unset in %q", unset)
 	}
 }
+
+// The inputs record, which the front door's replay keys on, is byte for byte the same whether the load asked go list
+// or kept its answer from an earlier run: the cached run that keeps it writes the record a --no-cache run writes.
+func TestTheInputsRecordIsTheSameWithAKeptListing(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "vet-finding"))
+	inputsLine := func(run cachedRun) string {
+		for line := range strings.Lines(run.stream) {
+			if strings.HasPrefix(line, `{"kind":"inputs"`) {
+				return line
+			}
+		}
+		test.Fatalf("no inputs record in\n%s", run.stream)
+		return ""
+	}
+	asked := inputsLine(runCachedEngine(test, root))
+	kept := inputsLine(runCachedEngine(test, root))
+	fresh := inputsLine(runCachedEngine(test, root, "--no-cache"))
+	if kept != fresh || asked != fresh {
+		test.Fatalf("the inputs record\nwith a kept listing %s\nasking go list     %s", kept, fresh)
+	}
+}
