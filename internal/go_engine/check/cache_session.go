@@ -1,6 +1,7 @@
 package check
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"runtime"
@@ -163,6 +164,17 @@ func (session *CacheSession) Restore(
 		restoring[hit] = restored.types
 	}
 	return restoring
+}
+
+// Listing is go list's answer the load kept under key, for load.ListingStore: the session's store keeps it beside
+// the entries.
+func (session *CacheSession) Listing(key [sha256.Size]byte) ([]byte, bool) {
+	return session.caching.Store.Get(cache.Key(key))
+}
+
+// KeepListing keeps go list's answer under key, for load.ListingStore.
+func (session *CacheSession) KeepListing(key [sha256.Size]byte, listing []byte) error {
+	return session.caching.Store.Put(cache.Key(key), listing)
 }
 
 // exportDataReader reads the export data of the package under key from the store, for the load.

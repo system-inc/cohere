@@ -84,8 +84,8 @@ func (engine *pipeline) run() int {
 		engine.session = engine.cacheSession()
 		workspace := engine.described.workspace
 		if engine.session != nil {
-			loaded, loadError = load.PackagesRestoring(workspace.Root, workspace.Patterns(), workspace.Environment(),
-				engine.described.readableOurs, engine.session)
+			loaded, loadError = load.PackagesCached(workspace.Root, workspace.Patterns(), workspace.Environment(),
+				engine.described.readableOurs, load.Caching{Restorer: engine.session, Listings: engine.session})
 		} else {
 			loaded, loadError = load.Packages(workspace.Root, workspace.Patterns(), workspace.Environment(),
 				engine.described.readableOurs)

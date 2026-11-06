@@ -26,7 +26,8 @@ type sessionRun struct {
 func runWithSession(test *testing.T, directory string, caching *Caching, rules []rule.Rule) sessionRun {
 	test.Helper()
 	session := NewCacheSession(caching, rules)
-	loaded, loadError := load.PackagesRestoring(directory, []string{"./..."}, []string{"GOWORK=off"}, nil, session)
+	loaded, loadError := load.PackagesCached(directory, []string{"./..."}, []string{"GOWORK=off"}, nil,
+		load.Caching{Restorer: session, Listings: session})
 	if loadError != nil {
 		test.Fatalf("loading %s: %v", directory, loadError)
 	}
