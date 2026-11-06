@@ -1,16 +1,17 @@
 package go_engine
 
 // The engine side of cohere-go/consistency-require-separated-folder-words's mirrors. The rule knows no mirror: a
-// folder that keeps another project's name is excused by a //cohere:ignore directly above the package clause the
-// finding is at, which only the engine's suppression reads, and a directive there that withholds nothing is the
-// engine's own consistency-no-unused-ignore finding. analysistest runs the analyzer alone, so only a run through the
-// engine can show either.
+// folder that keeps another project's name is excused by a //cohere:file-ignore in the file the finding is at, since
+// the finding sits at that file's start, where no line directive reaches. Only the engine's suppression reads it,
+// and one that withholds nothing is the engine's own consistency-no-unused-ignore finding. analysistest runs the
+// analyzer alone, so only a run through the engine can show either.
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -19,11 +20,25 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_require_separated_folder_words"
 	"github.com/system-inc/cohere/internal/go_engine/suppression"
+	"github.com/system-inc/cohere/policy"
 )
 
-// separatedFolderWordsDirective is the directive a mirror carries, on its own line directly above the clause.
-const separatedFolderWordsDirective = "//cohere:ignore " + consistency_require_separated_folder_words.Name +
-	" typescript-go's package name\n"
+// separatedFolderWordsDirectivePattern finds the directive a message names, `//cohere:` and its keyword.
+var separatedFolderWordsDirectivePattern = regexp.MustCompile(`//cohere:[a-z-]+`)
+
+// separatedFolderWordsDirective is the directive a mirror carries, written with the directive the folder message
+// tells a reader to use, so the advice and the suppression can't disagree: were the message to name a directive that
+// doesn't reach the file's start, the mirror below would stop being withheld.
+func separatedFolderWordsDirective(test *testing.T) string {
+	test.Helper()
+	advice := policy.MessageOf(consistency_require_separated_folder_words.Name, "runTogetherFolder").Render(
+		map[string]string{"folder": "tsoptions", "replacement": "ts_options"})
+	directive := separatedFolderWordsDirectivePattern.FindString(advice)
+	if directive == "" {
+		test.Fatalf("the folder message names no //cohere: directive, so a reader can't keep a mirror: %s", advice)
+	}
+	return directive + " " + consistency_require_separated_folder_words.Name + " typescript-go's package name\n"
+}
 
 // separatedFolderWordsRun runs the engine's lint phase over the module in directory with the rule alone registered,
 // as the engine runs a project with no settings file, every house rule and the suppression rules at error, and returns
@@ -84,11 +99,13 @@ func TestSeparatedFolderWordsMirrorIsExcusedByTheEngineSuppression(test *testing
 		textRulesGoVersion(test)))
 	writeTextRulesFile(test, directory, "root.go", []byte("package formatoptions\n\nconst Root = 1\n"))
 	writeTextRulesFile(test, directory, "tsoptions/options.go",
-		[]byte(separatedFolderWordsDirective+"package tsoptions\n\nconst Options = 1\n"))
+		[]byte(separatedFolderWordsDirective(test)+"package tsoptions\n\nconst Options = 1\n"))
 	tree := writeTextRulesFile(test, directory, "treebuilder/tree.go",
 		[]byte("package treebuilder\n\nconst Tree = 1\n"))
 	inner := writeTextRulesFile(test, directory, "inner/inner.go",
-		[]byte("// The package's name is a word.\n"+separatedFolderWordsDirective+"package inner\n\nconst Inner = 1\n"))
+		[]byte("// The package's name is a word.\n"+
+			separatedFolderWordsDirective(test)+
+			"package inner\n\nconst Inner = 1\n"))
 
 	findings, lint := separatedFolderWordsRun(test, directory)
 
@@ -107,7 +124,7 @@ func TestSeparatedFolderWordsMirrorIsExcusedByTheEngineSuppression(test *testing
 	}
 	if !slices.Equal(reported, want) {
 		test.Errorf("the engine reported %v, want %v: the module root clean, the mirror withheld, the run-together "+
-			"folder reported at its clause, and the directive on a word reported unused", reported, want)
+			"folder reported at its file's start, and the directive on a word reported unused", reported, want)
 	}
 	if withheld := lint.WithheldBySuppression[consistency_require_separated_folder_words.Name]; withheld != 1 {
 		test.Errorf("the lint record counts %d findings withheld by suppression, want the mirror's 1", withheld)
