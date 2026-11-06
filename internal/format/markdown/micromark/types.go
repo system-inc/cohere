@@ -46,39 +46,6 @@ type Chunk struct {
 func textChunk(text []uint16) Chunk { return Chunk{Text: text, IsText: true} }
 func codeChunk(code Code) Chunk     { return Chunk{Code: code} }
 
-// Token is a span of the source with a type, plus the private fields constructs hang on it.
-//
-// One struct carries every field any construct uses, because upstream's tokens are open objects and the
-// fields are read across files. The ones prefixed with an underscore upstream are unexported here.
-type Token struct {
-	Type  string
-	Start Point
-	End   Point
-
-	// ContentType marks a chunk whose contents another tokenizer parses: flow, content, string or text.
-	ContentType string
-	Previous    *Token
-	Next        *Token
-
-	tokenizer                    *TokenizeContext
-	container                    bool
-	isInFirstContentOfListItem   bool
-	contentTypeTextTrailing      bool
-	open                         bool
-	close                        bool
-	inactive                     bool
-	balanced                     bool
-	gfmAutolinkLiteralWalkedInto bool
-
-	// Spread is upstream's _spread, read and written by mdast-util-from-markdown's prepareList.
-	Spread bool
-	// Align is upstream's _align on a GFM table token: "left", "right", "center" or "none" per column.
-	Align []string
-}
-
-// ended reports whether the token has been exited. Upstream tests `token.end` for undefined.
-func (token *Token) ended() bool { return token.End.Line != 0 }
-
 // Event is an enter or an exit of a token, in the context that produced it.
 type Event struct {
 	Enter   bool
@@ -114,51 +81,14 @@ type InitialConstruct struct {
 	ResolveAll *Resolver
 }
 
-// ConstructRecord maps a code to the constructs that may start there. Null holds upstream's `null` key,
-// the constructs tried at every code.
-type ConstructRecord struct {
-	ByCode map[Code][]*Construct
-	Null   []*Construct
-
-	// withNull is each code's list followed by Null, made once when the record is combined, so an attempt
-	// at a code builds no list (#vbjv3d6). Nil for a record made by hand.
-	withNull map[Code][]*Construct
-}
-
-// constructsAt is upstream's handleMapOfConstructs list: the constructs for the code, then those for every
-// code, and none at the end of input. Callers only read it.
-func (record *ConstructRecord) constructsAt(code Code) []*Construct {
-	if code == CodeEof {
-		return nil
-	}
-	if record.withNull != nil {
-		if list, found := record.withNull[code]; found {
-			return list
-		}
-		return record.Null
-	}
-	var list []*Construct
-	list = append(list, record.ByCode[code]...)
-	return append(list, record.Null...)
-}
-
-// combine fills withNull from ByCode and Null.
-func (record *ConstructRecord) combine() {
-	record.withNull = make(map[Code][]*Construct, len(record.ByCode))
-	for code, list := range record.ByCode {
-		record.withNull[code] = append(append([]*Construct(nil), list...), record.Null...)
-	}
-}
-
 // Constructs is what attempt, check and interrupt accept: one construct, a list, or a record.
 type Constructs interface{ isConstructs() }
 
 // ConstructList is a list of constructs tried in order.
 type ConstructList []*Construct
 
-func (*Construct) isConstructs()       {}
-func (ConstructList) isConstructs()    {}
-func (*ConstructRecord) isConstructs() {}
+func (*Construct) isConstructs()    {}
+func (ConstructList) isConstructs() {}
 
 // ContainerState is the state a container construct keeps across lines.
 //
@@ -172,97 +102,6 @@ type ContainerState struct {
 	furtherBlankLines bool
 	open              bool
 }
-
-// TokenizeContext is a tokenizer: its events, its position, and the parser it belongs to.
-type TokenizeContext struct {
-	Previous         Code
-	ContainerState   *ContainerState
-	Events           []Event
-	Parser           *ParseContext
-	CurrentConstruct *Construct
-	Interrupt        bool
-
-	contentTypeTextTrailing           bool
-	gfmTasklistFirstContentOfListItem bool
-	gfmTableDynamicInterruptHack      bool
-
-	point                Point
-	columnStart          map[int]int
-	resolveAllConstructs []resolvable
-	chunks               []Chunk
-	stack                []*Token
-	consumed             bool
-	state                State
-	initialize           *InitialConstruct
-	effects              *Effects
-	expectedCode         Code
-
-	// initialContainerState and initialSelf are the container state and the `this` the tokenizer starts
-	// with, held here so that starting one allocates neither (#vbjv3d6).
-	initialContainerState ContainerState
-	initialSelf           Self
-}
-
-// resolvable is upstream's resolveAllConstructs entry: a construct, or the initial construct, which also
-// carries a resolveAll. Compared by identity.
-type resolvable struct {
-	construct  *Construct
-	initialize *InitialConstruct
-}
-
-func (entry resolvable) resolveAll() *Resolver {
-	if entry.construct != nil {
-		return entry.construct.ResolveAll
-	}
-	return entry.initialize.ResolveAll
-}
-
-// Self is what a construct's tokenize receives as `this`: the context, or, under interrupt, an object
-// whose prototype is the context with `interrupt: true` set on it.
-//
-// Reads go through to the live context. interrupt is the one field upstream ever writes through `this`,
-// so it is the one field a view can shadow.
-type Self struct {
-	*TokenizeContext
-	isView        bool
-	viewInterrupt bool
-}
-
-// IsInterrupt reads `this.interrupt`.
-func (view *Self) IsInterrupt() bool {
-	if view.isView {
-		return view.viewInterrupt
-	}
-	return view.TokenizeContext.Interrupt
-}
-
-// SetInterrupt writes `this.interrupt`, onto the view when there is one, as a property assignment would.
-func (view *Self) SetInterrupt(value bool) {
-	if view.isView {
-		view.viewInterrupt = value
-		return
-	}
-	view.TokenizeContext.Interrupt = value
-}
-
-// Effects are the tools a construct tokenizes with.
-type Effects struct {
-	Attempt   func(constructs Constructs, returnState State, bogusState State) State
-	Check     func(constructs Constructs, returnState State, bogusState State) State
-	Interrupt func(constructs Constructs, returnState State, bogusState State) State
-	Consume   func(code Code)
-	// Enter opens a token. A non-nil token is upstream's `fields`: it becomes the token, with its type
-	// and start set.
-	Enter func(tokenType string, token *Token) *Token
-	Exit  func(tokenType string) *Token
-
-	// tokenizer is the tokenizer these effects belong to, through which a factory reaches the parse's
-	// Memory (#vbjv3d6).
-	tokenizer *TokenizeContext
-}
-
-// memory is the Memory of the parse these effects tokenize, nil when it allocates each value.
-func (effects *Effects) memory() *Memory { return effects.tokenizer.Parser.memory }
 
 // Extension is a syntax extension: per hook, constructs by code.
 type Extension struct {
@@ -283,21 +122,6 @@ type Extension struct {
 // extension, because upstream's gfm() is itself combineExtensions over five, then combined again, and the
 // order that two-level combination produces is observable.
 type FullConstructs = Extension
-
-// ParseContext is the parser: the combined constructs and the tokenizer factories.
-type ParseContext struct {
-	Constructs *FullConstructs
-	Defined    []string
-	Lazy       map[int]bool
-
-	// GfmFootnotes is upstream's parser.gfmFootnotes, which micromark-extension-gfm-footnote hangs on the
-	// parser: the identifiers of the footnote definitions seen so far.
-	GfmFootnotes []string
-
-	// memory is where the parse's tokens, attempts and tokenizers come from, nil to allocate each (#93dpede,
-	// #vbjv3d6).
-	memory *Memory
-}
 
 // Content types, upstream's constants.contentType*.
 const (

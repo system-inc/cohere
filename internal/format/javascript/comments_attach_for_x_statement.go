@@ -6,7 +6,10 @@ import "github.com/system-inc/cohere/internal/format/printing"
 
 // handleForXStatementComments is upstream's handleForXStatementComments.
 func handleForXStatementComments(context *commentContext) bool {
-	comment, enclosingNode, followingNode, options := context.Comment, context.Enclosing, context.Following, context.Options
+	comment := context.Comment
+	enclosingNode := context.Enclosing
+	followingNode := context.Following
+	options := context.Options
 	if enclosingNode.Is("ForInStatement", "ForOfStatement", "ForStatement") &&
 		followingNode != nil &&
 		followingNode == enclosingNode.Child("body") {

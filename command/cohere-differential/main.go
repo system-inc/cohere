@@ -382,8 +382,8 @@ func cohereOnlyRuleSettings(root string) map[string]json.RawMessage {
 			},
 		},
 	})
-	// Invariant: the setting holds only strings, and slices and maps of them, which always encode.
 	if encodeError != nil {
+		// Invariant: the setting holds only strings, and slices and maps of them, which always encode.
 		panic(encodeError)
 	}
 	return map[string]json.RawMessage{"nexus/import-require-path-alias": pathAliasSetting}

@@ -71,7 +71,7 @@ func printIgnored(path *Path, options *Options) Doc {
 		text = ";" + text
 	}
 	if current.Is("ClassExpression") && len(current.List("decorators")) > 0 {
-		return concatIn(path, indentIn(path, concatIn(path, softline, text)), softline)
+		return concatIn(path, indentIn(path, concatIn(path, softline, textDoc(text))), softline)
 	}
-	return concatIn(path, text)
+	return concatIn(path, textDoc(text))
 }

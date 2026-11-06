@@ -49,7 +49,7 @@ func Run(callerContext context.Context, graph *program.Graph, files []*ast.Sourc
 func Write(out io.Writer, report *Report, showIntentional bool) error {
 	writer := bufio.NewWriter(out)
 	// The dashes here and in every section below are escaped, not changed: the Swift unused report in
-	// command/cohere/engine_records.go prints this same shape, so the two print the same bytes.
+	// command/cohere/engine_run.go prints this same shape, so the two print the same bytes.
 	fmt.Fprintf(writer, "\nunused: a report, not a gate \u2014 nothing here fails a build\n")
 
 	intentionalFiles := 0

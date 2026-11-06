@@ -47,15 +47,6 @@ func (tree *signatureTree) graph() *Graph {
 	return graph
 }
 
-// state is one build's signatures and both fingerprints, keyed by base name.
-type signatureState struct {
-	signatures map[string]SignatureEntry
-	computed   int
-	emits      int
-	bySignature,
-	byContent map[string]string
-}
-
 func (tree *signatureTree) state(previous map[string]SignatureEntry) signatureState {
 	tree.t.Helper()
 	graph := tree.graph()
@@ -83,17 +74,6 @@ func (tree *signatureTree) state(previous map[string]SignatureEntry) signatureSt
 		state.byContent[name] = string(contentSum[:])
 	}
 	return state
-}
-
-func (state signatureState) signature(test *testing.T, name string) string {
-	test.Helper()
-	for fileName, entry := range state.signatures {
-		if filepath.Base(fileName) == name {
-			return entry.Signature
-		}
-	}
-	test.Fatalf("no signature for %s", name)
-	return ""
 }
 
 const signatureFixtureC = "export type Shape = { width: number };\n"

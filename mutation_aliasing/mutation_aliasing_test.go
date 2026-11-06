@@ -23,46 +23,8 @@ type testInstruction struct {
 	order         ssa.EvaluationOrder
 }
 
-type testBlock struct {
-	id            ssa.BlockId
-	instructions  []*testInstruction
-	successors    []ssa.BlockId
-	returns       *testPlace
-	predecessors  []ssa.BlockId
-	phis          []*ssa.Phi[testPlace]
-	terminalOrder ssa.EvaluationOrder
-}
-
-type testFunction struct {
-	entry            ssa.BlockId
-	blocks           []*testBlock
-	table            map[ssa.BlockId]*testBlock
-	next             ssa.BlockId
-	params           []testPlace
-	context          []testPlace
-	returns          *testPlace
-	parametersFrozen bool
-}
-
 func newTestFunction() *testFunction {
 	return &testFunction{table: map[ssa.BlockId]*testBlock{}, next: 1}
-}
-
-func (function *testFunction) block() *testBlock {
-	block := &testBlock{id: function.next}
-	function.next++
-	function.blocks = append(function.blocks, block)
-	function.table[block.id] = block
-	if function.entry == 0 {
-		function.entry = block.id
-	}
-	return block
-}
-
-// add appends an instruction to a block.
-func (block *testBlock) add(instruction *testInstruction) *testInstruction {
-	block.instructions = append(block.instructions, instruction)
-	return instruction
 }
 
 func place(id ssa.IdentifierId) testPlace { return testPlace{id: id} }

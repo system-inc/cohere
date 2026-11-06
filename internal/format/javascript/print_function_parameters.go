@@ -59,13 +59,13 @@ func printFunctionParameters(
 
 	if len(parameters) == 0 {
 		return concatIn(path, typeParametersDoc,
-			"(",
+			doc.Text("("),
 			printDanglingCommentsInList(
 				path,
 				options,
 				functionParameterDanglingCommentFilter,
 			),
-			")",
+			doc.Text(")"),
 		)
 	}
 
@@ -76,15 +76,15 @@ func printFunctionParameters(
 	iterateFunctionParametersPath(path, func(parameterPath *Path, index int) {
 		isLastParameter := index == len(parameters)-1
 		if isLastParameter && functionNode.Truthy("rest") {
-			printed = append(printed, toDoc("..."))
+			printed = append(printed, doc.Text("..."))
 		}
 		printed = append(printed, print(nil, nil))
 		if isLastParameter {
 			return
 		}
-		printed = append(printed, toDoc(","))
+		printed = append(printed, doc.Text(","))
 		if isParametersInTestCall || shouldHugParameters {
-			printed = append(printed, toDoc(" "))
+			printed = append(printed, doc.Text(" "))
 		} else if isNextLineEmptyAfter(parameters[index], options) {
 			printed = append(printed, hardline, hardline)
 		} else {
@@ -105,12 +105,14 @@ func printFunctionParameters(
 	if shouldExpandParameters && !isDecoratedFunction(path) {
 		if doc.WillBreak(typeParametersDoc) || doc.WillBreak(doc.Concat(printed)) {
 			// Removing lines in this case leads to broken or ugly output
+			// Invariant: shouldExpandParameters comes from expandFirstArg or expandLastArg, set only by
+			// printCallArguments inside printCatchingArgExpansionBailout, whose recover catches this.
 			panic(argumentExpansionBailout{})
 		}
 		return groupIn(path, concatIn(path, doc.RemoveLines(typeParametersDoc),
-			"(",
+			doc.Text("("),
 			doc.RemoveLines(doc.Concat(printed)),
-			")",
+			doc.Text(")"),
 		))
 	}
 
@@ -149,11 +151,11 @@ func printFunctionParameters(
 		trailingComma = printTrailingComma(options, "all")
 	}
 	return concatIn(path, typeParametersDoc,
-		"(",
-		indentIn(path, append([]Doc{softline}, printed...)),
+		doc.Text("("),
+		indentIn(path, doc.Concat(append([]Doc{softline}, printed...))),
 		trailingComma,
 		softline,
-		")",
+		doc.Text(")"),
 	)
 }
 
@@ -161,9 +163,9 @@ func printFunctionParameters(
 // array is.
 func wrapParameters(typeParametersDoc Doc, printed []Doc) Doc {
 	parts := make(doc.Concat, 0, len(printed)+3)
-	parts = append(parts, typeParametersDoc, toDoc("("))
+	parts = append(parts, typeParametersDoc, doc.Text("("))
 	parts = append(parts, printed...)
-	parts = append(parts, toDoc(")"))
+	parts = append(parts, doc.Text(")"))
 	return parts
 }
 

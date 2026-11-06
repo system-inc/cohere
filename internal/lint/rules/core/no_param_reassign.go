@@ -521,26 +521,6 @@ func forStatementInitializer(node *ast.Node) *ast.Node {
 	return node.AsForInOrOfStatement().Initializer
 }
 
-// ignoredParameterNames is the compiled form of the two allowance options.
-type ignoredParameterNames struct {
-	literal  map[string]bool
-	patterns []*esregexp.RegExp
-}
-
-// matches reports whether a parameter's property writes are excused.
-func (ignored ignoredParameterNames) matches(name string) bool {
-	if ignored.literal[name] {
-		return true
-	}
-	for _, pattern := range ignored.patterns {
-		// A match that overruns the time bound excuses too: no answer here is a report.
-		if pattern.TestOrTimeout(name) {
-			return true
-		}
-	}
-	return false
-}
-
 // compileIgnoredNames turns the two option lists into one predicate, compiling each pattern once.
 //
 // A pattern that will not compile is dropped rather than treated as matching nothing-or-everything,

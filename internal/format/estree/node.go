@@ -75,7 +75,14 @@ type Regex struct {
 func New(nodeType string, start int, end int, keysAndValues ...any) *Node {
 	node := &Node{nodeType: nodeType, Range: [2]int{start, end}, properties: make([]property, 0, len(keysAndValues)/2)}
 	for index := 0; index+1 < len(keysAndValues); index += 2 {
-		node.Set(keysAndValues[index].(string), keysAndValues[index+1])
+		key, ok := keysAndValues[index].(string)
+		if !ok {
+			// Invariant: every caller passes its keys as string literals, key then value, and the forwarders
+			// (the arena, the GraphQL parser's node, the selector parser's newSelectorNode) pass on keys their
+			// own callers wrote as literals.
+			panic("estree: a node property key that is not a string")
+		}
+		node.Set(key, keysAndValues[index+1])
 	}
 	return node
 }
@@ -148,23 +155,24 @@ func (node *Node) Has(key string) bool {
 // Set writes node[key], appending a new property at the end the way JavaScript does.
 func (node *Node) Set(key string, value any) {
 	// A typed nil stored in an interface is not == nil, which would make a missing child look present.
+	stored := value
 	switch typed := value.(type) {
 	case *Node:
 		if typed == nil {
-			value = nil
+			stored = nil
 		}
 	case *TemplateValue:
 		if typed == nil {
-			value = nil
+			stored = nil
 		}
 	}
 	for index := range node.properties {
 		if node.properties[index].key == key {
-			node.properties[index].value = value
+			node.properties[index].value = stored
 			return
 		}
 	}
-	node.properties = append(node.properties, property{key: key, value: value})
+	node.properties = append(node.properties, property{key: key, value: stored})
 }
 
 // Delete removes node[key].

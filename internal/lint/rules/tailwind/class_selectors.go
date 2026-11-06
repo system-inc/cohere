@@ -5,10 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"math"
 	"sync"
-
-	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
 // Selector is better-tailwindcss 4.7.0's selector (options/schemas/selectors.js): where a rule reads
@@ -74,121 +71,10 @@ const (
 	MatcherTypeAnonymousFunctionReturn MatcherType = "anonymousFunctionReturn"
 )
 
-// SelectorTarget is a call or argument target: all, first, last, or an index, negative from the end.
-type SelectorTarget struct {
-	Word  string
-	Index int
-}
-
-// UnmarshalJSON reads a target as upstream's schema does: one of three words, or a number. A number
-// that is not an integer is refused rather than read, since upstream indexes with it and crashes.
-func (target *SelectorTarget) UnmarshalJSON(raw []byte) error {
-	var word string
-	if decodeError := json.Unmarshal(raw, &word); decodeError == nil {
-		switch word {
-		case "all", "first", "last":
-			*target = SelectorTarget{Word: word}
-			return nil
-		}
-		return fmt.Errorf("a target is all, first, last or a number, not %q", word)
-	}
-	var number float64
-	if decodeError := json.Unmarshal(raw, &number); decodeError != nil {
-		return fmt.Errorf("a target is all, first, last or a number, not %s", raw)
-	}
-	if number != math.Trunc(number) || math.Abs(number) > 1<<31 {
-		return fmt.Errorf("a target index must be an integer, not %s", raw)
-	}
-	*target = SelectorTarget{Index: int(number)}
-	return nil
-}
-
-// MarshalJSON writes a target back in its upstream form, so a settings key built from selectors reads
-// the same target the same way.
-func (target SelectorTarget) MarshalJSON() ([]byte, error) {
-	if target.Word != "" {
-		return json.Marshal(target.Word)
-	}
-	return json.Marshal(target.Index)
-}
-
-// LegacySelector is one entry of upstream's legacy `attributes`, `callees`, `tags` or `variables`
-// options: a name pattern, or a name pattern and its matchers, `["cva", [{"match": "objectValues",
-// "pathPattern": "^variants"}]]`.
-type LegacySelector struct {
-	Name string
-	// Match is nil for a bare name, which reads direct strings only, as a flat selector with no matchers.
-	Match []SelectorMatcher
-}
-
 // legacyMatcher is a legacy entry's matcher, upstream's options/schemas/matchers.js.
 type legacyMatcher struct {
 	Match       MatcherType `json:"match"`
 	PathPattern string      `json:"pathPattern,omitempty"`
-}
-
-// UnmarshalJSON reads a legacy entry. A custom decoder decodes with its own json.Unmarshal, which
-// would accept a misspelled key the options decoder refuses, so the matchers are decoded through
-// rule.UnmarshalOptions here.
-func (legacy *LegacySelector) UnmarshalJSON(raw []byte) error {
-	var name string
-	if decodeError := json.Unmarshal(raw, &name); decodeError == nil {
-		*legacy = LegacySelector{Name: name}
-		return nil
-	}
-	var pair []json.RawMessage
-	if decodeError := json.Unmarshal(raw, &pair); decodeError != nil || len(pair) != 2 {
-		return fmt.Errorf("a selector is a name, or a name and its matchers, not %s", raw)
-	}
-	if decodeError := json.Unmarshal(pair[0], &name); decodeError != nil {
-		return fmt.Errorf("a selector's name is a string, not %s", pair[0])
-	}
-	var matchers []legacyMatcher
-	if unmarshalOptionsError := rule.UnmarshalOptions(pair[1], &matchers); unmarshalOptionsError != nil {
-		return fmt.Errorf("selector %q's matchers: %w", name, unmarshalOptionsError)
-	}
-	match := make([]SelectorMatcher, 0, len(matchers))
-	for _, matcher := range matchers {
-		switch matcher.Match {
-		case MatcherTypeStrings, MatcherTypeObjectKeys, MatcherTypeObjectValues:
-		default:
-			return fmt.Errorf(
-				"selector %q: a matcher is strings, objectKeys or objectValues, not %q",
-				name,
-				matcher.Match,
-			)
-		}
-		// upstream's toSelectorMatcher: a strings matcher drops its path.
-		if matcher.Match == MatcherTypeStrings {
-			match = append(match, SelectorMatcher{Type: matcher.Match})
-			continue
-		}
-		match = append(match, SelectorMatcher{Type: matcher.Match, Path: matcher.PathPattern})
-	}
-	*legacy = LegacySelector{Name: name, Match: match}
-	return nil
-}
-
-// MarshalJSON writes a legacy entry back in its upstream form.
-func (legacy LegacySelector) MarshalJSON() ([]byte, error) {
-	if legacy.Match == nil {
-		return json.Marshal(legacy.Name)
-	}
-	matchers := make([]legacyMatcher, 0, len(legacy.Match))
-	for _, matcher := range legacy.Match {
-		matchers = append(matchers, legacyMatcher{Match: matcher.Type, PathPattern: matcher.Path})
-	}
-	return json.Marshal([]any{legacy.Name, matchers})
-}
-
-// selector is upstream's migrateLegacySelector: a legacy entry as the flat selector it stands for. A
-// callee's or tag's name is also its path, so it matches a call by either.
-func (legacy LegacySelector) selector(kind SelectorKind) Selector {
-	selector := Selector{Kind: kind, Name: legacy.Name, Match: legacy.Match}
-	if kind == SelectorKindCallee || kind == SelectorKindTag {
-		selector.Path = legacy.Name
-	}
-	return selector
 }
 
 // defaultSelectorsJson is upstream 4.7.0's DEFAULT_SELECTORS, written by

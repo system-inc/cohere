@@ -855,14 +855,6 @@ func TestNoHtmlLinkForPagesFingerprintsTheConfiguredPagesDirectory(test *testing
 	}
 }
 
-// countingProgram is a Program whose file system counts the existence checks asked of it, by path.
-type countingProgram struct {
-	rule.Program
-	fileSystem *countingFileSystem
-}
-
-func (program countingProgram) FS() vfs.FS { return program.fileSystem }
-
 // countingFileSystem counts DirectoryExists calls by path. A route model build asks each candidate
 // directory once, so the count for one of them is how many builds there were.
 type countingFileSystem struct {

@@ -10,11 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync/atomic"
 )
-
-// Severity is whether a rule runs, and how loudly.
-type Severity int
 
 const (
 	// SeverityOff means the rule does not run for this file at all.
@@ -26,24 +22,6 @@ const (
 	// SeverityError reports and fails the run.
 	SeverityError
 )
-
-// String renders a severity the way the config spells it.
-//
-// Without this, fmt prints the underlying int as a control character, because Severity is an
-// iota and SeverityOff is 0. A diagnostic about a config key that rendered its severity as
-// '\x00' would be describing the exact problem it exists to report, illegibly.
-func (severity Severity) String() string {
-	switch severity {
-	case SeverityOff:
-		return "off"
-	case SeverityWarn:
-		return "warn"
-	case SeverityError:
-		return "error"
-	default:
-		return "unknown"
-	}
-}
 
 // RuleSetting is one rule's severity and its options, if it has any.
 //
@@ -85,68 +63,6 @@ type Override struct {
 	File   string
 }
 
-// Config is a resolved lint configuration: what runs everywhere, what never runs, and what changes
-// per path.
-type Config struct {
-	// Rules is the base configuration, applying to every file not excluded.
-	Rules map[string]RuleSetting
-
-	// IgnorePatterns are paths no rule runs on at all.
-	IgnorePatterns []string
-
-	// Overrides apply in order, later blocks winning over earlier ones, which is how both ESLint and
-	// oxlint resolve them. Order is preserved rather than sorted for exactly this reason.
-	Overrides []Override
-
-	// Plugins are the namespaces the config declares, which contribute their own rules without any
-	// rules block naming them. See PluginDefaultRules.
-	Plugins []string
-
-	// Root is the directory glob patterns resolve against: the directory of the file cohere was
-	// pointed at, whichever file in its `extends` chain a pattern was written in.
-	Root string
-
-	// Sources is every file the configuration was read from, the one cohere was pointed at first and
-	// then each file it extends, in order. Anything keyed on the configuration's bytes (the findings
-	// cache, the run cache, the scoped-run widening guard) must read all of them: a base edited alone
-	// changes what runs exactly as an edit to the project's own file does.
-	Sources []string
-
-	// Departures are the rules a file in the chain sets differently from a file it extends, each with
-	// the reason that file gave, keyed by rule name. Coverage reports them, so a departure is always
-	// visible and never becomes a quiet allowance.
-	Departures map[string]Departure
-
-	// OffReasons are why each rule the chain turns off at top level is off, keyed by rule name: the
-	// sentence a file gave under `reasons`, or its departure's reason when the off departs from an
-	// inherited ruling. Coverage prints each beside the rule. An off with no entry here is an allowance.
-	OffReasons map[string]OffReason
-
-	// CohereVersion is the range of cohere releases the project's own file accepts, or nil when it
-	// pins none. Only the project's own file may pin: a set is read by every project that extends it,
-	// and a range there would decide for all of them which release they run.
-	CohereVersion *VersionRange
-
-	// Settings is the project's own `settings`, keyed by plugin namespace, each value as written. Only
-	// the project's own file may write it, for the reason only it may pin a release: a value in a set
-	// would decide for every project extending it. Which namespaces a run reads, and which keys under
-	// each, is the rule packages' to say (rule.RegisterSettings), checked before any rule decodes.
-	Settings map[string]json.RawMessage
-
-	// ruleWriters is the source that turned each rule key on or set it: the file or set that wrote it at
-	// top level, the one that declared the plugin for a plugin default, or the one whose override names it.
-	ruleWriters map[string]string
-
-	// house is the per-file dispatch of a zero-config configuration, nil for one that names its sets.
-	house *houseSets
-
-	// resolutionMemo is Resolve's results by match, created on first use. See resolutionMemo.
-	resolutionMemo atomic.Pointer[resolutionMemo]
-
-	// compiledGlobs is IgnorePatterns and each override's Files, compiled on first use. See Config.globs.
-	compiledGlobs atomic.Pointer[configGlobs]
-}
-
 // Departure is one rule a configuration sets differently from the file it extends, and why.
 type Departure struct {
 	// File is the configuration that departs, and Reason is the sentence it gave under `departures`.
@@ -158,23 +74,6 @@ type Departure struct {
 type OffReason struct {
 	File   string
 	Reason string
-}
-
-// OffReasonFor returns why the rule named ruleName is off, found by its own key or by a key that reaches
-// it, the way the resolver lets a key spelled differently configure a rule.
-func (configuration *Config) OffReasonFor(ruleName string) (OffReason, bool) {
-	if configuration == nil {
-		return OffReason{}, false
-	}
-	if offReason, found := lookupByReach(configuration.OffReasons, ruleName); found {
-		return offReason, true
-	}
-	// Under zero config, a rule a per-file set turns on is off wherever the set does not fit, and the set
-	// says why. Asked only after the chain's own reasons, so a project's own off keeps its own.
-	if configuration.house != nil && !configuration.TurnsOffAtTopLevel(ruleName) {
-		return lookupByReach(configuration.house.gatedReasons, ruleName)
-	}
-	return OffReason{}, false
 }
 
 // lookupByReach finds ruleName's entry by its own key, or else by the first key, sorted, that reaches it.
@@ -193,45 +92,6 @@ func lookupByReach(reasons map[string]OffReason, ruleName string) (OffReason, bo
 		}
 	}
 	return OffReason{}, false
-}
-
-// TurnsOffAtTopLevel reports whether the chain's top-level rules turn the rule named ruleName off, by its
-// own key or, when no key names it exactly, by a key that reaches it.
-func (configuration *Config) TurnsOffAtTopLevel(ruleName string) bool {
-	if configuration == nil {
-		return false
-	}
-	if setting, found := configuration.Rules[ruleName]; found {
-		return setting.Severity == SeverityOff
-	}
-	for key, setting := range configuration.Rules {
-		if setting.Severity == SeverityOff && KeyReachesRule(key, ruleName) {
-			return true
-		}
-	}
-	return false
-}
-
-// RuleKeys returns every rule name the config mentions, in the base block or any override, at any
-// severity, `off` included.
-//
-// A key is evidence the rule exists somewhere even when cohere has not ported it: someone wrote a
-// decision about it. That is what lets a suppression naming an unported rule be told apart from one
-// naming a rule that exists nowhere.
-func (configuration *Config) RuleKeys() []string {
-	if configuration == nil {
-		return nil
-	}
-	keys := make([]string, 0, len(configuration.Rules))
-	for key := range configuration.Rules {
-		keys = append(keys, key)
-	}
-	for _, override := range configuration.Overrides {
-		for key := range override.Rules {
-			keys = append(keys, key)
-		}
-	}
-	return keys
 }
 
 // PluginDefaultRules are the rules a `plugins` declaration turns on without any rules block naming
@@ -816,64 +676,8 @@ func inheritedRuleSetting(
 	return inheritedName, rules[inheritedName], true, reach.reachesEvery(name, inheritedName)
 }
 
-// ruleReach is which registered rules each config key configures, by the resolver's own test, each
-// key asked once.
-//
-// Matching one key to the inherited spellings of its ruling compares it with every key the layers
-// below wrote, and each comparison asked the whole registry about both keys again: on ahra that was a
-// fresh 464-name scan, and a fresh map, for every pair, and it was 590ms of every run, the whole of
-// what the run spent outside its phases (#kgv1pry). A key reaches the same rules every time it is
-// asked, so each is asked once per load. One load runs on one goroutine, so a plain map does.
-type ruleReach struct {
-	registeredNames []string
-	byKey           map[string]map[string]bool
-}
-
 func newRuleReach(registeredNames []string) *ruleReach {
 	return &ruleReach{registeredNames: registeredNames, byKey: map[string]map[string]bool{}}
-}
-
-// of is the registered rules key configures.
-func (reach *ruleReach) of(key string) map[string]bool {
-	if reached, found := reach.byKey[key]; found {
-		return reached
-	}
-	reached := map[string]bool{}
-	for _, registered := range reach.registeredNames {
-		if KeyReachesRule(key, registered) {
-			reached[registered] = true
-		}
-	}
-	reach.byKey[key] = reached
-	return reached
-}
-
-// sameRuling reports whether two differently spelled keys configure a registered rule in common.
-//
-// Decided by the registry rather than by the names. `nexus/x` and `x` look like one ruling and are,
-// when only `x` is registered. `@typescript-eslint/no-invalid-this` and `no-invalid-this` look the same
-// way and are two rules, a core rule and its typescript-eslint twin; they still share a ruling, because
-// the resolver lets the qualified key configure the core rule when no key names it exactly (#hprjh4s).
-func (reach *ruleReach) sameRuling(left string, right string) bool {
-	leftReached := reach.of(left)
-	for registered := range reach.of(right) {
-		if leftReached[registered] {
-			return true
-		}
-	}
-	return false
-}
-
-// reachesEvery reports whether key reaches every registered rule inherited reaches, so that inherited
-// can be removed without leaving any rule it configured unconfigured.
-func (reach *ruleReach) reachesEvery(key string, inherited string) bool {
-	reached := reach.of(key)
-	for registered := range reach.of(inherited) {
-		if !reached[registered] {
-			return false
-		}
-	}
-	return true
 }
 
 // wholeTreePattern is a glob that names no directory and no file name, only an extension or nothing

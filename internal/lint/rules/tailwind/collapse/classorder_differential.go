@@ -44,7 +44,6 @@ package tailwind
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -131,53 +130,6 @@ type Divergence struct {
 	Planted bool
 }
 
-// Population is what a run covered, as distinct from what it found.
-//
-// The name and the reason are `internal/differential`'s: without this a report cannot tell agreement
-// from mutual silence, and a side claiming zero classes is enough on its own to disqualify the
-// comparison. Recorded per design system, since two systems is the floor and one of them going empty
-// while the other carries the run is exactly the shape a total would hide.
-type Population struct {
-	// SystemName is the design system this population was measured on.
-	SystemName string
-	// RegistryClasses and CorpusClasses are the two populations, kept apart because they answer
-	// different questions. The registry is what the engine advertises and the corpus is what someone
-	// happened to write, and an earlier table in this slice built from a corpus missed nine
-	// families.
-	RegistryClasses int
-	CorpusClasses   int
-	// EngineNullReadings is how many classes the engine itself declined, across both populations.
-	// A run where this is zero on the corpus has almost certainly lost its corpus.
-	EngineNullReadings int
-	// UnknownPopulationClasses is how many classes named a population this package does not know.
-	//
-	// Never zero by accident: it can only be non-zero if a caller invented a population name, and
-	// that miscounts the two floors below. Reported rather than absorbed, because absorbing it into
-	// the registry count is exactly the shape of silent miscount the floors exist to catch.
-	UnknownPopulationClasses int
-	// ByOutcome counts every class by where it landed. The five sum to the two class counts.
-	ByOutcome map[Outcome]int
-}
-
-// Total is every class this population covered, unknown ones included.
-//
-// Included rather than dropped so that the both-silent rate is computed over what was actually
-// walked. A denominator that quietly excluded some classes would understate every rate derived from
-// it, which is the direction that makes a run look better than it was.
-func (population Population) Total() int {
-	return population.RegistryClasses + population.CorpusClasses + population.UnknownPopulationClasses
-}
-
-// Answered is the classes on which both sides produced a reading.
-//
-// This is the denominator of the agreement rate, and it is deliberately not `Total`. Scoring
-// agreement over every class would let a run that went entirely silent report a high rate, since the
-// silent classes are not disagreements. Over answered classes a silent run reports zero of zero,
-// which reads as the absence of evidence it is.
-func (population Population) Answered() int {
-	return population.ByOutcome[OutcomeAgreed] + population.ByOutcome[OutcomeDisagreed]
-}
-
 // Control is a deliberate defect the harness must detect.
 //
 // The concept is `internal/differential`'s and so is the reason: a check that has never returned a
@@ -218,23 +170,6 @@ type ControlResult struct {
 	Detail string
 }
 
-// Report is one differential run: what it covered, what it found, and whether it can be trusted.
-type Report struct {
-	// TailwindVersion is the engine version the fixture was captured against.
-	TailwindVersion string
-	// GoSideName identifies the Go implementation under test.
-	GoSideName string
-	// Populations is one entry per design system, in fixture order.
-	Populations []Population
-	// Divergences is every non-agreeing class, controls included and marked.
-	Divergences []Divergence
-	// Controls is what each control did.
-	Controls []ControlResult
-	// SystemDivergence records the two design systems against each other rather than against Go.
-	// See RepositoriesDiverge.
-	SystemDivergence SystemDivergence
-}
-
 // SystemDivergence is how far apart the design systems themselves are.
 //
 // It is a property of the fixture rather than of a run, and it is passed into Compare rather than
@@ -251,40 +186,6 @@ type SystemDivergence struct {
 	// UniqueToOneSystem is how many registry classes exist in exactly one system. Measured 462, and
 	// this is where the per-repository divergence actually lives.
 	UniqueToOneSystem int
-}
-
-// ControlsProven is whether the harness was shown able to detect a difference at all.
-//
-// Reported separately from Trustworthy because they answer different questions, which is the
-// distinction `internal/differential` draws and the one worth keeping. Trustworthy asks whether this
-// run's population was real. This asks whether the instrument works.
-//
-// Every control must have fired, and they must cover both directions of silence. A harness that can
-// only see Go-side silence reports a clean run for every class where Go invents a reading the engine
-// never produced, and that direction is the one nothing else in the suite is looking at.
-func (report Report) ControlsProven() bool {
-	// Stated explicitly, though the loop below would reach the same answer: with no controls both
-	// direction flags stay false and the final conjunction returns false anyway. Mutation-tested and
-	// confirmed equivalent, so this line is documentation rather than logic, and it is kept because
-	// "a run with no controls has proven nothing" is the single most important thing this function
-	// says and it should not have to be derived from an empty loop.
-	if len(report.Controls) == 0 {
-		return false
-	}
-	sawGoSilentDirection := false
-	sawEngineSilentDirection := false
-	for _, result := range report.Controls {
-		if !result.Detected {
-			return false
-		}
-		switch result.Control.ExpectedOutcome {
-		case OutcomeGoSilent:
-			sawGoSilentDirection = true
-		case OutcomeEngineSilent:
-			sawEngineSilentDirection = true
-		}
-	}
-	return sawGoSilentDirection && sawEngineSilentDirection
 }
 
 // minimumPlausibleRegistryClasses is the floor below which a run is assumed to have been pointed at
@@ -314,206 +215,6 @@ const minimumPlausibleCorpusClasses = 400
 // under one percent overall; five percent is far enough above that to never fire on a real run and
 // far below any run that has actually gone quiet.
 const maximumPlausibleBothSilentRate = 0.05
-
-// Trustworthy reports whether this run's population was real, with the reasons it was not.
-//
-// Separate from whether it found anything, and checked first. Every reason below describes a run
-// whose agreement numbers mean nothing, and the point of returning them as strings is that a caller
-// prints them: a boolean false here reads as "the port is broken" when it means "this run did not
-// measure anything".
-func (report Report) Trustworthy() (bool, []string) {
-	var reasons []string
-
-	if len(report.Populations) < 2 {
-		// One design system is not a population. Per-repository divergence is the defect the whole
-		// port exists to fix, and it is unobservable from inside a single repository.
-		reasons = append(reasons, fmt.Sprintf(
-			"%d design systems measured, and per-repository divergence cannot be observed from one",
-			len(report.Populations),
-		))
-	}
-
-	for _, population := range report.Populations {
-		if population.RegistryClasses < minimumPlausibleRegistryClasses {
-			reasons = append(reasons, fmt.Sprintf(
-				"%s: %d registry classes is below the plausible floor of %d, so the run was pointed at the wrong thing",
-				population.SystemName, population.RegistryClasses, minimumPlausibleRegistryClasses,
-			))
-		}
-		if population.CorpusClasses < minimumPlausibleCorpusClasses {
-			reasons = append(reasons, fmt.Sprintf(
-				"%s: %d corpus classes is below the plausible floor of %d, and the corpus is where the engine's null readings live",
-				population.SystemName, population.CorpusClasses, minimumPlausibleCorpusClasses,
-			))
-		}
-		if population.Answered() == 0 {
-			reasons = append(reasons, fmt.Sprintf(
-				"%s: no class was answered by both sides, so there is nothing to agree about",
-				population.SystemName,
-			))
-		}
-		if total := population.Total(); total > 0 {
-			bothSilentRate := float64(population.ByOutcome[OutcomeBothSilent]) / float64(total)
-			if bothSilentRate > maximumPlausibleBothSilentRate {
-				reasons = append(reasons, fmt.Sprintf(
-					"%s: %d of %d classes (%.1f%%) had neither side answer, above the %.0f%% ceiling \u2014 a side reporting nothing is a failed run",
-					population.SystemName, population.ByOutcome[OutcomeBothSilent], total,
-					bothSilentRate*100, maximumPlausibleBothSilentRate*100,
-				))
-			}
-		}
-		if population.UnknownPopulationClasses > 0 {
-			reasons = append(reasons, fmt.Sprintf(
-				"%s: %d classes named a population this package does not know, so the registry and corpus floors were measured against the wrong counts",
-				population.SystemName, population.UnknownPopulationClasses,
-			))
-		}
-		if population.EngineNullReadings == 0 {
-			// The engine declines classes in both design systems and always has. Zero means the
-			// fixture stopped carrying the classes it declines, which removes exactly the population
-			// this harness was built to keep honest, and it removes it invisibly.
-			reasons = append(reasons, fmt.Sprintf(
-				"%s: the engine declined no class at all, so the population that proves silence is not scored has gone missing",
-				population.SystemName,
-			))
-		}
-	}
-
-	if !report.ControlsProven() {
-		reasons = append(
-			reasons,
-			"no control fired in both silent directions, so the harness has not been shown able to detect a difference",
-		)
-	}
-	for _, result := range report.Controls {
-		if result.Detected {
-			continue
-		}
-		reasons = append(reasons, fmt.Sprintf(
-			"control %q did not fire: %s \u2014 the harness has not been shown able to detect a difference",
-			result.Control.Name, result.Detail,
-		))
-	}
-
-	return len(reasons) == 0, reasons
-}
-
-// RepositoriesDiverge reports whether the two design systems differ at all, and how.
-//
-// This is `f7d1d8d`'s discipline: take the claim the port rests on and make it an assertion that
-// fails if it ever becomes trivially true. The claim is that a table generated from one repository
-// is wrong for another.
-//
-// Measured, the divergence is not where reading the theme result suggests. Theme resolution diverges
-// on *values*, 744 entries against 748 with 22 shared keys carrying different values, and a reading
-// is `{order, count}` where order indexes the declared *property*. A shared class declaring the same
-// property with a different value therefore reads identically in both, and all 95,134 shared
-// registry classes do.
-//
-// The divergence is in *membership*: 462 classes exist in exactly one system, because a
-// `--color-brand-*` token in one repository's `@theme` is what makes `accent-brand` a class at all.
-// A table generated against ahra has no row answering `accent-brand`, so it declines a class the
-// engine compiles. That is a silent-side defect rather than a wrong reading, and it is the sharper
-// statement of why a per-repository table is required.
-//
-// Both axes are returned so that a future Tailwind which starts diverging readings shows up as a
-// number moving off zero rather than as a fixture that quietly still passes.
-func (report Report) RepositoriesDiverge() (bool, string) {
-	if report.SystemDivergence.UniqueToOneSystem == 0 && report.SystemDivergence.DivergentReadings == 0 {
-		return false, fmt.Sprintf(
-			"the two design systems agree on all %d shared registry classes and neither holds a class the other "+
-				"lacks, so this fixture no longer demonstrates that a per-repository table is required",
-			report.SystemDivergence.SharedRegistryClasses,
-		)
-	}
-	return true, fmt.Sprintf(
-		"%d shared registry classes read identically, %d read differently, and %d classes exist in only one system",
-		report.SystemDivergence.SharedRegistryClasses,
-		report.SystemDivergence.DivergentReadings,
-		report.SystemDivergence.UniqueToOneSystem,
-	)
-}
-
-// Describe renders the run as prose a reader can check, controls separated from observations.
-func (report Report) Describe() string {
-	builder := &strings.Builder{}
-
-	fmt.Fprintf(builder, "tailwind %s, go side %q\n", report.TailwindVersion, report.GoSideName)
-
-	for _, population := range report.Populations {
-		fmt.Fprintf(builder,
-			"  %s: %d registry + %d corpus classes, %d answered by both\n",
-			population.SystemName, population.RegistryClasses, population.CorpusClasses, population.Answered(),
-		)
-		fmt.Fprintf(builder,
-			"    agreed %d, disagreed %d, go-silent %d, engine-silent %d, both-silent %d (engine declined %d)\n",
-			population.ByOutcome[OutcomeAgreed], population.ByOutcome[OutcomeDisagreed],
-			population.ByOutcome[OutcomeGoSilent], population.ByOutcome[OutcomeEngineSilent],
-			population.ByOutcome[OutcomeBothSilent], population.EngineNullReadings,
-		)
-		if answered := population.Answered(); answered > 0 {
-			fmt.Fprintf(builder, "    agreement over answered classes: %.4f%%\n",
-				float64(population.ByOutcome[OutcomeAgreed])/float64(answered)*100)
-		}
-	}
-
-	// Observed and planted are counted apart, never summed. A run with three controls reporting
-	// "3 divergences" on a design system whose real gap was zero is a sentence a reader takes as
-	// remaining exposure, and that has happened in this repository.
-	observed, planted := 0, 0
-	for _, divergence := range report.Divergences {
-		if divergence.Planted {
-			planted++
-			continue
-		}
-		observed++
-	}
-	fmt.Fprintf(builder, "  divergences: %d observed, %d planted by controls\n", observed, planted)
-
-	for _, result := range report.Controls {
-		status := "did not fire"
-		if result.Detected {
-			status = "fired"
-		}
-		fmt.Fprintf(builder, "    control %-22s %s: %d detections (floor %d) \u2014 %s\n",
-			result.Control.Name, status, result.Detections, result.Control.MinimumDetections, result.Control.Detail)
-	}
-
-	_, divergenceDetail := report.RepositoriesDiverge()
-	fmt.Fprintf(builder, "  design systems: %s\n", divergenceDetail)
-
-	return builder.String()
-}
-
-// DivergencesByOutcome groups the observed divergences, sorted, for a report a reader can act on.
-//
-// Planted divergences are excluded. They are proof the instrument works and they are not findings,
-// and a list that mixed them would hand a reader control noise to triage.
-func (report Report) DivergencesByOutcome() map[Outcome][]Divergence {
-	grouped := map[Outcome][]Divergence{}
-	for _, divergence := range report.Divergences {
-		if divergence.Planted {
-			continue
-		}
-		grouped[divergence.Outcome] = append(grouped[divergence.Outcome], divergence)
-	}
-	for outcome := range grouped {
-		sort.Slice(grouped[outcome], func(left, right int) bool {
-			return grouped[outcome][left].ClassName < grouped[outcome][right].ClassName
-		})
-	}
-	return grouped
-}
-
-// Format renders a reading the way the extractor's `readingKey` does, so a Go failure message and a
-// JavaScript one can be compared by eye without translating between two spellings.
-func (reading Reading) Format() string {
-	parts := make([]string, len(reading.Order))
-	for index, order := range reading.Order {
-		parts[index] = fmt.Sprint(order)
-	}
-	return "[" + strings.Join(parts, ",") + "]#" + fmt.Sprint(reading.Count)
-}
 
 // PopulationRegistry and PopulationCorpus are the two populations, named rather than spelled at each
 // use site.

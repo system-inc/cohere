@@ -87,10 +87,8 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	if len(current.List("children")) == 1 &&
 		current.List("children")[0].Is("JSXExpressionContainer") &&
 		current.List("children")[0].Child("expression").Is("TemplateLiteral", "TaggedTemplateExpression") {
-		parts := []any{openingLines}
-		for _, printed := range printAll(path, print, "children") {
-			parts = append(parts, printed)
-		}
+		parts := []Doc{openingLines}
+		parts = append(parts, printAll(path, print, "children")...)
 		parts = append(parts, closingLines)
 		return concatIn(path, parts...)
 	}
@@ -138,7 +136,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	if settingsOf(options).SingleQuote {
 		rawJsxWhitespace = "{' '}"
 	}
-	whitespace := ifBreak(concatIn(path, rawJsxWhitespace, softline), " ")
+	whitespace := ifBreak(concatIn(path, textDoc(rawJsxWhitespace), softline), doc.Text(" "))
 
 	isFacebookTranslationTag := current.Child("openingElement").Child("name").String("name") == "fbt"
 
@@ -229,7 +227,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	 */
 	multilineChildren := []Doc{emptyDoc}
 	// pushOntoLast is multilineChildren.push([multilineChildren.pop(), doc]).
-	pushOntoLast := func(document any) {
+	pushOntoLast := func(document Doc) {
 		last := len(multilineChildren) - 1
 		multilineChildren[last] = concatIn(path, multilineChildren[last], document)
 	}
@@ -240,23 +238,27 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 			if index == 1 && doc.IsEmptyDoc(children[index-1]) {
 				if len(children) == 2 {
 					// Solitary whitespace
-					pushOntoLast(rawJsxWhitespace)
+					pushOntoLast(textDoc(rawJsxWhitespace))
 					continue
 				}
 				// Leading whitespace
-				multilineChildren = append(multilineChildren, concatIn(path, rawJsxWhitespace, hardline), emptyDoc)
+				multilineChildren = append(
+					multilineChildren,
+					concatIn(path, textDoc(rawJsxWhitespace), hardline),
+					emptyDoc,
+				)
 				continue
 			}
 
 			if index == len(children)-1 {
 				// Trailing whitespace
-				pushOntoLast(rawJsxWhitespace)
+				pushOntoLast(textDoc(rawJsxWhitespace))
 				continue
 			}
 
 			if isEmptyText(at(index-1)) && isSameDoc(at(index-2), hardline) {
 				// Whitespace after line break
-				pushOntoLast(rawJsxWhitespace)
+				pushOntoLast(textDoc(rawJsxWhitespace))
 				continue
 			}
 		}
@@ -284,7 +286,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	if containsText {
 		content = fill(multilineChildren)
 	} else {
-		content = groupWithIn(path, multilineChildren, doc.GroupOptions{ShouldBreak: true})
+		content = groupWithIn(path, doc.Concat(multilineChildren), doc.GroupOptions{ShouldBreak: true})
 	}
 
 	// Upstream wraps content in `cursor` when options.cursorNode, nodeBeforeCursor or nodeAfterCursor
@@ -300,10 +302,8 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 		return multiLineElem
 	}
 
-	flatParts := []any{openingLines}
-	for _, child := range children {
-		flatParts = append(flatParts, child)
-	}
+	flatParts := []Doc{openingLines}
+	flatParts = append(flatParts, children...)
 	flatParts = append(flatParts, closingLines)
 	return conditionalGroup([]Doc{
 		groupIn(path, concatIn(path, flatParts...)),

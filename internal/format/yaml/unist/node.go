@@ -137,3 +137,11 @@ func (node *Node) Field(name string) any {
 // CommentData is the print core's comment bookkeeping. The YAML printer prints comments itself, so it
 // stays empty.
 func (node *Node) CommentData() *printing.CommentFields[*Node] { return &node.comments }
+
+// withContent is `...content`.
+func (node *Node) withContent(content content) *Node {
+	node.Anchor = content.anchor
+	node.Tag = content.tag
+	node.MiddleComments = content.middleComments
+	return node
+}

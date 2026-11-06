@@ -1,21 +1,18 @@
 package javascript
 
 import (
-	"fmt"
 	"sync"
 
-	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/doc"
 )
 
 /*
  * Upstream's doc builders under upstream's names, so a print function ports line for line.
  *
- * JavaScript docs are strings, arrays and objects freely mixed; Go's are typed. toDoc is the one place
- * that bridges them: a string becomes Text, a slice becomes Concat, nil becomes the empty string. Every
- * builder here takes `any` through toDoc, so `concat("(", print("x", nil), ")")` reads like upstream's
- * `["(", print("x"), ")"]`. A value toDoc does not recognise is a programming error and panics, rather
- * than printing nothing.
+ * JavaScript docs are strings, arrays and objects freely mixed; Go's are typed, and every builder here
+ * takes Doc. A string is made a Doc where it is passed: a constant as doc.Text, a computed one through
+ * textDoc, and an array given as one doc as doc.Concat. So upstream's `["(", print("x"), ")"]` reads
+ * `concat(doc.Text("("), print("x", nil), doc.Text(")"))`. A part left nil is the empty string.
  */
 
 var (
@@ -30,9 +27,10 @@ var (
 // emptyDoc is upstream's "".
 var emptyDoc Doc = doc.Text("")
 
-// internedTexts are the texts the printer writes most, each made a Doc once. A string becomes a Doc by
-// boxing it, which allocates every time; toDoc boxing the same punctuation over and over was 7.6M of the
-// printer's allocations on ahra (#fyw36kf). A text missing here is boxed as before.
+// internedTexts are the texts the printer writes most, each made a Doc once. A computed string becomes a
+// Doc by boxing it, which allocates every time; boxing the same punctuation over and over was 7.6M of the
+// printer's allocations on ahra (#fyw36kf). A constant needs none of this, since doc.Text of a constant is
+// static data. A text missing here is boxed.
 var internedTexts = func() map[string]Doc {
 	texts := map[string]Doc{}
 	for _, text := range []string{
@@ -64,49 +62,25 @@ func textDoc(text string) Doc {
 	return doc.Text(text)
 }
 
-// toDoc converts a JavaScript-shaped doc value.
-func toDoc(value any) Doc {
-	switch typed := value.(type) {
-	case nil:
+// orEmptyDoc is document, or emptyDoc where it is nil: a Doc that was never set reaches a builder as nil,
+// and the doc the builder makes holds upstream's "" in its place.
+func orEmptyDoc(document Doc) Doc {
+	if document == nil {
 		return emptyDoc
-	case string:
-		return textDoc(typed)
-	case doc.Doc:
-		return typed
-	case []Doc:
-		return doc.Concat(typed)
-	case []any:
-		parts := make(doc.Concat, len(typed))
-		for index, part := range typed {
-			parts[index] = toDoc(part)
-		}
-		return parts
 	}
-	panic(fmt.Sprintf("javascript: %T is not a doc", value))
+	return document
 }
 
 // concat is upstream's array doc.
-func concat(parts ...any) Doc {
+func concat(parts ...Doc) Doc {
 	result := make(doc.Concat, len(parts))
 	for index, part := range parts {
-		result[index] = toDoc(part)
+		result[index] = orEmptyDoc(part)
 	}
 	return result
 }
 
-// docMemory is where one format's docs come from: concat's parts, groups and indents, cut from chunks that
-// are reset once the doc is laid out and reused by the next format (#fyw36kf). Made one at a time they
-// were concat's 3.9M slices, and 1.7M groups and indents, a pass on ahra. A released doc reads as
-// poisonedDoc under cohere_poison, so a doc read after its file was printed shows in the output.
-//
-// An array doc from here is a *doc.Sequence: a Concat is a slice, and putting one in a Doc allocates a cell
-// for its header every time, 3.6M of them a pass on ahra; a pointer from the arena costs nothing.
-type docMemory struct {
-	parts     arena.Slab[doc.Doc]
-	sequences arena.Arena[doc.Sequence]
-	groups    arena.Arena[doc.Group]
-	indents   arena.Arena[doc.Indent]
-}
+var poisonedDoc Doc = doc.Text("CoherePoisonedDoc")
 
 var docMemories = sync.Pool{New: func() any {
 	memory := &docMemory{}
@@ -117,8 +91,6 @@ var docMemories = sync.Pool{New: func() any {
 	return memory
 }}
 
-var poisonedDoc Doc = doc.Text("CoherePoisonedDoc")
-
 // acquireDocMemory is a docMemory for one format, from the pool. Release it once the doc is laid out.
 func acquireDocMemory() *docMemory {
 	memory, isDocMemory := docMemories.Get().(*docMemory)
@@ -127,15 +99,6 @@ func acquireDocMemory() *docMemory {
 		panic("javascript: the doc memory pool held something other than a *docMemory")
 	}
 	return memory
-}
-
-// release resets the memory and returns it to the pool. Every doc it handed out is gone.
-func (memory *docMemory) release() {
-	memory.parts.Reset()
-	memory.sequences.Reset()
-	memory.groups.Reset()
-	memory.indents.Reset()
-	docMemories.Put(memory)
 }
 
 // docMemoryOf is the path's print's docMemory, or nil for the heap.
@@ -149,14 +112,14 @@ func docMemoryOf(path *Path) *docMemory {
 
 // concatIn is concat from the format's docMemory, when the path's print has one: its parts from the slab
 // and the doc a *doc.Sequence from the arena, so it allocates nothing.
-func concatIn(path *Path, parts ...any) Doc {
+func concatIn(path *Path, parts ...Doc) Doc {
 	memory := docMemoryOf(path)
 	if memory == nil {
 		return concat(parts...)
 	}
 	result := memory.parts.Make(len(parts))[:len(parts)]
 	for index, part := range parts {
-		result[index] = toDoc(part)
+		result[index] = orEmptyDoc(part)
 	}
 	return memory.sequences.New(doc.Sequence{Parts: result})
 }
@@ -182,36 +145,36 @@ func partsIn(path *Path, count int) []Doc {
 }
 
 // groupIn is group with the group from the format's docMemory.
-func groupIn(path *Path, contents any) Doc {
+func groupIn(path *Path, contents Doc) Doc {
 	return groupWithIn(path, contents, doc.GroupOptions{})
 }
 
 // groupWithIn is groupWith with the group from the format's docMemory. It builds what doc.NewGroup does.
-func groupWithIn(path *Path, contents any, options doc.GroupOptions) Doc {
+func groupWithIn(path *Path, contents Doc, options doc.GroupOptions) Doc {
 	memory := docMemoryOf(path)
 	if memory == nil {
 		return groupWith(contents, options)
 	}
 	return memory.groups.New(doc.Group{
 		Id:             options.Id,
-		Contents:       toDoc(contents),
+		Contents:       orEmptyDoc(contents),
 		Break:          options.ShouldBreak,
 		ExpandedStates: options.ExpandedStates,
 	})
 }
 
 // indentIn is indent with the indent from the format's docMemory. It builds what doc.NewIndent does.
-func indentIn(path *Path, contents any) Doc {
+func indentIn(path *Path, contents Doc) Doc {
 	memory := docMemoryOf(path)
 	if memory == nil {
 		return indent(contents)
 	}
-	return memory.indents.New(doc.Indent{Contents: toDoc(contents)})
+	return memory.indents.New(doc.Indent{Contents: orEmptyDoc(contents)})
 }
 
 // groupWith is upstream's group(contents, options).
-func groupWith(contents any, options doc.GroupOptions) Doc {
-	return doc.NewGroup(toDoc(contents), options)
+func groupWith(contents Doc, options doc.GroupOptions) Doc {
+	return doc.NewGroup(orEmptyDoc(contents), options)
 }
 
 // conditionalGroup is upstream's conditionalGroup(states, options).
@@ -220,43 +183,43 @@ func conditionalGroup(states []Doc, options doc.GroupOptions) Doc {
 }
 
 // indent is upstream's indent(contents).
-func indent(contents any) Doc { return doc.NewIndent(toDoc(contents)) }
+func indent(contents Doc) Doc { return doc.NewIndent(orEmptyDoc(contents)) }
 
 // align is upstream's align(width, contents) for a numeric width.
-func align(width int, contents any) Doc { return doc.NewAlign(width, toDoc(contents)) }
+func align(width int, contents Doc) Doc { return doc.NewAlign(width, orEmptyDoc(contents)) }
 
 // dedent is upstream's dedent(contents).
-func dedent(contents any) Doc { return doc.Dedent(toDoc(contents)) }
+func dedent(contents Doc) Doc { return doc.Dedent(orEmptyDoc(contents)) }
 
 // dedentToRoot is upstream's dedentToRoot(contents).
-func dedentToRoot(contents any) Doc { return doc.DedentToRoot(toDoc(contents)) }
+func dedentToRoot(contents Doc) Doc { return doc.DedentToRoot(orEmptyDoc(contents)) }
 
 // markAsRoot is upstream's markAsRoot(contents).
-func markAsRoot(contents any) Doc { return doc.MarkAsRoot(toDoc(contents)) }
+func markAsRoot(contents Doc) Doc { return doc.MarkAsRoot(orEmptyDoc(contents)) }
 
 // fill is upstream's fill(parts).
 func fill(parts []Doc) Doc { return doc.NewFill(parts) }
 
 // ifBreak is upstream's ifBreak(breakContents, flatContents).
-func ifBreak(breakContents any, flatContents any) Doc {
-	return doc.NewIfBreak(toDoc(breakContents), toDoc(flatContents), nil)
+func ifBreak(breakContents Doc, flatContents Doc) Doc {
+	return doc.NewIfBreak(orEmptyDoc(breakContents), orEmptyDoc(flatContents), nil)
 }
 
 // ifBreakWithGroup is upstream's ifBreak(breakContents, flatContents, { groupId }).
-func ifBreakWithGroup(breakContents any, flatContents any, groupId *doc.GroupId) Doc {
-	return doc.NewIfBreak(toDoc(breakContents), toDoc(flatContents), groupId)
+func ifBreakWithGroup(breakContents Doc, flatContents Doc, groupId *doc.GroupId) Doc {
+	return doc.NewIfBreak(orEmptyDoc(breakContents), orEmptyDoc(flatContents), groupId)
 }
 
 // indentIfBreak is upstream's indentIfBreak(contents, { groupId, negate }).
-func indentIfBreak(contents any, groupId *doc.GroupId, negate bool) Doc {
-	return doc.NewIndentIfBreak(toDoc(contents), groupId, negate)
+func indentIfBreak(contents Doc, groupId *doc.GroupId, negate bool) Doc {
+	return doc.NewIndentIfBreak(orEmptyDoc(contents), groupId, negate)
 }
 
 // label is upstream's label(name, contents).
-func label(name string, contents any) Doc { return doc.NewLabel(name, toDoc(contents)) }
+func label(name string, contents Doc) Doc { return doc.NewLabel(name, orEmptyDoc(contents)) }
 
 // join is upstream's join(separator, parts).
-func join(separator any, parts []Doc) Doc { return doc.Join(toDoc(separator), parts) }
+func join(separator Doc, parts []Doc) Doc { return doc.Join(orEmptyDoc(separator), parts) }
 
 // newGroupId is upstream's Symbol(name) used as a group id.
 func newGroupId(name string) *doc.GroupId { return doc.NewGroupId(name) }

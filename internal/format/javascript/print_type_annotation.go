@@ -1,5 +1,7 @@
 package javascript
 
+import "github.com/system-inc/cohere/internal/format/doc"
+
 // print/type-annotation.js.
 
 // shouldHugType is upstream's shouldHugType.
@@ -17,7 +19,8 @@ func shouldHugType(node Node) bool {
 
 /*
 Normally the `(TS)TypeAnnotation` node starts with `:` token.
-If we print `:` in parent node, `cursorNodeDiff` in `/src/main/core.js` will consider `:` is removed, cause cursor moves, see #12491.
+If we print `:` in parent node, `cursorNodeDiff` in `/src/main/core.js` will consider `:` is removed, cause cursor
+moves, see #12491.
 Token *before* `(TS)TypeAnnotation.typeAnnotation` should be printed in `getTypeAnnotationFirstToken` function.
 */
 // printTypeAnnotationProperty is upstream's printTypeAnnotationProperty(path, print, propertyName =
@@ -48,7 +51,7 @@ func printTypeAnnotationProperty(path *Path, print PrintFunc, property ...string
 	}
 
 	if shouldPrintLeadingSpace {
-		return concatIn(path, " ", print(propertyName, nil))
+		return concatIn(path, doc.Text(" "), print(propertyName, nil))
 	}
 	return print(propertyName, nil)
 }
@@ -106,7 +109,7 @@ func getTypeAnnotationFirstToken(path *Path) string {
 func printTypeAnnotation(path *Path, options *Options, print PrintFunc) Doc {
 	token := getTypeAnnotationFirstToken(path)
 	if token != "" {
-		return concatIn(path, token, " ", print("typeAnnotation", nil))
+		return concatIn(path, textDoc(token), doc.Text(" "), print("typeAnnotation", nil))
 	}
 	return print("typeAnnotation", nil)
 }

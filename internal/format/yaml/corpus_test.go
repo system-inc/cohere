@@ -34,61 +34,6 @@ const javaScriptSpaceText = "\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u20
 // relocation maps a Swift build leaves in .build).
 const oracleSizeLimit = 1 << 20
 
-// yamlCandidate is the port, measured two ways. The full stack is Format: the Go parser and the printer,
-// from the text. The tree loader prints the trees the real parser built, parsed by Node in batches before
-// the comparison starts, so the printer is measured apart from the parser; Format then checks it is
-// printing the text the tree was parsed from.
-type yamlCandidate struct {
-	options   formatoptions.Options
-	fullStack bool
-	texts     map[string]string
-	trees     map[string]parsed
-}
-
-func (candidate yamlCandidate) Handles(fileName string) bool {
-	extension := strings.ToLower(filepath.Ext(fileName))
-	return extension == ".yaml" || extension == ".yml"
-}
-
-func (candidate yamlCandidate) Format(fileName string, text string) (string, error) {
-	if candidate.fullStack {
-		return formatFullStack(fileName, text, candidate.options, "preserve", nil)
-	}
-	normalized, hasByteOrderMark := normalizeInput(text)
-	if candidate.texts[fileName] != normalized {
-		return "", fmt.Errorf("the file changed after it was parsed")
-	}
-	return formatParsed(
-		fileName,
-		candidate.trees[fileName],
-		normalized,
-		hasByteOrderMark,
-		candidate.options,
-		"preserve",
-		nil,
-	)
-}
-
-// frontMatterOracle formats a markdown file with Prettier and keeps the front matter block of the
-// output: the first line through the first later line that is the end delimiter ("---", or "..." as
-// pandoc allows).
-type frontMatterOracle struct{ engine *prettier.Engine }
-
-func (oracle frontMatterOracle) Handles(fileName string) bool { return oracle.engine.Handles(fileName) }
-
-func (oracle frontMatterOracle) Format(fileName string, text string) (string, error) {
-	formatted, formatError := oracle.engine.Format(fileName, text)
-	if formatError != nil {
-		return "", formatError
-	}
-	normalized, _ := normalizeInput(text)
-	frontMatter, _ := mdast.ParseFrontMatter(normalized)
-	if frontMatter == nil {
-		return "", fmt.Errorf("no front matter")
-	}
-	return frontMatterBlock(formatted, frontMatter.EndDelimiter), nil
-}
-
 func frontMatterBlock(formatted string, endDelimiter string) string {
 	lines := strings.SplitAfter(formatted, "\n")
 	length := 0

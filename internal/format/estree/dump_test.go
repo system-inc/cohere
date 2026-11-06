@@ -68,7 +68,10 @@ func TestConvertAgreesWithPrettier(test *testing.T) {
 	for _, corpus := range strings.Split(corpora, ":") {
 		corpus = strings.TrimSpace(corpus)
 		if strings.HasPrefix(corpus, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("finding the home directory for %s: %v", corpus, homeError)
+			}
 			corpus = filepath.Join(home, corpus[2:])
 		}
 		listing, outputError := exec.Command("git", "-C", corpus, "ls-files", "--", "*.ts", "*.tsx").Output()
@@ -91,7 +94,8 @@ func TestConvertAgreesWithPrettier(test *testing.T) {
 	command := exec.Command("node", "--input-type=module", "-e", prettierParseScript)
 	command.Dir = root
 	command.Stdin = strings.NewReader(strings.Join(files, "\n"))
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if runError := command.Run(); runError != nil {
 		test.Fatalf("node: %v\n%s", runError, stderr.String())
@@ -105,7 +109,11 @@ func TestConvertAgreesWithPrettier(test *testing.T) {
 		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
 			test.Fatal(decodeError)
 		}
-		oracle[record["file"].(string)] = record
+		file, isString := record["file"].(string)
+		if !isString {
+			test.Fatalf("the oracle printed a record with no file name: %s", line)
+		}
+		oracle[file] = record
 	}
 
 	identical, refused, different := 0, 0, 0
