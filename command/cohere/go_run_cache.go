@@ -33,9 +33,28 @@ func beginGoRunCache(location projectLocation) {
 	// No section beyond the run's own: the findings, shapes and types sections serve a TypeScript graph's walk,
 	// and the Go engine walks none of them.
 	session := beginRunCacheSession(location.Root, anchor, program.CacheTableSections{}, facts...)
-	if session != nil {
-		session.projectRoots = []string{anchor.Root(), anchor.Resolved()}
+	if session == nil {
+		return
 	}
+	session.projectRoots = []string{anchor.Root(), anchor.Resolved()}
+	// Decided before the run, from what the run is given: the record could not name what it would read.
+	if reason := goEnvironmentUnnameable(os.Environ()); reason != "" {
+		declineRunCache(reason)
+		session.note("the run cache does not record this run: " + reason)
+	}
+}
+
+// goEnvironmentUnnameable is why a run under environment reads what no inputs record can name, empty when it does
+// not: a `GO*` variable, `GOFLAGS` among them, carrying `-overlay`, whose file replaces source files by others the
+// record never sees, so editing one of those would replay a verdict about the files it replaced.
+func goEnvironmentUnnameable(environment []string) string {
+	for _, variable := range environment {
+		name, value, _ := strings.Cut(variable, "=")
+		if strings.HasPrefix(name, "GO") && strings.Contains(value, "-overlay") {
+			return fmt.Sprintf("%s carries -overlay, whose replacement files the record cannot name", name)
+		}
+	}
+	return ""
 }
 
 // goKeyedVariables are the variables a Go run's key takes by name, beside every `GO*` and `CGO_*` one. See
@@ -122,6 +141,13 @@ func declareGoRunCacheInputs(run *engineRun, exitCode int, settingsFile string) 
 	}
 	if reason := goRunUnrecordable(run, exitCode); reason != "" {
 		declineRunCache(reason)
+		return
+	}
+	if run.cgoTranslated {
+		// Said, as below: a project with cgo of its own would otherwise never replay, with nothing to say why.
+		reason := "the load translated cgo, whose C headers and compiler the record cannot name"
+		declineRunCache(reason)
+		session.note("the run cache did not record this run: " + reason)
 		return
 	}
 	if reason := goInputsUnreplayable(run.inputs, session.projectRoots); reason != "" {

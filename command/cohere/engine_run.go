@@ -146,6 +146,12 @@ type engineTypesRecord struct {
 	// which decodes as none.
 	WithheldInDependencyCgo           []withheldCgoFile `json:"withheldInDependencyCgo"`
 	WithheldDependencyCgoDeclarations int               `json:"withheldDependencyCgoDeclarations"`
+	// CgoTranslation is the Go engine's too: how many packages the cgo tool translated, and how long that load took,
+	// 0 and 0 on the load from source, which runs no cgo tool. A Swift engine sends none, which decodes as 0 and 0.
+	CgoTranslation struct {
+		Packages     int `json:"packages"`
+		Milliseconds int `json:"milliseconds"`
+	} `json:"cgoTranslation"`
 }
 
 type engineLintRecord struct {
@@ -265,6 +271,10 @@ type engineRun struct {
 	// filesRewritten is how many files the fix phase wrote, so a run that rewrote the tree it checked is never
 	// recorded as a verdict about that tree.
 	filesRewritten int
+
+	// cgoTranslated is whether the load ran the cgo tool, which reads C headers and a compiler no inputs record can
+	// name, so such a run is never recorded. See goInputsUnnameable.
+	cgoTranslated bool
 
 	// findings is every finding record received; findingsInPhase only those since the last phase
 	// record, which is how the types and lint records' own counts are checked.
@@ -789,6 +799,8 @@ func (run *engineRun) acceptTypes(record *engineTypesRecord) error {
 			counted(file.Errors, "type error", "type errors"), file.File, file.Package)
 	}
 	run.withheldInDependencyCgo = append(run.withheldInDependencyCgo, record.WithheldInDependencyCgo...)
+	translated := record.CgoTranslation.Packages > 0 || record.CgoTranslation.Milliseconds > 0
+	run.cgoTranslated = run.cgoTranslated || translated
 	run.withheldDependencyCgoDeclarations += record.WithheldDependencyCgoDeclarations
 	streams.Show(run.out)
 	return nil

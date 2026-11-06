@@ -856,3 +856,47 @@ func TestAGoWorkspaceInAWorktreeReplaysOverItsGitDirectory(test *testing.T) {
 		test.Fatalf("the worktree's index changed and the run replayed:\n%s", changed.stdout)
 	}
 }
+
+// TestAGoRunTheRecordCannotNameIsNeverRecorded: a run that reads what no inputs record can name is never recorded,
+// and says so in the account. A project with cgo of its own is loaded through the cgo tool, which reads system C
+// headers and a compiler; a `GOFLAGS` carrying `-overlay` replaces source files by others nothing names. In each, the
+// second run of an unchanged module is a miss, and the reason is said on both.
+func TestAGoRunTheRecordCannotNameIsNeverRecorded(test *testing.T) {
+	test.Parallel()
+	for _, shape := range []struct {
+		name    string
+		prepare func(fixture *goReplayFixture)
+		reason  string
+	}{
+		{"a project with cgo of its own", func(fixture *goReplayFixture) {
+			fixture.setVariable("CGO_ENABLED", "1")
+			fixture.write("native.go", "package replay\n\n// #include <stdlib.h>\nimport \"C\"\n\n"+
+				"// Absolute is the magnitude of value, from C's abs.\nfunc Absolute(value int) int {\n"+
+				"\treturn int(C.abs(C.int(value)))\n}\n")
+		}, "the run cache did not record this run: the load translated cgo"},
+		{"an overlay in GOFLAGS", func(fixture *goReplayFixture) {
+			overlay := filepath.Join(fixture.parent, "overlay.json")
+			if writeError := os.WriteFile(overlay, []byte(`{"Replace":{}}`), 0o644); writeError != nil {
+				fixture.test.Fatal(writeError)
+			}
+			fixture.setVariable("GOFLAGS", strings.TrimSpace(os.Getenv("GOFLAGS")+" -overlay="+overlay))
+		}, "the run cache does not record this run: GOFLAGS carries -overlay"},
+	} {
+		test.Run(shape.name, func(test *testing.T) {
+			test.Parallel()
+			fixture := newGoReplayFixture(test)
+			shape.prepare(fixture)
+			arguments := []string{"--no-fix", "--verbose"}
+			for _, attempt := range []string{"the first run", "the second run"} {
+				run := fixture.run(true, arguments...)
+				if isGoReplay(run) {
+					test.Fatalf("%s replayed:\n%s", attempt, run.stdout)
+				}
+				if !strings.Contains(run.stdout+run.stderr, shape.reason) {
+					test.Errorf("%s did not say why it was not recorded, %q:\n%s%s", attempt, shape.reason,
+						run.stdout, run.stderr)
+				}
+			}
+		})
+	}
+}
