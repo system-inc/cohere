@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are three.
+// The changes are four.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -53,6 +53,17 @@
 //
 // Peak RSS is the cap's either way, about 5.6 GB, since with collection
 // off the heap grows to the limit before the first cycle.
+//
+// The fourth is the restore, the seam the engine's per-package findings
+// cache goes through. Options.Restored names the packages whose findings
+// and facts the cache already holds. An action on such a package gets no
+// horizontal prerequisites, so nothing on the package runs. It still
+// finishes its vertical ones and inherits their facts as any action does,
+// then Options.Restore adds the package's own facts from the cache, with
+// RestoreObjectFact and RestorePackageFact, in place of a pass. An
+// importer then inherits them as it would have inherited them from a run.
+// ExportedFacts is what such an entry is written from: the facts an
+// action exported that its importers read.
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
@@ -135,6 +146,14 @@ type Options struct {
 	// in the [packages.Config] can be communicated via
 	// Pass.ReadFile to each Analyzer.
 	readFile driverutil.ReadFileFunc
+
+	// cohere: Restored reports whether a package's analysis is restored
+	// rather than run. Every action on such a package skips its pass and
+	// its horizontal prerequisites, and Restore gives it the package's own
+	// facts once it has inherited its prerequisites'. An error Restore
+	// returns is the action's Err. Both are nil when nothing is restored.
+	Restored func(*packages.Package) bool
+	Restore  func(*Action) error
 }
 
 // Graph holds the results of a round of analysis, including the graph
@@ -276,8 +295,11 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 			act = &Action{Analyzer: a, Package: pkg, opts: opts}
 
 			// Add a dependency on each required analyzers.
-			for _, req := range a.Requires {
-				act.Deps = append(act.Deps, mkAction(req, pkg))
+			// cohere: unless the package is restored, since then nothing on it runs.
+			if opts.Restored == nil || !opts.Restored(pkg) {
+				for _, req := range a.Requires {
+					act.Deps = append(act.Deps, mkAction(req, pkg))
+				}
 			}
 
 			// An analysis that consumes/produces facts
@@ -486,6 +508,13 @@ func (act *Action) execOnce() {
 			// become available to this analysis pass.
 			inheritFacts(act, dep)
 		}
+	}
+
+	// cohere: a restored package's own facts come from the cache, in
+	// place of a pass, on top of those it inherited (see Options.Restored).
+	if act.opts.Restored != nil && act.opts.Restored(act.Package) {
+		act.Err = act.opts.Restore(act)
+		return
 	}
 
 	// Quick (nonexhaustive) check that the correct go/packages mode bits were used.
@@ -776,6 +805,38 @@ func (act *Action) exportObjectFact(obj types.Object, fact analysis.Fact) {
 		fmt.Fprintf(log, "%s: object %s has fact %s\n",
 			act.Package.Fset.Position(obj.Pos()), objstr, fact)
 	}
+}
+
+// cohere: ExportedFacts returns the facts act exported itself that an
+// importer inherits from it, the object facts filtered as inheritFacts
+// filters them, so a restore that adds them back gives every importer
+// what a run would have.
+func (act *Action) ExportedFacts() ([]analysis.ObjectFact, []analysis.PackageFact) {
+	var objectFacts []analysis.ObjectFact
+	for key, fact := range act.objectFacts {
+		if key.obj.Pkg() == act.Package.Types && exportedFrom(key.obj, act.Package.Types) {
+			objectFacts = append(objectFacts, analysis.ObjectFact{Object: key.obj, Fact: fact})
+		}
+	}
+	var packageFacts []analysis.PackageFact
+	for key, fact := range act.packageFacts {
+		if key.pkg == act.Package.Types {
+			packageFacts = append(packageFacts, analysis.PackageFact{Package: key.pkg, Fact: fact})
+		}
+	}
+	return objectFacts, packageFacts
+}
+
+// cohere: RestoreObjectFact gives a restored action a fact its package
+// exported in the run the cache holds, obj being of act's own package.
+func (act *Action) RestoreObjectFact(obj types.Object, fact analysis.Fact) {
+	act.objectFacts[objectFactKey{obj, factType(fact)}] = fact
+}
+
+// cohere: RestorePackageFact gives a restored action a fact its package
+// exported about itself in the run the cache holds.
+func (act *Action) RestorePackageFact(fact analysis.Fact) {
+	act.packageFacts[packageFactKey{act.Package.Types, factType(fact)}] = fact
 }
 
 // AllObjectFacts returns a new slice containing all object facts of
