@@ -337,7 +337,8 @@ func directoryFingerprint(directory string) ([sha256.Size]byte, bool) {
 // goFileHeader is what go list reads of one Go file, as go/build's readGoInfo reads it: its bytes up to the end of
 // its imports, which hold its build constraints, its package clause and its imports, cgo's preamble and its #cgo
 // lines included, and its `//go:embed` lines. Nothing below the imports reaches go list's answer, not even a parse
-// error there, so an edit to a function's body moves no listing. A file that does not parse that far is hashed
+// error there, so an edit to a function's body moves no listing. readGoInfo is the reason this is enough, so a Go
+// whose readGoInfo reads more of a file is a reason to look here again. A file that does not parse that far is hashed
 // whole, since go list's error about it can depend on any of it. It returns whether the file embeds, and whether it
 // could be read.
 func goFileHeader(file string) (string, bool, bool) {

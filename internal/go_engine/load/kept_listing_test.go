@@ -221,3 +221,46 @@ func TestOnlyWhatCannotMoveIsLeftOutOfTheListing(test *testing.T) {
 		test.Fatalf("want a listing with an error never kept")
 	}
 }
+
+// A module a go.work uses through a symbolic link, as every worktree's go.work reaches TypeScript/tsc, is still read:
+// the walk names the link and does not follow it, as go does not, but each listed package's directory is read
+// through it. So a header edit inside the linked module asks go list again, and the load is the one without a kept
+// answer.
+func TestAModuleAGoWorkUsesThroughASymbolicLinkIsRead(test *testing.T) {
+	test.Parallel()
+
+	root, resolveError := filepath.EvalSymlinks(test.TempDir())
+	if resolveError != nil {
+		test.Fatalf("resolving the temporary directory: %v", resolveError)
+	}
+	writeListingFiles(test, root, map[string]string{
+		"project/go.mod":  "module example.com/linked\n\ngo 1.24\n",
+		"project/go.work": "go 1.24\n\nuse (\n\t.\n\t./outside\n)\n",
+		"project/user/user.go": "package user\n\nimport \"example.com/outside/lib\"\n\n// User calls Lib.\n" +
+			"func User() int { return lib.Lib() }\n",
+		"elsewhere/go.mod":     listingFiles["outside/go.mod"],
+		"elsewhere/lib/lib.go": listingFiles["outside/lib/lib.go"],
+	})
+	project := filepath.Join(root, "project")
+	if linkError := os.Symlink(filepath.Join(root, "elsewhere"), filepath.Join(project, "outside")); linkError != nil {
+		test.Fatalf("linking the module: %v", linkError)
+	}
+	listings := &listingMap{listings: map[[sha256.Size]byte][]byte{}}
+	loadSummary(test, project, nil, listings)
+	if _, kept := loadSummary(test, project, nil, listings); !kept {
+		test.Fatalf("want the second load, with nothing moved, to keep go list's answer")
+	}
+	writeListingFiles(test, root, map[string]string{
+		"elsewhere/lib/lib.go": "package lib\n\nimport \"strings\"\n\n// Lib is two.\n" +
+			"func Lib() int { return len(strings.Repeat(\"a\", 2)) }\n",
+	})
+	edited, kept := loadSummary(test, project, nil, listings)
+	if kept {
+		test.Fatalf("want a header edit inside the linked module to ask go list again")
+	}
+	fresh, _ := loadSummary(test, project, nil, nil)
+	if strings.Join(edited, "\n") != strings.Join(fresh, "\n") {
+		test.Fatalf("after the edit\n%s\nwithout a kept answer\n%s", strings.Join(edited, "\n"),
+			strings.Join(fresh, "\n"))
+	}
+}
