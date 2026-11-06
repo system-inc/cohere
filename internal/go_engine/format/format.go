@@ -9,6 +9,7 @@ package format
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -31,6 +32,10 @@ type Options struct {
 
 	// SingleThreaded formats one file at a time, for `--single-threaded`.
 	SingleThreaded bool
+
+	// Known is the verdicts of files gofmt had nothing to do to in an earlier run, read in place of formatting a
+	// file whose bytes are the same, and given what this run learns. Nil formats every file.
+	Known *KnownFiles
 }
 
 // ChangedFile is a file gofmt changed, or would change under a check.
@@ -66,6 +71,10 @@ type Result struct {
 	// `// Code generated ... DO NOT EDIT.` before the package clause. Their output is their generator's, so
 	// they are neither formatted nor reported.
 	Generated []string
+
+	// Known counts the files answered from Options.Known rather than formatted, each one gofmt left as it was, or
+	// skipped as generated, when it last saw the same bytes.
+	Known int
 }
 
 // outcome is what a run did with one file: at most one of its fields is set, and none for a file gofmt would
@@ -74,6 +83,9 @@ type outcome struct {
 	changed      *ChangedFile
 	notFormatted *NotFormattedFile
 	generated    bool
+
+	// known is a file answered from Options.Known.
+	known bool
 }
 
 // Run formats files, which are absolute paths, as many at once as there are cores unless
@@ -82,7 +94,7 @@ func Run(files []string, options Options) Result {
 	outcomes := make([]outcome, len(files))
 	if options.SingleThreaded {
 		for index, file := range files {
-			outcomes[index] = formatFile(file, options.Write)
+			outcomes[index] = formatFile(file, options.Write, options.Known)
 		}
 	} else {
 		slots := make(chan struct{}, runtime.GOMAXPROCS(0))
@@ -91,7 +103,7 @@ func Run(files []string, options Options) Result {
 			slots <- struct{}{}
 			group.Go(func() {
 				defer func() { <-slots }()
-				outcomes[index] = formatFile(file, options.Write)
+				outcomes[index] = formatFile(file, options.Write, options.Known)
 			})
 		}
 		group.Wait()
@@ -99,6 +111,9 @@ func Run(files []string, options Options) Result {
 
 	result := Result{FilesConsidered: len(files)}
 	for index, file := range files {
+		if outcomes[index].known {
+			result.Known++
+		}
 		switch {
 		case outcomes[index].changed != nil:
 			result.Changed = append(result.Changed, *outcomes[index].changed)
@@ -111,11 +126,19 @@ func Run(files []string, options Options) Result {
 	return result
 }
 
-// formatFile formats one file, writing the result when write is set.
-func formatFile(file string, write bool) outcome {
+// formatFile formats one file, writing the result when write is set, unless known says what gofmt made of the same
+// bytes before.
+func formatFile(file string, write bool, known *KnownFiles) outcome {
 	original, readError := os.ReadFile(file)
 	if readError != nil {
 		return notFormatted(file, fmt.Sprintf("it cannot be read: %v", readError))
+	}
+	var digest [sha256.Size]byte
+	if known != nil {
+		digest = sha256.Sum256(original)
+		if verdict, held := known.verdict(digest); held {
+			return outcome{generated: verdict == VerdictGenerated, known: true}
+		}
 	}
 
 	// The package clause and the comments above it are all the generated rule reads. A parse that stops there
@@ -127,6 +150,9 @@ func formatFile(file string, write bool) outcome {
 		return notFormatted(file, fmt.Sprintf("it does not parse: %v", headerError))
 	}
 	if ast.IsGenerated(header) {
+		if known != nil {
+			known.learn(digest, VerdictGenerated)
+		}
 		return outcome{generated: true}
 	}
 
@@ -135,6 +161,9 @@ func formatFile(file string, write bool) outcome {
 		return notFormatted(file, formatFailureReason(formatError))
 	}
 	if bytes.Equal(formatted, original) {
+		if known != nil {
+			known.learn(digest, VerdictUnchanged)
+		}
 		return outcome{}
 	}
 	changed := &ChangedFile{File: file, FirstDifferingLine: firstDifferingLine(original, formatted)}

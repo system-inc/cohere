@@ -3,7 +3,9 @@ package go_engine
 import (
 	"cmp"
 	"fmt"
+	"runtime"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/system-inc/cohere/internal/go_engine/check"
@@ -160,12 +162,21 @@ type suppressedFindings struct {
 
 // suppress applies the //cohere:ignore comments of every readable file in scope, read from the contents the
 // project description read, to the findings in scope. ran are the analyzer rules that ran: a directive naming a
-// rule the settings turned off is neither used nor unused.
+// rule the settings turned off is neither used nor unused. The files are indexed as many at once as there are cores,
+// since each index is its own file's.
 func (engine *pipeline) suppress(ran []string, inScope []check.Finding) suppressedFindings {
-	indexes := make([]*suppression.Index, 0, len(engine.described.contents))
-	for _, file := range engine.described.readable() {
-		indexes = append(indexes, suppression.Build(file, engine.described.contents[file]))
+	readable := engine.described.readable()
+	indexes := make([]*suppression.Index, len(readable))
+	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
+	var group sync.WaitGroup
+	for index, file := range readable {
+		slots <- struct{}{}
+		group.Go(func() {
+			defer func() { <-slots }()
+			indexes[index] = suppression.Build(file, engine.described.contents[file])
+		})
 	}
+	group.Wait()
 	located := make([]suppression.Finding, 0, len(inScope))
 	for _, found := range inScope {
 		located = append(located, suppression.Finding{Rule: found.Rule, File: found.File, Line: found.Line})

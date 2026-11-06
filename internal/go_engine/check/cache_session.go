@@ -166,15 +166,27 @@ func (session *CacheSession) Restore(
 	return restoring
 }
 
-// Listing is go list's answer the load kept under key, for load.ListingStore: the session's store keeps it beside
-// the entries.
-func (session *CacheSession) Listing(key [sha256.Size]byte) ([]byte, bool) {
+// Kept is what a run kept in the session's store under key beside the entries, go list's answer for
+// load.ListingStore and gofmt's verdicts among it.
+func (session *CacheSession) Kept(key [sha256.Size]byte) ([]byte, bool) {
 	return session.caching.Store.Get(cache.Key(key))
 }
 
-// KeepListing keeps go list's answer under key, for load.ListingStore.
-func (session *CacheSession) KeepListing(key [sha256.Size]byte, listing []byte) error {
-	return session.caching.Store.Put(cache.Key(key), listing)
+// Keep keeps contents under key in the session's store.
+func (session *CacheSession) Keep(key [sha256.Size]byte, contents []byte) error {
+	return session.caching.Store.Put(cache.Key(key), contents)
+}
+
+// KeyFor is the key of what a run keeps under label that depends on the engine itself and the build, as gofmt's
+// verdicts depend on the gofmt the engine links: another engine or build never reads it.
+func (session *CacheSession) KeyFor(label string) [sha256.Size]byte {
+	digest := sha256.New()
+	for _, part := range append([]string{label, session.caching.Context.FormatVersion,
+		session.caching.Context.EngineIdentity}, session.caching.Context.Build...) {
+		// Ignored: a hash.Hash never returns an error from Write, and the zero byte ends each part.
+		_, _ = digest.Write(append([]byte(part), 0))
+	}
+	return [sha256.Size]byte(digest.Sum(nil))
 }
 
 // exportDataReader reads the export data of the package under key from the store, for the load.

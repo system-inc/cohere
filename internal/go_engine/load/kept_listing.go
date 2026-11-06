@@ -26,8 +26,8 @@ const listingFormatVersion = "go-engine-listing-1"
 
 // ListingStore is where the load keeps go list's answer between runs, the findings cache's store, by a sha256 key.
 type ListingStore interface {
-	Listing(key [sha256.Size]byte) ([]byte, bool)
-	KeepListing(key [sha256.Size]byte, listing []byte) error
+	Kept(key [sha256.Size]byte) ([]byte, bool)
+	Keep(key [sha256.Size]byte, listing []byte) error
 }
 
 // keptListing is go list's answer as the store keeps it, with what it was read from: the directories it walked for
@@ -68,7 +68,7 @@ func cachedList(
 	if keyError != nil {
 		return nil, false, keyError
 	}
-	if contents, stored := listings.Listing(key); stored {
+	if contents, stored := listings.Kept(key); stored {
 		var kept keptListing
 		if gob.NewDecoder(bytes.NewReader(contents)).Decode(&kept) == nil &&
 			listingFingerprint(kept.Roots, kept.Directories, kept.ModuleFiles) == kept.Fingerprint {
@@ -83,7 +83,7 @@ func cachedList(
 	var encoded bytes.Buffer
 	if gob.NewEncoder(&encoded).Encode(kept) == nil {
 		// Ignored: a listing that cannot be kept is asked of go list again next run, which is all its keeping saves.
-		_ = listings.KeepListing(key, encoded.Bytes())
+		_ = listings.Keep(key, encoded.Bytes())
 	}
 	return listed, false, nil
 }
