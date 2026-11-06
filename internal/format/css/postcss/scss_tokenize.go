@@ -36,7 +36,7 @@ type scssTokenizer struct {
 	content           string
 	escape            bool
 	escaped           bool
-	prev              string
+	previous          string
 	n                 int
 	currentToken      token
 
@@ -182,15 +182,15 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 	// } `SCSS PATCH`
 
 	case openParentheses:
-		tokens.prev = ""
+		tokens.previous = ""
 		if len(tokens.buffer) > 0 {
-			tokens.prev = tokens.buffer[len(tokens.buffer)-1].value
+			tokens.previous = tokens.buffer[len(tokens.buffer)-1].value
 			tokens.buffer = tokens.buffer[:len(tokens.buffer)-1]
 		}
 		tokens.n = tokens.charCodeAt(tokens.pos + 1)
 
 		// `SCSS PATCH` {
-		if tokens.prev == "url" && tokens.n != singleQuote && tokens.n != doubleQuote {
+		if tokens.previous == "url" && tokens.n != singleQuote && tokens.n != doubleQuote {
 			tokens.brackets = 1
 			tokens.escaped = false
 			tokens.next = tokens.pos + 1

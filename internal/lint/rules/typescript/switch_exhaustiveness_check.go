@@ -201,13 +201,13 @@ var SwitchExhaustivenessCheck = rule.Rule[SwitchExhaustivenessCheckOptions]{
 			settings = SwitchExhaustivenessCheckOptions{}
 		}
 		if settings.AllowDefaultCaseForExhaustiveSwitch == nil {
-			settings.AllowDefaultCaseForExhaustiveSwitch = type_checking.Ref(true)
+			settings.AllowDefaultCaseForExhaustiveSwitch = type_checking.Reference(true)
 		}
 		if settings.ConsiderDefaultExhaustiveForUnions == nil {
-			settings.ConsiderDefaultExhaustiveForUnions = type_checking.Ref(false)
+			settings.ConsiderDefaultExhaustiveForUnions = type_checking.Reference(false)
 		}
 		if settings.RequireDefaultForNonUnion == nil {
-			settings.RequireDefaultForNonUnion = type_checking.Ref(false)
+			settings.RequireDefaultForNonUnion = type_checking.Reference(false)
 		}
 		// Upstream compiles the pattern with `new RegExp(pattern, 'u')`, so an invalid one throws
 		// when the rule is created. Here it matches no comment, which leaves the real default clause

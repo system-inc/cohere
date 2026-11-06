@@ -377,10 +377,10 @@ func isUnsafeAssignmentWorker(
 			return nil, nil, false
 		}
 
-		for index, arg := range typeArguments {
+		for index, argument := range typeArguments {
 			receiverArgument := receiverTypeArguments[index]
 
-			_, _, unsafe := isUnsafeAssignmentWorker(arg, receiverArgument, typeChecker, senderNode, visited)
+			_, _, unsafe := isUnsafeAssignmentWorker(argument, receiverArgument, typeChecker, senderNode, visited)
 			if unsafe {
 				return receiver, subjectType, true
 			}

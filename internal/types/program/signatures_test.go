@@ -177,7 +177,7 @@ func TestAChangeTwoLevelsDownReachesTheImporter(test *testing.T) {
 
 // JSDoc on an export is part of its declaration output, so a rule reading a deprecation through types sees
 // the change. Pinned because no-deprecated depends on it.
-func TestAJSDocEditOnAnExportChangesTheSignature(test *testing.T) {
+func TestJsDocEditOnAnExportChangesTheSignature(test *testing.T) {
 	test.Parallel()
 	tree := signatureFixture(test)
 	before := tree.state(nil)

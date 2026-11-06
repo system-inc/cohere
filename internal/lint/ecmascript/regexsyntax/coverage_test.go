@@ -36,8 +36,8 @@ func TestParseRegexFlagsReadsBothModeFlags(test *testing.T) {
 				testCase.flags, got.Unicode, got.UnicodeSets, testCase.unicode, testCase.unicodeSet)
 		}
 		// UV is what every caller branches on, so it is asserted rather than assumed to follow.
-		if want := testCase.unicode || testCase.unicodeSet; got.UV() != want {
-			test.Errorf("ParseRegexFlags(%q).UV() = %v, want %v", testCase.flags, got.UV(), want)
+		if want := testCase.unicode || testCase.unicodeSet; got.UnicodeMode() != want {
+			test.Errorf("ParseRegexFlags(%q).UV() = %v, want %v", testCase.flags, got.UnicodeMode(), want)
 		}
 	}
 }

@@ -284,14 +284,14 @@ var scssParseFixtures = []parseFixture{
 	{name: "unexpected close", text: "a{}}", malformed: true},
 }
 
-// TestParseSCSSAgreesWithPostcssScss is the scss parser's acceptance test, TestParseAgreesWithPostcss's
+// TestParseScssAgreesWithPostcssScss is the scss parser's acceptance test, TestParseAgreesWithPostcss's
 // twin: every Prettier tests/format/scss/**/*.scss file under COHERE_PRETTIER_FORK, the css-in-js
 // templates of Prettier's styled-components and styled-jsx tests (built as Prettier's embed builds
 // them, @prettier-placeholder-N-id and all), and every inline fixture must parse to postcss-scss's tree
 // or be refused by both with the same error. Off unless COHERE_PRETTIER_FORK names the fork.
 //
 // A .scss file postcss-scss refuses is counted, and the test fails if that passes a tenth of them.
-func TestParseSCSSAgreesWithPostcssScss(test *testing.T) {
+func TestParseScssAgreesWithPostcssScss(test *testing.T) {
 	test.Parallel()
 	root := corpus.PrettierFork.Root(test)
 
@@ -411,7 +411,7 @@ func TestParseSCSSAgreesWithPostcssScss(test *testing.T) {
 			fail("%s: the fixture says malformed=%v and postcss-scss says %s", name, expectMalformed, want.describe())
 			continue
 		}
-		got, gotError := dumpParseWith(ParseSCSS, *want.Text)
+		got, gotError := dumpParseWith(ParseScss, *want.Text)
 		switch {
 		case oracleRefused && gotError != nil:
 			wantError, readError := json_value.Parse(want.Error)

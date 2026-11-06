@@ -197,9 +197,9 @@ func utilityParseDefinitions(test *testing.T, fixture utilityCorpus) []*UtilityD
 		if !strings.HasSuffix(block.Name, "-*") {
 			continue
 		}
-		nodes, parseCSSError := ParseCSS(block.Source)
-		if parseCSSError != nil {
-			test.Fatalf("parse @utility %s: %v", block.Name, parseCSSError)
+		nodes, parseCssError := ParseCss(block.Source)
+		if parseCssError != nil {
+			test.Fatalf("parse @utility %s: %v", block.Name, parseCssError)
 		}
 		if len(nodes) != 1 || nodes[0].Kind != KindAtRule || nodes[0].Name != "@utility" {
 			test.Fatalf("@utility %s parsed to %d nodes, expected one at-rule", block.Name, len(nodes))
@@ -485,10 +485,10 @@ func TestUtilityFindsThePerDeclarationRoots(test *testing.T) {
 				continue
 			}
 
-			singlePath, singleOK := evaluator.Reading(utilityCandidateFromCase(singlePathCase))
-			multiPath, multiOK := evaluator.Reading(utilityCandidateFromCase(multiPathCase))
-			if !singleOK || !multiOK {
-				test.Errorf("%s: one of the two probes did not compile (-4 ok=%v, -50 ok=%v)", root, singleOK, multiOK)
+			singlePath, singleOk := evaluator.Reading(utilityCandidateFromCase(singlePathCase))
+			multiPath, multiOk := evaluator.Reading(utilityCandidateFromCase(multiPathCase))
+			if !singleOk || !multiOk {
+				test.Errorf("%s: one of the two probes did not compile (-4 ok=%v, -50 ok=%v)", root, singleOk, multiOk)
 				continue
 			}
 			if multiPath.Count <= singlePath.Count {
@@ -604,12 +604,12 @@ func TestUtilityRatioSpliceIsLoadBearing(test *testing.T) {
 			}
 			candidate := utilityCandidateFromCase(aCase)
 
-			real, realOK := evaluator.Reading(candidate)
-			if !realOK {
+			real, realOk := evaluator.Reading(candidate)
+			if !realOk {
 				continue
 			}
-			mutated, mutatedOK := evaluator.compileWithoutRatioSplice(candidate)
-			if !mutatedOK {
+			mutated, mutatedOk := evaluator.compileWithoutRatioSplice(candidate)
+			if !mutatedOk {
 				test.Errorf("%s: the mutant did not compile while the real path did", aCase.ClassName)
 				continue
 			}
@@ -866,9 +866,9 @@ func TestUtilitySyntheticCasesMatchEngine(test *testing.T) {
 				if !strings.HasSuffix(block.Name, "-*") {
 					continue
 				}
-				nodes, parseCSSError := ParseCSS(block.Source)
-				if parseCSSError != nil {
-					test.Fatalf("parse @utility %s: %v", block.Name, parseCSSError)
+				nodes, parseCssError := ParseCss(block.Source)
+				if parseCssError != nil {
+					test.Fatalf("parse @utility %s: %v", block.Name, parseCssError)
 				}
 				if len(nodes) != 1 || nodes[0].Kind != KindAtRule {
 					test.Fatalf("@utility %s parsed to %d nodes, expected one at-rule", block.Name, len(nodes))

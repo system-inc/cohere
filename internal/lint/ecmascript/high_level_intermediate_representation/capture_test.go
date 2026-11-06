@@ -376,13 +376,13 @@ export function Outer() {
 	}
 }
 
-// TestCaptureKeepsSSAValid runs construction over functions that capture and verifies the result.
+// TestCaptureKeepsSsaValid runs construction over functions that capture and verifies the result.
 //
 // A capture introduces a value with no defining instruction in the nested function, which is
 // exactly the shape that breaks a use-must-be-dominated-by-its-definition checker if the value is
 // not treated as live on entry. That it passes is asserted here; that the checker could still fail
 // is asserted by TestCaptureVerifierStillDetectsAViolation below.
-func TestCaptureKeepsSSAValid(test *testing.T) {
+func TestCaptureKeepsSsaValid(test *testing.T) {
 	test.Parallel()
 
 	sources := map[string]string{
@@ -450,7 +450,7 @@ export function Outer(flag: boolean) {
 `
 	outer := lowerTypedFunctions(test, "control.tsx", code)[0]
 	Construct(outer)
-	if violations := VerifySSA(outer); len(violations) != 0 {
+	if violations := VerifySsa(outer); len(violations) != 0 {
 		test.Fatalf("the baseline must be clean before it is broken, got %v", violations)
 	}
 
@@ -458,7 +458,7 @@ export function Outer(flag: boolean) {
 	if len(nested.Context) == 0 {
 		test.Fatal("the nested function captured nothing, so this control is not testing captured code")
 	}
-	if violations := VerifySSA(nested); len(violations) != 0 {
+	if violations := VerifySsa(nested); len(violations) != 0 {
 		test.Fatalf("the nested baseline must be clean before it is broken, got %v", violations)
 	}
 
@@ -487,7 +487,7 @@ export function Outer(flag: boolean) {
 	from.Phis = nil
 	to.Phis = append(to.Phis, moved)
 
-	violations := VerifySSA(nested)
+	violations := VerifySsa(nested)
 	if len(violations) == 0 {
 		test.Error("moving a phi off its join in a function that holds captures was not detected, " +
 			"so a clean verification of captured code proves nothing")

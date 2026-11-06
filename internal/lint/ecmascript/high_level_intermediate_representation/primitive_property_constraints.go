@@ -60,7 +60,7 @@ func (state *primitiveConstraintState) visit(function *Function) {
 	state.visited[function] = true
 	key := func(place Place) primitiveConstraintKey { return primitiveConstraintKey{function, place.Identifier} }
 	if function.Kind == FunctionKindComponent {
-		for _, parameter := range function.Params {
+		for _, parameter := range function.Parameters {
 			state.bind(key(parameter), primitiveConstraintOther)
 		}
 	}

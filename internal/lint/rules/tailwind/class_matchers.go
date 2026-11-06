@@ -194,7 +194,7 @@ func evaluateMatchers(node *ast.Node, live uint64, matchers []compiledMatcher) (
 				isMatch = true
 			}
 		case MatcherTypeObjectKeys:
-			if isESObjectKey(node) &&
+			if isEsObjectKey(node) &&
 				!isInsideDisallowedBinaryExpression(node) &&
 				!isInsideConditionalExpressionTest(node) &&
 				!isInsideLogicalExpressionLeft(node) &&
@@ -484,7 +484,7 @@ func selectorMatchers(matchers []compiledMatcher) []liveMatcher {
 // ancestors are asked from; own is the node itself when it is a string literal, and nil for a quasi,
 // which is never an object key nor an indexed access.
 func stringsMatcherReads(from *ast.Node, own *ast.Node) bool {
-	if own != nil && (isIndexedAccessLiteral(own) || isESObjectKey(own)) {
+	if own != nil && (isIndexedAccessLiteral(own) || isEsObjectKey(own)) {
 		return false
 	}
 	return !isInsideDisallowedBinaryExpression(from) &&
@@ -496,7 +496,7 @@ func stringsMatcherReads(from *ast.Node, own *ast.Node) bool {
 // objectValuesMatcherReads is the object values matcher's conditions for a string-like node, with
 // from and own as stringsMatcherReads takes them.
 func objectValuesMatcherReads(from *ast.Node, own *ast.Node) bool {
-	if own != nil && (isESObjectKey(own) || isIndexedAccessLiteral(own)) {
+	if own != nil && (isEsObjectKey(own) || isIndexedAccessLiteral(own)) {
 		return false
 	}
 	return isInsideObjectValue(from) &&
@@ -571,8 +571,8 @@ func propertyKey(property *ast.Node) *ast.Node {
 	return skipOuter(property.Name())
 }
 
-// isESObjectKey is upstream's isESObjectKey: the key of a property in an object literal.
-func isESObjectKey(node *ast.Node) bool {
+// isEsObjectKey is upstream's isEsObjectKey: the key of a property in an object literal.
+func isEsObjectKey(node *ast.Node) bool {
 	parent := esParent(node)
 	return parent != nil && isProperty(parent) && propertyKey(parent) == node
 }
@@ -590,7 +590,7 @@ func isIndexedAccessLiteral(node *ast.Node) bool {
 
 // binaryOperator is a binary expression's operator, and whether ESTree calls it a BinaryExpression
 // rather than a logical, assignment or sequence expression.
-func isESBinaryExpression(node *ast.Node) (ast.Kind, bool) {
+func isEsBinaryExpression(node *ast.Node) (ast.Kind, bool) {
 	if node.Kind != ast.KindBinaryExpression {
 		return 0, false
 	}
@@ -606,7 +606,7 @@ func isESBinaryExpression(node *ast.Node) (ast.Kind, bool) {
 // isInsideDisallowedBinaryExpression is upstream's: any ancestor a binary expression other than `+`.
 func isInsideDisallowedBinaryExpression(node *ast.Node) bool {
 	for parent := esParent(node); parent != nil; parent = esParent(parent) {
-		if operator, isBinary := isESBinaryExpression(parent); isBinary && operator != ast.KindPlusToken {
+		if operator, isBinary := isEsBinaryExpression(parent); isBinary && operator != ast.KindPlusToken {
 			return true
 		}
 	}
@@ -711,7 +711,7 @@ func objectPath(node *ast.Node, asQuasi bool) string {
 			return objectPath(property, false)
 		}
 	}
-	if isESObjectKey(node) {
+	if isEsObjectKey(node) {
 		return objectPath(esParent(node), false)
 	}
 	parent := esParent(node)

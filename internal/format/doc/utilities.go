@@ -5,9 +5,9 @@ package doc
 //
 // It matters because printers branch on labels (the JavaScript printer's member chains are labelled
 // "member-chain"), and wrapping a labelled doc in its comments without this would hide the label.
-func InheritLabel(document Doc, fn func(Doc) Doc) Doc {
+func InheritLabel(document Doc, transform func(Doc) Doc) Doc {
 	if labelled, isLabel := document.(*Label); isLabel {
-		return &Label{Label: labelled.Label, Contents: fn(labelled.Contents)}
+		return &Label{Label: labelled.Label, Contents: transform(labelled.Contents)}
 	}
-	return fn(document)
+	return transform(document)
 }

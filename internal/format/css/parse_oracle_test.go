@@ -344,7 +344,7 @@ func TestParseAgreesWithPrettierCssParser(test *testing.T) {
 			fail("%s: the fork parses it and Go refused: %v", each.Name, dumpGlueParseError)
 		default:
 			wantTree := want["ast"]
-			if !isASCII(text) {
+			if !isAscii(text) {
 				wantTree = withoutKey(wantTree, "sourceIndex")
 				got = withoutKey(got, "sourceIndex")
 			}
@@ -399,7 +399,7 @@ func dumpGlueParse(text string) (json_value.Value, error) {
 // end.offset, and the front matter's start.index and end.index) are converted from bytes to UTF-16. Each
 // node's Range must agree with its source offsets. A float64 JSON cannot carry, which json.Marshal would
 // refuse, becomes a description no oracle prints, so the comparison still fails on it.
-func dumpGlueValue(value any, toUTF16 func(int) json_value.Value) json_value.Value {
+func dumpGlueValue(value any, toUtf16 func(int) json_value.Value) json_value.Value {
 	switch typed := value.(type) {
 	case nil:
 		return json_value.Null{}
@@ -409,15 +409,15 @@ func dumpGlueValue(value any, toUTF16 func(int) json_value.Value) json_value.Val
 		}
 		result := json_value.Object{}
 		if typed.Type() != "" {
-			result["type"] = textThroughJSON(typed.Type())
+			result["type"] = textThroughJson(typed.Type())
 		}
 		for _, key := range typed.Keys() {
 			child := typed.Get(key)
 			switch {
 			case key == "source":
-				result[key] = dumpGlueSource(child, toUTF16)
+				result[key] = dumpGlueSource(child, toUtf16)
 			case typed.Type() == "front-matter" && (key == "start" || key == "end"):
-				dumped := dumpGlueValue(child, toUTF16)
+				dumped := dumpGlueValue(child, toUtf16)
 				position, isPosition := dumped.(json_value.Object)
 				if !isPosition {
 					// Not an object: kept as dumped, so the comparison with the fork names it.
@@ -434,11 +434,11 @@ func dumpGlueValue(value any, toUTF16 func(int) json_value.Value) json_value.Val
 					index, isInt = original.Get("index").(int)
 				}
 				if isInt {
-					position["index"] = toUTF16(index)
+					position["index"] = toUtf16(index)
 				}
 				result[key] = position
 			default:
-				result[key] = dumpGlueValue(child, toUTF16)
+				result[key] = dumpGlueValue(child, toUtf16)
 			}
 		}
 		if source := sourceOf(typed); source != nil {
@@ -455,19 +455,19 @@ func dumpGlueValue(value any, toUTF16 func(int) json_value.Value) json_value.Val
 		}
 		result := make(json_value.Array, len(typed))
 		for index, child := range typed {
-			result[index] = dumpGlueValue(child, toUTF16)
+			result[index] = dumpGlueValue(child, toUtf16)
 		}
 		return result
 	case []any:
 		result := make(json_value.Array, len(typed))
 		for index, child := range typed {
-			result[index] = dumpGlueValue(child, toUTF16)
+			result[index] = dumpGlueValue(child, toUtf16)
 		}
 		return result
 	case map[string]any:
 		result := json_value.Object{}
 		for key, child := range typed {
-			result[key] = dumpGlueValue(child, toUTF16)
+			result[key] = dumpGlueValue(child, toUtf16)
 		}
 		return result
 	case float64:
@@ -480,7 +480,7 @@ func dumpGlueValue(value any, toUTF16 func(int) json_value.Value) json_value.Val
 		}
 		return json_value.Number(strconv.FormatFloat(typed, 'g', -1, 64))
 	case string:
-		return textThroughJSON(typed)
+		return textThroughJson(typed)
 	case bool:
 		return json_value.Boolean(typed)
 	case int:
@@ -490,11 +490,11 @@ func dumpGlueValue(value any, toUTF16 func(int) json_value.Value) json_value.Val
 	}
 }
 
-// textThroughJSON is text as it comes back from json.Marshal and json.Unmarshal, the trip the whole tree
+// textThroughJson is text as it comes back from json.Marshal and json.Unmarshal, the trip the whole tree
 // used to make: each byte of invalid UTF-8 becomes U+FFFD, and every other byte is kept. A string sliced
 // at a byte offset inside a character holds such bytes. Keys are left as they are: they are the
 // libraries' own ASCII property names.
-func textThroughJSON(text string) json_value.String {
+func textThroughJson(text string) json_value.String {
 	if utf8.ValidString(text) {
 		return json_value.String(text)
 	}
@@ -511,27 +511,27 @@ func textThroughJSON(text string) json_value.String {
 	return json_value.String(builder.String())
 }
 
-func dumpGlueSource(value any, toUTF16 func(int) json_value.Value) json_value.Value {
+func dumpGlueSource(value any, toUtf16 func(int) json_value.Value) json_value.Value {
 	source, isMap := value.(map[string]any)
 	if !isMap {
-		return dumpGlueValue(value, toUTF16)
+		return dumpGlueValue(value, toUtf16)
 	}
 	result := json_value.Object{}
 	for key, child := range source {
 		switch key {
 		case "startOffset", "endOffset":
 			if offset, isNumber := child.(int); isNumber {
-				result[key] = toUTF16(offset)
+				result[key] = toUtf16(offset)
 				continue
 			}
-			result[key] = dumpGlueValue(child, toUTF16)
+			result[key] = dumpGlueValue(child, toUtf16)
 		case "start", "end":
 			position, isPosition := child.(map[string]any)
 			if !isPosition {
-				result[key] = dumpGlueValue(child, toUTF16)
+				result[key] = dumpGlueValue(child, toUtf16)
 				continue
 			}
-			dumped := dumpGlueValue(position, toUTF16)
+			dumped := dumpGlueValue(position, toUtf16)
 			converted, isConverted := dumped.(json_value.Object)
 			if !isConverted {
 				// Not an object: kept as dumped, so the comparison with the fork names it.
@@ -539,11 +539,11 @@ func dumpGlueSource(value any, toUTF16 func(int) json_value.Value) json_value.Va
 				continue
 			}
 			if offset, isNumber := position["offset"].(int); isNumber {
-				converted["offset"] = toUTF16(offset)
+				converted["offset"] = toUtf16(offset)
 			}
 			result[key] = converted
 		default:
-			result[key] = dumpGlueValue(child, toUTF16)
+			result[key] = dumpGlueValue(child, toUtf16)
 		}
 	}
 	return result
@@ -573,7 +573,7 @@ func utf16OffsetTable(text string) func(int) json_value.Value {
 	}
 }
 
-func isASCII(text string) bool {
+func isAscii(text string) bool {
 	for index := 0; index < len(text); index++ {
 		if text[index] >= 0x80 {
 			return false

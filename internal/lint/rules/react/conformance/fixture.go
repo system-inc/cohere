@@ -200,27 +200,27 @@ func Load(root string) ([]Fixture, error) {
 
 	fixtures := make([]Fixture, 0, len(inputPaths))
 	for _, inputPath := range inputPaths {
-		name, err := filepath.Rel(root, inputPath)
-		if err != nil {
-			return nil, err
+		name, relativePathError := filepath.Rel(root, inputPath)
+		if relativePathError != nil {
+			return nil, relativePathError
 		}
 		// Slashed, because the stated divergences are keyed `new-mutability/error.x.js`, and on Windows
 		// Rel answers with `\`, so every lookup missed and a known divergence scored as a new one.
 		name = filepath.ToSlash(name)
 
-		sourceBytes, err := os.ReadFile(inputPath)
-		if err != nil {
-			return nil, err
+		sourceBytes, readError := os.ReadFile(inputPath)
+		if readError != nil {
+			return nil, readError
 		}
 		source := string(sourceBytes)
 
 		expectPath := strings.TrimSuffix(inputPath, filepath.Ext(inputPath)) + ".expect.md"
-		expectBytes, err := os.ReadFile(expectPath)
-		if err != nil {
+		expectBytes, readError := os.ReadFile(expectPath)
+		if readError != nil {
 			return nil, fmt.Errorf(
 				"%s: expectation missing; upstream pairs these 1:1 and a fixture without one cannot be scored: %w",
 				name,
-				err,
+				readError,
 			)
 		}
 
@@ -235,9 +235,10 @@ func Load(root string) ([]Fixture, error) {
 
 		var expectation Expectation
 		if errorNamed {
-			expectation, err = ParseExpectation(string(expectBytes))
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", name, err)
+			var parseExpectationError error
+			expectation, parseExpectationError = ParseExpectation(string(expectBytes))
+			if parseExpectationError != nil {
+				return nil, fmt.Errorf("%s: %w", name, parseExpectationError)
 			}
 		} else if strings.Contains("\n"+string(expectBytes), "\n## Error") {
 			// The other direction of the same set equality, and it is the one that matters for a

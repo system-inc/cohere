@@ -183,14 +183,16 @@ func repositoryOnlyModules(moduleDirectory string, compiled []Module) ([]Module,
 				outputError,
 			)
 		}
-		var downloaded struct{ Dir string }
+		var downloaded struct {
+			Directory string `json:"Dir"`
+		}
 		if decodeError := json.Unmarshal(output, &downloaded); decodeError != nil {
 			return nil, decodeError
 		}
 		byPath[requirement.Path] = Module{
 			Path:      requirement.Path,
 			Version:   requirement.Version,
-			Directory: downloaded.Dir,
+			Directory: downloaded.Directory,
 		}
 	}
 	return sortedModules(byPath), nil

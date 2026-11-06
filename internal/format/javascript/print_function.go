@@ -31,7 +31,7 @@ func isMethodValue(path *Path) bool {
 - `TSDeclareFunction`(TypeScript)
 */
 // printFunction is upstream's printFunction.
-func printFunction(path *Path, options *Options, print PrintFunc, args *printArguments) Doc {
+func printFunction(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
 	if isMethodValue(path) {
 		return printMethodValue(path, options, print)
 	}
@@ -39,7 +39,7 @@ func printFunction(path *Path, options *Options, print PrintFunc, args *printArg
 	current := node(path)
 
 	shouldExpandParameters := false
-	if current.Is("FunctionExpression") && args != nil && args.expandLastArg {
+	if current.Is("FunctionExpression") && arguments != nil && arguments.expandLastArgument {
 		parent := parentOf(path)
 		if isCallExpression(parent) &&
 			(len(getCallArguments(parent)) > 1 ||

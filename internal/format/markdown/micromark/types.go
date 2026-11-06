@@ -310,30 +310,30 @@ const (
 
 // The constants upstream's micromark-util-symbol names, that constructs read.
 const (
-	attentionSideAfter                   = 2
-	attentionSideBefore                  = 1
-	atxHeadingOpeningFenceSizeMax        = 6
-	autolinkDomainSizeMax                = 63
-	autolinkSchemeSizeMax                = 32
-	cdataOpeningString                   = "CDATA["
-	characterGroupPunctuation            = 2
-	characterGroupWhitespace             = 1
-	characterReferenceDecimalSizeMax     = 7
-	characterReferenceHexadecimalSizeMax = 6
-	characterReferenceNamedSizeMax       = 31
-	codeFencedSequenceSizeMin            = 3
-	hardBreakPrefixSizeMin               = 2
-	htmlBasic                            = 6
-	htmlCdata                            = 5
-	htmlComment                          = 2
-	htmlComplete                         = 7
-	htmlDeclaration                      = 4
-	htmlInstruction                      = 3
-	htmlRawSizeMax                       = 8
-	htmlRaw                              = 1
-	linkResourceDestinationBalanceMax    = 32
-	linkReferenceSizeMax                 = 999
-	listItemValueSizeMax                 = 10
-	tabSize                              = 4
-	thematicBreakMarkerCountMin          = 3
+	attentionSideAfter                       = 2
+	attentionSideBefore                      = 1
+	atxHeadingOpeningFenceSizeMaximum        = 6
+	autolinkDomainSizeMaximum                = 63
+	autolinkSchemeSizeMaximum                = 32
+	cdataOpeningString                       = "CDATA["
+	characterGroupPunctuation                = 2
+	characterGroupWhitespace                 = 1
+	characterReferenceDecimalSizeMaximum     = 7
+	characterReferenceHexadecimalSizeMaximum = 6
+	characterReferenceNamedSizeMaximum       = 31
+	codeFencedSequenceSizeMinimum            = 3
+	hardBreakPrefixSizeMinimum               = 2
+	htmlBasic                                = 6
+	htmlCdata                                = 5
+	htmlComment                              = 2
+	htmlComplete                             = 7
+	htmlDeclaration                          = 4
+	htmlInstruction                          = 3
+	htmlRawSizeMaximum                       = 8
+	htmlRaw                                  = 1
+	linkResourceDestinationBalanceMaximum    = 32
+	linkReferenceSizeMaximum                 = 999
+	listItemValueSizeMaximum                 = 10
+	tabSize                                  = 4
+	thematicBreakMarkerCountMinimum          = 3
 )

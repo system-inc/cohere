@@ -12,7 +12,7 @@ import (
 
 // A file handed to the formatter with CRLF is counted once, however many passes it takes, and the note
 // names the count and the .gitattributes line. A tree with none prints nothing.
-func TestCRLFFilesAreNamedOnceWithTheFix(test *testing.T) {
+func TestCrlfFilesAreNamedOnceWithTheFix(test *testing.T) {
 	test.Parallel()
 	var lineEndings crlfFiles
 	transform := lineEndings.observing(func(fileName string, text string, _ *ast.SourceFile) (string, error) {
@@ -70,7 +70,7 @@ func TestCRLFFilesAreNamedOnceWithTheFix(test *testing.T) {
 // prints only under --verbose; a file `--fix` would change for any other reason says nothing about line
 // endings (#dr78rt8). Both through the binary, so the name the formatter saw and the name the finding
 // prints are proven to be the same file.
-func TestACRLFFilesWouldChangeFindingSaysWhy(test *testing.T) {
+func TestACrlfFilesWouldChangeFindingSaysWhy(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	root := test.TempDir()

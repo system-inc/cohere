@@ -245,9 +245,9 @@ func writeToken(builder *strings.Builder, token *Token) {
 	}
 	writer.key("offset")
 	builder.WriteString(strconv.Itoa(token.Offset))
-	if token.Type == "block-scalar" || token.Props != nil {
+	if token.Type == "block-scalar" || token.Properties != nil {
 		writer.key("props")
-		writeTokenList(builder, token.Props)
+		writeTokenList(builder, token.Properties)
 	}
 	if token.HasSource() {
 		writer.key("source")

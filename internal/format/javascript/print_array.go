@@ -44,7 +44,7 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 		// we already check for an empty array just above so we are safe
 		needsForcedTrailingComma := lastElem == nil
 
-		groupID := newGroupID("array")
+		groupId := newGroupId("array")
 
 		shouldBreak := (!settingsOf(options).inJestEach &&
 			len(elements) > 1 &&
@@ -81,7 +81,7 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 		case !shouldPrintTrailingComma(options, "es5"):
 			trailingComma = emptyDoc
 		case shouldUseConciseFormatting:
-			trailingComma = ifBreakWithGroup(",", "", groupID)
+			trailingComma = ifBreakWithGroup(",", "", groupId)
 		default:
 			trailingComma = ifBreak(",", "")
 		}
@@ -103,7 +103,7 @@ func printArray(path *Path, options *Options, print PrintFunc) Doc {
 			softline,
 			"]",
 		),
-			doc.GroupOptions{ShouldBreak: shouldBreak, ID: groupID},
+			doc.GroupOptions{ShouldBreak: shouldBreak, Id: groupId},
 		))
 	}
 

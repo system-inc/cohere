@@ -21,9 +21,9 @@ import (
 // file or a line of `packed-refs`. Anything else, such as the reftable ref store, is an error that names
 // it, never a guess: a wrong commit builds and runs the wrong rules while looking like the right ones.
 func readHead(repository string) (string, error) {
-	gitDirectory, err := gitDirectoryOf(repository)
-	if err != nil {
-		return "", err
+	gitDirectory, gitDirectoryOfError := gitDirectoryOf(repository)
+	if gitDirectoryOfError != nil {
+		return "", gitDirectoryOfError
 	}
 	commonDirectory := gitDirectory
 	if contents, readError := os.ReadFile(filepath.Join(gitDirectory, "commondir")); readError == nil {
@@ -35,9 +35,9 @@ func readHead(repository string) (string, error) {
 		return "", fmt.Errorf("%s keeps its refs in the reftable store, which cohere does not read", repository)
 	}
 
-	head, err := os.ReadFile(filepath.Join(gitDirectory, "HEAD"))
-	if err != nil {
-		return "", fmt.Errorf("reading HEAD in %s: %w", repository, err)
+	head, readError := os.ReadFile(filepath.Join(gitDirectory, "HEAD"))
+	if readError != nil {
+		return "", fmt.Errorf("reading HEAD in %s: %w", repository, readError)
 	}
 	value := strings.TrimSpace(string(head))
 	// A symbolic ref can name another, so the chain is followed, and bounded so a loop is an error.
@@ -49,9 +49,10 @@ func readHead(repository string) (string, error) {
 			}
 			return value, nil
 		}
-		value, err = readReference(gitDirectory, commonDirectory, strings.TrimSpace(reference))
-		if err != nil {
-			return "", fmt.Errorf("reading HEAD in %s: %w", repository, err)
+		var readReferenceError error
+		value, readReferenceError = readReference(gitDirectory, commonDirectory, strings.TrimSpace(reference))
+		if readReferenceError != nil {
+			return "", fmt.Errorf("reading HEAD in %s: %w", repository, readReferenceError)
 		}
 	}
 	return "", fmt.Errorf("HEAD in %s is a chain of symbolic refs that does not end", repository)

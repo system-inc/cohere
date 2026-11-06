@@ -64,8 +64,8 @@ func (crash runCrash) message() string {
 // printCrash prints one crash as a line of JSON under `--json`. The human view names crashes grouped by what
 // crashed (printCrashGroups), and `--verbose` names each in its coverage notes, in the same words.
 func printCrash(out *bufio.Writer, crash runCrash) {
-	if activeOutput.Mode == outputJSON {
-		writeJSONLine(out, crashJSON{Kind: "crash", runCrash: crash})
+	if activeOutput.Mode == outputJson {
+		writeJsonLine(out, crashJson{Kind: "crash", runCrash: crash})
 	}
 }
 
@@ -138,8 +138,8 @@ func writeCrashGroups(out *bufio.Writer, crashes []runCrash) {
 	}
 }
 
-// crashJSON is one crash's line under `--json`.
-type crashJSON struct {
+// crashJson is one crash's line under `--json`.
+type crashJson struct {
 	Kind string `json:"kind"`
 	runCrash
 }

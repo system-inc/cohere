@@ -54,7 +54,7 @@ func (paths Paths) SwiftEngineBinaryPath(hash string) string {
 //
 // A variable so a test can stand in for SwiftPM: a cold build compiles swift-syntax and swift-format,
 // measured at 225s, and the decisions worth testing are which tree is built and when, not SwiftPM.
-var buildSwiftProduct = buildSwiftProductWithSwiftPM
+var buildSwiftProduct = buildSwiftProductWithSwiftPm
 
 // ResolveSwiftEngine returns the path to a cohere-swift binary matching the engine's sources and the
 // installed toolchain, building it when there is none.
@@ -243,7 +243,7 @@ func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
 	}
 }
 
-// buildSwiftProductWithSwiftPM builds the engine in release mode and copies the product to binaryPath.
+// buildSwiftProductWithSwiftPm builds the engine in release mode and copies the product to binaryPath.
 //
 // A cold build compiles swift-syntax and swift-format and takes minutes, so it announces itself on
 // stderr before starting, whatever the verbosity: a command that is silent for three minutes reads as
@@ -251,7 +251,7 @@ func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
 //
 // Copied rather than linked, because the next build replaces the product in place, and a link would
 // turn every hash-named binary into whichever engine was built last.
-func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory string, binaryPath string) error {
+func buildSwiftProductWithSwiftPm(packageDirectory string, scratchDirectory string, binaryPath string) error {
 	if createDirectoryError := os.MkdirAll(filepath.Dir(binaryPath), 0o755); createDirectoryError != nil {
 		return fmt.Errorf("creating the binary cache directory: %w", createDirectoryError)
 	}

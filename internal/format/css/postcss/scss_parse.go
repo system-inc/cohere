@@ -6,7 +6,7 @@ import "github.com/system-inc/cohere/internal/format/estree"
 // parseWithParser(postcssScssParse, text) runs postcssScssParse(text, { map: false }), so, as for Parse,
 // Input has no `from` and no map.
 
-// ParseSCSS is postcss-scss's parse: the Root of the tree ScssParser builds, or the CssSyntaxError it
+// ParseScss is postcss-scss's parse: the Root of the tree ScssParser builds, or the CssSyntaxError it
 // threw, marked with printing.Syntax; a TypeError upstream throws (see TypeError) is marked the same way.
 //
 // The tree is Parse's, with what postcss-scss adds:
@@ -17,6 +17,6 @@ import "github.com/system-inc/cohere/internal/format/estree"
 //     nodes, its fields in NestedDeclaration's order (isNested, nodes, source, prop, important, value);
 //   - raws.selector, raws.params and raws.value, where Parser.raw keeps them, carry scss, the text with
 //     its `//` comments as written, when raw (with those comments as /* */) differs.
-func ParseSCSS(text string) (*estree.Node, error) {
+func ParseScss(text string) (*estree.Node, error) {
 	return parseWith(text, newScssParser)
 }

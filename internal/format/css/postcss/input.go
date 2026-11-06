@@ -38,8 +38,8 @@ import (
 type input struct {
 	// css is this.css, the text after the byte order mark.
 	css string
-	// hasBOM is this.hasBOM.
-	hasBOM bool
+	// hasBom is this.hasBom.
+	hasBom bool
 
 	// units are css's UTF-16 code units, what charCodeAt reads. A byte that is not UTF-8 is one unit,
 	// U+FFFD, as Node decodes it.
@@ -60,10 +60,10 @@ func newInput(css string) *input {
 	if len(in.css) >= 3 &&
 		in.css[0] == 0xEF &&
 		((in.css[1] == 0xBB && in.css[2] == 0xBF) || (in.css[1] == 0xBF && in.css[2] == 0xBE)) {
-		in.hasBOM = true
+		in.hasBom = true
 		in.css = in.css[3:]
 	} else {
-		in.hasBOM = false
+		in.hasBom = false
 	}
 
 	in.units = make([]uint16, 0, len(in.css))

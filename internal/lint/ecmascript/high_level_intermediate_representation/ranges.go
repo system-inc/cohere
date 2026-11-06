@@ -179,7 +179,7 @@ type rangeGraph struct {
 
 // newRangeGraph is the adapter for one function and its effects.
 func newRangeGraph(function *Function, effects *AliasingEffects) rangeGraph {
-	return rangeGraph{effects: effects, refs: refDerivedValues(function)}
+	return rangeGraph{effects: effects, refs: referenceDerivedValues(function)}
 }
 
 func (rangeGraph) InstructionOrder(

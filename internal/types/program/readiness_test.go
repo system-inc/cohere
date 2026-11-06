@@ -32,15 +32,16 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) 
 		"a.ts":                "// cohere-disable-next-line test-set-enabled -- suppressed, still counted\nexport const first = 1;\nexport const second = 2;\n",
 		"b.ts":                "export const third = 3;\n",
 	})
-	graph, err := program.Build(
+	graph, buildError := program.Build(
 		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true},
 	)
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
-	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
-	if err != nil {
-		test.Fatalf("loading the config: %v", err)
+	var loadError error
+	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError != nil {
+		test.Fatalf("loading the config: %v", loadError)
 	}
 	graph.Readiness = &program.Readiness{Options: map[string][]json.RawMessage{
 		"test-set-enabled": nil, "test-set-off": nil, "test-set-skips": nil,
@@ -70,9 +71,9 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) 
 			return nil
 		}, NoListener: rule.NoListenerAnswersInRun},
 	}
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 
 	reported := map[string]int{}
@@ -137,15 +138,16 @@ func TestReadinessOffMeasuresNothing(test *testing.T) {
 		"CohereSettings.json": `{"rules": {"test-set-off": "off", "test-other": "error"}}`,
 		"a.ts":                "export const first = 1;\n",
 	})
-	graph, err := program.Build(
+	graph, buildError := program.Build(
 		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true},
 	)
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
-	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
-	if err != nil {
-		test.Fatalf("loading the config: %v", err)
+	var loadError error
+	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError != nil {
+		test.Fatalf("loading the config: %v", loadError)
 	}
 	ran := false
 	rules := []rule.Rule[rule.NoOptions]{
@@ -163,9 +165,9 @@ func TestReadinessOffMeasuresNothing(test *testing.T) {
 			NoListener: rule.NoListenerAnswersInRun,
 		},
 	}
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 	if result.Adamic != nil || ran {
 		test.Errorf("with readiness off the walk recorded %v and ran the off rule: %t", result.Adamic, ran)
@@ -182,15 +184,16 @@ func TestReadinessRunsATierEnabledSetRuleOncePerFile(test *testing.T) {
 		"a.ts":                "export const first = 1;\n",
 		"b.ts":                "export const second = 2;\n",
 	})
-	graph, err := program.Build(
+	graph, buildError := program.Build(
 		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true},
 	)
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
-	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
-	if err != nil {
-		test.Fatalf("loading the config: %v", err)
+	var loadError error
+	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError != nil {
+		test.Fatalf("loading the config: %v", loadError)
 	}
 	graph.Readiness = &program.Readiness{Options: map[string][]json.RawMessage{"test-set-enabled": nil}}
 
@@ -204,9 +207,9 @@ func TestReadinessRunsATierEnabledSetRuleOncePerFile(test *testing.T) {
 			ruleContext.ReportNode(node, rule.Message{Id: "enabled", Description: "enabled"})
 		}}
 	}}}
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 	if got := runs.Load(); got != 2 {
 		test.Errorf("the tier-enabled set rule ran %d times over 2 files, want once per file", got)
@@ -275,13 +278,14 @@ func TestAWarmReplayRunsNoRuleForReadiness(test *testing.T) {
 	}
 
 	walk := func(previous *program.LintCache) (program.Result, *program.LintCache) {
-		graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-		if err != nil {
-			test.Fatalf("building: %v", err)
+		graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+		if buildError != nil {
+			test.Fatalf("building: %v", buildError)
 		}
-		graph.LintConfig, err = configuration.Load(filepath.Join(root, "CohereSettings.json"))
-		if err != nil {
-			test.Fatalf("loading the config: %v", err)
+		var loadError error
+		graph.LintConfig, loadError = configuration.Load(filepath.Join(root, "CohereSettings.json"))
+		if loadError != nil {
+			test.Fatalf("loading the config: %v", loadError)
 		}
 		graph.Readiness = &program.Readiness{Options: map[string][]json.RawMessage{
 			"test-set-enabled": nil, "test-set-off": nil, typeAware.Name: nil,
@@ -289,9 +293,9 @@ func TestAWarmReplayRunsNoRuleForReadiness(test *testing.T) {
 		reuse := program.NewFindingsReuse(program.HashRuleSet([]string{"fixture"}), previous, program.PathAnchor{})
 		reuse.MeasureReadiness()
 		graph.FindingsReuse = reuse
-		result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
-		if err != nil {
-			test.Fatalf("walking: %v", err)
+		result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+		if walkError != nil {
+			test.Fatalf("walking: %v", walkError)
 		}
 		return result, reuse.Recorded()
 	}

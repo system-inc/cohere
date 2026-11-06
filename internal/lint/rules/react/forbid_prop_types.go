@@ -215,8 +215,8 @@ type forbidPropTypesWalker struct {
 	ctx      rule.Context
 	settings ForbidPropTypesOptions
 
-	// propTypesPackageName is the local name bound to the prop-types package, when one is imported.
-	propTypesPackageName string
+	// propertyTypesPackageName is the local name bound to the prop-types package, when one is imported.
+	propertyTypesPackageName string
 
 	// reactPackageName is the local name bound to react, when it is imported.
 	reactPackageName string
@@ -246,7 +246,7 @@ func (walker *forbidPropTypesWalker) collectImports(sourceFile *ast.Node) {
 		switch moduleSpecifier.Text() {
 		case "prop-types":
 			if name := forbidPropTypesFirstLocalName(child); name != "" {
-				walker.propTypesPackageName = name
+				walker.propertyTypesPackageName = name
 			}
 
 		case "react":
@@ -256,7 +256,7 @@ func (walker *forbidPropTypesWalker) collectImports(sourceFile *ast.Node) {
 			// `import { PropTypes } from 'react'` binds the prop types package under whatever
 			// local name that specifier uses.
 			if local := forbidPropTypesLocalNameForImported(child, "PropTypes"); local != "" {
-				walker.propTypesPackageName = local
+				walker.propertyTypesPackageName = local
 			}
 
 		default:
@@ -708,7 +708,7 @@ func (walker *forbidPropTypesWalker) isPropTypesPackage(node *ast.Node) bool {
 	}
 	switch node.Kind {
 	case ast.KindIdentifier:
-		return node.Text() == walker.propTypesPackageName || !walker.isForeignPropTypesPackage
+		return node.Text() == walker.propertyTypesPackageName || !walker.isForeignPropTypesPackage
 
 	case ast.KindPropertyAccessExpression:
 		receiver := node.AsPropertyAccessExpression().Expression

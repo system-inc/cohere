@@ -39,9 +39,9 @@ func TestEveryCopyMatchesUpstreamOutsideItsMarkedChanges(test *testing.T) {
 		test.Fatalf("resolving the module root: %v", rootError)
 	}
 	var copies []string
-	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
-		if walkError != nil {
-			return walkError
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() {
 			if path != root && (strings.HasPrefix(entry.Name(), ".") || slices.Contains(skippedDirectories,

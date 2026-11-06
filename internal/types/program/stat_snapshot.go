@@ -82,17 +82,17 @@ func (snapshot *StatSnapshot) identityOf(path string) (fileIdentity, bool) {
 	return identityFromInfo(information)
 }
 
-// checkedStatsFS answers existence checks and stats from the run cache's check where it statted the path, and
+// checkedStatsFileSystem answers existence checks and stats from the run cache's check where it statted the path, and
 // asks the disk beneath for everything else. It answers as the disk does (vfs's Common): a stat follows a
 // symbolic link, a file exists when something that is not a directory is there, and a directory when a directory
 // is. Listings, reads and realpaths pass through.
-type checkedStatsFS struct {
+type checkedStatsFileSystem struct {
 	vfs.FS
 	snapshot *StatSnapshot
 	answered *atomic.Int64
 }
 
-func (fileSystem *checkedStatsFS) FileExists(path tspath.RootedFilePath) bool {
+func (fileSystem *checkedStatsFileSystem) FileExists(path tspath.RootedFilePath) bool {
 	if information, present, known := fileSystem.snapshot.answer(path.AsString()); known {
 		fileSystem.answered.Add(1)
 		return present && !information.IsDir()
@@ -100,7 +100,7 @@ func (fileSystem *checkedStatsFS) FileExists(path tspath.RootedFilePath) bool {
 	return fileSystem.FS.FileExists(path)
 }
 
-func (fileSystem *checkedStatsFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
+func (fileSystem *checkedStatsFileSystem) DirectoryExists(path tspath.RootedDirectoryPath) bool {
 	if information, present, known := fileSystem.snapshot.answer(path.AsString()); known {
 		fileSystem.answered.Add(1)
 		return present && information.IsDir()
@@ -108,7 +108,7 @@ func (fileSystem *checkedStatsFS) DirectoryExists(path tspath.RootedDirectoryPat
 	return fileSystem.FS.DirectoryExists(path)
 }
 
-func (fileSystem *checkedStatsFS) Stat(path tspath.RootedPath) vfs.FileInfo {
+func (fileSystem *checkedStatsFileSystem) Stat(path tspath.RootedPath) vfs.FileInfo {
 	if information, present, known := fileSystem.snapshot.answer(path.AsString()); known {
 		fileSystem.answered.Add(1)
 		if !present {

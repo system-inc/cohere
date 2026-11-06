@@ -232,11 +232,11 @@ func checkRuleBudget(
 		}
 		row := result.Timings.Sorted()[0]
 		rows = append(rows, row)
-		if row.TotalCPU() > budget {
+		if row.TotalCpu() > budget {
 			return rows, fmt.Errorf(
 				"rule CPU budget exceeded: %s %.3fms > %.3fms",
 				row.Name,
-				float64(row.TotalCPU())/float64(time.Millisecond),
+				float64(row.TotalCpu())/float64(time.Millisecond),
 				float64(budget)/float64(time.Millisecond),
 			)
 		}
@@ -258,12 +258,12 @@ func TestRegisteredRuleCPUBudget(test *testing.T) {
 	if checkRuleBudgetError != nil {
 		test.Fatal(checkRuleBudgetError)
 	}
-	sort.Slice(rows, func(left, right int) bool { return rows[left].TotalCPU() > rows[right].TotalCPU() })
+	sort.Slice(rows, func(left, right int) bool { return rows[left].TotalCpu() > rows[right].TotalCpu() })
 	for index, row := range rows {
 		if index == 10 {
 			break
 		}
-		test.Logf("rule CPU: %s %.3fms", row.Name, float64(row.TotalCPU())/float64(time.Millisecond))
+		test.Logf("rule CPU: %s %.3fms", row.Name, float64(row.TotalCpu())/float64(time.Millisecond))
 	}
 	test.Logf("rule CPU budget check elapsed: %s", time.Since(started))
 }

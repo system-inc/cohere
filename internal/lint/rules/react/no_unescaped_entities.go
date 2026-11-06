@@ -321,7 +321,7 @@ func configuredEntities(options rule.Given[NoUnescapedEntitiesOptions]) []forbid
 // and the JSON decoder cannot be told that with a struct. It is decoded as `json.RawMessage` and
 // dispatched on its first byte below.
 type noUnescapedEntitiesWireEntry struct {
-	Char         *string   `json:"char"`
+	Character    *string   `json:"char"`
 	Alternatives *[]string `json:"alternatives"`
 }
 
@@ -384,12 +384,12 @@ func decodeForbiddenEntity(element json.RawMessage) (forbiddenEntity, bool) {
 	if decodeError := json.Unmarshal(element, &asObject); decodeError != nil {
 		return forbiddenEntity{}, false
 	}
-	if asObject.Char == nil || asObject.Alternatives == nil {
+	if asObject.Character == nil || asObject.Alternatives == nil {
 		return forbiddenEntity{}, false
 	}
 
 	return forbiddenEntity{
-		character:       *asObject.Char,
+		character:       *asObject.Character,
 		alternatives:    *asObject.Alternatives,
 		hasAlternatives: true,
 	}, true

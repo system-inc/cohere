@@ -278,9 +278,9 @@ func isNexusTier(source string) bool {
 // The chain is read by the lint loader's own SourcesOf rather than by a second walk of `extends` here,
 // so the two readers cannot disagree about which files a configuration is made of.
 func resolveChain(path string) (Resolution, error) {
-	sources, err := configuration.SourcesOf(path)
-	if err != nil {
-		return Resolution{}, err
+	sources, sourcesOfError := configuration.SourcesOf(path)
+	if sourcesOfError != nil {
+		return Resolution{}, sourcesOfError
 	}
 
 	blocks := make([]json.RawMessage, len(sources))
@@ -330,14 +330,16 @@ func resolveChain(path string) (Resolution, error) {
 				path,
 			)
 		}
-		resolution, err = blockResolution(nexusTier, block)
-		if err != nil {
-			return Resolution{}, err
+		var blockResolutionError error
+		resolution, blockResolutionError = blockResolution(nexusTier, block)
+		if blockResolutionError != nil {
+			return Resolution{}, blockResolutionError
 		}
 	} else {
-		resolution, err = houseResolution()
-		if err != nil {
-			return Resolution{}, err
+		var houseResolutionError error
+		resolution, houseResolutionError = houseResolution()
+		if houseResolutionError != nil {
+			return Resolution{}, houseResolutionError
 		}
 		// SourcesOf lists the project's own file first and each base after the file that extends it, so the
 		// first block found is the most derived.
@@ -358,9 +360,10 @@ func resolveChain(path string) (Resolution, error) {
 	}
 
 	resolution.Source = path
-	resolution.IgnorePatterns, err = configuration.IgnorePatternsOf(path)
-	if err != nil {
-		return Resolution{}, err
+	var ignorePatternsOfError error
+	resolution.IgnorePatterns, ignorePatternsOfError = configuration.IgnorePatternsOf(path)
+	if ignorePatternsOfError != nil {
+		return Resolution{}, ignorePatternsOfError
 	}
 	return resolution, nil
 }

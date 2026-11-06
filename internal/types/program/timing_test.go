@@ -12,9 +12,9 @@ import (
 func TestSortedPutsTheExpensiveRuleFirst(test *testing.T) {
 	test.Parallel()
 	timings := NewTimings([]string{"cheap", "expensive", "middling"})
-	timings.forRule("cheap").ListenerCPU = time.Millisecond
-	timings.forRule("expensive").ListenerCPU = 500 * time.Millisecond
-	timings.forRule("middling").ListenerCPU = 50 * time.Millisecond
+	timings.forRule("cheap").ListenerCpu = time.Millisecond
+	timings.forRule("expensive").ListenerCpu = 500 * time.Millisecond
+	timings.forRule("middling").ListenerCpu = 50 * time.Millisecond
 
 	sorted := timings.Sorted()
 	if len(sorted) != 3 {
@@ -38,18 +38,18 @@ func TestSetupAndListenerTimeStaySeparate(test *testing.T) {
 	test.Parallel()
 	timings := NewTimings([]string{"decides-slowly"})
 	timing := timings.forRule("decides-slowly")
-	timing.SetupCPU = 300 * time.Millisecond
-	timing.ListenerCPU = 2 * time.Millisecond
+	timing.SetupCpu = 300 * time.Millisecond
+	timing.ListenerCpu = 2 * time.Millisecond
 
 	sorted := timings.Sorted()
-	if sorted[0].SetupCPU != 300*time.Millisecond {
-		test.Fatalf("setup time was lost: %v", sorted[0].SetupCPU)
+	if sorted[0].SetupCpu != 300*time.Millisecond {
+		test.Fatalf("setup time was lost: %v", sorted[0].SetupCpu)
 	}
-	if sorted[0].ListenerCPU != 2*time.Millisecond {
-		test.Fatalf("listener time was lost: %v", sorted[0].ListenerCPU)
+	if sorted[0].ListenerCpu != 2*time.Millisecond {
+		test.Fatalf("listener time was lost: %v", sorted[0].ListenerCpu)
 	}
-	if sorted[0].TotalCPU() != 302*time.Millisecond {
-		test.Fatalf("total does not sum its parts: %v", sorted[0].TotalCPU())
+	if sorted[0].TotalCpu() != 302*time.Millisecond {
+		test.Fatalf("total does not sum its parts: %v", sorted[0].TotalCpu())
 	}
 }
 
@@ -106,7 +106,7 @@ func TestNilCollectorIsInert(test *testing.T) {
 	if timings.Sorted() != nil {
 		test.Fatal("a nil collector produced rows")
 	}
-	if timings.TotalCPU() != 0 {
+	if timings.TotalCpu() != 0 {
 		test.Fatal("a nil collector reported time")
 	}
 	if timings.forRule("anything") != nil {
@@ -118,14 +118,14 @@ func TestNilCollectorIsInert(test *testing.T) {
 // treats it.
 func spinFor(test *testing.T, cpu time.Duration) {
 	test.Helper()
-	start, known := threadCPU()
+	start, known := threadCpu()
 	if !known {
 		test.Skip(
 			"this platform has no thread CPU clock, so --timing reports no CPU here and the meter has nothing to test",
 		)
 	}
 	for {
-		if now, _ := threadCPU(); now-start >= cpu {
+		if now, _ := threadCpu(); now-start >= cpu {
 			return
 		}
 	}
@@ -151,9 +151,9 @@ func startTestMeter(test *testing.T) (*workerMeter, *Timings) {
 	return meter, timings
 }
 
-// TestAMeteredCallIsBilledItsCPU covers the wrapper the whole table rests on. Five calls each spinning 2ms
+// TestAMeteredCallIsBilledItsCpu covers the wrapper the whole table rests on. Five calls each spinning 2ms
 // of CPU are billed 10ms, and each call is counted as a node offered.
-func TestAMeteredCallIsBilledItsCPU(test *testing.T) {
+func TestAMeteredCallIsBilledItsCpu(test *testing.T) {
 	test.Parallel()
 	meter, _ := startTestMeter(test)
 	timing := &RuleTiming{Name: "spins"}
@@ -166,8 +166,8 @@ func TestAMeteredCallIsBilledItsCPU(test *testing.T) {
 	if timing.NodesOffered != 5 {
 		test.Fatalf("calls were not counted: %d", timing.NodesOffered)
 	}
-	if !within(timing.ListenerCPU, 10*time.Millisecond) {
-		test.Fatalf("five calls spinning 2ms were billed %v", timing.ListenerCPU)
+	if !within(timing.ListenerCpu, 10*time.Millisecond) {
+		test.Fatalf("five calls spinning 2ms were billed %v", timing.ListenerCpu)
 	}
 }
 
@@ -190,8 +190,8 @@ func TestAWaitingCallCostsNothing(test *testing.T) {
 	}
 	// Relative to the sleep, so it holds at any load: a busy machine stretches the sleep and the few
 	// instructions around it alike. A wall clock bills all of it, about 100%.
-	if timing.ListenerCPU > wall/20 {
-		test.Fatalf("five calls that only slept were billed %v of CPU, having slept %v", timing.ListenerCPU, wall)
+	if timing.ListenerCpu > wall/20 {
+		test.Fatalf("five calls that only slept were billed %v of CPU, having slept %v", timing.ListenerCpu, wall)
 	}
 }
 
@@ -202,8 +202,8 @@ func TestSetupIsBilledApartFromListeners(test *testing.T) {
 	timing := &RuleTiming{Name: "decides"}
 	meter.setup(timing, func() { spinFor(test, 3*time.Millisecond) })
 
-	if !within(timing.SetupCPU, 3*time.Millisecond) || timing.ListenerCPU != 0 {
-		test.Fatalf("a 3ms setup was billed setup %v and listen %v", timing.SetupCPU, timing.ListenerCPU)
+	if !within(timing.SetupCpu, 3*time.Millisecond) || timing.ListenerCpu != 0 {
+		test.Fatalf("a 3ms setup was billed setup %v and listen %v", timing.SetupCpu, timing.ListenerCpu)
 	}
 }
 
@@ -237,13 +237,13 @@ func TestSharedFillIsBilledToTheDerivationNotTheRuleThatAsked(test *testing.T) {
 		})
 	}, nil)
 
-	if !within(timing.ListenerCPU, 2*time.Millisecond) {
-		test.Fatalf("the rule that asked was billed %v for its own 2ms", timing.ListenerCPU)
+	if !within(timing.ListenerCpu, 2*time.Millisecond) {
+		test.Fatalf("the rule that asked was billed %v for its own 2ms", timing.ListenerCpu)
 	}
-	if got := timings.SharedCPU()["comments.All"]; !within(got, 3*time.Millisecond) {
+	if got := timings.SharedCpu()["comments.All"]; !within(got, 3*time.Millisecond) {
 		test.Fatalf("the outer derivation was billed %v for its own 3ms", got)
 	}
-	if got := timings.SharedCPU()["hir.Function"]; !within(got, 4*time.Millisecond) {
+	if got := timings.SharedCpu()["hir.Function"]; !within(got, 4*time.Millisecond) {
 		test.Fatalf("the per-node derivation was billed %v to its family for its 4ms", got)
 	}
 	if cache.Fills()["comments.All"] != 1 || cache.Fills()["hir.Function:175:1001"] != 1 {
@@ -271,9 +271,9 @@ func TestARuleThatPanicsStillBalancesItsFrames(test *testing.T) {
 	}
 }
 
-// TestTheWorkersCPUIsAccountedFor holds that the rows and the account add up to what the worker's thread
+// TestTheWorkersCpuIsAccountedFor holds that the rows and the account add up to what the worker's thread
 // spent, so nothing the table prints is a residual it cannot name.
-func TestTheWorkersCPUIsAccountedFor(test *testing.T) {
+func TestTheWorkersCpuIsAccountedFor(test *testing.T) {
 	test.Parallel()
 	timings := NewTimings(nil)
 	meter := startWorkerMeter(timings)
@@ -289,12 +289,12 @@ func TestTheWorkersCPUIsAccountedFor(test *testing.T) {
 	if account.Calls != 1 {
 		test.Fatalf("one call was counted as %d", account.Calls)
 	}
-	if !within(account.WalkCPU, 2*time.Millisecond) {
-		test.Fatalf("2ms spent outside any call was billed to the walk as %v", account.WalkCPU)
+	if !within(account.WalkCpu, 2*time.Millisecond) {
+		test.Fatalf("2ms spent outside any call was billed to the walk as %v", account.WalkCpu)
 	}
-	parts := timing.ListenerCPU + account.InstrumentCPU + account.WalkCPU
-	if difference := account.WorkersCPU - parts; difference < -time.Microsecond || difference > time.Microsecond {
-		test.Fatalf("the worker spent %v and its parts sum to %v", account.WorkersCPU, parts)
+	parts := timing.ListenerCpu + account.InstrumentCpu + account.WalkCpu
+	if difference := account.WorkersCpu - parts; difference < -time.Microsecond || difference > time.Microsecond {
+		test.Fatalf("the worker spent %v and its parts sum to %v", account.WorkersCpu, parts)
 	}
 }
 

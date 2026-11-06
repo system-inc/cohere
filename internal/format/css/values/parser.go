@@ -161,7 +161,7 @@ func (parser *parser) operator() {
 			if parser.position > 0 {
 				if parser.current.Is("func") && parser.current.String("value") == "calc" {
 					// allow operators to be proceeded by spaces and opening parens
-					if kind(parser.prevToken()) != "space" && kind(parser.prevToken()) != "(" {
+					if kind(parser.previousToken()) != "space" && kind(parser.previousToken()) != "(" {
 						parser.error("Syntax Error", parser.currToken())
 					} else if kind(parser.nextToken()) != "space" && kind(parser.nextToken()) != "word" {
 						// valid: calc(1 - +2)
@@ -177,7 +177,7 @@ func (parser *parser) operator() {
 					}
 				} else if kind(parser.nextToken()) == "space" ||
 					kind(parser.nextToken()) == "operator" ||
-					kind(parser.prevToken()) == "operator" {
+					kind(parser.previousToken()) == "operator" {
 					// if we're not in a function and someone has doubled up on operators,
 					// or they're trying to perform a calc outside of a calc
 					// eg. +-4px or 5+ 5, throw an error
@@ -415,7 +415,7 @@ func rNoFollow(word []uint16) bool {
 	if len(word) == 0 || (word[0] != '#' && word[0] != '{' && word[0] != '}') {
 		return false
 	}
-	return !(word[0] == '#' && len(word) > 1 && alphaNum(word[1]))
+	return !(word[0] == '#' && len(word) > 1 && alphanumeric(word[1]))
 }
 
 // isHex is /^#(.+)/: '#' and at least one character that is not a line terminator.
@@ -570,7 +570,7 @@ func (parser *parser) currToken() *token { return parser.tokenAt(parser.position
 
 func (parser *parser) nextToken() *token { return parser.tokenAt(parser.position + 1) }
 
-func (parser *parser) prevToken() *token { return parser.tokenAt(parser.position - 1) }
+func (parser *parser) previousToken() *token { return parser.tokenAt(parser.position - 1) }
 
 func (parser *parser) tokenAt(index int) *token {
 	if index < 0 || index >= len(parser.tokens) {

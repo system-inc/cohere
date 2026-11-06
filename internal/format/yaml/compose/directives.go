@@ -10,8 +10,8 @@ import (
 	"unicode/utf8"
 )
 
-// DirectivesYAML is the %YAML directive's state.
-type DirectivesYAML struct {
+// DirectivesYaml is the %YAML directive's state.
+type DirectivesYaml struct {
 	Explicit bool
 	Version  string
 }
@@ -22,7 +22,7 @@ type Directives struct {
 	DocStart bool
 	// DocEnd is the doc-end marker ...
 	DocEnd bool
-	YAML   DirectivesYAML
+	Yaml   DirectivesYaml
 	// Tags maps each `%TAG` handle to its prefix.
 	Tags map[string]string
 
@@ -35,22 +35,22 @@ func defaultTags() map[string]string {
 }
 
 // newDirectives is `new Directives(yaml, tags)`: Object.assign over the defaults, so both are copies.
-func newDirectives(yaml DirectivesYAML, tags map[string]string) *Directives {
+func newDirectives(yaml DirectivesYaml, tags map[string]string) *Directives {
 	merged := defaultTags()
 	maps.Copy(merged, tags)
-	return &Directives{YAML: yaml, Tags: merged}
+	return &Directives{Yaml: yaml, Tags: merged}
 }
 
 // atDocument is upstream's: during parsing, get a Directives instance for the current document and
 // update the stream state according to the current version's spec.
 func (directives *Directives) atDocument() *Directives {
-	result := newDirectives(directives.YAML, directives.Tags)
-	switch directives.YAML.Version {
+	result := newDirectives(directives.Yaml, directives.Tags)
+	switch directives.Yaml.Version {
 	case "1.1":
 		directives.atNextDocument = true
 	case "1.2":
 		directives.atNextDocument = false
-		directives.YAML = DirectivesYAML{Explicit: false, Version: "1.2"}
+		directives.Yaml = DirectivesYaml{Explicit: false, Version: "1.2"}
 		directives.Tags = defaultTags()
 	}
 	return result
@@ -62,7 +62,7 @@ var versionPattern = regexp.MustCompile(`^\d+\.\d+$`)
 // success.
 func (directives *Directives) add(line []uint16, onError func(offset int, message string, warning bool)) bool {
 	if directives.atNextDocument {
-		directives.YAML = DirectivesYAML{Explicit: false, Version: "1.1"}
+		directives.Yaml = DirectivesYaml{Explicit: false, Version: "1.1"}
 		directives.Tags = defaultTags()
 		directives.atNextDocument = false
 	}
@@ -70,7 +70,7 @@ func (directives *Directives) add(line []uint16, onError func(offset int, messag
 	name := parts[0]
 	parts = parts[1:]
 	switch {
-	case equalsASCII(name, "%TAG"):
+	case equalsAscii(name, "%TAG"):
 		if len(parts) != 2 {
 			onError(0, "%TAG directive should contain exactly two parts", false)
 			if len(parts) < 2 {
@@ -80,15 +80,15 @@ func (directives *Directives) add(line []uint16, onError func(offset int, messag
 		handle, prefix := parts[0], parts[1]
 		directives.Tags[unitsToString(handle)] = unitsToString(prefix)
 		return true
-	case equalsASCII(name, "%YAML"):
-		directives.YAML.Explicit = true
+	case equalsAscii(name, "%YAML"):
+		directives.Yaml.Explicit = true
 		if len(parts) != 1 {
 			onError(0, "%YAML directive should contain exactly one part", false)
 			return false
 		}
 		version := parts[0]
-		if equalsASCII(version, "1.1") || equalsASCII(version, "1.2") {
-			directives.YAML.Version = unitsToString(version)
+		if equalsAscii(version, "1.1") || equalsAscii(version, "1.2") {
+			directives.Yaml.Version = unitsToString(version)
 			return true
 		}
 		isValid := versionPattern.MatchString(asciiView(version))
@@ -122,7 +122,7 @@ func splitSpaceOrTab(text []uint16) [][]uint16 {
 // tag, which may also be the non-specific tag '!' or a '!local' tag, or "" where upstream returns null
 // (unresolvable). Upstream can also return the empty string, for !<>; every caller treats the two alike.
 func (directives *Directives) tagName(source []uint16, onError func(message string)) string {
-	if equalsASCII(source, "!") {
+	if equalsAscii(source, "!") {
 		return "!" // non-specific tag
 	}
 	if characterAt(source, 0) != '!' {
@@ -131,7 +131,7 @@ func (directives *Directives) tagName(source []uint16, onError func(message stri
 	}
 	if characterAt(source, 1) == '<' {
 		verbatim := slice(source, 2, -1)
-		if equalsASCII(verbatim, "!") || equalsASCII(verbatim, "!!") {
+		if equalsAscii(verbatim, "!") || equalsAscii(verbatim, "!!") {
 			onError("Verbatim tags aren't resolved, so " + unitsToString(source) + " is invalid.")
 			return ""
 		}
@@ -160,7 +160,7 @@ func (directives *Directives) tagName(source []uint16, onError func(message stri
 		}
 		return prefix + unitsToString(decoded)
 	}
-	if equalsASCII(handle, "!") {
+	if equalsAscii(handle, "!") {
 		return unitsToString(source) // local tag
 	}
 	onError("Could not resolve tag: " + unitsToString(source))
@@ -175,9 +175,9 @@ func decodeURIComponent(text []uint16) (decoded []uint16, ok bool) {
 		if index+2 >= len(text) || text[index] != '%' {
 			return 0, false
 		}
-		high, highOK := hexDigit(text[index+1])
-		low, lowOK := hexDigit(text[index+2])
-		if !highOK || !lowOK {
+		high, highOk := hexDigit(text[index+1])
+		low, lowOk := hexDigit(text[index+2])
+		if !highOk || !lowOk {
 			return 0, false
 		}
 		return high<<4 | low, true

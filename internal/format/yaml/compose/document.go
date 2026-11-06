@@ -40,9 +40,9 @@ type Document struct {
 	// Comment is a comment immediately after this Document, "" for none.
 	Comment string
 	// Errors are the errors encountered during composing.
-	Errors []*YAMLError
+	Errors []*YamlError
 	// Warnings are the warnings encountered during composing.
-	Warnings []*YAMLError
+	Warnings []*YamlError
 
 	Options    *Options
 	Directives *Directives
@@ -56,12 +56,12 @@ type Document struct {
 
 // newDocument is `new Document(undefined, Object.assign({ _directives: directives }, options))`.
 func newDocument(directives *Directives, options Options) *Document {
-	document := &Document{Errors: []*YAMLError{}, Warnings: []*YAMLError{}}
+	document := &Document{Errors: []*YamlError{}, Warnings: []*YamlError{}}
 	document.Options = &options
 	version := options.Version
 	document.Directives = directives.atDocument()
-	if document.Directives.YAML.Explicit {
-		version = document.Directives.YAML.Version
+	if document.Directives.Yaml.Explicit {
+		version = document.Directives.Yaml.Version
 	}
 	document.setSchema(version, options)
 	return document
@@ -72,10 +72,10 @@ func (document *Document) setSchema(version string, options Options) {
 	var schema schemaOptions
 	switch version {
 	case "1.1":
-		document.Directives.YAML.Version = "1.1"
+		document.Directives.Yaml.Version = "1.1"
 		schema = schemaOptions{resolveKnownTags: false, schema: "yaml-1.1"}
 	case "1.2", "next":
-		document.Directives.YAML.Version = version
+		document.Directives.Yaml.Version = version
 		schema = schemaOptions{resolveKnownTags: true, schema: "core"}
 	default:
 		panic("compose: Expected '1.1', '1.2' or null as first argument, but found: " + version)

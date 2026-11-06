@@ -32,7 +32,7 @@ func CloneFunction(function *Function) *Function {
 		Node:                function.Node,
 		Name:                function.Name,
 		Kind:                function.Kind,
-		Params:              append([]Place(nil), function.Params...),
+		Parameters:          append([]Place(nil), function.Parameters...),
 		Returns:             function.Returns,
 		Context:             append([]Place(nil), function.Context...),
 		Entry:               function.Entry,

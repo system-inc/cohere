@@ -105,7 +105,7 @@ func (parser *parser) parseName() *estree.Node {
 func (parser *parser) parseDocument() *estree.Node {
 	start := parser.lexer.token
 	return parser.node(start, "Document",
-		"definitions", parser.many(tokenKindSOF, parser.parseDefinition, tokenKindEOF),
+		"definitions", parser.many(tokenKindSof, parser.parseDefinition, tokenKindEof),
 	)
 }
 
@@ -1364,11 +1364,11 @@ func (parser *parser) unexpected(atToken *token) *SyntaxError {
 // any returns a possibly empty list of parse nodes, determined by the parseFn. This list begins with a
 // lex token of openKind and ends with a lex token of closeKind. Advances the parser to the next lex
 // token after the closing token.
-func (parser *parser) any(openKind tokenKind, parseFn func() *estree.Node, closeKind tokenKind) []*estree.Node {
+func (parser *parser) any(openKind tokenKind, parse func() *estree.Node, closeKind tokenKind) []*estree.Node {
 	parser.expectToken(openKind)
 	nodes := []*estree.Node{}
 	for !parser.expectOptionalToken(closeKind) {
-		nodes = append(nodes, parseFn())
+		nodes = append(nodes, parse())
 	}
 	return nodes
 }
@@ -1379,13 +1379,13 @@ func (parser *parser) any(openKind tokenKind, parseFn func() *estree.Node, close
 // closing token.
 func (parser *parser) optionalMany(
 	openKind tokenKind,
-	parseFn func() *estree.Node,
+	parse func() *estree.Node,
 	closeKind tokenKind,
 ) []*estree.Node {
 	if parser.expectOptionalToken(openKind) {
 		nodes := []*estree.Node{}
 		for {
-			nodes = append(nodes, parseFn())
+			nodes = append(nodes, parse())
 			if parser.expectOptionalToken(closeKind) {
 				break
 			}
@@ -1398,11 +1398,11 @@ func (parser *parser) optionalMany(
 // many returns a non-empty list of parse nodes, determined by the parseFn. This list begins with a lex
 // token of openKind and ends with a lex token of closeKind. Advances the parser to the next lex token
 // after the closing token.
-func (parser *parser) many(openKind tokenKind, parseFn func() *estree.Node, closeKind tokenKind) []*estree.Node {
+func (parser *parser) many(openKind tokenKind, parse func() *estree.Node, closeKind tokenKind) []*estree.Node {
 	parser.expectToken(openKind)
 	nodes := []*estree.Node{}
 	for {
-		nodes = append(nodes, parseFn())
+		nodes = append(nodes, parse())
 		if parser.expectOptionalToken(closeKind) {
 			break
 		}
@@ -1413,12 +1413,12 @@ func (parser *parser) many(openKind tokenKind, parseFn func() *estree.Node, clos
 // delimitedMany returns a non-empty list of parse nodes, determined by the parseFn. This list may
 // begin with a lex token of delimiterKind followed by items separated by lex tokens of tokenKind.
 // Advances the parser to the next lex token after last item in the list.
-func (parser *parser) delimitedMany(delimiterKind tokenKind, parseFn func() *estree.Node) []*estree.Node {
+func (parser *parser) delimitedMany(delimiterKind tokenKind, parse func() *estree.Node) []*estree.Node {
 	parser.expectOptionalToken(delimiterKind)
 
 	nodes := []*estree.Node{}
 	for {
-		nodes = append(nodes, parseFn())
+		nodes = append(nodes, parse())
 		if !parser.expectOptionalToken(delimiterKind) {
 			break
 		}

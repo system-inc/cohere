@@ -197,12 +197,13 @@ func staleFiles(source sources, scratch string, recapture bool) ([]string, error
 
 // gather reads every source Build takes. Without recapture, the examples are the committed files.
 func gather(source sources, scratch string, recapture bool) (docsdata.Inputs, error) {
-	inputs, err := docsdata.SourceInputs(source.root)
-	if err != nil {
-		return inputs, err
+	inputs, sourceInputsError := docsdata.SourceInputs(source.root)
+	if sourceInputsError != nil {
+		return inputs, sourceInputsError
 	}
-	if inputs.Help, inputs.VerbHelp, err = source.help(scratch); err != nil {
-		return inputs, err
+	var helpError error
+	if inputs.Help, inputs.VerbHelp, helpError = source.help(scratch); helpError != nil {
+		return inputs, helpError
 	}
 	if !recapture {
 		return inputs, nil
@@ -212,9 +213,9 @@ func gather(source sources, scratch string, recapture bool) (docsdata.Inputs, er
 	if captureError := source.capture(captured); captureError != nil {
 		return inputs, captureError
 	}
-	records, err := docsdata.ReadCaptures(captured)
-	if err != nil {
-		return inputs, err
+	records, readCapturesError := docsdata.ReadCaptures(captured)
+	if readCapturesError != nil {
+		return inputs, readCapturesError
 	}
 	if len(records) == 0 {
 		// A capture that recorded nothing would leave every example orphaned, and a check reading that as a

@@ -33,11 +33,11 @@ func spin(iterations int) {
 	spinSink.Add(value)
 }
 
-// threadCPU is the calling thread's CPU, by the kernel's thread clock: the same clock the meter reads, read
+// threadCpu is the calling thread's CPU, by the kernel's thread clock: the same clock the meter reads, read
 // here by the planted rule about itself, on its own thread at its own moment. It panics rather than taking
 // a *testing.T, because the planted rules call it from the walk's workers, where t.Fatal may not be
 // called; a rule's panic is contained and shows up below as a rule that ran on fewer files.
-func threadCPU() time.Duration {
+func threadCpu() time.Duration {
 	var spec unix.Timespec
 	if clockGettimeError := unix.ClockGettime(unix.CLOCK_THREAD_CPUTIME_ID, &spec); clockGettimeError != nil {
 		panic(fmt.Sprintf("reading the thread CPU clock: %v", clockGettimeError))
@@ -45,7 +45,7 @@ func threadCPU() time.Duration {
 	return time.Duration(spec.Nano())
 }
 
-// TestATimedWalkBillsCPUNotWaiting is the control the instrument is trusted on (#8qyzmxw).
+// TestATimedWalkBillsCpuNotWaiting is the control the instrument is trusted on (#8qyzmxw).
 //
 // The table it replaced charged each listener call its wall time, so a rule descheduled mid-call was
 // billed for the time it spent off the CPU, and the better-tailwindcss family read about 1.2s when its
@@ -58,7 +58,7 @@ func threadCPU() time.Duration {
 // billed 2.39ms after sleeping 7.69s, past an absolute 2ms bound, at 0.03% of its sleep). And neither
 // reads process-wide CPU, which a parallel test beside this one would add to. Shown able to fail: with the
 // meter reading the wall clock in place of the thread clock, the sleeper is billed nearly all of its sleep.
-func TestATimedWalkBillsCPUNotWaiting(test *testing.T) {
+func TestATimedWalkBillsCpuNotWaiting(test *testing.T) {
 	test.Parallel()
 	const fileCount = 80
 	const sleepPerFile = 5 * time.Millisecond
@@ -67,9 +67,9 @@ func TestATimedWalkBillsCPUNotWaiting(test *testing.T) {
 	runtime.LockOSThread()
 	iterations := 1_000_000
 	for {
-		before := threadCPU()
+		before := threadCpu()
 		spin(iterations)
-		if threadCPU()-before >= 4*time.Millisecond {
+		if threadCpu()-before >= 4*time.Millisecond {
 			break
 		}
 		iterations *= 2
@@ -104,9 +104,9 @@ func TestATimedWalkBillsCPUNotWaiting(test *testing.T) {
 		Name: "planted-spinner",
 		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-				start := threadCPU()
+				start := threadCpu()
 				spin(iterations)
-				spunTotal.Add(int64(threadCPU() - start))
+				spunTotal.Add(int64(threadCpu() - start))
 			}}
 		},
 	}
@@ -148,16 +148,16 @@ func TestATimedWalkBillsCPUNotWaiting(test *testing.T) {
 	// The sleeper's CPU is the few instructions around each sleep: about 28µs per 50ms slept on
 	// darwin/arm64, a twentieth of a percent. A twentieth of the sleep is a hundred times that, and a wall
 	// clock bills twenty times more again.
-	if slept.TotalCPU() > sleptWall/20 {
-		test.Fatalf("a rule that only sleeps was billed %v of CPU, having slept %v", slept.TotalCPU(), sleptWall)
+	if slept.TotalCpu() > sleptWall/20 {
+		test.Fatalf("a rule that only sleeps was billed %v of CPU, having slept %v", slept.TotalCpu(), sleptWall)
 	}
 
 	// The spinner's own reads bracket its work inside the meter's, so the meter bills it what it measured,
 	// less the calibrated cost of measuring a call, plus the few instructions between the two pairs of reads.
 	spunSelf := time.Duration(spunTotal.Load())
-	if got := spun.TotalCPU(); got < spunSelf*9/10 || got > spunSelf*11/10+2*time.Millisecond {
+	if got := spun.TotalCpu(); got < spunSelf*9/10 || got > spunSelf*11/10+2*time.Millisecond {
 		test.Fatalf("a rule that measured %v of its own CPU was billed %v", spunSelf, got)
 	}
 	test.Logf("spinner billed %v against %v it measured itself; sleeper billed %v after %v asleep",
-		spun.TotalCPU(), spunSelf, slept.TotalCPU(), sleptWall)
+		spun.TotalCpu(), spunSelf, slept.TotalCpu(), sleptWall)
 }

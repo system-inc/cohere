@@ -225,9 +225,9 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 	root := corpus.PrettierFork.Root(test)
 
 	type input struct {
-		Name   string `json:"name"`
-		Params string `json:"params"`
-		File   string `json:"file,omitempty"`
+		Name       string `json:"name"`
+		Parameters string `json:"params"`
+		File       string `json:"file,omitempty"`
 	}
 	var inputs []input
 	corpusFiles := 0
@@ -274,7 +274,7 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 	throws := map[string]bool{}
 	for _, fixture := range mediaQueryFixtures {
 		name := "fixture: " + fixture.name
-		inputs = append(inputs, input{Name: name, Params: fixture.params})
+		inputs = append(inputs, input{Name: name, Parameters: fixture.params})
 		throws[name] = fixture.throws
 	}
 
@@ -317,11 +317,11 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 		}
 	}
 	for _, want := range records {
-		if want.Name == nil || want.Params == nil {
+		if want.Name == nil || want.Parameters == nil {
 			test.Fatalf("the oracle printed a record without a name and params: %+v", want)
 		}
 		name := *want.Name
-		parameters := *want.Params
+		parameters := *want.Parameters
 		wantError, oracleRefused := "", want.Error != nil
 		if oracleRefused {
 			wantError = *want.Error
@@ -404,10 +404,10 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 // oracleRecord is one line of the oracle script's output: a params string with its tree, or the
 // message the library threw. name and params are pointers so a record missing either is told apart.
 type oracleRecord struct {
-	Name   *string         `json:"name"`
-	Params *string         `json:"params"`
-	Error  *string         `json:"error"`
-	Tree   json.RawMessage `json:"tree"`
+	Name       *string         `json:"name"`
+	Parameters *string         `json:"params"`
+	Error      *string         `json:"error"`
+	Tree       json.RawMessage `json:"tree"`
 }
 
 // dumpMediaQuery parses params and renders the tree the way the oracle script does, as the JSON value

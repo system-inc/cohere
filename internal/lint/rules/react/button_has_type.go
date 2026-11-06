@@ -461,7 +461,7 @@ func buttonHasTypeProvenPermitted(ruleContext rule.Context, expression *ast.Node
 	if expressionType == nil {
 		return false
 	}
-	for constituent := range type_checking.UnionTypePartsSeq(expressionType) {
+	for constituent := range type_checking.UnionTypePartsSequence(expressionType) {
 		if !type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsStringLiteral) {
 			return false
 		}

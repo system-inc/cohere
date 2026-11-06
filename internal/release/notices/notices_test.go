@@ -235,10 +235,10 @@ func TestEveryLicenseTextIsUsedAndEveryReferenceExists(test *testing.T) {
 	}
 }
 
-// TestNoGPLFileIsTracked holds the copyleft check the license survey came back clean on. git's own test
+// TestNoGplFileIsTracked holds the copyleft check the license survey came back clean on. git's own test
 // corpus, which is GPL, is read at test time from COHERE_GIT_SOURCE and must never be committed, and
 // nothing else GPL may be either. A tracked file holding a `GNU` license's title fails here by name.
-func TestNoGPLFileIsTracked(test *testing.T) {
+func TestNoGplFileIsTracked(test *testing.T) {
 	test.Parallel()
 
 	// Built from pieces, so this file doesn't match its own search. Fixed strings in the two casings a

@@ -253,8 +253,8 @@ func (state *reactivity) run() {
 	// Parameters are the root source: a component's props and a hook's arguments both arrive here,
 	// and both can differ between renders. Upstream marks the place behind a spread parameter as
 	// well as a plain one, which `Function.Params` already flattens for us.
-	for index := range state.function.Params {
-		state.mark(state.function.Params[index].Identifier)
+	for index := range state.function.Parameters {
+		state.mark(state.function.Parameters[index].Identifier)
 	}
 
 	// The frontier depends only on the control-flow graph, which nothing here mutates, so it is
@@ -1034,8 +1034,8 @@ func (state *reactivity) applyToPlaces(function *Function, isOutermost bool) {
 			state.setPlace(place)
 		})
 	}
-	for index := range function.Params {
-		state.setPlace(&function.Params[index])
+	for index := range function.Parameters {
+		state.setPlace(&function.Parameters[index])
 	}
 	state.setPlace(&function.Returns)
 

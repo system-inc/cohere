@@ -61,7 +61,7 @@ func TestFindingLine(test *testing.T) {
 	test.Parallel()
 	finding := runFinding{
 		Path: "app/os/Session.ts", Line: 12, Column: 5, Severity: "error",
-		Rule: "nexus/consistency-no-abbreviated-identifier", MessageID: "abbreviated",
+		Rule: "nexus/consistency-no-abbreviated-identifier", MessageId: "abbreviated",
 		Message: "`ctx` is an abbreviation.\nWrite `context`.",
 	}
 	want := "app/os/Session.ts:12:5 error nexus/consistency-no-abbreviated-identifier `ctx` is an abbreviation. Write `context`."

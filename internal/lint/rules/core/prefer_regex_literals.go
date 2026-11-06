@@ -930,7 +930,7 @@ func quantifiersAndGroupsBalance(pattern string, flags string) bool {
 			// under `u` or `v`, which drop annex B entirely. Upstream reaches the same split
 			// through regexpp's own unicode mode, and the corpus states it: `String.raw` + `\w{1, 2`
 			// under `u` withholds its suggestion because the pattern does not parse.
-			if parsedFlags.UV() {
+			if parsedFlags.UnicodeMode() {
 				return false
 			}
 			previousWasRepeatable = true

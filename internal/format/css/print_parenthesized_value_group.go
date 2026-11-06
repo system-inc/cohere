@@ -31,7 +31,7 @@ func printTrailingComma(path *astPath, options *printerOptions) doc.Doc {
 		!(node.Type() == "value-comma_group" &&
 			everyNode(node.List("groups"), func(group *estree.Node) bool { return group.Type() == "value-comment" })) &&
 		shouldPrintTrailingComma(options) &&
-		printing.CallParent(path, func(path *astPath) bool { return isSCSSMapItemNode(path, options) }, 0) {
+		printing.CallParent(path, func(path *astPath) bool { return isScssMapItemNode(path, options) }, 0) {
 		return doc.NewIfBreak(doc.Text(","), nil, nil)
 	}
 
@@ -53,7 +53,7 @@ func printParenthesizedValueGroup(path *astPath, options *printerOptions, print 
 	groups := node.List("groups")
 
 	if hasParent &&
-		isURLFunctionNode(parent) &&
+		isUrlFunctionNode(parent) &&
 		(groupCount == 1 ||
 			(groupCount > 0 &&
 				len(groups) > 0 &&
@@ -131,8 +131,8 @@ func printParenthesizedValueGroup(path *astPath, options *printerOptions, print 
 
 	isKey := isKeyInValuePairNode(node, parent)
 	isConfiguration := isConfigurationNode(node, parent)
-	isSCSSMapItem := isSCSSMapItemNode(path, options)
-	shouldBreak := isConfiguration || (isSCSSMapItem && !isKey)
+	isScssMapItem := isScssMapItemNode(path, options)
+	shouldBreak := isConfiguration || (isScssMapItem && !isKey)
 	shouldDedent := isConfiguration || isKey
 
 	printed := doc.NewGroup(

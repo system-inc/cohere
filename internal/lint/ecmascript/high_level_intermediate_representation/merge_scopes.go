@@ -268,8 +268,8 @@ func (scopes *MergedScopes) Ids() []ScopeId {
 	return scopes.order
 }
 
-// Len reports how many scopes survived, for measurement.
-func (scopes *MergedScopes) Len() int {
+// Length reports how many scopes survived, for measurement.
+func (scopes *MergedScopes) Length() int {
 	if scopes == nil {
 		return 0
 	}
@@ -404,7 +404,7 @@ type mergeSweepState struct {
 // single easiest way to get this pass subtly wrong.
 func MergeOverlappingReactiveScopes(function *Function, scopes *ReactiveScopes) *MergedScopes {
 	result := &MergedScopes{}
-	if function == nil || scopes == nil || scopes.Len() == 0 {
+	if function == nil || scopes == nil || scopes.Length() == 0 {
 		return result
 	}
 

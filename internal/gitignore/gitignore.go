@@ -136,15 +136,15 @@ func (matcher *Matcher) listedAbsent(directory string, name string) bool {
 
 // New reads a repository's root `.gitignore` and, when `.git` is a directory, its info/exclude.
 func New(repositoryRoot string) (*Matcher, error) {
-	root, err := filepath.Abs(repositoryRoot)
-	if err != nil {
-		return nil, err
+	root, absolutePathError := filepath.Abs(repositoryRoot)
+	if absolutePathError != nil {
+		return nil, absolutePathError
 	}
 	matcher := &Matcher{root: root}
 
-	rules, err := readTreeFile(root, "")
-	if err != nil {
-		return nil, err
+	rules, readTreeFileError := readTreeFile(root, "")
+	if readTreeFileError != nil {
+		return nil, readTreeFileError
 	}
 	matcher.files = append(matcher.files, rules)
 
@@ -155,9 +155,10 @@ func New(repositoryRoot string) (*Matcher, error) {
 		if readError != nil {
 			return nil, readError
 		}
-		matcher.exclude, err = parseRules(contents, ExcludeFile, "")
-		if err != nil {
-			return nil, err
+		var parseRulesError error
+		matcher.exclude, parseRulesError = parseRules(contents, ExcludeFile, "")
+		if parseRulesError != nil {
+			return nil, parseRulesError
 		}
 	}
 	return matcher, nil

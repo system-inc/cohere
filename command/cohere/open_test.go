@@ -20,7 +20,7 @@ func TestOpenFlag(test *testing.T) {
 	binary := buildCohere(test)
 	for _, testCase := range []struct {
 		name, source, settings string
-		args                   []string
+		commandArguments       []string
 		paths                  []string
 		none                   bool
 	}{
@@ -104,11 +104,14 @@ func TestOpenFlag(test *testing.T) {
 			}
 			run := func(open bool) (string, int) {
 				test.Helper()
-				args := append([]string{"--directory", root, "--no-format", "--no-cache", "--json"}, testCase.args...)
+				commandArguments := append(
+					[]string{"--directory", root, "--no-format", "--no-cache", "--json"},
+					testCase.commandArguments...,
+				)
 				if open {
-					args = append(args, "--open")
+					commandArguments = append(commandArguments, "--open")
 				}
-				command := exec.Command(binary, args...)
+				command := exec.Command(binary, commandArguments...)
 				command.Dir = root
 				command.Env = append(os.Environ(), "PATH="+editor, "OPEN_LOG="+log)
 				output, outputError := command.CombinedOutput()

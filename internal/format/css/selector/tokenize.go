@@ -97,7 +97,7 @@ func slice(css []uint16, start int, end int) string {
 	if start >= clampedEnd {
 		return ""
 	}
-	return unitsToWTF8(css[start:clampedEnd])
+	return unitsToWtf8(css[start:clampedEnd])
 }
 
 // indexOf is css.indexOf(search, from).

@@ -305,7 +305,7 @@ func (record LintRecord) MarshalJSON() ([]byte, error) {
 	if counted.WithheldAsCopied == nil {
 		counted.WithheldAsCopied = map[string]int{}
 	}
-	return encodeWithoutHTMLEscaping(counted)
+	return encodeWithoutHtmlEscaping(counted)
 }
 
 // MarshalJSON writes an empty ChangedFiles as `[]`, never `null`. The front door decodes the list into a
@@ -318,5 +318,5 @@ func (record FixRecord) MarshalJSON() ([]byte, error) {
 	if listed.ChangedFiles == nil {
 		listed.ChangedFiles = []ChangedFile{}
 	}
-	return encodeWithoutHTMLEscaping(listed)
+	return encodeWithoutHtmlEscaping(listed)
 }

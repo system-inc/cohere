@@ -253,7 +253,7 @@ func thisIsDefaultBoundIn(ruleContext rule.Context, node *ast.Node, settings noI
 	if settings.CapIsConstructor && startsWithUpperCase(functionOwnName(node)) {
 		return false
 	}
-	if hasJSDocThisTag(ruleContext, node) {
+	if hasJsDocThisTag(ruleContext, node) {
 		return false
 	}
 
@@ -416,7 +416,7 @@ func startsWithUpperCase(name string) bool {
 	return unicode.ToLower(first) != first
 }
 
-// hasJSDocThisTag answers whether a `@this` tag documents this function.
+// hasJsDocThisTag answers whether a `@this` tag documents this function.
 //
 // Upstream asks two questions and reports if either says yes, and both are reproduced because both
 // were measured to matter. This is the largest single piece of machinery behind a rule whose own
@@ -452,7 +452,7 @@ func startsWithUpperCase(name string) bool {
 // with no closing word boundary. So `@thisx` satisfies it and `@nothis` does not, both measured.
 // That reads as a defect and is reproduced rather than corrected, because fidelity is the authority
 // where upstream gives no reasoning.
-func hasJSDocThisTag(ruleContext rule.Context, node *ast.Node) bool {
+func hasJsDocThisTag(ruleContext rule.Context, node *ast.Node) bool {
 	if ruleContext.SourceFile == nil {
 		return false
 	}

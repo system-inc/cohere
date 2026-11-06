@@ -62,7 +62,7 @@ func TestTheCheckedStatsAnswerAsTheDiskDoes(test *testing.T) {
 
 	disk := osvfs.FS()
 	var answered atomic.Int64
-	checked := &checkedStatsFS{FS: disk, snapshot: snapshot, answered: &answered}
+	checked := &checkedStatsFileSystem{FS: disk, snapshot: snapshot, answered: &answered}
 	paths := []string{file, directory, fileLink, directoryLink, absent}
 	for _, path := range paths {
 		for _, asked := range []string{path, path + "/", filepath.Dir(path) + "//" + filepath.Base(path)} {

@@ -73,7 +73,7 @@ const (
 	lambda                    = "// @validateNoSetStateInRender\nfunction Component(props) {\n  const [x, setX] = useState(0);\n\n  const foo = () => {\n    setX(1);\n  };\n  foo();\n\n  return [x];\n}\n"
 	nestedFunctionExpressions = "// @validateNoSetStateInRender\nfunction Component(props) {\n  const [x, setX] = useState(0);\n\n  const foo = () => {\n    setX(1);\n  };\n\n  const bar = () => {\n    foo();\n  };\n\n  const baz = () => {\n    bar();\n  };\n  baz();\n\n  return [x];\n}\n"
 	hookReturn                = "// @validateNoSetStateInRender @enableTreatSetIdentifiersAsStateSetters\nfunction Component() {\n  const [state, setState] = useCustomState(0);\n  const aliased = setState;\n\n  setState(1);\n  aliased(2);\n\n  return state;\n}\n\nfunction useCustomState(init) {\n  return useState(init);\n}\n"
-	propInRender              = "// @validateNoSetStateInRender @enableTreatSetIdentifiersAsStateSetters\nfunction Component({setX}) {\n  const aliased = setX;\n\n  setX(1);\n  aliased(2);\n\n  return x;\n}\n"
+	propertyInRender          = "// @validateNoSetStateInRender @enableTreatSetIdentifiersAsStateSetters\nfunction Component({setX}) {\n  const aliased = setX;\n\n  setX(1);\n  aliased(2);\n\n  return x;\n}\n"
 )
 
 // reactStateDeclarations is the part of `@types/react` this rule reads.
@@ -230,7 +230,7 @@ func TestSetStateInRenderStaysSilentOnFixturesTheShippedRuleDoesNotReport(test *
 	// matching the name, under a pragma that defaults to off and that the ESLint rule exposes no
 	// option for. Measured: the shipped rule produces nothing on this input, with or without the
 	// import, so we and React agree here and only the compiler golden differs.
-	rule_testing.ExpectClean(test, runSetStateFixture(test, reactImport+propInRender))
+	rule_testing.ExpectClean(test, runSetStateFixture(test, reactImport+propertyInRender))
 }
 
 // TestSetStateInRenderReportsWhereTheCheckerBeatsReactsInference records a divergence, in the
@@ -284,7 +284,7 @@ func TestSetStateInRenderStaysSilentOnTheCorpusAsWritten(test *testing.T) {
 		{name: "lambda", source: lambda},
 		{name: "nested function expressions", source: nestedFunctionExpressions},
 		{name: "hook return", source: hookReturn},
-		{name: "prop in render", source: propInRender},
+		{name: "prop in render", source: propertyInRender},
 	}
 
 	for _, testCase := range cases {
@@ -729,7 +729,7 @@ func TestFixturesMatchTheVendoredCorpusByte(test *testing.T) {
 		{lambda, "error.unconditional-set-state-lambda.js"},
 		{nestedFunctionExpressions, "error.unconditional-set-state-nested-function-expressions.js"},
 		{hookReturn, "error.invalid-unconditional-set-state-hook-return-in-render.js"},
-		{propInRender, "error.invalid-unconditional-set-state-prop-in-render.js"},
+		{propertyInRender, "error.invalid-unconditional-set-state-prop-in-render.js"},
 	}
 
 	directory := filepath.Join("conformance", "testdata", "fixtures")

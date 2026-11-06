@@ -306,7 +306,7 @@ func (graph *Graph) Walk(callerContext context.Context, files []*ast.SourceFile,
 	var processStart time.Duration
 	var processKnown bool
 	if timings != nil {
-		processStart, processKnown = processCPU()
+		processStart, processKnown = processCpu()
 	}
 
 	var waitGroup sync.WaitGroup
@@ -904,7 +904,7 @@ func reportUnknownRuleReferences(sourceFile *ast.SourceFile, directives *suppres
 		}
 		report(rule.Diagnostic{
 			RuleName:   reference.Name,
-			Range:      core.NewTextRange(reference.Pos, reference.End),
+			Range:      core.NewTextRange(reference.Position, reference.End),
 			Message:    rule.Message{Id: "ruleNotFound", Description: description},
 			SourceFile: sourceFile,
 		})

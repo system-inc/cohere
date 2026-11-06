@@ -59,7 +59,7 @@ return () => (argument: number) => [reactiveValue, stableValue, argument];
 								capture.Reactive, context.Identifier, context.Reactive)
 						}
 					}
-					for _, parameter := range nested.Params {
+					for _, parameter := range nested.Parameters {
 						if parameter.Reactive {
 							test.Errorf(
 								"nested parameter id=%d inherited unrelated outer reactivity",

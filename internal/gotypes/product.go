@@ -212,11 +212,11 @@ func productKey(
 					path,
 				)
 			}
-			modulePath, version, directory := module.Path, module.Version, module.Dir
+			modulePath, version, directory := module.Path, module.Version, module.Directory
 			if module.Replace != nil {
 				modulePath, version = module.Replace.Path, module.Replace.Version
-				if module.Replace.Dir != "" {
-					directory = module.Replace.Dir
+				if module.Replace.Directory != "" {
+					directory = module.Replace.Directory
 				}
 			}
 			if version != "" {
@@ -236,7 +236,7 @@ func productKey(
 				}
 				field(packageHash, "go.mod", sum)
 				for _, name := range append(append([]string{}, listedPackage.GoFiles...), listedPackage.CgoFiles...) {
-					file := filepath.Join(listedPackage.Dir, name)
+					file := filepath.Join(listedPackage.Directory, name)
 					within, relativeError := relative(file)
 					if relativeError != nil {
 						return "", "", fmt.Errorf("%s: %w", path, relativeError)
@@ -517,17 +517,18 @@ func (product Product) compile(state *productState, directory string) error {
 		if exportFiles[path] == "" {
 			return fmt.Errorf("building the %s product, go list compiled no export data for %s", product.Name, path)
 		}
-		content, err := os.ReadFile(exportFiles[path])
-		if err != nil {
-			return err
+		content, readError := os.ReadFile(exportFiles[path])
+		if readError != nil {
+			return readError
 		}
-		if content, err = exportDataOnly(content); err != nil {
+		var exportDataOnlyError error
+		if content, exportDataOnlyError = exportDataOnly(content); exportDataOnlyError != nil {
 			return fmt.Errorf(
 				"building the %s product, %s's export file %s: %w",
 				product.Name,
 				path,
 				exportFiles[path],
-				err,
+				exportDataOnlyError,
 			)
 		}
 		name := fmt.Sprintf("exports/%04d.a", index)

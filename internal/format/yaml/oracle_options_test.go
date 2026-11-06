@@ -232,9 +232,9 @@ func jsonTextToDoc(test *testing.T, oracle *optionsOracle, options formatoptions
 	}
 }
 
-// TestPrettierRcEmbedsJSON covers embed.js: a .prettierrc, .stylelintrc or .lintstagedrc that is JSON
+// TestPrettierRcEmbedsJson covers embed.js: a .prettierrc, .stylelintrc or .lintstagedrc that is JSON
 // prints as JSON, and one that is YAML falls back to the YAML printer; any other name never embeds.
-func TestPrettierRcEmbedsJSON(test *testing.T) {
+func TestPrettierRcEmbedsJson(test *testing.T) {
 	test.Parallel()
 	oracle := newOptionsOracle(test)
 	inputs := []string{
@@ -318,9 +318,9 @@ func TestPrettierRcEmbedsJSON(test *testing.T) {
 	}
 }
 
-// TestPrettierRcWithoutTextToDocPrintsYAML: with no textToDoc the embed fails, and the core prints the
+// TestPrettierRcWithoutTextToDocPrintsYaml: with no textToDoc the embed fails, and the core prints the
 // file as YAML, as upstream does when the JSON format throws.
-func TestPrettierRcWithoutTextToDocPrintsYAML(test *testing.T) {
+func TestPrettierRcWithoutTextToDocPrintsYaml(test *testing.T) {
 	test.Parallel()
 	texts, _, trees := parseInputs(test, []string{`{"a":1}`})
 	actual, printFileError := PrintFile(".prettierrc", trees[0].root, texts[0], formatoptions.Default(), nil)

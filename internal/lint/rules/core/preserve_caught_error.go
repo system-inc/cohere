@@ -28,7 +28,7 @@ var messageIncorrectCause = rule.Message{
 		"has no way to tell that the chain was cut here. Attach the caught error itself.",
 }
 
-var messageMissingCatchErrorParam = rule.Message{
+var messageMissingCatchErrorParameter = rule.Message{
 	Id: "missingCatchErrorParam",
 	Description: "This throws a new error out of a catch clause that declares no parameter, so the " +
 		"error it caught cannot be reached at all. Nothing in the block can log it, inspect it, or " +
@@ -352,7 +352,7 @@ func checkThrowInCatch(
 	declaration := catchClause.AsCatchClause().VariableDeclaration
 	if declaration == nil {
 		if requireCatchParameter {
-			ruleContext.ReportNode(throwStatement, messageMissingCatchErrorParam)
+			ruleContext.ReportNode(throwStatement, messageMissingCatchErrorParameter)
 		}
 		return
 	}

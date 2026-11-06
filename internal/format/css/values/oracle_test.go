@@ -499,7 +499,7 @@ func dumpValues(text string, options Options) (json_value.Value, error) {
 // Every string the parser builds is decoded from UTF-16, so it is valid UTF-8 and reads in JSON as
 // it is. A float64 JSON cannot carry, which json.Marshal would refuse, becomes a description no
 // oracle prints, so the comparison still fails on it.
-func dumpValuesValue(value any, toUTF16 func(int) int) json_value.Value {
+func dumpValuesValue(value any, toUtf16 func(int) int) json_value.Value {
 	switch typed := value.(type) {
 	case nil:
 		return json_value.String("<undefined>")
@@ -517,10 +517,10 @@ func dumpValuesValue(value any, toUTF16 func(int) int) json_value.Value {
 					result[key] = json_value.String(fmt.Sprintf("a sourceIndex of type %T", typed.Get(key)))
 					continue
 				}
-				result[key] = json_value.Number(strconv.Itoa(toUTF16(index)))
+				result[key] = json_value.Number(strconv.Itoa(toUtf16(index)))
 				continue
 			}
-			result[key] = dumpValuesValue(typed.Get(key), toUTF16)
+			result[key] = dumpValuesValue(typed.Get(key), toUtf16)
 		}
 		return result
 	case []*estree.Node:
@@ -529,13 +529,13 @@ func dumpValuesValue(value any, toUTF16 func(int) int) json_value.Value {
 		}
 		result := make(json_value.Array, len(typed))
 		for index, child := range typed {
-			result[index] = dumpValuesValue(child, toUTF16)
+			result[index] = dumpValuesValue(child, toUtf16)
 		}
 		return result
 	case map[string]any:
 		result := json_value.Object{}
 		for key, each := range typed {
-			result[key] = dumpValuesValue(each, toUTF16)
+			result[key] = dumpValuesValue(each, toUtf16)
 		}
 		return result
 	case float64:

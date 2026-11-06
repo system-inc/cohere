@@ -108,7 +108,7 @@ type lexer struct {
 }
 
 func newLexer(body string) *lexer {
-	startOfFileToken := newToken(tokenKindSOF, 0, 0, 0, 0)
+	startOfFileToken := newToken(tokenKindSof, 0, 0, 0, 0)
 
 	return &lexer{
 		body:      body,
@@ -129,7 +129,7 @@ func (lexer *lexer) advance() *token {
 // lookahead looks ahead and returns the next non-ignored token, but does not change the state of Lexer.
 func (lexer *lexer) lookahead() *token {
 	token := lexer.token
-	if token.kind != tokenKindEOF {
+	if token.kind != tokenKindEof {
 		for {
 			if token.next != nil {
 				token = token.next
@@ -137,7 +137,7 @@ func (lexer *lexer) lookahead() *token {
 				// Read the next token and form a link in the token linked-list.
 				nextToken := readNextToken(lexer, token.end)
 				token.next = nextToken
-				nextToken.prev = token
+				nextToken.previous = token
 				token = nextToken
 			}
 			if token.kind != tokenKindComment {
@@ -240,7 +240,7 @@ func isTrailingSurrogate(code int) bool {
 // U+1234).
 func printCodePointAt(lexer *lexer, location int) string {
 	if location >= len(lexer.body) {
-		return string(tokenKindEOF)
+		return string(tokenKindEof)
 	}
 	code, _ := codePointAt(lexer.body, location)
 	if code >= 0x0020 && code <= 0x007e {
@@ -417,7 +417,7 @@ func readNextToken(lexer *lexer, start int) *token {
 		}
 	}
 
-	return createToken(lexer, tokenKindEOF, bodyLength, bodyLength)
+	return createToken(lexer, tokenKindEof, bodyLength, bodyLength)
 }
 
 // readComment reads a comment token from the source file.

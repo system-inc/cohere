@@ -201,7 +201,7 @@ const (
 // render nothing, with at least one number that can be falsy.
 func correctnessNoLeakedNumberRenderCanLeak(typeChecker *checker.Checker, operandType *checker.Type) bool {
 	leaks := false
-	for part := range type_checking.UnionTypePartsSeq(operandType) {
+	for part := range type_checking.UnionTypePartsSequence(operandType) {
 		switch correctnessNoLeakedNumberRenderClassify(typeChecker, part, 0) {
 		case correctnessNoLeakedNumberRenderDecline:
 			return false
@@ -256,7 +256,7 @@ func correctnessNoLeakedNumberRenderClassify(
 			return correctnessNoLeakedNumberRenderDecline
 		}
 		verdict := correctnessNoLeakedNumberRenderSilent
-		for constraintPart := range type_checking.UnionTypePartsSeq(constraint) {
+		for constraintPart := range type_checking.UnionTypePartsSequence(constraint) {
 			switch correctnessNoLeakedNumberRenderClassify(typeChecker, constraintPart, depth+1) {
 			case correctnessNoLeakedNumberRenderDecline:
 				return correctnessNoLeakedNumberRenderDecline

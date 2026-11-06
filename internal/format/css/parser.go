@@ -45,16 +45,16 @@ func parse(text string) (*estree.Node, error) {
 	return parseCss(text, &parseOptions{parser: "css"})
 }
 
-// parseSCSS is the scss parser's parse, the same as parse but through postcss-scss
+// scssParse is the scss parser's parse, the same as parse but through postcss-scss
 // (postcss.ParseSCSS), with options.parser "scss" for the glue's scss branches.
-func parseSCSS(text string) (*estree.Node, error) {
+func scssParse(text string) (*estree.Node, error) {
 	return parseScss(text, &parseOptions{parser: "scss"})
 }
 
 // parseWithParserName is the parse of the parser named: "css" or "scss".
 func parseWithParserName(text string, parser string) (*estree.Node, error) {
 	if parser == "scss" {
-		return parseSCSS(text)
+		return scssParse(text)
 	}
 	return parse(text)
 }
@@ -155,9 +155,9 @@ var valueParamsAtRuleNames = map[string]bool{
 	"add-mixin":    true,
 }
 
-// parseNestedCSS returns its node, or the node upstream returns in its place. Upstream's recursion
+// parseNestedCss returns its node, or the node upstream returns in its place. Upstream's recursion
 // ignores what it returns, so only parseWithParser's call can see a replacement.
-func parseNestedCSS(node *estree.Node, options *parseOptions) *estree.Node {
+func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 	if node == nil {
 		return node
 	}
@@ -165,10 +165,10 @@ func parseNestedCSS(node *estree.Node, options *parseOptions) *estree.Node {
 	for _, key := range node.Keys() {
 		switch child := node.Get(key).(type) {
 		case *estree.Node:
-			parseNestedCSS(child, options)
+			parseNestedCss(child, options)
 		case []*estree.Node:
 			for _, element := range child {
-				parseNestedCSS(element, options)
+				parseNestedCss(element, options)
 			}
 		}
 	}
@@ -468,7 +468,7 @@ func parseWithParser(
 
 	options.originalText = text
 	addTypePrefix(result, "css-", nil)
-	result = parseNestedCSS(result, options)
+	result = parseNestedCss(result, options)
 
 	calculateLoc(result, text)
 
@@ -488,7 +488,7 @@ func parseCss(text string, options *parseOptions) (*estree.Node, error) {
 
 // parseScss is upstream's parseScss: parseWithParser over postcss-scss's parse.
 func parseScss(text string, options *parseOptions) (*estree.Node, error) {
-	return parseCatching(postcss.ParseSCSS, text, options)
+	return parseCatching(postcss.ParseScss, text, options)
 }
 
 // parseCatching is parseWithParser, and the one place a throw upstream would let through comes back as

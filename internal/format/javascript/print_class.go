@@ -102,14 +102,14 @@ func printClassWithoutDecorators(path *Path, options *Options, print PrintFunc) 
 		printHeritageClauses(path, options, print, "implements"),
 	)
 
-	var heritageGroupId *doc.GroupID
+	var heritageGroupId *doc.GroupId
 	if groupMode {
 		heritageGroupId = getHeritageGroupId(options, current)
 		parts = append(parts,
 			groupWithIn(
 				path,
 				concatIn(path, append(partsGroup, indentIn(path, concatIn(path, extendsParts...)))...),
-				doc.GroupOptions{ID: heritageGroupId},
+				doc.GroupOptions{Id: heritageGroupId},
 			),
 		)
 	} else {

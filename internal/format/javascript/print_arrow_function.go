@@ -36,16 +36,16 @@ func shouldAlwaysAddParens(node Node) bool { return node.Is("SequenceExpression"
 // printArrowFunction is upstream's printArrowFunction. Upstream defaults args to {}; a nil args is
 // replaced with an empty one, and that empty one is what reaches print("body", args), as upstream's {}
 // does.
-func printArrowFunction(path *Path, options *Options, print PrintFunc, args *printArguments) Doc {
-	if args == nil {
-		args = &printArguments{}
+func printArrowFunction(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
+	if arguments == nil {
+		arguments = &printArguments{}
 	}
 	var signatureDocs []Doc
 	var bodyDoc Doc
 	var bodyComments []Doc
 	shouldBreakChain := false
 	shouldPrintAsChain :=
-		!args.expandLastArg && node(path).Child("body").Is("ArrowFunctionExpression")
+		!arguments.expandLastArgument && node(path).Child("body").Is("ArrowFunctionExpression")
 	var functionBody Node
 
 	// upstream's immediately invoked `(function rec() { ... })()`, with path.call(rec, "body").
@@ -56,7 +56,7 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 			path,
 			options,
 			print,
-			args,
+			arguments,
 		)
 		if len(signatureDocs) == 0 {
 			signatureDocs = append(signatureDocs, signatureDoc)
@@ -77,7 +77,7 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 		}
 
 		if !shouldPrintAsChain || !current.Child("body").Is("ArrowFunctionExpression") {
-			bodyDoc = print("body", args)
+			bodyDoc = print("body", arguments)
 			functionBody = current.Child("body")
 		} else {
 			call(path, func(path *Path) any { rec(path); return nil }, "body")
@@ -94,16 +94,16 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 				(!shouldBreakChain && shouldAddParensIfNotBreak(functionBody)))
 
 	isCallee := keyOf(path) == "callee" && isCallLikeExpression(parentOf(path))
-	chainGroupID := newGroupID("arrow-chain")
+	chainGroupId := newGroupId("arrow-chain")
 
-	signaturesDoc := printArrowFunctionSignatures(path, args, signatureDocs, shouldBreakChain)
+	signaturesDoc := printArrowFunctionSignatures(path, arguments, signatureDocs, shouldBreakChain)
 	shouldBreakSignatures := false
 	shouldIndentSignatures := false
 	shouldPrintSoftlineInIndent := false
 	if shouldPrintAsChain &&
 		(isCallee ||
 			// isAssignmentRhs
-			args.assignmentLayout != "") {
+			arguments.assignmentLayout != "") {
 		shouldIndentSignatures = true
 		// If the arrow function has a leading line comment, there should be a hardline above it
 		// so we should not print a softline in indent call
@@ -117,11 +117,19 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 			nil,
 		)
 		shouldBreakSignatures =
-			args.assignmentLayout == "chain-tail-arrow-chain" ||
+			arguments.assignmentLayout == "chain-tail-arrow-chain" ||
 				(isCallee && !shouldPutBodyOnSameLine)
 	}
 
-	bodyDoc = printArrowFunctionBody(path, options, args, bodyDoc, bodyComments, functionBody, shouldPutBodyOnSameLine)
+	bodyDoc = printArrowFunctionBody(
+		path,
+		options,
+		arguments,
+		bodyDoc,
+		bodyComments,
+		functionBody,
+		shouldPutBodyOnSameLine,
+	)
 
 	var signatures Doc = signaturesDoc
 	if shouldIndentSignatures {
@@ -133,17 +141,17 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 	}
 	var body Doc
 	if shouldPrintAsChain {
-		body = indentIfBreak(bodyDoc, chainGroupID, false)
+		body = indentIfBreak(bodyDoc, chainGroupId, false)
 	} else {
 		body = groupIn(path, bodyDoc)
 	}
 	var trailing Doc = emptyDoc
 	if shouldPrintAsChain && isCallee {
-		trailing = ifBreakWithGroup(softline, "", chainGroupID)
+		trailing = ifBreakWithGroup(softline, "", chainGroupId)
 	}
 	return groupIn(path, concatIn(
 		path,
-		groupWithIn(path, signatures, doc.GroupOptions{ShouldBreak: shouldBreakSignatures, ID: chainGroupID}),
+		groupWithIn(path, signatures, doc.GroupOptions{ShouldBreak: shouldBreakSignatures, Id: chainGroupId}),
 		" =>",
 		body,
 		trailing,
@@ -151,7 +159,7 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 }
 
 // printArrowFunctionSignature is upstream's printArrowFunctionSignature.
-func printArrowFunctionSignature(path *Path, options *Options, print PrintFunc, args *printArguments) Doc {
+func printArrowFunctionSignature(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
 	current := node(path)
 	var parts []any
 
@@ -162,11 +170,11 @@ func printArrowFunctionSignature(path *Path, options *Options, print PrintFunc, 
 	if shouldPrintParamsWithoutParens(path, options) {
 		parts = append(parts, print([]any{"params", 0}, nil))
 	} else {
-		shouldExpandParameters := args.expandLastArg || args.expandFirstArg
+		shouldExpandParameters := arguments.expandLastArgument || arguments.expandFirstArgument
 		returnTypeDoc := printReturnType(path, print)
 		if shouldExpandParameters {
 			if doc.WillBreak(returnTypeDoc) {
-				panic(argExpansionBailout{})
+				panic(argumentExpansionBailout{})
 			}
 			returnTypeDoc = groupIn(path, doc.RemoveLines(returnTypeDoc))
 		}
@@ -213,7 +221,7 @@ func mayBreakAfterShortPrefix(functionBody Node, bodyDoc Doc, options *Options) 
 // { signatureDocs, shouldBreak } is two parameters.
 func printArrowFunctionSignatures(
 	path *Path,
-	args *printArguments,
+	arguments *printArguments,
 	signatureDocs []Doc,
 	shouldBreak bool,
 ) Doc {
@@ -235,7 +243,7 @@ func printArrowFunctionSignatures(
 
 	if (key == "callee" && isCallLikeExpression(parent)) ||
 		// isAssignmentRhs
-		args.assignmentLayout != "" {
+		arguments.assignmentLayout != "" {
 		return groupWithIn(
 			path,
 			join(concatIn(path, " =>", line), signatureDocs),
@@ -255,7 +263,7 @@ func printArrowFunctionSignatures(
 func printArrowFunctionBody(
 	path *Path,
 	options *Options,
-	args *printArguments,
+	arguments *printArguments,
 	bodyDoc Doc,
 	bodyComments []Doc,
 	functionBody Node,
@@ -265,7 +273,7 @@ func printArrowFunctionBody(
 	parent := parentOf(path)
 
 	var trailingComma Doc = emptyDoc
-	if args.expandLastArg {
+	if arguments.expandLastArgument {
 		trailingComma = printTrailingComma(options, "all")
 	}
 
@@ -274,7 +282,7 @@ func printArrowFunctionBody(
 	// with the opening (, or if it's inside a JSXExpression (e.g. an attribute)
 	// we should align the expression's closing } with the line with the opening {.
 	var trailingSpace Doc = emptyDoc
-	if (args.expandLastArg || parent.Is("JSXExpressionContainer")) &&
+	if (arguments.expandLastArgument || parent.Is("JSXExpressionContainer")) &&
 		!hasAnyComment(current) {
 		trailingSpace = softline
 	}

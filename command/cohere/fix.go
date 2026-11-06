@@ -484,7 +484,7 @@ func printWouldChange(out *bufio.Writer, changed []edit.ChangedFile, lineEndings
 				Column:    1,
 				Severity:  "error",
 				Rule:      "fix",
-				MessageID: "would-change",
+				MessageId: "would-change",
 				Message:   message,
 			},
 			fmt.Sprintf("%s:1:1 - %s [fix/would-change]\n", file.FileName, message))

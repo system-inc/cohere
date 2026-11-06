@@ -375,7 +375,7 @@ func TestParseAgreesWithPostcssSelectorParser(test *testing.T) {
 			if !utf8.Valid(source) {
 				return fmt.Errorf("%s is not UTF-8, which the comparison cannot carry through JSON", path)
 			}
-			inputs = append(inputs, input{Name: path, Text: string(source), CSS: true})
+			inputs = append(inputs, input{Name: path, Text: string(source), Css: true})
 			corpusFiles++
 			return nil
 		})
@@ -525,7 +525,7 @@ func TestParseAgreesWithPostcssSelectorParser(test *testing.T) {
 type oracleInput struct {
 	Name string `json:"name"`
 	Text string `json:"text"`
-	CSS  bool   `json:"css,omitempty"`
+	Css  bool   `json:"css,omitempty"`
 }
 
 // oracleRecord is one line of the oracle script's output: a selector's tree or its error, or with

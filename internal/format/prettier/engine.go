@@ -113,8 +113,8 @@ func drainPromise(vm *goja.Runtime, value goja.Value) (string, error) {
 		return value.String(), nil
 	}
 
-	const maxPumps = 100000
-	for pump := 0; pump < maxPumps && promise.State() == goja.PromiseStatePending; pump++ {
+	const maximumPumps = 100000
+	for pump := 0; pump < maximumPumps && promise.State() == goja.PromiseStatePending; pump++ {
 		if _, runStringError := vm.RunString("0"); runStringError != nil {
 			return "", fmt.Errorf("pumping the job queue: %w", runStringError)
 		}
@@ -127,6 +127,6 @@ func drainPromise(vm *goja.Runtime, value goja.Value) (string, error) {
 		// Go whitespace: a rejection's message, trimmed for a person to read, and compared with nothing.
 		return "", fmt.Errorf("%s", strings.TrimSpace(promise.Result().String()))
 	default:
-		return "", fmt.Errorf("the formatter's promise never settled after %d pumps", maxPumps)
+		return "", fmt.Errorf("the formatter's promise never settled after %d pumps", maximumPumps)
 	}
 }

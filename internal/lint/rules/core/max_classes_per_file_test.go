@@ -48,11 +48,11 @@ func TestMaxClassesPerFileFires(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
-		name       string
-		sourceText string
-		options    string
-		wantCount  int
-		wantMax    int
+		name        string
+		sourceText  string
+		options     string
+		wantCount   int
+		wantMaximum int
 	}{
 		{"two declarations", "class Foo {}\nclass Bar {}", "", 2, 1},
 		{"a declaration and an expression", "class Foo {}\nconst myExpression = class {}", "", 2, 1},
@@ -86,7 +86,7 @@ func TestMaxClassesPerFileFires(test *testing.T) {
 
 			// The rendered text, not only the id. Both numbers move per finding, and passing them
 			// in the wrong order renders a grammatical sentence that no id assertion can see.
-			want := maxClassesPerFileMessage(testCase.wantCount, testCase.wantMax).Description
+			want := maxClassesPerFileMessage(testCase.wantCount, testCase.wantMaximum).Description
 			if got := result.Diagnostics[0].Message.Description; got != want {
 				test.Fatalf("message text:\n got %q\nwant %q", got, want)
 			}

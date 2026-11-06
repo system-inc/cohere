@@ -52,18 +52,18 @@ func TestArchitectureIsReadFromTheBinary(test *testing.T) {
 	}
 }
 
-// TestMinimumMacOSIsReadFromTheBinary uses one binary twice: as Go built it, which passes, and with its
+// TestMinimumMacOsIsReadFromTheBinary uses one binary twice: as Go built it, which passes, and with its
 // recorded minimum rewritten to macOS 27 by vtool, which is refused. The rewritten copy is the case the
 // guard exists for, an engine built against a deployment target newer than the release promises.
-func TestMinimumMacOSIsReadFromTheBinary(test *testing.T) {
+func TestMinimumMacOsIsReadFromTheBinary(test *testing.T) {
 	test.Parallel()
 
 	binary := smallMacBinary(test, "arm64")
-	if requireMinimumMacOSError := requireMinimumMacOS(
+	if requireMinimumMacOsError := requireMinimumMacOs(
 		binary,
-		MinimumSwiftEngineMacOS,
-	); requireMinimumMacOSError != nil {
-		test.Fatalf("a binary Go built for an old macOS was refused: %v", requireMinimumMacOSError)
+		MinimumSwiftEngineMacOs,
+	); requireMinimumMacOsError != nil {
+		test.Fatalf("a binary Go built for an old macOS was refused: %v", requireMinimumMacOsError)
 	}
 
 	tooNew := filepath.Join(test.TempDir(), "too-new")
@@ -82,18 +82,18 @@ func TestMinimumMacOSIsReadFromTheBinary(test *testing.T) {
 		test.Fatalf("rewriting the minimum macOS: %v\n%s", outputError, output)
 	}
 
-	requireMinimumMacOSError := requireMinimumMacOS(tooNew, MinimumSwiftEngineMacOS)
-	if requireMinimumMacOSError == nil {
+	requireMinimumMacOsError := requireMinimumMacOs(tooNew, MinimumSwiftEngineMacOs)
+	if requireMinimumMacOsError == nil {
 		test.Fatal("a binary requiring macOS 27 was accepted for a release promising macOS 15")
 	}
-	if !strings.Contains(requireMinimumMacOSError.Error(), "requires macOS 27.0") {
-		test.Fatalf("the refusal does not name the minimum it found: %v", requireMinimumMacOSError)
+	if !strings.Contains(requireMinimumMacOsError.Error(), "requires macOS 27.0") {
+		test.Fatalf("the refusal does not name the minimum it found: %v", requireMinimumMacOsError)
 	}
 }
 
-// TestMacOSVersionsCompareByNumber holds the comparison the guard rests on, including the case a string
+// TestMacOsVersionsCompareByNumber holds the comparison the guard rests on, including the case a string
 // comparison gets wrong: 9 sorts after 15 as text and before it as a version.
-func TestMacOSVersionsCompareByNumber(test *testing.T) {
+func TestMacOsVersionsCompareByNumber(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -110,16 +110,16 @@ func TestMacOSVersionsCompareByNumber(test *testing.T) {
 		{"15.0.1", "15.0", false},
 	}
 	for _, testCase := range cases {
-		newer, macOSVersionIsNewerError := macOSVersionIsNewer(testCase.version, testCase.than)
-		if macOSVersionIsNewerError != nil {
-			test.Fatalf("comparing %s with %s: %v", testCase.version, testCase.than, macOSVersionIsNewerError)
+		newer, macOsVersionIsNewerError := macOsVersionIsNewer(testCase.version, testCase.than)
+		if macOsVersionIsNewerError != nil {
+			test.Fatalf("comparing %s with %s: %v", testCase.version, testCase.than, macOsVersionIsNewerError)
 		}
 		if newer != testCase.newer {
 			test.Errorf("%s newer than %s: got %v, want %v", testCase.version, testCase.than, newer, testCase.newer)
 		}
 	}
 
-	if _, macOSVersionIsNewerError := macOSVersionIsNewer("fifteen", "15.0"); macOSVersionIsNewerError == nil {
+	if _, macOsVersionIsNewerError := macOsVersionIsNewer("fifteen", "15.0"); macOsVersionIsNewerError == nil {
 		test.Error("a version that is not a number was compared")
 	}
 }

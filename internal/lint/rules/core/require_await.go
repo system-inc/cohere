@@ -772,7 +772,7 @@ func requireAwaitTypesDemandPromise(
 func requireAwaitExpandTypes(types []*checker.Type, substitutions map[*checker.Type][]*checker.Type) []*checker.Type {
 	var expanded []*checker.Type
 	for _, listedType := range types {
-		for part := range type_checking.UnionTypePartsSeq(listedType) {
+		for part := range type_checking.UnionTypePartsSequence(listedType) {
 			if standIns, substituted := substitutions[part]; substituted {
 				for _, standIn := range standIns {
 					expanded = append(expanded, type_checking.UnionTypeParts(standIn)...)

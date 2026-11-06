@@ -77,8 +77,8 @@ func wordEnd(css []uint16, index int) bool {
 	return false
 }
 
-// wordEndNum is upstream's /[ \n\t\r\(\)\{\}\*:;@!&'"\-\+\|~>,\[\]\\]|\//g at one index.
-func wordEndNum(css []uint16, index int) bool {
+// endsNumberWord is upstream's /[ \n\t\r\(\)\{\}\*:;@!&'"\-\+\|~>,\[\]\\]|\//g at one index.
+func endsNumberWord(css []uint16, index int) bool {
 	switch css[index] {
 	case ' ', '\n', '\t', '\r', '(', ')', '{', '}', '*', ':', ';', '@', '!', '&', '\'', '"', '-', '+', '|', '~', '>',
 		',', '[', ']', '\\', '/':
@@ -87,9 +87,9 @@ func wordEndNum(css []uint16, index int) bool {
 	return false
 }
 
-// alphaNum is upstream's /^[a-z0-9]/i. JavaScript's case-insensitive class without the u flag folds
+// alphanumeric is upstream's /^[a-z0-9]/i. JavaScript's case-insensitive class without the u flag folds
 // only within ASCII here, so this is a plain ASCII test.
-func alphaNum(code uint16) bool {
+func alphanumeric(code uint16) bool {
 	return (code >= 'a' && code <= 'z') || (code >= 'A' && code <= 'Z') || (code >= '0' && code <= '9')
 }
 
@@ -386,7 +386,7 @@ func tokenize(input []uint16, options Options) []token {
 				line = nextLine
 				position = next
 
-			} else if code == pound && !(position+1 < length && alphaNum(css[position+1])) {
+			} else if code == pound && !(position+1 < length && alphanumeric(css[position+1])) {
 				next = position + 1
 
 				push("#", slice(position, next), line, position-offset, line, next-offset, position)
@@ -419,7 +419,7 @@ func tokenize(input []uint16, options Options) []token {
 				// we're dealing with a word that starts with a number
 				// those get treated differently
 				if code >= digit0 && code <= digit9 {
-					regex = wordEndNum
+					regex = endsNumberWord
 					isWordEndNumber = true
 				}
 
@@ -440,7 +440,7 @@ func tokenize(input []uint16, options Options) []token {
 					if (ncode == lowerE || ncode == upperE) &&
 						(ncode1 == minus || ncode1 == plus) &&
 						(ncode2 >= digit0 && ncode2 <= digit9) {
-						lastIndex := regexLastIndex(css, next+2, wordEndNum)
+						lastIndex := regexLastIndex(css, next+2, endsNumberWord)
 
 						if lastIndex == 0 {
 							next = length - 1

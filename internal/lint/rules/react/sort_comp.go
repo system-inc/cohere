@@ -128,14 +128,14 @@ func DecodeSortCompOptions(raw []byte) (SortCompOptions, error) {
 	return options, nil
 }
 
-// sortCompUnsortedProps builds the per-finding message naming both members and the direction.
+// sortCompUnsortedProperties builds the per-finding message naming both members and the direction.
 //
 // The Id is fixed and only the Description moves, so `ExpectFindings` can still count these while
 // the rendered text names the two members the way upstream's `{{propA}} should be placed
 // {{position}} {{propB}}` interpolation does. The first sentence is upstream's text verbatim,
 // because it is the part a reader matches against upstream's own output; the rest is this
 // codebase's house style of saying why rather than restating the rule name.
-func sortCompUnsortedProps(propertyA string, position string, propertyB string) rule.Message {
+func sortCompUnsortedProperties(propertyA string, position string, propertyB string) rule.Message {
 	return rule.Message{
 		Id: "unsortedProps",
 		Description: fmt.Sprintf(
@@ -647,10 +647,10 @@ type sortCompError struct {
 	// closestDistance is the smallest index gap to a losing partner seen so far, and
 	// closestMember / closestIndex are that partner. The message names this partner rather than the
 	// most recent one.
-	closestDistance int
-	closestMember   sortCompMember
-	closestHasRef   bool
-	closestIndex    int
+	closestDistance     int
+	closestMember       sortCompMember
+	closestHasReference bool
+	closestIndex        int
 }
 
 // sortCompCheckOrder runs the pairwise vote over one component's members and reports what survives.
@@ -702,7 +702,7 @@ func sortCompCheckOrder(ruleContext rule.Context, methodsOrder []string, members
 		}
 		existing.closestDistance = distance
 		existing.closestMember = memberB
-		existing.closestHasRef = true
+		existing.closestHasReference = true
 		existing.closestIndex = indexB
 	}
 
@@ -727,7 +727,7 @@ func sortCompCheckOrder(ruleContext rule.Context, methodsOrder []string, members
 		if !stillPresent {
 			continue
 		}
-		if !current.closestHasRef {
+		if !current.closestHasReference {
 			continue
 		}
 		partner, partnerRecorded := errors[current.closestIndex]
@@ -743,7 +743,7 @@ func sortCompCheckOrder(ruleContext rule.Context, methodsOrder []string, members
 
 	for _, index := range sortCompSortedIndexes(errors) {
 		reported := errors[index]
-		if !reported.closestHasRef {
+		if !reported.closestHasReference {
 			continue
 		}
 		position := "after"
@@ -752,7 +752,7 @@ func sortCompCheckOrder(ruleContext rule.Context, methodsOrder []string, members
 		}
 		ruleContext.ReportNode(
 			reported.member.node,
-			sortCompUnsortedProps(reported.member.name, position, reported.closestMember.name),
+			sortCompUnsortedProperties(reported.member.name, position, reported.closestMember.name),
 		)
 	}
 }

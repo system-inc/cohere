@@ -21,7 +21,7 @@ const (
 	typeRoot       = "root"
 	typePseudo     = "pseudo"
 	typeNesting    = "nesting"
-	typeID         = "id"
+	typeId         = "id"
 	typeComment    = "comment"
 	typeCombinator = "combinator"
 	typeClass      = "class"

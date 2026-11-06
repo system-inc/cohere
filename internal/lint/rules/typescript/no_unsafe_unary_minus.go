@@ -158,9 +158,9 @@ var NoUnsafeUnaryMinus = rule.Rule[rule.NoOptions]{
 					return
 				}
 
-				argType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, expr.Operand)
+				argumentType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, expr.Operand)
 
-				for part := range type_checking.UnionTypePartsSeq(argType) {
+				for part := range type_checking.UnionTypePartsSequence(argumentType) {
 					if !type_checking.IsTypeFlagSet(
 						part,
 						checker.TypeFlagsAny|checker.TypeFlagsNever|checker.TypeFlagsBigIntLike|checker.TypeFlagsNumberLike,

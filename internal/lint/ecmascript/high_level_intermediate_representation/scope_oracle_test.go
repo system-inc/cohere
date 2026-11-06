@@ -100,7 +100,7 @@ func countScopeStages(function *Function, checker *shimchecker.Checker) scopeSta
 	BuildReactiveScopeTerminals(function, scopes, identity)
 	dependencies := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
 
-	counts := scopeStageCounts{assigned: scopes.Len()}
+	counts := scopeStageCounts{assigned: scopes.Length()}
 
 	tree, _ := BuildReactiveFunction(function)
 	if tree == nil {

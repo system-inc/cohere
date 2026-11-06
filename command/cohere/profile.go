@@ -18,9 +18,9 @@ func startProfile(path string) error {
 	if createError != nil {
 		return fmt.Errorf("creating the profile: %w", createError)
 	}
-	if startCPUProfileError := pprof.StartCPUProfile(file); startCPUProfileError != nil {
+	if startCpuProfileError := pprof.StartCPUProfile(file); startCpuProfileError != nil {
 		_ = file.Close() // Ignored: the profile never started, so nothing was written, and its start error is returned.
-		return fmt.Errorf("starting the profile: %w", startCPUProfileError)
+		return fmt.Errorf("starting the profile: %w", startCpuProfileError)
 	}
 	profileFile = file
 	// A profiled run never returns early: the profile is something the caller reads, and it is complete

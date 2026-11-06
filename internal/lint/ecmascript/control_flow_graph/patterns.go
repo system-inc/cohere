@@ -167,13 +167,13 @@ func (builder *Builder[E]) patternBind(node *ast.Node) {
 func (builder *Builder[E]) bindWithDefault(target *ast.Node, fallback *ast.Node) {
 	if fallback != nil {
 		join := builder.newBlock()
-		builder.link(builder.cur, join)
+		builder.link(builder.current, join)
 		withFallback := builder.newBlock()
-		builder.link(builder.cur, withFallback)
+		builder.link(builder.current, withFallback)
 
 		builder.enter(withFallback)
 		builder.expr(fallback)
-		builder.link(builder.cur, join)
+		builder.link(builder.current, join)
 
 		builder.enter(join)
 	}

@@ -200,7 +200,7 @@ func TestOnlyThrowErrorStaysSilent(test *testing.T) {
 			"\nthrow undefined;\n      ",
 			rule.Configured(OnlyThrowErrorOptions{Allow: []type_checking.TypeOrValueSpecifier{
 				{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"undefined"}},
-			}, AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}),
+			}, AllowThrowingAny: type_checking.Reference(false), AllowThrowingUnknown: type_checking.Reference(false)}),
 		},
 		{
 			"upstream valid case 33",
@@ -209,16 +209,16 @@ func TestOnlyThrowErrorStaysSilent(test *testing.T) {
 				Allow: []type_checking.TypeOrValueSpecifier{
 					{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomError"}},
 				},
-				AllowThrowingAny:     type_checking.Ref(false),
-				AllowThrowingUnknown: type_checking.Ref(false),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
 			}),
 		},
 		{"upstream valid case 34", "\nthrow new Map();\n      ", rule.Configured(OnlyThrowErrorOptions{
 			Allow: []type_checking.TypeOrValueSpecifier{
 				{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Map"}},
 			},
-			AllowThrowingAny:     type_checking.Ref(false),
-			AllowThrowingUnknown: type_checking.Ref(false),
+			AllowThrowingAny:     type_checking.Reference(false),
+			AllowThrowingUnknown: type_checking.Reference(false),
 		})},
 		// upstream valid case 35 is not here. It is pinned by
 		// TestOnlyThrowErrorAmbientPackageIsAHarnessLimit instead, because our fixture tsconfig
@@ -232,38 +232,38 @@ func TestOnlyThrowErrorStaysSilent(test *testing.T) {
 			"upstream valid case 37",
 			"\ntry {\n} catch (e) {\n  throw e;\n}\n      ",
 			rule.Configured(OnlyThrowErrorOptions{
-				AllowRethrowing:      type_checking.Ref(true),
-				AllowThrowingAny:     type_checking.Ref(false),
-				AllowThrowingUnknown: type_checking.Ref(false),
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
 			}),
 		},
 		{
 			"upstream valid case 38",
 			"\ntry {\n} catch (eOuter) {\n  try {\n    if (Math.random() > 0.5) {\n      throw eOuter;\n    }\n  } catch (eInner) {\n    if (Math.random() > 0.5) {\n      throw eOuter;\n    } else {\n      throw eInner;\n    }\n  }\n}\n      ",
 			rule.Configured(OnlyThrowErrorOptions{
-				AllowRethrowing:      type_checking.Ref(true),
-				AllowThrowingAny:     type_checking.Ref(false),
-				AllowThrowingUnknown: type_checking.Ref(false),
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
 			}),
 		},
 		{
 			"upstream valid case 39",
 			"\nPromise.reject('foo').catch(e => {\n  throw e;\n});\n      ",
 			rule.Configured(OnlyThrowErrorOptions{
-				AllowRethrowing:      type_checking.Ref(true),
-				AllowThrowingAny:     type_checking.Ref(false),
-				AllowThrowingUnknown: type_checking.Ref(false),
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
 			}),
 		},
 		{
 			"upstream valid case 40",
 			"\nasync function foo() {\n  throw await Promise.resolve(new Error('error'));\n}\n      ",
-			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}),
+			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Reference(false)}),
 		},
 		{
 			"upstream valid case 41",
 			"\nfunction* foo(): Generator<number, void, Error> {\n  throw yield 303;\n}\n      ",
-			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}),
+			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Reference(false)}),
 		},
 	}
 
@@ -442,13 +442,13 @@ func TestOnlyThrowErrorFires(test *testing.T) {
 		{
 			"upstream invalid case 33",
 			"\nfunction fun(value: any) {\n  throw value;\n}\n      ",
-			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}),
+			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Reference(false)}),
 			[]string{"object"},
 		},
 		{
 			"upstream invalid case 34",
 			"\nfunction fun(value: unknown) {\n  throw value;\n}\n      ",
-			rule.Configured(OnlyThrowErrorOptions{AllowThrowingUnknown: type_checking.Ref(false)}),
+			rule.Configured(OnlyThrowErrorOptions{AllowThrowingUnknown: type_checking.Reference(false)}),
 			[]string{"object"},
 		},
 		{
@@ -470,8 +470,8 @@ func TestOnlyThrowErrorFires(test *testing.T) {
 				Allow: []type_checking.TypeOrValueSpecifier{
 					{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomError"}},
 				},
-				AllowThrowingAny:     type_checking.Ref(false),
-				AllowThrowingUnknown: type_checking.Ref(false),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
 			}),
 			[]string{"object"},
 		},
@@ -479,9 +479,9 @@ func TestOnlyThrowErrorFires(test *testing.T) {
 			"upstream invalid case 38",
 			"\nlet x = 1;\nPromise.reject('foo').catch(e => {\n  throw x;\n});\n      ",
 			rule.Configured(OnlyThrowErrorOptions{
-				AllowRethrowing:      type_checking.Ref(true),
-				AllowThrowingAny:     type_checking.Ref(false),
-				AllowThrowingUnknown: type_checking.Ref(false),
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
 			}),
 			[]string{"object"},
 		},
@@ -489,9 +489,9 @@ func TestOnlyThrowErrorFires(test *testing.T) {
 			"upstream invalid case 39",
 			"\nPromise.reject('foo').catch((...e) => {\n  throw e;\n});\n      ",
 			rule.Configured(OnlyThrowErrorOptions{
-				AllowRethrowing:      type_checking.Ref(true),
-				AllowThrowingAny:     type_checking.Ref(false),
-				AllowThrowingUnknown: type_checking.Ref(false),
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
 			}),
 			[]string{"object"},
 		},
@@ -499,9 +499,9 @@ func TestOnlyThrowErrorFires(test *testing.T) {
 			"upstream invalid case 40",
 			"\ndeclare const x: any[];\nPromise.reject('foo').catch(...x, e => {\n  throw e;\n});\n      ",
 			rule.Configured(OnlyThrowErrorOptions{
-				AllowRethrowing:      type_checking.Ref(true),
-				AllowThrowingAny:     type_checking.Ref(false),
-				AllowThrowingUnknown: type_checking.Ref(false),
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
 			}),
 			[]string{"object"},
 		},
@@ -509,9 +509,9 @@ func TestOnlyThrowErrorFires(test *testing.T) {
 			"upstream invalid case 41",
 			"\ndeclare const x: any[];\nPromise.reject('foo').then(...x, e => {\n  throw e;\n});\n      ",
 			rule.Configured(OnlyThrowErrorOptions{
-				AllowRethrowing:      type_checking.Ref(true),
-				AllowThrowingAny:     type_checking.Ref(false),
-				AllowThrowingUnknown: type_checking.Ref(false),
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
 			}),
 			[]string{"object"},
 		},
@@ -519,9 +519,9 @@ func TestOnlyThrowErrorFires(test *testing.T) {
 			"upstream invalid case 42",
 			"\ndeclare const onFulfilled: any;\ndeclare const x: any[];\nPromise.reject('foo').then(onFulfilled, ...x, e => {\n  throw e;\n});\n      ",
 			rule.Configured(OnlyThrowErrorOptions{
-				AllowRethrowing:      type_checking.Ref(true),
-				AllowThrowingAny:     type_checking.Ref(false),
-				AllowThrowingUnknown: type_checking.Ref(false),
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
 			}),
 			[]string{"object"},
 		},
@@ -529,9 +529,9 @@ func TestOnlyThrowErrorFires(test *testing.T) {
 			"upstream invalid case 43",
 			"\nPromise.reject('foo').then((...e) => {\n  throw e;\n});\n      ",
 			rule.Configured(OnlyThrowErrorOptions{
-				AllowRethrowing:      type_checking.Ref(true),
-				AllowThrowingAny:     type_checking.Ref(false),
-				AllowThrowingUnknown: type_checking.Ref(false),
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
 			}),
 			[]string{"object"},
 		},
@@ -539,22 +539,22 @@ func TestOnlyThrowErrorFires(test *testing.T) {
 			"upstream invalid case 44",
 			"\nPromise.reject('foo').then(e => {\n  throw globalThis;\n});\n      ",
 			rule.Configured(OnlyThrowErrorOptions{
-				AllowRethrowing:      type_checking.Ref(true),
-				AllowThrowingAny:     type_checking.Ref(false),
-				AllowThrowingUnknown: type_checking.Ref(false),
+				AllowRethrowing:      type_checking.Reference(true),
+				AllowThrowingAny:     type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
 			}),
 			[]string{"object"},
 		},
 		{
 			"upstream invalid case 45",
 			"\nasync function foo() {\n  throw await bar;\n}\n      ",
-			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}),
+			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Reference(false)}),
 			[]string{"object"},
 		},
 		{
 			"upstream invalid case 46",
 			"\nasync function foo() {\n  throw await Promise.resolve<number>(303);\n}\n      ",
-			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}),
+			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Reference(false)}),
 			[]string{"object"},
 		},
 	}
@@ -628,7 +628,7 @@ func TestOnlyThrowErrorSpans(test *testing.T) {
 		{
 			"an await points at the await expression",
 			"declare const bar: number;\nasync function foo() {\n  throw await bar;\n}",
-			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}),
+			rule.Configured(OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Reference(false)}),
 			[]string{"await bar"},
 		},
 
@@ -731,9 +731,9 @@ func TestOnlyThrowErrorParenthesizedRethrow(test *testing.T) {
 	rule_testing.ExpectClean(test, runOnlyThrowError(test, source, rule.Given[OnlyThrowErrorOptions]{}))
 
 	rule_testing.ExpectFindings(test, runOnlyThrowError(test, source, rule.Configured(OnlyThrowErrorOptions{
-		AllowRethrowing:      type_checking.Ref(false),
-		AllowThrowingAny:     type_checking.Ref(false),
-		AllowThrowingUnknown: type_checking.Ref(false),
+		AllowRethrowing:      type_checking.Reference(false),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
 	})), "object")
 }
 
@@ -752,9 +752,9 @@ func TestOnlyThrowErrorRethrowShape(test *testing.T) {
 	test.Parallel()
 
 	strict := OnlyThrowErrorOptions{
-		AllowRethrowing:      type_checking.Ref(true),
-		AllowThrowingAny:     type_checking.Ref(false),
-		AllowThrowingUnknown: type_checking.Ref(false),
+		AllowRethrowing:      type_checking.Reference(true),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
 	}
 
 	cases := []struct {
@@ -849,9 +849,9 @@ func TestOnlyThrowErrorConstFoldedKeyDiverges(test *testing.T) {
 
 	source := "const k = 'catch';\nPromise.reject('x')[k](e => {\n  throw e;\n});"
 	rule_testing.ExpectFindings(test, runOnlyThrowError(test, source, rule.Configured(OnlyThrowErrorOptions{
-		AllowRethrowing:      type_checking.Ref(true),
-		AllowThrowingAny:     type_checking.Ref(false),
-		AllowThrowingUnknown: type_checking.Ref(false),
+		AllowRethrowing:      type_checking.Reference(true),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
 	})), "object")
 }
 
@@ -872,19 +872,19 @@ func TestOnlyThrowErrorDefaultsArePermissive(test *testing.T) {
 		{
 			"any is thrown freely by default",
 			"function fun(value: any) {\n  throw value;\n}",
-			OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)},
+			OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Reference(false)},
 		},
 		{
 			"unknown is thrown freely by default",
 			"function fun(value: unknown) {\n  throw value;\n}",
-			OnlyThrowErrorOptions{AllowThrowingUnknown: type_checking.Ref(false)},
+			OnlyThrowErrorOptions{AllowThrowingUnknown: type_checking.Reference(false)},
 		},
 		{
 			"a caught value is rethrown freely by default",
 			"try {\n} catch (e) {\n  throw e;\n}",
 			OnlyThrowErrorOptions{
-				AllowRethrowing:      type_checking.Ref(false),
-				AllowThrowingUnknown: type_checking.Ref(false),
+				AllowRethrowing:      type_checking.Reference(false),
+				AllowThrowingUnknown: type_checking.Reference(false),
 			},
 		},
 	}
@@ -924,8 +924,8 @@ func TestOnlyThrowErrorUndefBeatsTheEscapes(test *testing.T) {
 		runOnlyThrowError(test, "throw undefined;", rule.Given[OnlyThrowErrorOptions]{}), "undef")
 
 	rule_testing.ExpectFindings(test, runOnlyThrowError(test, "throw undefined;", rule.Configured(OnlyThrowErrorOptions{
-		AllowThrowingAny:     type_checking.Ref(true),
-		AllowThrowingUnknown: type_checking.Ref(true),
+		AllowThrowingAny:     type_checking.Reference(true),
+		AllowThrowingUnknown: type_checking.Reference(true),
 	})), "undef")
 
 	rule_testing.ExpectFindings(test, runOnlyThrowError(test,
@@ -1110,8 +1110,8 @@ func TestOnlyThrowErrorAmbientPackageIsAHarnessLimit(test *testing.T) {
 		Allow: []type_checking.TypeOrValueSpecifier{
 			{From: type_checking.TypeOrValueSpecifierFromPackage, Name: []string{"ErrorLike"}, Package: "errors"},
 		},
-		AllowThrowingAny:     type_checking.Ref(false),
-		AllowThrowingUnknown: type_checking.Ref(false),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
 	}
 
 	// Upstream is silent; we report, because the module does not resolve under this tsconfig.
@@ -1124,8 +1124,8 @@ func TestOnlyThrowErrorAmbientPackageIsAHarnessLimit(test *testing.T) {
 	rule_testing.ExpectFindings(test,
 		rule_testing.RunTypedFilesWithOptions(test, OnlyThrowError, files, onlyThrowErrorFile, OnlyThrowErrorOptions{
 			AllowInline:          []string{"ErrorLike"},
-			AllowThrowingAny:     type_checking.Ref(false),
-			AllowThrowingUnknown: type_checking.Ref(false),
+			AllowThrowingAny:     type_checking.Reference(false),
+			AllowThrowingUnknown: type_checking.Reference(false),
 		}), "object")
 }
 
@@ -1151,9 +1151,9 @@ func TestOnlyThrowErrorSurvivesMalformedShapes(test *testing.T) {
 	test.Parallel()
 
 	strict := OnlyThrowErrorOptions{
-		AllowRethrowing:      type_checking.Ref(true),
-		AllowThrowingAny:     type_checking.Ref(false),
-		AllowThrowingUnknown: type_checking.Ref(false),
+		AllowRethrowing:      type_checking.Reference(true),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
 	}
 
 	test.Run("a one-argument then does not index past its arguments", func(test *testing.T) {
@@ -1190,9 +1190,9 @@ func TestOnlyThrowErrorPrivateMethodName(test *testing.T) {
 	test.Parallel()
 
 	strict := OnlyThrowErrorOptions{
-		AllowRethrowing:      type_checking.Ref(true),
-		AllowThrowingAny:     type_checking.Ref(false),
-		AllowThrowingUnknown: type_checking.Ref(false),
+		AllowRethrowing:      type_checking.Reference(true),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
 	}
 
 	rule_testing.ExpectClean(test, runOnlyThrowError(test,
@@ -1246,8 +1246,8 @@ func TestOnlyThrowErrorSpecifierComposites(test *testing.T) {
 		Allow: []type_checking.TypeOrValueSpecifier{
 			{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Map"}},
 		},
-		AllowThrowingAny:     type_checking.Ref(false),
-		AllowThrowingUnknown: type_checking.Ref(false),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
 	}
 
 	test.Run("a union matches only when every member matches", func(test *testing.T) {
@@ -1295,19 +1295,19 @@ func TestOnlyThrowErrorSpecifierDeclinesTheErrorType(test *testing.T) {
 		Allow: []type_checking.TypeOrValueSpecifier{
 			{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"error"}},
 		},
-		AllowThrowingAny:     type_checking.Ref(false),
-		AllowThrowingUnknown: type_checking.Ref(false),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
 	})), "object")
 
 	rule_testing.ExpectFindings(test, runOnlyThrowError(test, source, rule.Configured(OnlyThrowErrorOptions{
 		AllowInline:          []string{"error"},
-		AllowThrowingAny:     type_checking.Ref(false),
-		AllowThrowingUnknown: type_checking.Ref(false),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
 	})), "object")
 
 	rule_testing.ExpectFindings(test, runOnlyThrowError(test, source, rule.Configured(OnlyThrowErrorOptions{
-		AllowThrowingAny:     type_checking.Ref(false),
-		AllowThrowingUnknown: type_checking.Ref(false),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
 	})), "object")
 }
 
@@ -1331,8 +1331,8 @@ func TestOnlyThrowErrorDeclinesSynthesizedNodes(test *testing.T) {
 	test.Parallel()
 
 	strict := OnlyThrowErrorOptions{
-		AllowThrowingAny:     type_checking.Ref(false),
-		AllowThrowingUnknown: type_checking.Ref(false),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
 	}
 
 	for _, source := range []string{"throw;", "throw ();", "throw (());"} {
@@ -1370,9 +1370,9 @@ func TestOnlyThrowErrorUndeclaredIdentifier(test *testing.T) {
 	test.Parallel()
 
 	strict := OnlyThrowErrorOptions{
-		AllowRethrowing:      type_checking.Ref(true),
-		AllowThrowingAny:     type_checking.Ref(false),
-		AllowThrowingUnknown: type_checking.Ref(false),
+		AllowRethrowing:      type_checking.Reference(true),
+		AllowThrowingAny:     type_checking.Reference(false),
+		AllowThrowingUnknown: type_checking.Reference(false),
 	}
 	rule_testing.ExpectFindings(test,
 		runOnlyThrowError(test, "throw notDeclaredAnywhere;", rule.Configured(strict)), "object")

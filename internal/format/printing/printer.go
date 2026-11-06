@@ -11,7 +11,7 @@ import (
 // PrintFunc is upstream's mainPrint as a printer receives it: print the node at selector, relative to
 // the current path. A nil selector prints the current node. A selector is one name or a slice of names,
 // exactly as upstream's print(selector, args).
-type PrintFunc func(selector any, args any) doc.Doc
+type PrintFunc func(selector any, arguments any) doc.Doc
 
 // CommentContext is upstream's decorated comment, what the ownLine, endOfLine and remaining handlers
 // receive when the printer sets AvoidAstMutation, and what attachment builds either way.
@@ -52,7 +52,7 @@ type TextToDoc func(text string, parser string) (doc.Doc, error)
 // Printer is upstream's printer object: what a language supplies to the core. Every field but Print,
 // LocStart, LocEnd and VisitorKeys is optional, and a nil one means what upstream's absent one means.
 type Printer[N Node[N]] struct {
-	Print func(path *AstPath[N], options *Options[N], print PrintFunc, args any) doc.Doc
+	Print func(path *AstPath[N], options *Options[N], print PrintFunc, arguments any) doc.Doc
 
 	// LocStart and LocEnd are upstream's options.locStart and locEnd: byte offsets, with the
 	// language's own overrides.
@@ -71,7 +71,7 @@ type Printer[N Node[N]] struct {
 	EmbedVisitorKeys     func(node N) []string
 	Preprocess           func(ast N, options *Options[N]) N
 	HasPrettierIgnore    func(path *AstPath[N]) bool
-	PrintPrettierIgnored func(path *AstPath[N], options *Options[N], print PrintFunc, args any) doc.Doc
+	PrintPrettierIgnored func(path *AstPath[N], options *Options[N], print PrintFunc, arguments any) doc.Doc
 	WillPrintOwnComments func(path *AstPath[N], options *Options[N]) bool
 
 	CanAttachComment     func(node N, ancestors []N) bool
@@ -164,44 +164,44 @@ func PrintAstToDoc[N Node[N]](ast N, comments []N, options *Options[N]) (doc.Doc
 	embeds := map[N]doc.Doc{}
 
 	var mainPrint PrintFunc
-	mainPrintInternal := func(args any) doc.Doc {
+	mainPrintInternal := func(arguments any) doc.Doc {
 		ensurePrintingNode(path, options)
 		value := path.Value()
 		if isNil(value) {
 			return doc.Text("")
 		}
 		node, isNode := asNode[N](value)
-		shouldCache := isNode && args == nil
+		shouldCache := isNode && arguments == nil
 		if shouldCache {
 			if cached, present := cache[node]; present {
 				return cached
 			}
 		}
-		printed := callPluginPrintFunction(path, options, mainPrint, args, embeds)
+		printed := callPluginPrintFunction(path, options, mainPrint, arguments, embeds)
 		if shouldCache {
 			cache[node] = printed
 		}
 		return printed
 	}
-	mainPrint = func(selector any, args any) doc.Doc {
+	mainPrint = func(selector any, arguments any) doc.Doc {
 		switch typed := selector.(type) {
 		case nil:
-			return mainPrintInternal(args)
+			return mainPrintInternal(arguments)
 		case *AstPath[N]:
 			if typed == path {
-				return mainPrintInternal(args)
+				return mainPrintInternal(arguments)
 			}
 			panic("printing: print was called with a path other than the one being printed")
 		case []any:
-			return Call(path, func(*AstPath[N]) doc.Doc { return mainPrintInternal(args) }, typed...)
+			return Call(path, func(*AstPath[N]) doc.Doc { return mainPrintInternal(arguments) }, typed...)
 		case []string:
 			names := make([]any, len(typed))
 			for index, name := range typed {
 				names[index] = name
 			}
-			return Call(path, func(*AstPath[N]) doc.Doc { return mainPrintInternal(args) }, names...)
+			return Call(path, func(*AstPath[N]) doc.Doc { return mainPrintInternal(arguments) }, names...)
 		default:
-			return Call(path, func(*AstPath[N]) doc.Doc { return mainPrintInternal(args) }, selector)
+			return Call(path, func(*AstPath[N]) doc.Doc { return mainPrintInternal(arguments) }, selector)
 		}
 	}
 
@@ -219,7 +219,7 @@ func callPluginPrintFunction[N Node[N]](
 	path *AstPath[N],
 	options *Options[N],
 	print PrintFunc,
-	args any,
+	arguments any,
 	embeds map[N]doc.Doc,
 ) doc.Doc {
 	node, _ := path.Node()
@@ -228,12 +228,12 @@ func callPluginPrintFunction[N Node[N]](
 	var printed doc.Doc
 	switch {
 	case printer.HasPrettierIgnore != nil && printer.HasPrettierIgnore(path):
-		printed = printIgnored(path, options, print, args)
+		printed = printIgnored(path, options, print, arguments)
 	default:
 		if embedded, present := embeds[node]; present {
 			printed = embedded
 		} else {
-			printed = printer.Print(path, options, print, args)
+			printed = printer.Print(path, options, print, arguments)
 		}
 	}
 
@@ -248,7 +248,7 @@ func callPluginPrintFunction[N Node[N]](
 
 // printIgnored is upstream's printIgnored, src/main/print-ignored.js: a prettier-ignore'd node prints as
 // its original text, and every comment inside it counts as printed.
-func printIgnored[N Node[N]](path *AstPath[N], options *Options[N], print PrintFunc, args any) doc.Doc {
+func printIgnored[N Node[N]](path *AstPath[N], options *Options[N], print PrintFunc, arguments any) doc.Doc {
 	node, _ := path.Node()
 	start := options.Printer.LocStart(node)
 	end := options.Printer.LocEnd(node)
@@ -258,7 +258,7 @@ func printIgnored[N Node[N]](path *AstPath[N], options *Options[N], print PrintF
 		}
 	}
 	if options.Printer.PrintPrettierIgnored != nil {
-		return options.Printer.PrintPrettierIgnored(path, options, print, args)
+		return options.Printer.PrintPrettierIgnored(path, options, print, arguments)
 	}
 	return doc.Text(options.OriginalText[start:end])
 }

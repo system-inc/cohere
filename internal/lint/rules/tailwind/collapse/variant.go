@@ -505,8 +505,8 @@ func appendVariantAndNested(population []ParsedVariant, variant ParsedVariant) [
 	return grown
 }
 
-// Len reports how many distinct variants the order holds.
-func (order *RunVariantOrder) Len() int {
+// Length reports how many distinct variants the order holds.
+func (order *RunVariantOrder) Length() int {
 	return len(order.entries)
 }
 

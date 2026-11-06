@@ -434,7 +434,7 @@ func hasComponentShapedParameters(node *ast.Node) bool {
 			return false
 		}
 		name := second.Text()
-		return containsRef(name)
+		return containsReference(name)
 	}
 	return false
 }
@@ -462,12 +462,12 @@ func isSpreadParameter(parameter *ast.Node) bool {
 	return parameter.AsParameterDeclaration().DotDotDotToken != nil
 }
 
-// containsRef answers upstream's `name.includes('ref') || name.includes('Ref')`.
+// containsReference answers upstream's `name.includes('ref') || name.includes('Ref')`.
 //
 // Written as two substring tests rather than as a case-insensitive comparison, because that is what
 // upstream does and the two differ: a parameter named `REF` contains neither spelling and is
 // therefore not a valid second parameter upstream, while a case-insensitive test would accept it.
-func containsRef(name string) bool {
+func containsReference(name string) bool {
 	return containsSubstring(name, "ref") || containsSubstring(name, "Ref")
 }
 

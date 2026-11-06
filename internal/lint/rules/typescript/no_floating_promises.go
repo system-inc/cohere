@@ -17,7 +17,7 @@ type NoFloatingPromisesOptions struct {
 	AllowForKnownSafePromises       []type_checking.TypeOrValueSpecifier
 	AllowForKnownSafePromisesInline []string
 	CheckThenables                  *bool
-	IgnoreIIFE                      *bool
+	IgnoreIife                      *bool `json:"IgnoreIIFE"`
 	IgnoreVoid                      *bool
 }
 
@@ -291,13 +291,13 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 			}
 		}
 		if settings.CheckThenables == nil {
-			settings.CheckThenables = type_checking.Ref(false)
+			settings.CheckThenables = type_checking.Reference(false)
 		}
-		if settings.IgnoreIIFE == nil {
-			settings.IgnoreIIFE = type_checking.Ref(false)
+		if settings.IgnoreIife == nil {
+			settings.IgnoreIife = type_checking.Reference(false)
 		}
 		if settings.IgnoreVoid == nil {
-			settings.IgnoreVoid = type_checking.Ref(true)
+			settings.IgnoreVoid = type_checking.Reference(true)
 		}
 
 		isHigherPrecedenceThanUnary := func(node *ast.Node) bool {
@@ -330,7 +330,7 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 			subjectType *checker.Type,
 			matcher func(signature *checker.Signature) bool,
 		) bool {
-			for part := range type_checking.UnionTypePartsSeq(subjectType) {
+			for part := range type_checking.UnionTypePartsSequence(subjectType) {
 				if type_checking.Some(type_checking.GetCallSignatures(ruleContext.TypeChecker, part), matcher) {
 					return true
 				}
@@ -348,7 +348,7 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 				ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node),
 			)
 
-			for part := range type_checking.UnionTypePartsSeq(subjectType) {
+			for part := range type_checking.UnionTypePartsSequence(subjectType) {
 				if len(type_checking.GetCallSignatures(ruleContext.TypeChecker, part)) != 0 {
 					return true
 				}
@@ -413,7 +413,7 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 
 		isPromiseArray := func(node *ast.Node) bool {
 			subjectType := ruleContext.TypeChecker.GetTypeAtLocation(node)
-			for typePart := range type_checking.UnionTypePartsSeq(subjectType) {
+			for typePart := range type_checking.UnionTypePartsSequence(subjectType) {
 				apparent := checker.Checker_getApparentType(ruleContext.TypeChecker, typePart)
 
 				if checker.Checker_isArrayType(ruleContext.TypeChecker, apparent) {
@@ -594,7 +594,7 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 
 				exprStatement := node.AsExpressionStatement()
 
-				if *settings.IgnoreIIFE && isAsyncIife(exprStatement) {
+				if *settings.IgnoreIife && isAsyncIife(exprStatement) {
 					return
 				}
 
@@ -668,7 +668,7 @@ type noFloatingPromisesRawOptions struct {
 	AllowForKnownSafeCalls    []noFloatingPromisesRawSpecifier `json:"allowForKnownSafeCalls"`
 	AllowForKnownSafePromises []noFloatingPromisesRawSpecifier `json:"allowForKnownSafePromises"`
 	CheckThenables            *bool                            `json:"checkThenables"`
-	IgnoreIIFE                *bool                            `json:"ignoreIIFE"`
+	IgnoreIife                *bool                            `json:"ignoreIIFE"`
 	IgnoreVoid                *bool                            `json:"ignoreVoid"`
 }
 
@@ -765,7 +765,7 @@ func DecodeNoFloatingPromisesOptions(raw []byte) (NoFloatingPromisesOptions, err
 
 	options := NoFloatingPromisesOptions{
 		CheckThenables: decoded.CheckThenables,
-		IgnoreIIFE:     decoded.IgnoreIIFE,
+		IgnoreIife:     decoded.IgnoreIife,
 		IgnoreVoid:     decoded.IgnoreVoid,
 	}
 	options.AllowForKnownSafeCalls, options.AllowForKnownSafeCallsInline = specifiersFrom(

@@ -11,12 +11,13 @@ import (
 // ownedDiscovery discovers a repository's projects and decides their ownership, as a bare run does.
 func ownedDiscovery(test *testing.T, root string) discovery {
 	test.Helper()
-	found, err := discoverProjects(root, nil)
-	if err != nil {
-		test.Fatal(err)
+	found, discoverProjectsError := discoverProjects(root, nil)
+	if discoverProjectsError != nil {
+		test.Fatal(discoverProjectsError)
 	}
-	if found.Ownership, err = resolveOwnership(&found); err != nil {
-		test.Fatal(err)
+	var resolveOwnershipError error
+	if found.Ownership, resolveOwnershipError = resolveOwnership(&found); resolveOwnershipError != nil {
+		test.Fatal(resolveOwnershipError)
 	}
 	return found
 }

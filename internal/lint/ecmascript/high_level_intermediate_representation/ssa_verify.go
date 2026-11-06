@@ -38,22 +38,22 @@ package high_level_intermediate_representation
 
 import "github.com/system-inc/cohere/static_single_assignment"
 
-// VerifySSA checks that a function is in single static assignment form and returns every violation.
+// VerifySsa checks that a function is in single static assignment form and returns every violation.
 //
 // An empty result means the property holds. It does not mean the function was worth checking: a
 // function whose variable references all lowered to `LoadGlobal` has almost nothing to cohere and
 // passes trivially. `SSAStats` is how a caller tells a real pass from a vacuous one.
 //
 // Nested functions are not descended into; call it per function.
-func VerifySSA(function *Function) []static_single_assignment.SSAViolation {
+func VerifySsa(function *Function) []static_single_assignment.SSAViolation {
 	if function == nil {
 		return nil
 	}
 	return static_single_assignment.VerifySSA(ssaGraph{}, function)
 }
 
-// CollectSSAStats measures one function.
-func CollectSSAStats(function *Function) static_single_assignment.SSAStats {
+// CollectSsaStats measures one function.
+func CollectSsaStats(function *Function) static_single_assignment.SSAStats {
 	if function == nil {
 		return static_single_assignment.SSAStats{}
 	}

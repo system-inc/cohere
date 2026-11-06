@@ -98,9 +98,9 @@ func TestSwiftLiteralsOutrunTheText(test *testing.T) {
 func TestOneEditReachesBothEngines(test *testing.T) {
 	test.Parallel()
 	edited := fstest.MapFS{}
-	walkDirectoryError := fs.WalkDir(MessageFiles(), ".", func(name string, entry fs.DirEntry, walkError error) error {
-		if walkError != nil || entry.IsDir() {
-			return walkError
+	walkDirectoryError := fs.WalkDir(MessageFiles(), ".", func(name string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil || entry.IsDir() {
+			return pathError
 		}
 		data, readFileError := fs.ReadFile(MessageFiles(), name)
 		edited[name] = &fstest.MapFile{Data: data}

@@ -32,8 +32,8 @@ var (
 	)
 	afterNameNewlinePattern   = regexp.MustCompile(`^` + javaScriptWhitespaceClass + `*\n`)
 	mediaFeatureSpacesPattern = regexp.MustCompile(` +`)
-	mediaURLOpeningPattern    = regexp.MustCompile(`(?i)^url\(` + javaScriptWhitespaceClass + `+`)
-	mediaURLClosingPattern    = regexp.MustCompile(javaScriptWhitespaceClass + `+\)$`)
+	mediaUrlOpeningPattern    = regexp.MustCompile(`(?i)^url\(` + javaScriptWhitespaceClass + `+`)
+	mediaUrlClosingPattern    = regexp.MustCompile(javaScriptWhitespaceClass + `+\)$`)
 	valueAllSpacePattern      = regexp.MustCompile(`^ *$`)
 )
 
@@ -155,8 +155,8 @@ func genericPrint(path *astPath, options *printerOptions, print printing.PrintFu
 		return doc.Text(adjustStrings(node.String("value"), options))
 
 	case "media-url":
-		value := mediaURLOpeningPattern.ReplaceAllString(node.String("value"), "url(")
-		value = mediaURLClosingPattern.ReplaceAllString(value, ")")
+		value := mediaUrlOpeningPattern.ReplaceAllString(node.String("value"), "url(")
+		value = mediaUrlClosingPattern.ReplaceAllString(value, ")")
 		return doc.Text(adjustStrings(value, options))
 
 	case "media-unknown":
@@ -511,7 +511,7 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 	var printedValue doc.Doc = doc.Text("")
 	if estree.IsTruthy(node.Get("value")) {
 		var after doc.Doc = doc.Text("")
-		if isSCSSControlDirectiveNode(node, options) {
+		if isScssControlDirectiveNode(node, options) {
 			if hasParensAroundNode(node) {
 				after = doc.Text(" ")
 			} else {
@@ -527,7 +527,7 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 	if isPresent(node.Get("nodes")) {
 		var opening doc.Doc = doc.Text(" ")
 		_, selectorValueIsString := selector.Get("value").(string)
-		if isSCSSControlDirectiveNode(node, options) {
+		if isScssControlDirectiveNode(node, options) {
 			opening = doc.Text("")
 		} else if (selector != nil &&
 			!isPresent(selector.Get("nodes")) &&
