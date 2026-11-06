@@ -1,0 +1,13 @@
+{
+    "why": "lf06: call 2, one loosening mechanism: `max` takes a looser limit as it takes a stricter one, so 2,100 lines under a limit of 3,000 are clean",
+    "expect": [],
+    "options": {
+        "max": 3000
+    },
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

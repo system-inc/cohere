@@ -1,0 +1,28 @@
+{
+    "why": "am04: call 3, no comparator exemption: another comparator's `a` and `b` (TypeScript `toSorted`, Go `slices.MaxFunc`, Swift `max`) are reported at their declarations",
+    "expect": [
+        {
+            "covers": "a",
+            "occurrence": {
+                "typescript": 3,
+                "go": 8,
+                "swift": 5
+            }
+        },
+        {
+            "covers": "b",
+            "occurrence": {
+                "typescript": 3,
+                "go": 1,
+                "swift": 2
+            }
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

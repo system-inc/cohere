@@ -51,8 +51,13 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error) {
 		}
 		turnedOff = append(turnedOff, registeredRule.Name)
 	}
+	caching, cachingError := lintCache(engine.request, engine.described.workspace, loaded, enabled)
+	if cachingError != nil {
+		engine.note("the findings cache sat this run out: %v", cachingError)
+	}
 	result, checkError := check.Run(loaded.Packages, enabled, check.Options{
 		SingleThreaded: engine.request.switches["single-threaded"],
+		Cache:          caching,
 	})
 	if checkError != nil {
 		engine.note("the rules could not run: %v", checkError)
@@ -111,6 +116,17 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error) {
 	record.WithheldBySuppression = outcome.withheldByRule
 	record.WithheldAsGenerated = result.WithheldAsGenerated
 	record.WithheldAsCopied = result.WithheldAsCopied
+	record.Cache = contract.LintCache{
+		On:           result.Cache.On,
+		Hit:          result.Cache.Hit,
+		Missed:       result.Cache.Missed,
+		Written:      result.Cache.Written,
+		Unstorable:   result.Cache.Unstorable,
+		FactsDropped: result.Cache.FactsDropped,
+	}
+	for _, problem := range result.Cache.Problems {
+		engine.note("the findings cache: %s", problem)
+	}
 	if len(record.Crashes) > 0 {
 		engine.incomplete = true
 	}

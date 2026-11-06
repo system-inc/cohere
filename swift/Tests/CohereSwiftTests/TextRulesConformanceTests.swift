@@ -27,7 +27,8 @@ import Testing
  The TypeScript adapter resolves each case's own file through the house configuration, overrides included. The
  Swift engine has no per-file settings to resolve: its rule configuration is one severity and one set of options
  per rule, and the one file-name exemption it has (`*.generated.swift` under file-length) is in the rule itself,
- which a case reaches by naming its file.
+ which a case reaches by naming its file. A case reaches a target kind the same way: a path under `Tests/` is a
+ test target's file, where `consistency-no-print` does not apply.
  */
 struct TextRulesConformanceTests {
     static let corpusRoot = URL(fileURLWithPath: #filePath)
@@ -374,10 +375,13 @@ struct TextRulesConformanceTests {
     static func run(_ testCase: Case, in corpus: Corpus, options: [String: Int] = [:]) throws -> [ByteRange] {
         let rules = try rules(for: testCase.family, in: corpus, options: options)
         let root = testCase.file.root ?? "/project"
+        let path = testCase.file.path ?? "case"
+        /* SwiftPM's default layout puts a test target's sources under `Tests/<target>/`, so a case whose path starts there is a test target's file, as the engine's manifest reading would kind it. Every other case is a library's. */
+        let targetKind = path.hasPrefix("Tests/") ? "test" : "library"
         let file = ParsedFile(
-            url: URL(fileURLWithPath: "\(root)/\(testCase.file.path ?? "case").swift"),
+            url: URL(fileURLWithPath: "\(root)/\(path).swift"),
             targetName: "Fixture",
-            targetKind: "library",
+            targetKind: targetKind,
             source: testCase.source,
             tree: Parser.parse(source: testCase.source),
             nodeCount: 0,
