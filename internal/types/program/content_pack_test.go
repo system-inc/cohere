@@ -18,14 +18,14 @@ import (
 // packFixture is a directory of files and a cache directory beside it, read through a fresh content pack
 // each "run", the way successive cohere runs read a project.
 type packFixture struct {
-	t     *testing.T
+	test  *testing.T
 	files string
 	cache string
 }
 
 func newPackFixture(test *testing.T) *packFixture {
 	root := test.TempDir()
-	fixture := &packFixture{t: test, files: filepath.Join(root, "files"), cache: filepath.Join(root, "cache")}
+	fixture := &packFixture{test: test, files: filepath.Join(root, "files"), cache: filepath.Join(root, "cache")}
 	if createDirectoryError := os.MkdirAll(fixture.files, 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
@@ -35,43 +35,43 @@ func newPackFixture(test *testing.T) *packFixture {
 func (fixture *packFixture) path(name string) string { return filepath.Join(fixture.files, name) }
 
 func (fixture *packFixture) write(name string, contents string) {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	if writeError := os.WriteFile(fixture.path(name), []byte(contents), 0o644); writeError != nil {
-		fixture.t.Fatal(writeError)
+		fixture.test.Fatal(writeError)
 	}
 }
 
 // run opens the pack, reads every name through it, saves, and returns what it read and the pack's counts.
 func (fixture *packFixture) run(names ...string) (map[string]string, int, int, int) {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	pack, openContentPackError := OpenContentPack(fixture.cache)
 	if openContentPackError != nil {
-		fixture.t.Logf("open: %v", openContentPackError)
+		fixture.test.Logf("open: %v", openContentPackError)
 	}
 	fileSystem := pack.wrap(osvfs.FS())
 	read := map[string]string{}
 	for _, name := range names {
 		contents, ok := fileSystem.ReadFile(tspath.RootedFilePath(fixture.path(name)))
 		if !ok {
-			fixture.t.Fatalf("%s could not be read", name)
+			fixture.test.Fatalf("%s could not be read", name)
 		}
 		read[name] = contents
 	}
 	if saveError := pack.Save(); saveError != nil {
-		fixture.t.Fatalf("saving the pack: %v", saveError)
+		fixture.test.Fatalf("saving the pack: %v", saveError)
 	}
 	hits, misses, damaged := pack.Counts()
 	return read, hits, misses, damaged
 }
 
 func (fixture *packFixture) dataFile() string {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	matches, globError := filepath.Glob(filepath.Join(fixture.cache, "contents-*.pack"))
 	if globError != nil {
-		fixture.t.Fatalf("listing the data files: %v", globError)
+		fixture.test.Fatalf("listing the data files: %v", globError)
 	}
 	if len(matches) != 1 {
-		fixture.t.Fatalf("want one data file, found %v", matches)
+		fixture.test.Fatalf("want one data file, found %v", matches)
 	}
 	return matches[0]
 }
@@ -108,7 +108,7 @@ func TestTheContentPackNeverServesChangedBytes(test *testing.T) {
 		{"the same size with the modification time restored", func(fixture *packFixture) {
 			information, statError := os.Stat(fixture.path("a.ts"))
 			if statError != nil {
-				fixture.t.Fatal(statError)
+				fixture.test.Fatal(statError)
 			}
 			fixture.write("a.ts", "export const a = 9;\n")
 			if changeTimesError := os.Chtimes(
@@ -116,20 +116,20 @@ func TestTheContentPackNeverServesChangedBytes(test *testing.T) {
 				information.ModTime(),
 				information.ModTime(),
 			); changeTimesError != nil {
-				fixture.t.Fatal(changeTimesError)
+				fixture.test.Fatal(changeTimesError)
 			}
 			after, statAfterError := os.Stat(fixture.path("a.ts"))
 			if statAfterError != nil {
-				fixture.t.Fatal(statAfterError)
+				fixture.test.Fatal(statAfterError)
 			}
 			if !after.ModTime().Equal(information.ModTime()) || after.Size() != information.Size() {
-				fixture.t.Fatal("the fixture did not restore the size and modification time, so this proves nothing")
+				fixture.test.Fatal("the fixture did not restore the size and modification time, so this proves nothing")
 			}
 		}},
 		{"a replace by rename, size and modification time kept", func(fixture *packFixture) {
 			information, statError := os.Stat(fixture.path("a.ts"))
 			if statError != nil {
-				fixture.t.Fatal(statError)
+				fixture.test.Fatal(statError)
 			}
 			fixture.write("replacement.ts", "export const a = 9;\n")
 			if changeTimesError := os.Chtimes(
@@ -137,17 +137,17 @@ func TestTheContentPackNeverServesChangedBytes(test *testing.T) {
 				information.ModTime(),
 				information.ModTime(),
 			); changeTimesError != nil {
-				fixture.t.Fatal(changeTimesError)
+				fixture.test.Fatal(changeTimesError)
 			}
 			if renameError := os.Rename(fixture.path("replacement.ts"), fixture.path("a.ts")); renameError != nil {
-				fixture.t.Fatal(renameError)
+				fixture.test.Fatal(renameError)
 			}
 		}},
 	} {
 		test.Run(change.name, func(test *testing.T) {
 			test.Parallel()
 			fixture := newPackFixture(test)
-			fixture.t = test
+			fixture.test = test
 			fixture.write("a.ts", "export const a = 1;\n")
 			fixture.run("a.ts")
 			// Change times move in nanoseconds, but a filesystem may store coarser ones.
@@ -191,43 +191,43 @@ func TestADamagedContentPackIsReadAround(test *testing.T) {
 		{"a flipped byte in the data", func(fixture *packFixture) {
 			data, readError := os.ReadFile(fixture.dataFile())
 			if readError != nil {
-				fixture.t.Fatal(readError)
+				fixture.test.Fatal(readError)
 			}
 			data[3] ^= 0xff
 			if writeError := os.WriteFile(fixture.dataFile(), data, 0o644); writeError != nil {
-				fixture.t.Fatal(writeError)
+				fixture.test.Fatal(writeError)
 			}
 		}, true},
 		{"a data file truncated to half", func(fixture *packFixture) {
 			information, statError := os.Stat(fixture.dataFile())
 			if statError != nil {
-				fixture.t.Fatal(statError)
+				fixture.test.Fatal(statError)
 			}
 			if truncateError := os.Truncate(fixture.dataFile(), information.Size()/2); truncateError != nil {
-				fixture.t.Fatal(truncateError)
+				fixture.test.Fatal(truncateError)
 			}
 		}, true},
 		{"a flipped byte in the index", func(fixture *packFixture) {
 			index := filepath.Join(fixture.cache, contentPackIndexName)
 			data, readError := os.ReadFile(index)
 			if readError != nil {
-				fixture.t.Fatal(readError)
+				fixture.test.Fatal(readError)
 			}
 			data[len(data)/2] ^= 0xff
 			if writeError := os.WriteFile(index, data, 0o644); writeError != nil {
-				fixture.t.Fatal(writeError)
+				fixture.test.Fatal(writeError)
 			}
 		}, false},
 		{"a data file deleted", func(fixture *packFixture) {
 			if removeError := os.Remove(fixture.dataFile()); removeError != nil {
-				fixture.t.Fatal(removeError)
+				fixture.test.Fatal(removeError)
 			}
 		}, false},
 	} {
 		test.Run(damage.name, func(test *testing.T) {
 			test.Parallel()
 			fixture := newPackFixture(test)
-			fixture.t = test
+			fixture.test = test
 			fixture.write("a.ts", "export const a = 1;\n")
 			fixture.write("b.ts", "export const b = 2;\n")
 			fixture.run("a.ts", "b.ts")

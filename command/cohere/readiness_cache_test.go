@@ -49,9 +49,9 @@ func readinessFixture(test *testing.T) *runCacheFixture {
 
 // coldReadiness is the readiness a `--no-cache` run reads over the tree as it is now.
 func (fixture *runCacheFixture) coldReadiness() string {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	output, _ := fixture.run(false, readinessFlag)
-	return readinessIn(fixture.t, output)
+	return readinessIn(fixture.test, output)
 }
 
 // (a) A whole-run replay prints the readiness its recording run measured, and that is the cold number.

@@ -20,10 +20,10 @@ type scssParser struct {
 
 // newScssParser is new ScssParser(input): Parser's constructor with this ScssParser.
 func newScssParser(in *input) *parser {
-	s := &scssParser{parser: &parser{}}
-	s.this = s
-	s.construct(in)
-	return s.parser
+	scssParser := &scssParser{parser: &parser{}}
+	scssParser.this = scssParser
+	scssParser.construct(in)
+	return scssParser.parser
 }
 
 func (parser *scssParser) atrule(atToken token) {

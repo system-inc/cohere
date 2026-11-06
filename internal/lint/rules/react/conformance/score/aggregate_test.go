@@ -13,7 +13,7 @@ import (
 // Result, which is the whole distinction `score.go` draws: an empty Result claims "I looked and
 // found nothing", and on a corpus where every fixture expects at least one error that claim is a
 // wrong answer rather than an absent one.
-type engineImplementation struct{ t *testing.T }
+type engineImplementation struct{ test *testing.T }
 
 func (implementation engineImplementation) Analyze(
 	fixture react_conformance.Fixture,
@@ -39,7 +39,7 @@ func (implementation engineImplementation) Analyze(
 			Reason: "no rule engine wired for upstream rule " + rules[0],
 		}
 	}
-	return Analyze(subject, fixture, implementation.t.TempDir())
+	return Analyze(subject, fixture, implementation.test.TempDir())
 }
 
 // TestAggregateWithTheRuleEngineWired is the whole-corpus score with real rules running.
@@ -62,7 +62,7 @@ func TestAggregateWithTheRuleEngineWired(test *testing.T) {
 		test.Fatalf("loading the corpus: %v", loadError)
 	}
 
-	report, aggregateError := react_conformance.Aggregate(fixtures, engineImplementation{t: test})
+	report, aggregateError := react_conformance.Aggregate(fixtures, engineImplementation{test: test})
 	if aggregateError != nil {
 		test.Fatalf("aggregating: %v", aggregateError)
 	}

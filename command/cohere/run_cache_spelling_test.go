@@ -12,7 +12,7 @@ import (
 // runFrom runs the fixture's binary in dir as a shell there would, with PWD naming dir, so the run spells its
 // root the way dir does. Arguments are fixture.run's: verbose, cached, no formatting.
 func (fixture *runCacheFixture) runFrom(dir string) string {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	command := exec.Command(fixture.binary, verboseArguments([]string{"--no-format"})...)
 	command.Dir = dir
 	command.Env = append(
@@ -21,7 +21,7 @@ func (fixture *runCacheFixture) runFrom(dir string) string {
 	)
 	output, outputError := command.CombinedOutput()
 	if _, isExit := outputError.(*exec.ExitError); outputError != nil && !isExit {
-		fixture.t.Fatalf("running cohere in %s: %v\n%s", dir, outputError, output)
+		fixture.test.Fatalf("running cohere in %s: %v\n%s", dir, outputError, output)
 	}
 	return string(output)
 }

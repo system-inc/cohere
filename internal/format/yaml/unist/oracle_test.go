@@ -373,22 +373,22 @@ func compareParse(text string, expected oracleResult) []string {
 	if decodeError := decoder.Decode(&theirs); decodeError != nil {
 		return []string{fmt.Sprintf("decoding upstream's tree: %v", decodeError)}
 	}
-	c := &comparison{offsets: offsets, byId: map[int]*Node{}, idOf: map[*Node]int{}, parents: map[*Node]int{}}
-	c.node("root", root, &theirs)
-	for node, parentId := range c.parents {
+	comparison := &comparison{offsets: offsets, byId: map[int]*Node{}, idOf: map[*Node]int{}, parents: map[*Node]int{}}
+	comparison.node("root", root, &theirs)
+	for node, parentId := range comparison.parents {
 		switch parentId {
 		case -1, -2:
 			// null (the root), or never defined: nil either way here.
 			if node.Parent != nil {
-				c.differ(node.NodeType, "has a parent where upstream's has none")
+				comparison.differ(node.NodeType, "has a parent where upstream's has none")
 			}
 		default:
-			if expected, known := c.byId[parentId]; !known || node.Parent != expected {
-				c.differ(node.NodeType+"@"+fmt.Sprint(node.Position.Start), "parent is not upstream's _parent")
+			if expected, known := comparison.byId[parentId]; !known || node.Parent != expected {
+				comparison.differ(node.NodeType+"@"+fmt.Sprint(node.Position.Start), "parent is not upstream's _parent")
 			}
 		}
 	}
-	return c.differences
+	return comparison.differences
 }
 
 // compareAll parses every text both ways and reports the first few that differ.

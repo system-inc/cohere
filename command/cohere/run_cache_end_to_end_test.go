@@ -180,7 +180,7 @@ func TestRunCacheEndToEnd(test *testing.T) {
 			func(fixture *runCacheFixture) {
 				information, statError := os.Stat(filepath.Join(fixture.root, "source/a.ts"))
 				if statError != nil {
-					fixture.t.Fatal(statError)
+					fixture.test.Fatal(statError)
 				}
 				time.Sleep(10 * time.Millisecond)
 				fixture.write("source/a.ts", "export const a: string = 1;\n")
@@ -189,7 +189,7 @@ func TestRunCacheEndToEnd(test *testing.T) {
 					information.ModTime(),
 					information.ModTime(),
 				); changeTimesError != nil {
-					fixture.t.Fatal(changeTimesError)
+					fixture.test.Fatal(changeTimesError)
 				}
 			}},
 		{"a file added at the top level", true, nil,
@@ -619,7 +619,7 @@ func TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory(test *
 // once, with a home of its own. Each scenario has its own, so they run in parallel; on one shared
 // repository they ran one after another, each undoing its change for the next (#nxgt2ca).
 type runCacheFixture struct {
-	t      *testing.T
+	test   *testing.T
 	binary string
 	root   string
 	home   string
@@ -627,7 +627,7 @@ type runCacheFixture struct {
 
 func newRunCacheFixture(test *testing.T, binary string) *runCacheFixture {
 	test.Helper()
-	fixture := &runCacheFixture{t: test, binary: binary, root: test.TempDir(), home: test.TempDir()}
+	fixture := &runCacheFixture{test: test, binary: binary, root: test.TempDir(), home: test.TempDir()}
 	fixture.write(
 		"tsconfig.json",
 		`{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`,
@@ -649,23 +649,23 @@ func newRunCacheFixture(test *testing.T, binary string) *runCacheFixture {
 }
 
 func (fixture *runCacheFixture) git(arguments ...string) {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	command := exec.Command("git", arguments...)
 	command.Dir = fixture.root
 	command.Env = append(os.Environ(), "HOME="+fixture.home)
 	if output, outputError := command.CombinedOutput(); outputError != nil {
-		fixture.t.Fatalf("git %v: %v\n%s", arguments, outputError, output)
+		fixture.test.Fatalf("git %v: %v\n%s", arguments, outputError, output)
 	}
 }
 
 func (fixture *runCacheFixture) write(name, contents string) {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	path := filepath.Join(fixture.root, name)
 	if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
-		fixture.t.Fatal(createDirectoryError)
+		fixture.test.Fatal(createDirectoryError)
 	}
 	if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
-		fixture.t.Fatal(writeError)
+		fixture.test.Fatal(writeError)
 	}
 }
 
@@ -673,21 +673,21 @@ func (fixture *runCacheFixture) write(name, contents string) {
 // beside the build. A config that names no set is zero config, read after the build as it always was, so a
 // scenario meant for the ahead path would pass on the other one and prove nothing about it.
 func (fixture *runCacheFixture) requireConfigReadAhead() {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	if usesHouseSets(projectLocation{LintConfigFileName: filepath.Join(fixture.root, "CohereSettings.json")}) {
-		fixture.t.Fatal("the fixture's lint config is zero config, so it is read after the build, not ahead of it")
+		fixture.test.Fatal("the fixture's lint config is zero config, so it is read after the build, not ahead of it")
 	}
 }
 
 func (fixture *runCacheFixture) remove(name string) {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	if removeError := os.RemoveAll(filepath.Join(fixture.root, name)); removeError != nil {
-		fixture.t.Fatal(removeError)
+		fixture.test.Fatal(removeError)
 	}
 }
 
 func (fixture *runCacheFixture) commit(message string) {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	fixture.git("add", "-A")
 	fixture.git("commit", "--quiet", "--allow-empty", "-m", message)
 }
@@ -695,7 +695,7 @@ func (fixture *runCacheFixture) commit(message string) {
 // run launches the binary bare unless arguments are given; bare and `--no-fix` are the shapes the
 // run cache serves. cached false is the cold truth every cached result is held against.
 func (fixture *runCacheFixture) run(cached bool, arguments ...string) (string, int) {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	command := exec.Command(fixture.binary, verboseArguments(arguments)...)
 	command.Dir = fixture.root
 	environment := []string{"HOME=" + fixture.home}
@@ -717,17 +717,17 @@ func (fixture *runCacheFixture) run(cached bool, arguments ...string) (string, i
 	}
 	exitError, isExit := outputError.(*exec.ExitError)
 	if !isExit {
-		fixture.t.Fatalf("running cohere: %v\n%s", outputError, output)
+		fixture.test.Fatalf("running cohere: %v\n%s", outputError, output)
 	}
-	return string(output), childExitCode(fixture.t, exitError)
+	return string(output), childExitCode(fixture.test, exitError)
 }
 
 // establishHit runs twice with arguments and requires the second to replay the first.
 func (fixture *runCacheFixture) establishHit(arguments ...string) {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	fixture.run(true, arguments...)
 	if output, _ := fixture.run(true, arguments...); !isRunCacheReplay(output) {
-		fixture.t.Fatalf(
+		fixture.test.Fatalf(
 			"an unchanged tree did not replay, so nothing below can show a change was noticed:\n%s",
 			output,
 		)

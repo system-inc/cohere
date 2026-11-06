@@ -50,7 +50,7 @@ type record struct {
 
 // Golden is one test's recorded answers.
 type Golden struct {
-	t       testing.TB
+	test    testing.TB
 	path    string
 	digest  string
 	update  bool
@@ -67,7 +67,7 @@ func Open(test testing.TB, name string) *Golden {
 		test.Fatal(bundlesDigestError)
 	}
 	golden := &Golden{
-		t:       test,
+		test:    test,
 		path:    filepath.Join("testdata", "oracle", name+".json.gz"),
 		digest:  digest,
 		update:  os.Getenv(UpdateVariable) != "",
@@ -119,17 +119,17 @@ func read(path string, digest string) (map[string]Answer, error) {
 // write saves what this run recorded. Keys are sorted by the encoder, so recording twice from the same
 // bundles writes the same bytes.
 func (golden *Golden) write() {
-	if golden.t.Failed() {
-		golden.t.Logf("not recording %s, since the test failed", golden.path)
+	if golden.test.Failed() {
+		golden.test.Logf("not recording %s, since the test failed", golden.path)
 		return
 	}
 	if createDirectoryError := os.MkdirAll(filepath.Dir(golden.path), 0o755); createDirectoryError != nil {
-		golden.t.Errorf("recording %s: %v", golden.path, createDirectoryError)
+		golden.test.Errorf("recording %s: %v", golden.path, createDirectoryError)
 		return
 	}
 	file, createError := os.Create(golden.path)
 	if createError != nil {
-		golden.t.Errorf("recording %s: %v", golden.path, createError)
+		golden.test.Errorf("recording %s: %v", golden.path, createError)
 		return
 	}
 	defer file.Close()
@@ -137,14 +137,14 @@ func (golden *Golden) write() {
 	encoder := json.NewEncoder(zipped)
 	encoder.SetIndent("", " ")
 	if encodeError := encoder.Encode(record{Digest: golden.digest, Answers: golden.answers}); encodeError != nil {
-		golden.t.Errorf("recording %s: %v", golden.path, encodeError)
+		golden.test.Errorf("recording %s: %v", golden.path, encodeError)
 		return
 	}
 	if closeError := zipped.Close(); closeError != nil {
-		golden.t.Errorf("recording %s: %v", golden.path, closeError)
+		golden.test.Errorf("recording %s: %v", golden.path, closeError)
 		return
 	}
-	golden.t.Logf("recorded %d oracle answers in %s", len(golden.answers), golden.path)
+	golden.test.Logf("recorded %d oracle answers in %s", len(golden.answers), golden.path)
 }
 
 // Key is an answer's key: every input it depends on, each prefixed with its length so no two inputs can
@@ -175,7 +175,7 @@ func (golden *Golden) Answer(key string, compute func() (string, error)) (string
 	answer, recorded := golden.answers[key]
 	golden.mutex.Unlock()
 	if !recorded {
-		golden.t.Errorf(
+		golden.test.Errorf(
 			"an oracle answer %s never recorded was asked for, so the fixtures changed: record them again with %s=1",
 			golden.path,
 			UpdateVariable,

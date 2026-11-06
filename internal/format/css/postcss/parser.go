@@ -75,10 +75,10 @@ type parser struct {
 }
 
 func newParser(in *input) *parser {
-	p := &parser{}
-	p.this = p
-	p.construct(in)
-	return p
+	parser := &parser{}
+	parser.this = parser
+	parser.construct(in)
+	return parser
 }
 
 // construct is Parser's constructor, split from newParser so a subclass sets this first and its own
