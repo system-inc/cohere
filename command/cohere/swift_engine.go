@@ -54,6 +54,14 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 		return 1, engineArgumentsError
 	}
 
+	// Before the engine is resolved, so a run with nothing changed replays here and exits having hashed no engine
+	// source, asked no toolchain and started no process. Only a check: a listing is no verdict, and none of its flags
+	// is one the run cache admits anyway.
+	engineChoice := swiftEngineChoice(os.Getenv(dispatch.SwiftEngineOverrideVariable), release.Current())
+	if mode == engineModeCheck {
+		beginSwiftRunCache(location)
+	}
+
 	// Building the engine is a step the launcher's progress shows: in full under --verbose, otherwise one
 	// line on a terminal, cleared before the report (#ytqqv8v).
 	// The progress writes to the terminal itself, so what this run said first is delivered first.
@@ -79,7 +87,24 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 	for _, directory := range yield.Directories {
 		run.yieldedDirectories = append(run.yieldedDirectories, resolvedPath(directory))
 	}
-	return runEngineBinary(binaryPath, arguments, run, os.Stderr)
+	// os.Stderr is read here, after the run cache began, so the engine writes into the recording's tee.
+	exitCode, runError := runEngineBinary(binaryPath, arguments, run, os.Stderr)
+	// A test instrument: a file written after the engine read the tree and before its run is recorded, holding
+	// COHERE_TEST_WRITE_AFTER_SWIFT_ENGINE_TEXT, so a test can change an input the verdict was read from. See
+	// TestASwiftInputChangedDuringTheRunIsNeverReplayedOver.
+	if written := os.Getenv("COHERE_TEST_WRITE_AFTER_SWIFT_ENGINE"); written != "" {
+		if createDirectoryError := os.MkdirAll(filepath.Dir(written), 0o755); createDirectoryError != nil {
+			return 1, createDirectoryError
+		}
+		text := []byte(os.Getenv("COHERE_TEST_WRITE_AFTER_SWIFT_ENGINE_TEXT"))
+		if writeError := os.WriteFile(written, text, 0o644); writeError != nil {
+			return 1, writeError
+		}
+	}
+	if runError == nil {
+		declareSwiftRunCacheInputs(run, exitCode, location.LintConfigFileName, binaryPath, engineChoice)
+	}
+	return exitCode, runError
 }
 
 // swiftEnginePlatform is the platform this cohere runs on. A variable so a test can run as a platform
@@ -118,7 +143,8 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 				named,
 			)
 		}
-		fmt.Fprintf(
+		// The invocation's, as a graph line is (see invocationTag): a replay ran no engine, named or not.
+		printInvocation(
 			streams.Errors,
 			"cohere: running the Swift engine %s named by %s, not one built from the sources on disk\n",
 			named,

@@ -508,6 +508,14 @@ final class IgnoreRules {
     private let repositoryWidePatterns: [[Pattern]]
     /* Each directory's own `.gitignore`, by its path relative to the root ("" for the root), read once. */
     private var directoryPatterns: [String: [Pattern]] = [:]
+    /*
+     Every file this read or looked for to decide what git ignores, there or not: the git config files, `info/exclude`,
+     the global excludes file and each `.gitignore` consulted. The run's inputs record names each (`RunInputs`), since
+     a line added to any of them changes which files are ours.
+     */
+    private(set) var filesConsulted: Set<String> = []
+    /* Every directory `visibleFiles` listed, absolute, so the inputs record can name each listing the walk read. */
+    private(set) var directoriesListed: [String] = []
 
     /*
      `environment` supplies `HOME` and `XDG_CONFIG_HOME`, where the global config and excludes file live.
@@ -526,6 +534,7 @@ final class IgnoreRules {
             configurationFiles.append(commonDirectory.appendingPathComponent("config").path)
         }
         var settings: [String: String] = [:]
+        var consulted = Set(configurationFiles)
         for file in configurationFiles {
             guard let contents = FileManager.default.contents(atPath: file) else { continue }
             for entry in Self.coreSettings(in: String(decoding: contents, as: UTF8.self)) {
@@ -552,10 +561,14 @@ final class IgnoreRules {
         }
         var repositoryWide: [[Pattern]] = []
         if let commonDirectory = repository.commonDirectory {
-            repositoryWide.append(Self.patterns(inFile: commonDirectory.appendingPathComponent("info/exclude").path))
+            let exclude = commonDirectory.appendingPathComponent("info/exclude").path
+            consulted.insert(exclude)
+            repositoryWide.append(Self.patterns(inFile: exclude))
         }
+        consulted.insert(globalExcludes)
         repositoryWide.append(Self.patterns(inFile: globalExcludes))
         repositoryWidePatterns = repositoryWide
+        filesConsulted = consulted
     }
 
     /* Whether git would list `path` (absolute, symlinks resolved): inside this repository, inside no other, under no ignored directory, and not ignored itself. */
@@ -583,16 +596,26 @@ final class IgnoreRules {
      `skipping` holds directories (absolute, symlinks resolved) the caller knows are not the repository's source
      whatever its ignore files say, such as the engine's own scratch, and they are never entered either.
      */
-    func visibleFiles(under directory: String, skipping: Set<String> = []) -> [String] {
+    func visibleFiles(
+        under directory: String,
+        skipping: Set<String> = [],
+        skippingWhere isSkipped: (String) -> Bool = { _ in false },
+    ) -> [String] {
         guard directory == rootPath || isVisible(directory, isDirectory: true) else { return [] }
         let relative = directory == rootPath ? "" : String(directory.dropFirst(rootPath.count + 1))
         var files: [String] = []
-        collect(relativeDirectory: relative, skipping: skipping, into: &files)
+        collect(relativeDirectory: relative, skipping: skipping, skippingWhere: isSkipped, into: &files)
         return files
     }
 
-    private func collect(relativeDirectory: String, skipping: Set<String>, into files: inout [String]) {
+    private func collect(
+        relativeDirectory: String,
+        skipping: Set<String>,
+        skippingWhere isSkipped: (String) -> Bool,
+        into files: inout [String],
+    ) {
         let absolute = relativeDirectory.isEmpty ? rootPath : rootPath + "/" + relativeDirectory
+        directoriesListed.append(absolute)
         let entries: [URL]
         do {
             entries = try FileManager.default.contentsOfDirectory(
@@ -609,14 +632,14 @@ final class IgnoreRules {
             let relative = relativeDirectory.isEmpty ? name : relativeDirectory + "/" + name
             let isSymbolicLink = Self.isSymbolicLink(entry)
             let isDirectory = !isSymbolicLink && Self.isDirectory(entry)
-            if isDirectory && skipping.contains(rootPath + "/" + relative) {
+            if isDirectory && (skipping.contains(rootPath + "/" + relative) || isSkipped(rootPath + "/" + relative)) {
                 continue
             }
             guard admits(name: name, relative: relative, parent: relativeDirectory, isDirectory: isDirectory) else {
                 continue
             }
             if isDirectory {
-                collect(relativeDirectory: relative, skipping: skipping, into: &files)
+                collect(relativeDirectory: relative, skipping: skipping, skippingWhere: isSkipped, into: &files)
             }
             else {
                 let path = rootPath + "/" + relative
@@ -690,6 +713,7 @@ final class IgnoreRules {
         }
         let file =
             relativeDirectory.isEmpty ? rootPath + "/.gitignore" : rootPath + "/" + relativeDirectory + "/.gitignore"
+        filesConsulted.insert(file)
         let patterns = Self.patterns(inFile: file)
         directoryPatterns[relativeDirectory] = patterns
         return patterns

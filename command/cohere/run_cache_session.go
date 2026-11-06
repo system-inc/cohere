@@ -58,7 +58,9 @@ type runCacheSession struct {
 	// recordedWithin is where a directory holding a file the run read is recorded: the project roots and every
 	// directory the engine listed, which lie in the roots it walked. A file outside them, as the git index in a
 	// worktree's git directory or a file of the toolchain, is decided by its own signature alone (see
-	// program.RecordRunCacheWithin). Nil records every holding directory, as a TypeScript run does.
+	// program.RecordRunCacheWithin). Nil records every holding directory, as a TypeScript run does; empty records
+	// none, as a Swift run does, whose engine lists every directory whose listing it read (see
+	// declareSwiftRunCacheInputs).
 	recordedWithin []string
 
 	// declined is the reason this run must not be recorded, empty while it may be.

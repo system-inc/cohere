@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -87,7 +86,7 @@ func goRunCacheFacts(
 		"root=" + anchor.Resolved(),
 		"lint-config=" + anchor.Stable(settingsFile),
 		fmt.Sprintf("color=%t", color),
-		"go=" + goOnPath(lookPath),
+		"go=" + toolOnPath("go", lookPath),
 	}
 	variables := []string{}
 	for _, variable := range environment {
@@ -104,121 +103,16 @@ func goRunCacheFacts(
 	return facts
 }
 
-// goOnPath is the `go` PATH finds, absolute, and where its links lead, or a word saying there is none. A go the
-// loader cannot find fails the load, and a run that failed is never recorded, so the word only has to differ from
-// every path.
-func goOnPath(lookPath func(string) (string, error)) string {
-	found, lookPathError := lookPath("go")
-	if lookPathError != nil {
-		return "not found"
-	}
-	absolute, absoluteError := filepath.Abs(found)
-	if absoluteError != nil {
-		return "not absolute: " + found
-	}
-	resolved, resolveError := filepath.EvalSymlinks(absolute)
-	if resolveError != nil {
-		return absolute + " (links unresolved)"
-	}
-	return absolute + " resolved " + resolved
-}
-
-// declareGoRunCacheInputs declares a finished Go run's inputs to the run cache, when its exit is a verdict a later
-// run may replay, and otherwise leaves it unrecorded. A run with no session (not admitted, `--no-cache`, a listing)
-// has nothing to declare.
-//
-// A run whose engine wrote no inputs record is never declared, so never recorded, the way a TypeScript run that
-// never built its graph is not: with no inputs there is nothing to prove a later tree unchanged against. What is
-// declared is the engine's files, the directories it listed as extra directories, its absent paths as absent, and
-// the settings file this front door handed it, present or absent, which the engine names in no record of its own.
-// The directory holding a file is recorded only within the project's root and the directories the engine listed,
-// which lie in the roots it walked: a file outside them, the git index in a worktree's git directory among them, is
-// decided by its own signature, since its directory moves with every lock file git writes there.
+// declareGoRunCacheInputs declares a finished Go run's inputs to the run cache, as declareEngineRunCacheInputs does
+// for every engine. The directory holding a file is recorded only within the project's root and the directories the
+// engine listed, which lie in the roots it walked: a file outside them, the git index in a worktree's git directory
+// among them, is decided by its own signature, since its directory moves with every lock file git writes there.
 func declareGoRunCacheInputs(run *engineRun, exitCode int, settingsFile string) {
-	session := activeRunCache
-	if session == nil || run.inputs == nil {
-		return
-	}
-	if reason := goRunUnrecordable(run, exitCode); reason != "" {
-		declineRunCache(reason)
-		return
-	}
+	unnameable := ""
 	if run.cgoTranslated {
-		// Said, as below: a project with cgo of its own would otherwise never replay, with nothing to say why.
-		reason := "the load translated cgo, whose C headers and compiler the record cannot name"
-		declineRunCache(reason)
-		session.note("the run cache did not record this run: " + reason)
-		return
+		unnameable = "the load translated cgo, whose C headers and compiler the record cannot name"
 	}
-	if reason := goInputsUnreplayable(run.inputs, session.projectRoots); reason != "" {
-		// Said, and kept for the next run, since a record like this would never replay and nothing else would say
-		// why: it is the engine's record that is wrong, and only a cold run every time shows it.
-		declineRunCache(reason)
-		session.note("the run cache did not record this run: " + reason)
-		return
+	if declareEngineRunCacheInputs(run, exitCode, settingsFile, unnameable) {
+		activeRunCache.recordedWithin = slices.Concat(activeRunCache.projectRoots, run.inputs.Directories)
 	}
-	declareRunCacheInputs(run.inputs.Files...)
-	session.extraDirectories = append(session.extraDirectories, run.inputs.Directories...)
-	session.recordedWithin = slices.Concat(session.projectRoots, run.inputs.Directories)
-	session.extraAbsent = append(session.extraAbsent, run.inputs.Absent...)
-	if _, statError := os.Stat(settingsFile); statError == nil {
-		session.extraFiles = append(session.extraFiles, settingsFile)
-	} else {
-		session.extraAbsent = append(session.extraAbsent, settingsFile)
-	}
-}
-
-// goInputsUnreplayable is why an inputs record could never be replayed, empty when it can: a path inside a root's
-// cache directory, which this run writes after its record is taken (the table, and any cache of the engine's kept
-// beside it), or a listed directory above a root, whose listing moves with everything beside the project. Each
-// would make every later run a miss, so the record is refused rather than kept, and the engine's record is what
-// needs mending.
-func goInputsUnreplayable(inputs *engineInputsRecord, roots []string) string {
-	for _, paths := range [][]string{inputs.Files, inputs.Directories, inputs.Absent} {
-		for _, path := range paths {
-			for _, root := range roots {
-				if pathWithin(path, cacheDirectory(root)) {
-					return fmt.Sprintf("the Go engine named %s, inside the cache directory the run writes, so "+
-						"no later run could replay it", path)
-				}
-			}
-		}
-	}
-	for _, directory := range inputs.Directories {
-		for _, root := range roots {
-			if directory != root && pathWithin(root, directory) {
-				return fmt.Sprintf("the Go engine listed %s, a directory above the root %s whose listing moves "+
-					"with everything beside the project, so no later run could replay it", directory, root)
-			}
-		}
-	}
-	return ""
-}
-
-// pathWithin reports whether path is directory or below it.
-func pathWithin(path string, directory string) bool {
-	relative, relativeError := filepath.Rel(directory, path)
-	return relativeError == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
-}
-
-// goRunUnrecordable is why a finished Go run's exit is no verdict to replay, empty when it is one.
-//
-// A verdict is exit 0 or 1 from a run that called itself complete. acceptSummary refuses a complete summary whose
-// own records show a requested phase that did not run, a crash, a file with no compiler record or a file it could
-// not read, so complete is every phase ran and nothing went unchecked, held to the records rather than taken on
-// the engine's word. And a run whose fix phase rewrote a file is declined, as a TypeScript run that rewrote one
-// is: its verdict describes the tree it read, and the record would sign the tree it wrote.
-func goRunUnrecordable(run *engineRun, exitCode int) string {
-	switch {
-	case exitCode != 0 && exitCode != 1:
-		return fmt.Sprintf("the run exited %d, which is no verdict about the tree", exitCode)
-	case run.summary == nil || run.summary.Complete == nil:
-		return "the run ended without a summary"
-	case !*run.summary.Complete:
-		return "the run did not check everything, and a run that fell short is checked again rather than replayed"
-	case run.filesRewritten > 0:
-		return fmt.Sprintf("the fix phase rewrote %s, so the tree it read is not the tree on disk",
-			counted(run.filesRewritten, "file", "files"))
-	}
-	return ""
 }

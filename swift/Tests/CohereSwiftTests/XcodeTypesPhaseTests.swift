@@ -201,6 +201,43 @@ struct XcodeTypesPhaseTests {
         }
     }
 
+    /*
+     The pins a build starts from and keeps are inputs of the run's record (`RunInputs.pinsRead`), so a run that finds
+     them as the last one left them writes neither: the kept copy and the workspace's keep their modification date and
+     identity across a second unchanged run, and a pin that did change is still written.
+     */
+    @Test func unchangedPinsAreNeitherKeptNorRestoredAgain() throws {
+        try Self.withFolder { folder in
+            let app = [Self.target("App", "application", sdkRoot: "iphoneos")]
+            let signature = { (file: URL) -> String in
+                let values = try file.resourceValues(forKeys: [
+                    .contentModificationDateKey, .attributeModificationDateKey, .fileResourceIdentifierKey,
+                ])
+                return "\(String(describing: values.contentModificationDate?.timeIntervalSinceReferenceDate)) "
+                    + "\(String(describing: values.attributeModificationDate?.timeIntervalSinceReferenceDate)) "
+                    + "\(String(describing: values.fileResourceIdentifier))"
+            }
+            let generated = Self.phase(app, in: folder)
+            try Self.write("{\"pins\":[\"a\"]}", to: generated.resolvedInBundle)
+            generated.keepResolved()
+            let kept = try signature(generated.keptResolved)
+            Thread.sleep(forTimeInterval: 0.01)
+            generated.keepResolved()
+            #expect(try signature(generated.keptResolved) == kept, "unchanged pins were kept again")
+            try Self.write("{\"pins\":[\"b\"]}", to: generated.resolvedInBundle)
+            generated.keepResolved()
+            #expect(try Data(contentsOf: generated.keptResolved) == Data(contentsOf: generated.resolvedInBundle))
+
+            let committed = Self.phase(app, in: folder, resolutionAllowed: false, kind: .xcodeProject)
+            try Self.write("{}", to: committed.resolvedInBundle)
+            committed.restoreResolved()
+            let restored = try signature(committed.resolvedInBuild)
+            Thread.sleep(forTimeInterval: 0.01)
+            committed.restoreResolved()
+            #expect(try signature(committed.resolvedInBuild) == restored, "unchanged pins were restored again")
+        }
+    }
+
     /* The workspace names the committed bundle by its absolute path, escaped for XML. */
     @Test func writesAWorkspaceNamingTheCommittedBundle() throws {
         try Self.withFolder { folder in
