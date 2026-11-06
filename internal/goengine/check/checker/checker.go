@@ -56,8 +56,9 @@
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
-//   - The init that gave analysistest access to Action.pass, through
-//     go/analysis/internal, is dropped; nothing here uses analysistest.
+//   - The init that gives analysistest access to Action.pass sets it in
+//     the copy of go/analysis/internal in check/internal, which the copy
+//     of analysistest in check/analysistest reads.
 //   - The helpers from internal/analysis/driverutil that this file
 //     calls (ReadFileFunc, CheckedReadFile, ResolveURL, ValidateFixes)
 //     are copied unchanged into the driverutil package beside it, one
@@ -113,12 +114,14 @@ import (
 	"time"
 
 	"golang.org/x/tools/go/analysis"
-	// cohere: no go/analysis/internal, which only the init dropped below used.
+	// cohere: go/analysis/internal is the copy in check/internal, imported below.
 	"golang.org/x/tools/go/packages"
 
-	// cohere: x/tools' internal/analysis/driverutil, copied beside this file, since
-	// this module cannot import x/tools' internal packages.
+	// cohere: x/tools' internal/analysis/driverutil, copied beside this file, and
+	// go/analysis/internal, copied beside this package, since this module cannot
+	// import x/tools' internal packages.
 	"github.com/system-inc/cohere/internal/goengine/check/checker/driverutil"
+	"github.com/system-inc/cohere/internal/goengine/check/internal"
 )
 
 // Options specifies options that control the analysis driver.
@@ -350,9 +353,12 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 	return &Graph{Roots: roots}, nil
 }
 
-// cohere: upstream's init, which gave analysistest access to Action.pass
-// through go/analysis/internal, is dropped: this module cannot import x/tools'
-// internal packages, and nothing here uses analysistest.
+func init() {
+	// Allow analysistest to access Action.pass,
+	// for the legacy analysistest.Result data type,
+	// and for internal/checker.ApplyFixes to access pass.ReadFile.
+	internal.ActionPass = func(x any) *analysis.Pass { return x.(*Action).pass }
+}
 
 type objectFactKey struct {
 	obj types.Object

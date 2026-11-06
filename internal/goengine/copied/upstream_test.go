@@ -76,10 +76,23 @@ func TestEveryCopyMatchesUpstreamOutsideItsMarkedChanges(test *testing.T) {
 	// A walk that found no copy would pass over a tree nobody examined, so the copies the engine carries today
 	// must be among those found.
 	for _, expected := range []string{
+		"internal/goengine/check/analysistest/analysistest.go",
+		"internal/goengine/check/astutil/free/free.go",
 		"internal/goengine/check/checker/checker.go",
+		"internal/goengine/check/checker/driverutil/fix.go",
 		"internal/goengine/check/checker/driverutil/readfile.go",
 		"internal/goengine/check/checker/driverutil/url.go",
 		"internal/goengine/check/checker/driverutil/validatefix.go",
+		"internal/goengine/check/diff/diff.go",
+		"internal/goengine/check/diff/lcs/common.go",
+		"internal/goengine/check/diff/lcs/doc.go",
+		"internal/goengine/check/diff/lcs/labels.go",
+		"internal/goengine/check/diff/lcs/old.go",
+		"internal/goengine/check/diff/lcs/sequence.go",
+		"internal/goengine/check/diff/merge.go",
+		"internal/goengine/check/diff/ndiff.go",
+		"internal/goengine/check/diff/unified.go",
+		"internal/goengine/check/internal/internal.go",
 	} {
 		if !slices.Contains(copies, expected) {
 			test.Errorf("the walk did not find %s among the copies it found, %q", expected, copies)
