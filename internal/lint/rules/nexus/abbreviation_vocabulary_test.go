@@ -102,7 +102,7 @@ func TestAbbreviationVocabularyJudgesEveryForm(test *testing.T) {
 
 	judged := 0
 	for word := range vocabulary.WholeByName {
-		finding, found := findAbbreviation(word)
+		finding, found := findAbbreviation(word, true)
 		if !found || finding.form != "whole" || finding.message.Id != abbreviatedIdentifierText.Id {
 			test.Errorf("whole %q: got %+v, want %s", word, finding, abbreviatedIdentifierText.Id)
 		}
@@ -113,7 +113,7 @@ func TestAbbreviationVocabularyJudgesEveryForm(test *testing.T) {
 		vocabulary.LatePrefixes...,
 	) {
 		name := entry.Abbreviation + "Widget"
-		finding, found := findAbbreviation(name)
+		finding, found := findAbbreviation(name, true)
 		if !found || finding.form != "prefix" || finding.message.Id != abbreviatedIdentifierText.Id {
 			test.Errorf("prefix %q: got %+v, want %s", name, finding, abbreviatedIdentifierText.Id)
 		}
@@ -125,7 +125,7 @@ func TestAbbreviationVocabularyJudgesEveryForm(test *testing.T) {
 		if entry.Suffix.Matcher == "millisecondWord" {
 			wantId = millisecondSuffixText.Id
 		}
-		finding, found := findAbbreviation(name)
+		finding, found := findAbbreviation(name, true)
 		if !found || finding.form != "suffix" || finding.message.Id != wantId {
 			test.Errorf("suffix %q: got %+v, want %s", name, finding, wantId)
 		}
@@ -133,7 +133,7 @@ func TestAbbreviationVocabularyJudgesEveryForm(test *testing.T) {
 	}
 	for _, entry := range vocabulary.Segments {
 		name := "widget" + abbreviation.Capitalize(entry.Abbreviation) + "Name"
-		finding, found := findAbbreviation(name)
+		finding, found := findAbbreviation(name, true)
 		if !found || finding.form != "segment" || finding.entry != entry {
 			test.Errorf("segment %q: got %+v, want %s", name, finding, entry.Abbreviation)
 		}
@@ -154,12 +154,12 @@ func TestAbbreviationSegmentsJudgeOnlyTheWholeWord(test *testing.T) {
 		"checkName", "widgetCheckName", "changeSet", "posixPath", "postOffice", "bufferSize", "widgetBuffer",
 		"muteButton", "multiplier", "temporaryFile", "sourceMap", "commandLine", "packageName", "position",
 	} {
-		if finding, found := findAbbreviation(name); found {
+		if finding, found := findAbbreviation(name, true); found {
 			test.Errorf("%q reads as an abbreviation: %+v", name, finding)
 		}
 	}
 	for _, name := range []string{"chList", "readCh", "posValue", "bufSize", "widgetMu", "sb"} {
-		if _, found := findAbbreviation(name); !found {
+		if _, found := findAbbreviation(name, true); !found {
 			test.Errorf("%q holds a whole abbreviated word and was not judged", name)
 		}
 	}
@@ -246,7 +246,7 @@ func TestAbbreviationVocabularyOrderIsObservableWhereItMatters(test *testing.T) 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			finding, found := findAbbreviation(testCase.name)
+			finding, found := findAbbreviation(testCase.name, true)
 			if !found || finding.message.Id != testCase.wantId {
 				test.Fatalf("got %+v, want %s", finding, testCase.wantId)
 			}
