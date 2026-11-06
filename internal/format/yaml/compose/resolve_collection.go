@@ -340,8 +340,9 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 					if len(coll.Items) == 0 {
 						// `coll.items[coll.items.length - 1]` is undefined.
 						// Invariant: upstream throws here, and composeCollectionCatching recovers this panic
-						// into the document's RESOURCE_EXHAUSTION error, as upstream's catch does, so it never
-						// leaves the package.
+						// into a reported error, so it never leaves the package. No YAML text reaches it, since
+						// cst.Parser builds an item holding only spaces, commas and comments only as a flow
+						// collection's last; only hand-built tokens do.
 						panic(typeError("Cannot read properties of undefined (reading 'comment')"))
 					}
 					previous := coll.Items[len(coll.Items)-1]
