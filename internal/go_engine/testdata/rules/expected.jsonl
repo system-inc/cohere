@@ -184,6 +184,7 @@
 {"kind":"rule","name":"cohere-go/consistency-require-octal-prefix","severity":"error"}
 {"kind":"rule","name":"cohere-go/consistency-require-one-type-per-file","severity":"error"}
 {"kind":"rule","name":"cohere-go/consistency-require-operator-assignment","severity":"error"}
+{"kind":"rule","name":"cohere-go/consistency-require-separated-folder-words","severity":"error"}
 {"kind":"rule","name":"cohere-go/copylocks","severity":"error"}
 {"kind":"rule","name":"cohere-go/correctness-no-caller-data-mutation","severity":"error"}
 {"kind":"rule","name":"cohere-go/correctness-no-identical-branches","severity":"error"}

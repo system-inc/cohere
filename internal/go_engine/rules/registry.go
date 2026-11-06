@@ -50,6 +50,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_require_octal_prefix"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_require_one_type_per_file"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_require_operator_assignment"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_require_separated_folder_words"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_no_caller_data_mutation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_no_identical_branches"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_no_process_exit_after_output"
@@ -210,6 +211,7 @@ func House() []rule.Rule {
 		consistency_require_octal_prefix.Rule,
 		consistency_require_one_type_per_file.Rule,
 		consistency_require_operator_assignment.Rule,
+		consistency_require_separated_folder_words.Rule,
 		correctness_no_caller_data_mutation.Rule,
 		correctness_no_identical_branches.Rule,
 		correctness_no_process_exit_after_output.Rule,
