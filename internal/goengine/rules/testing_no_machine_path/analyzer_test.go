@@ -21,9 +21,9 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 	}
 }
 
-// The fixtures carry every case of testpolicy's TestHomePathsFindsAPlantedHomePath, so the port is held to finding
-// what testpolicy finds there, and each case where the house's stricter marker reading parts from testpolicy's, a
-// marker mid-sentence, in the wrong case, with its reason on the next line, or trailing the line above, as flagged.
+// The fixtures carry each home directory the rule must find, in a plain, raw or longer string, and each marker that
+// excuses nothing as flagged: one with no reason, mid-sentence, in the wrong case, with its reason on the next line,
+// trailing the line above, or a blank line away.
 // The flagged fixtures carry a // want on every literal the rule must report, and analysistest fails on a finding no
 // want expects as much as on a want nothing found, so the allowed and lookalike fixtures prove the rule stays quiet
 // on a reasoned marker, a literal outside a _test.go file, and text that only resembles a home directory.
