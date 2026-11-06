@@ -443,7 +443,18 @@ func gate(worktree string, commit string) (int, string) {
 	reportWorkspace(covered, streams.Errors)
 	patterns := covered.Patterns()
 	started := time.Now()
-	ran := []string{"go vet", "go test over " + strings.Join(patterns, " ")}
+	// The modules by directory, as the gate's report names them, not the package patterns, which in cohere run to
+	// about 900 characters of shim paths.
+	tested := "go test of the module"
+	if covered.FromWorkspace {
+		directories := make([]string, 0, len(covered.Modules))
+		for _, module := range covered.Modules {
+			directories = append(directories, module.Directory)
+		}
+		tested = fmt.Sprintf("go test of %d modules from go.work (%s)", len(directories),
+			strings.Join(directories, ", "))
+	}
+	ran := []string{"go vet", tested}
 	// Each command takes its share as the pool is when it starts (tokenRun.step): a gate that waited for its
 	// token on a busy pool widens for its tests or its docs check once the pool goes idle.
 	code := withSteppedToken("land gate on "+shortCommit(commit)+" in "+worktree, func(step func(string) []string) int {
