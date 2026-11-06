@@ -73,6 +73,11 @@ public struct PackageModel: Equatable, Sendable {
     public var root: URL
     public var projectKind = ProjectKind.swiftPackage
     public var toolsVersion: String
+    /*
+     The platforms the manifest names, in its order and SwiftPM's spelling (`macos`, `ios`, `visionos`). Empty when it
+     names none, which SwiftPM reads as every platform at its default deployment target.
+     */
+    public var platforms: [String] = []
     public var targets: [Target]
     /* Paths of the local packages this one depends on that sit inside its directory. */
     public var localDependencyRoots: [URL]
@@ -85,6 +90,8 @@ public struct PackageModel: Equatable, Sendable {
      product (`cohere-swift-p.build` for target `CohereSwiftCommand`), so this is how its records are found.
      */
     public var productTargets: [String: String] = [:]
+    /* Every product's name, in the manifest's order, whatever it is built from: how xcodebuild names a package's schemes (`XcodePackageTypesPhase`). */
+    public var productNames: [String] = []
     /* The targets a library product is built from: the package's API to whoever depends on it, so what they declare public is used by someone this build never sees. */
     public var libraryProductTargets: Set<String> = []
     /* An Xcode project's targets whose product type this engine does not know, to the type: among the library product targets, so their public declarations are kept, and named so the report says why. */
@@ -255,6 +262,7 @@ public struct PackageModel: Equatable, Sendable {
         self.name = description.name
         self.root = root
         self.toolsVersion = toolsVersion
+        self.platforms = (description.platforms ?? []).map(\.name)
         self.targets = description.targets.map { target in
             let directory = root.appendingPathComponent(target.path, isDirectory: true)
             let sources = (target.sources ?? [])
@@ -282,6 +290,7 @@ public struct PackageModel: Equatable, Sendable {
             },
             uniquingKeysWith: { first, _ in first },
         )
+        self.productNames = (description.products ?? []).map(\.name)
         self.libraryProductTargets = Set(
             (description.products ?? []).filter { $0.type?.name == "library" }.flatMap(\.targets)
         )

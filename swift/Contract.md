@@ -322,6 +322,20 @@ because no input changed, then names each build that failed and the step it fail
 ours carries an error for is a finding at the spec or the committed project file, and a build that left no
 record leaves every file it was for in `filesWithoutRecord`, never an empty report.
 
+A package is built with `swift build --build-tests` for the macOS host when its manifest names macOS among its
+`platforms`, or names no platform. One whose `platforms` leave out macOS (#ee9ct1r) is never judged against the
+host's SDK, which it does not target: it is built by xcodebuild in its own folder, through the scheme Xcode makes
+for the package (named for it when it has one product, else `<Package>-Package`), for the generic device of the
+first platform it names among iOS, tvOS, watchOS and visionOS, with `build-for-testing`, into the same `xcode-build`
+derived data. Its typed rules and `--unused` read that build, as at an Xcode root. It signs nothing, removes the
+empty `.swiftpm` folders xcodebuild makes in the package, and under `--no-fix` is held to the package's own
+`Package.resolved`, as `swift build` is. `build` reads
+`xcodebuild of the package for <platform>, the first platform it names, since it names no macOS, scheme <scheme>, derived data <path>`,
+then the step a failed build failed at. A local package's own tests are not built by the root's schemes, so their
+files are in `filesWithoutRecord` and `build` says so. A package whose platforms name none of those (Mac Catalyst
+alone), or whose folder also holds an Xcode project or workspace, is not built: `build` begins `not built:` and
+says why, and every file is in `filesWithoutRecord`, so the run is incomplete.
+
 **Only compiler errors cut lint off.** In TypeScript every diagnostic the checker reports is an
 error, so "any type diagnostic bails" and "any type error bails" were the same rule. In Swift they
 are not. A warning (`variable was never mutated`) is a finding and fails the run, but the code
