@@ -374,6 +374,14 @@ struct XcodeTypesPhase {
      `--no-fix` a committed resolution the project no longer matches is named, since the build was held to it.
      */
     func failedStep(of result: ProcessRunner.Result) -> String {
+        Self.failedStep(of: result, heldTo: resolutionAllowed ? nil : committedResolved)
+    }
+
+    /*
+     What failed, in xcodebuild's words, for any xcodebuild this engine runs: a project's (above), or a package's built
+     for a device platform (`XcodePackageTypesPhase`). `heldTo` is the resolution a `--no-fix` build was held to, if any.
+     */
+    static func failedStep(of result: ProcessRunner.Result, heldTo committed: URL?) -> String {
         let text = String(decoding: result.standardOutput, as: UTF8.self) + "\n" + result.standardError
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         if let header = lines.firstIndex(where: { $0.hasPrefix("The following build commands failed:") }) {
@@ -386,8 +394,8 @@ struct XcodeTypesPhase {
         if let error = lines.firstIndex(where: { $0.hasPrefix("xcodebuild: error:") }) {
             let explained = [lines[error]] + lines[(error + 1)...].prefix { $0.hasPrefix(" ") }
             let said = explained.map { $0.trimmingCharacters(in: .whitespaces) }.joined(separator: " ")
-            guard Self.isResolutionFailure(said) else { return said }
-            if !resolutionAllowed, let committed = committedResolved {
+            guard isResolutionFailure(said) else { return said }
+            if let committed {
                 return
                     "\(said) (under --no-fix the build is held to the resolution the repository commits, \(committed.path), and a check never moves it)"
             }
@@ -466,14 +474,30 @@ struct XcodeTypesPhase {
     /*
      xcodebuild makes an empty `.swiftpm/xcode` inside every local package a build links, whether it resolves or not
      (measured 2026-11-05, on a path package beside an app). A check writes nothing into the developer's tree, so
-     each of those two folders that this build made, empty and created since it started, is removed again, innermost
-     first. One holding anything, or older than the build, is not ours to judge and stays. The local packages are
-     read after the build, so the ones its package state names for the first time are cleaned as well.
+     each of those folders that this build made is removed again (`removeFoldersMade`). The local packages are read
+     after the build, so the ones its package state names for the first time are cleaned as well.
      */
     func removeFoldersMadeInLocalPackages(since buildStart: Date) {
-        for root in project.projectFile.localPackages + Self.localPackages(stateIn: clonedPackages) {
+        Self.removeFoldersMade(
+            in: project.projectFile.localPackages + Self.localPackages(stateIn: clonedPackages),
+            since: buildStart,
+        )
+    }
+
+    /*
+     The folders an xcodebuild makes in a package it reads, removed from each of these roots when empty and created
+     since the build started, innermost first: `.swiftpm/xcode`, `.swiftpm/configuration`, then `.swiftpm`. The
+     configuration folder was measured 2026-11-06, made beside `xcode` in a package xcodebuild built as the root. One
+     holding anything, or older than the build, is not ours to judge and stays.
+     */
+    static func removeFoldersMade(in roots: [URL], since buildStart: Date) {
+        for root in roots {
             let swiftpm = root.appendingPathComponent(".swiftpm", isDirectory: true)
-            for directory in [swiftpm.appendingPathComponent("xcode", isDirectory: true), swiftpm] {
+            let made = [
+                swiftpm.appendingPathComponent("xcode", isDirectory: true),
+                swiftpm.appendingPathComponent("configuration", isDirectory: true), swiftpm,
+            ]
+            for directory in made {
                 guard let entries = try? FileManager.default.contentsOfDirectory(atPath: directory.path),
                     entries.isEmpty,
                     let created = try? FileManager.default.attributesOfItem(atPath: directory.path)[.creationDate]

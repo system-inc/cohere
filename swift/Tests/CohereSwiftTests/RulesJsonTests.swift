@@ -33,7 +33,11 @@ struct RulesJsonTests {
 
     /* Every registered rule as it declares itself, sorted by name. */
     static func declaredRows() -> [Row] {
-        let fileRows = RuleRegistry.fileRules(vocabulary: AbbreviationVocabulary()).map { rule in
+        let fileRows = RuleRegistry.fileRules(
+            vocabulary: AbbreviationVocabulary(),
+            shoutingVocabulary: ShoutingVocabulary(),
+        )
+        .map { rule in
             Row(name: rule.name, origin: rule.origin, upstreamName: rule.upstreamName, typeAware: false)
         }
         let typedRows = RuleRegistry.typedRules.map { rule in

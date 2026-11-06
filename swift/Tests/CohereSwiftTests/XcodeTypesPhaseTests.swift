@@ -78,7 +78,7 @@ struct XcodeTypesPhaseTests {
 
     /*
      Applications and tools build before the test bundles that host in them, each for its SDK's platform, and a test
-     bundle builds for testing. A target whose SDKROOT names no platform, or that sets none, is not built and says why.
+     bundle builds for testing. A target whose `SDKROOT` names no platform, or that sets none, is not built and says why.
      */
     @Test func plansOneBuildPerTargetForItsPlatform() throws {
         try Self.withFolder { folder in

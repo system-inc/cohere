@@ -27,7 +27,11 @@ struct RuleConfigurationOptionsTests {
             tree: Parser.parse(source: source),
             nodeCount: 0,
         )
-        let rules = RuleRegistry.fileRules(vocabulary: AbbreviationVocabulary(), configuration: configuration)
+        let rules = RuleRegistry.fileRules(
+            vocabulary: AbbreviationVocabulary(),
+            shoutingVocabulary: ShoutingVocabulary(),
+            configuration: configuration,
+        )
         return rules.filter { $0.name == FileLength().name }.flatMap { $0.findings(in: file) }
     }
 

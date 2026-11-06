@@ -737,7 +737,7 @@ struct XcodeProjectPipelineTests {
     }
 
     /*
-     A target whose SDKROOT names no platform this engine builds for is not built, and its files are a named gap. Its
+     A target whose `SDKROOT` names no platform this engine builds for is not built, and its files are a named gap. Its
      build settings are not asked for either, so the toolchain rules leave it unchecked, named at the spec with why,
      rather than judging it on or off.
      */
