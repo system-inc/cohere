@@ -1,0 +1,153 @@
+package cache
+
+import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+)
+
+// sampleKey is a key whose entry's path is known: its first byte names its directory.
+var sampleKey = Key{0xAB, 0xCD, 0xEF}
+
+// An entry put is got back whole, under `.cache/cohere/go/ab/abcdef...`, and the store makes nothing on disk until
+// the first Put. An empty entry is an entry.
+func TestAnEntryPutIsGotBack(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store := Open(root)
+	if _, found := store.Get(sampleKey); found {
+		test.Fatal("an empty store had an entry")
+	}
+	if _, statError := os.Stat(filepath.Join(root, ".cache")); !os.IsNotExist(statError) {
+		test.Fatalf("opening and reading the store made .cache: %v", statError)
+	}
+
+	entry := []byte("findings and facts")
+	if putError := store.Put(sampleKey, entry); putError != nil {
+		test.Fatal(putError)
+	}
+	entryPath := filepath.Join(root, ".cache", "cohere", "go", "ab", sampleKey.String())
+	if _, statError := os.Stat(entryPath); statError != nil {
+		test.Errorf("the entry is not where the store keeps it: %v", statError)
+	}
+	got, found := store.Get(sampleKey)
+	if !found || !bytes.Equal(got, entry) {
+		test.Errorf("want %q back, got %q (found %v)", entry, got, found)
+	}
+
+	emptyKey := Key{0x01}
+	if putError := store.Put(emptyKey, nil); putError != nil {
+		test.Fatal(putError)
+	}
+	if got, found := store.Get(emptyKey); !found || len(got) != 0 {
+		test.Errorf("want the empty entry back, got %q (found %v)", got, found)
+	}
+}
+
+// An entry file cut short, changed, unreadable or not a file at all is a miss, never an error.
+func TestABrokenEntryIsAMiss(test *testing.T) {
+	test.Parallel()
+
+	for name, breakEntry := range map[string]func(path string) error{
+		"cut short":      func(path string) error { return os.Truncate(path, 40) },
+		"cut in its sum": func(path string) error { return os.Truncate(path, 10) },
+		"emptied":        func(path string) error { return os.Truncate(path, 0) },
+		"unreadable":     func(path string) error { return os.Chmod(path, 0o000) },
+		"a directory":    func(path string) error { return replaceWithDirectory(path) },
+		"a byte changed": func(path string) error { return changeLastByte(path) },
+		"removed":        func(path string) error { return os.Remove(path) },
+		"written over":   func(path string) error { return os.WriteFile(path, []byte("short"), 0o644) },
+	} {
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+
+			store := Open(test.TempDir())
+			if putError := store.Put(sampleKey, bytes.Repeat([]byte("entry "), 20)); putError != nil {
+				test.Fatal(putError)
+			}
+			if breakError := breakEntry(store.path(sampleKey)); breakError != nil {
+				test.Fatal(breakError)
+			}
+			if got, found := store.Get(sampleKey); found {
+				test.Errorf("a broken entry was found: %q", got)
+			}
+		})
+	}
+}
+
+// replaceWithDirectory puts a directory where the file at path was.
+func replaceWithDirectory(path string) error {
+	if removeError := os.Remove(path); removeError != nil {
+		return removeError
+	}
+	return os.Mkdir(path, 0o755)
+}
+
+// changeLastByte changes the file's last byte, so its length is right and its bytes are not.
+func changeLastByte(path string) error {
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		return readError
+	}
+	contents[len(contents)-1]++
+	return os.WriteFile(path, contents, 0o644)
+}
+
+// Many Puts of one key at once leave one of their entries whole, and no temporary file behind.
+func TestConcurrentPutsOfOneKeyLeaveAWholeEntry(test *testing.T) {
+	test.Parallel()
+
+	store := Open(test.TempDir())
+	const writers = 16
+	const size = 1 << 20
+	putErrors := make([]error, writers)
+	var started sync.WaitGroup
+	for writer := range writers {
+		started.Go(func() {
+			putErrors[writer] = store.Put(sampleKey, bytes.Repeat([]byte{byte(writer)}, size))
+		})
+	}
+	started.Wait()
+	for writer, putError := range putErrors {
+		if putError != nil {
+			test.Errorf("Put %d: %v", writer, putError)
+		}
+	}
+	got, found := store.Get(sampleKey)
+	if !found || len(got) != size || !bytes.Equal(got, bytes.Repeat(got[:1], size)) {
+		test.Fatalf("want one writer's whole entry, got %d bytes (found %v)", len(got), found)
+	}
+	entries, readError := os.ReadDir(filepath.Dir(store.path(sampleKey)))
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	if len(entries) != 1 {
+		var names []string
+		for _, entry := range entries {
+			names = append(names, entry.Name())
+		}
+		test.Errorf("want the entry alone in its directory, got %s", strings.Join(names, ", "))
+	}
+}
+
+// A Put that cannot write is an error, and leaves no entry.
+func TestAPutThatCannotWriteIsAnError(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	// A file where the store's directory goes, so no directory can be made under it.
+	if writeError := os.WriteFile(filepath.Join(root, ".cache"), nil, 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	store := Open(root)
+	if putError := store.Put(sampleKey, []byte("entry")); putError == nil {
+		test.Error("a Put under a file succeeded")
+	}
+	if _, found := store.Get(sampleKey); found {
+		test.Error("a failed Put left an entry")
+	}
+}

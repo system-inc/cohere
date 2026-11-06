@@ -20,7 +20,8 @@ func translated(workspace string, patterns []string, environment []string) ([]*p
 		// ForTest is what tells a test variant from the package it tests without reading the opaque ID. Module is
 		// what gives a pass its module's path, so a rule that judges a package's path below its module root, as
 		// consistency_no_utils_folder does, never judges the module's own name, which nobody inside it can rename.
-		// EmbedFiles no rule reads; they are loaded so the inputs record names them (see inputs.go).
+		// EmbedFiles are inputs to the verdict, as the source load lists them: the per-package cache keys on them, and
+		// the inputs record names them (see inputs.go).
 		Mode:  packages.LoadAllSyntax | packages.NeedForTest | packages.NeedModule | packages.NeedEmbedFiles,
 		Tests: true,
 		Dir:   workspace,

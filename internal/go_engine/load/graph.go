@@ -71,7 +71,10 @@ func (graph *graph) add(added *node) *node {
 
 // newNode is a listed package as id, its files, imports and module as go list gave them, shaped as go/packages
 // shapes a package: GoFiles holds the cgo files after the rest, absolute, and CompiledGoFiles is the same files, the
-// ones type-checked, since no cgo tool runs.
+// ones type-checked, since no cgo tool runs. EmbedFiles are the package's own embedded files: go list resolves a
+// test's `//go:embed` patterns only under -test, so "p [p.test]" lists p's and "p_test [p.test]" none, where
+// go/packages would add the tests'. No rule reads an embedded file's bytes, and the patterns are in the test files,
+// so nothing a verdict depends on is missing from a package's files.
 func newNode(listedPackage *listedPackage, id string, workspace string) *node {
 	directory := listedPackage.Directory
 	loaded := &packages.Package{
@@ -83,8 +86,8 @@ func newNode(listedPackage *listedPackage, id string, workspace string) *node {
 		OtherFiles: absolute(directory, listedPackage.CFiles, listedPackage.CxxFiles, listedPackage.MFiles,
 			listedPackage.HFiles, listedPackage.FFiles, listedPackage.SFiles, listedPackage.SwigFiles,
 			listedPackage.SwigCxxFiles, listedPackage.SysoFiles),
-		EmbedFiles:   absolute(directory, listedPackage.EmbedFiles),
 		IgnoredFiles: absolute(directory, listedPackage.IgnoredGoFiles, listedPackage.IgnoredOtherFiles),
+		EmbedFiles:   absolute(directory, listedPackage.EmbedFiles),
 		Module:       listedPackage.Module,
 	}
 	if listedPackage.Error != nil {
@@ -176,7 +179,6 @@ func (graph *graph) addTestVariants(listed *listing, root *listedPackage, worksp
 	if len(root.TestGoFiles) > 0 || root.Name == "main" {
 		withTests := *root
 		withTests.GoFiles = slices.Concat(root.GoFiles, root.TestGoFiles)
-		withTests.EmbedFiles = slices.Concat(root.EmbedFiles, root.TestEmbedFiles)
 		inPackage = newNode(&withTests, path+suffix, workspace)
 		inPackage.loaded.ForTest = path
 		for written, resolved := range resolvedImports(root, root.TestImports) {
@@ -247,7 +249,6 @@ func (graph *graph) addTestVariants(listed *listing, root *listedPackage, worksp
 			Directory:  root.Directory,
 			Module:     root.Module,
 			GoFiles:    root.XTestGoFiles,
-			EmbedFiles: root.XTestEmbedFiles,
 			ImportMap:  root.ImportMap,
 		}
 		externalNode := newNode(external, path+"_test"+suffix, workspace)
