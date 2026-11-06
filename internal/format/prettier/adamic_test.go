@@ -33,7 +33,11 @@ func TestTheEngineFormatsAnAdamicFileAsTypeScript(test *testing.T) {
 	if formatError != nil {
 		test.Fatal(formatError)
 	}
-	if asAdamic, _ := engine.Format("/repo/Dog.a", sources[0]); asAdamic == asTSX {
+	asAdamic, formatError := engine.Format("/repo/Dog.a", sources[0])
+	if formatError != nil {
+		test.Fatal(formatError)
+	}
+	if asAdamic == asTSX {
 		test.Errorf("the .tsx control formats `<T,>` as .a does, so the comparison above proves nothing:\n%s", asTSX)
 	}
 }
