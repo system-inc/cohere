@@ -47,13 +47,12 @@ func TestParseGlueTypesAndOffsets(test *testing.T) {
 		test.Fatalf("root: %s [%d, %d]", root.Type(), locStart(root), locEnd(root))
 	}
 	rule := root.List("nodes")[0]
-	if !rule.Is("css-rule") || !rule.Child("selector").Is("selector-root") ||
-		rawsIn(rule)["selector"] != estree.String("a") {
+	if !rule.Is("css-rule") || !rule.Child("selector").Is("selector-root") || rawString(rule, "selector") != "a" {
 		test.Fatalf(
 			"rule: %s, selector %s, raws.selector %v",
 			rule.Type(),
 			rule.Child("selector").Type(),
-			rawsIn(rule)["selector"],
+			rawString(rule, "selector"),
 		)
 	}
 

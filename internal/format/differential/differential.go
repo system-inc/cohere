@@ -126,16 +126,15 @@ func Compare(
 	workers int,
 	cache *OracleCache,
 ) (Report, error) {
-	if workers < 1 {
-		workers = 1
-	}
+	// At least one worker, so a zero or negative count still compares every file.
+	workerCount := max(workers, 1)
 
 	results := make([]FileResult, len(files))
 	indexes := make(chan int)
-	errs := make(chan error, workers)
+	errs := make(chan error, workerCount)
 	var group sync.WaitGroup
 
-	for worker := 0; worker < workers; worker++ {
+	for worker := 0; worker < workerCount; worker++ {
 		group.Add(1)
 		go func() {
 			defer group.Done()
@@ -249,7 +248,8 @@ func FirstDifference(expected string, actual string) string {
 	expectedLines := strings.Split(expected, "\n")
 	actualLines := strings.Split(actual, "\n")
 	for line := 0; line < len(expectedLines) || line < len(actualLines); line++ {
-		var want, got string
+		var want string
+		var got string
 		if line < len(expectedLines) {
 			want = expectedLines[line]
 		}

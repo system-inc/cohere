@@ -8,7 +8,7 @@ package postcss
 func newNestedDeclaration() *node {
 	return &node{
 		nodeType: "decl",
-		raws:     map[string]any{},
+		raws:     map[string]rawEntry{},
 		keys:     []string{"isNested", "nodes"},
 		isNested: true,
 		nodes:    []*node{},

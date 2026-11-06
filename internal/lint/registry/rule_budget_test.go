@@ -152,8 +152,8 @@ func buildBudgetGraph(test *testing.T, files map[string]string) *program.Graph {
 // process. The deadline is a separate safety bound, never reported as CPU time.
 func measureOne(graph *program.Graph, subject rule.Entry, deadline time.Duration) (program.Result, error) {
 	type answer struct {
-		result program.Result
-		err    error
+		result       program.Result
+		measureError error
 	}
 	done := make(chan answer, 1)
 	cancelContext, cancel := context.WithCancel(context.Background())
@@ -166,7 +166,7 @@ func measureOne(graph *program.Graph, subject rule.Entry, deadline time.Duration
 	defer timer.Stop()
 	select {
 	case got := <-done:
-		return got.result, got.err
+		return got.result, got.measureError
 	case <-timer.C:
 		return program.Result{}, fmt.Errorf(
 			"rule CPU budget exceeded: %s reached deadline %.3fms (CPU budget %.3fms; CPU measurement unfinished)",

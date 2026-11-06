@@ -25,7 +25,10 @@ func TestParseScssTree(test *testing.T) {
 	}
 
 	comment := nodes[0]
-	commentRaws := objectOf(test, comment.Get("raws"), "comment raws")
+	commentRaws, commentRawsIsObject := comment.Get("raws").(estree.Record)
+	if !commentRawsIsObject {
+		test.Fatalf("comment raws is %#v, want an object", comment.Get("raws"))
+	}
 	if comment.Type() != "comment" ||
 		comment.String("text") != "a *//* b" ||
 		commentRaws["inline"] != estree.Boolean(true) ||
@@ -51,7 +54,11 @@ func TestParseScssTree(test *testing.T) {
 	) {
 		test.Errorf("nested declaration keys %v", keys)
 	}
-	value := objectOf(test, nested.Get("raws"), "nested declaration raws")["value"]
+	nestedRaws, nestedRawsIsObject := nested.Get("raws").(estree.Record)
+	if !nestedRawsIsObject {
+		test.Fatalf("nested declaration raws is %#v, want an object", nested.Get("raws"))
+	}
+	value := nestedRaws["value"]
 	if record, isRecord := value.(estree.Record); !isRecord || !maps.Equal(record, estree.Record{
 		"value": estree.String("0 "),
 		"raw":   estree.String("0 /* c*/\n "),

@@ -33,14 +33,14 @@ import (
 // useBeforeDefineCycles answers the cycle question for one file, building each block's reference
 // graph only when a candidate reference first needs it.
 type useBeforeDefineCycles struct {
-	ctx rule.Context
+	ruleContext rule.Context
 	// graphs maps a block to its statements' references to one another: statement to the statements
 	// it reaches.
 	graphs map[*ast.Node]map[*ast.Node]map[*ast.Node]bool
 }
 
 func newUseBeforeDefineCycles(ruleContext rule.Context) *useBeforeDefineCycles {
-	return &useBeforeDefineCycles{ctx: ruleContext, graphs: map[*ast.Node]map[*ast.Node]map[*ast.Node]bool{}}
+	return &useBeforeDefineCycles{ruleContext: ruleContext, graphs: map[*ast.Node]map[*ast.Node]map[*ast.Node]bool{}}
 }
 
 // exempts reports whether a forward reference from identifier to declaration is one no ordering can
@@ -158,8 +158,8 @@ func (cycles *useBeforeDefineCycles) graph(block *ast.Node) map[*ast.Node]map[*a
 		visit = func(current *ast.Node) {
 			if current.Kind == ast.KindIdentifier && !isDeclaringName(current) {
 				declarations := rule.DeclarationsIn(
-					cycles.ctx.SourceFile,
-					useBeforeDefineResolveBinding(cycles.ctx, current),
+					cycles.ruleContext.SourceFile,
+					useBeforeDefineResolveBinding(cycles.ruleContext, current),
 				)
 				if declaration := useBeforeDefineBindingDeclaration(declarations); declaration != nil {
 					if target := useBeforeDefineStatementOf(

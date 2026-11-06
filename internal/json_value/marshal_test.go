@@ -1,4 +1,4 @@
-package jsonvalue
+package json_value
 
 import (
 	"encoding/json"
@@ -6,9 +6,9 @@ import (
 )
 
 // Each text is compact and its object keys sorted, which is how encoding/json writes a value back, so a value
-// that marshals to anything else lost or changed something on the way through ParseJsonValue. A number keeps
+// that marshals to anything else lost or changed something on the way through Parse. A number keeps
 // its own spelling, `1.0` and `1e3` and `-0` as written, and null stays null, where encoding/json alone would
-// write a JsonNumber as a quoted string and a JsonNull as `{}`.
+// write a Number as a quoted string and a Null as `{}`.
 func TestEachValueMarshalsToTheTextItParsed(test *testing.T) {
 	test.Parallel()
 
@@ -33,7 +33,7 @@ func TestEachValueMarshalsToTheTextItParsed(test *testing.T) {
 		test.Run(text, func(test *testing.T) {
 			test.Parallel()
 
-			value, parseError := ParseJsonValue([]byte(text))
+			value, parseError := Parse([]byte(text))
 			if parseError != nil {
 				test.Fatal(parseError)
 			}
@@ -48,12 +48,12 @@ func TestEachValueMarshalsToTheTextItParsed(test *testing.T) {
 	}
 }
 
-// A JsonNumber made by hand rather than parsed still goes through encoding/json's check that it is a number
+// A Number made by hand rather than parsed still goes through encoding/json's check that it is a number
 // literal, so a value that is not one is an error rather than invalid JSON in the output.
 func TestNumberThatIsNotOneFailsToMarshal(test *testing.T) {
 	test.Parallel()
 
-	if encoded, marshalError := json.Marshal(JsonNumber("one")); marshalError == nil {
-		test.Errorf("marshaled JsonNumber(\"one\") as %s, without an error", encoded)
+	if encoded, marshalError := json.Marshal(Number("one")); marshalError == nil {
+		test.Errorf("marshaled Number(\"one\") as %s, without an error", encoded)
 	}
 }

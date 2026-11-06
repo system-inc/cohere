@@ -420,7 +420,11 @@ func jsxNoConstructedContextValuesCheckMemo(ruleContext rule.Context, value *ast
 		return line + 1
 	}
 
-	walk := &jsxNoConstructedContextValuesStabilityWalk{ctx: ruleContext, active: map[*ast.Node]bool{}, render: scope}
+	walk := &jsxNoConstructedContextValuesStabilityWalk{
+		ruleContext: ruleContext,
+		active:      map[*ast.Node]bool{},
+		render:      scope,
+	}
 	found, _ := walk.memoFinding(memo, scope, 0)
 	if found == nil {
 		return

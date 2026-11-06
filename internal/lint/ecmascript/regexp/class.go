@@ -137,7 +137,7 @@ func classAtoms(body string, options rewriteOptions, escaping escapeContext) ([]
 				atoms = append(atoms, classAtom{kind: classSet, text: body[index:end]})
 			}
 		default:
-			atoms = append(atoms, classAtom{kind: classRune, lo: escape.r})
+			atoms = append(atoms, classAtom{kind: classRune, lo: escape.character})
 		}
 		index = end
 	}

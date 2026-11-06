@@ -10,7 +10,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/jsonvalue"
+	"github.com/system-inc/cohere/internal/json_value"
 )
 
 // parseFromCorpusVariable names more roots for the proof below, separated by the path list separator: a real
@@ -123,15 +123,15 @@ func convertedDump(test *testing.T, fileName string, sourceFile *ast.SourceFile)
 	for index := range offsets {
 		offsets[index] = index
 	}
-	dumped := make(jsonvalue.JsonArray, len(comments))
+	dumped := make(json_value.Array, len(comments))
 	for index, comment := range comments {
-		dumped[index] = jsonvalue.JsonObject{
+		dumped[index] = json_value.Object{
 			"type":  jsonString(comment.Type()),
-			"range": jsonvalue.JsonArray{jsonInteger(comment.Range[0]), jsonInteger(comment.Range[1])},
+			"range": json_value.Array{jsonInteger(comment.Range[0]), jsonInteger(comment.Range[1])},
 			"value": jsonString(comment.String("value")),
 		}
 	}
-	encoded, encodeError := json.Marshal(jsonvalue.JsonObject{"ast": dumpValue(program, offsets), "comments": dumped})
+	encoded, encodeError := json.Marshal(json_value.Object{"ast": dumpValue(program, offsets), "comments": dumped})
 	if encodeError != nil {
 		test.Fatalf("%s: %v", fileName, encodeError)
 	}

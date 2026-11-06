@@ -411,7 +411,7 @@ func correctnessRequireBlockingStandardStreamsScanFile(ruleContext rule.Context)
 		reason = correctnessRequireBlockingStandardStreamsUnimported
 	}
 	analysis := &correctnessRequireBlockingStandardStreamsAnalysis{
-		ctx:              ruleContext,
+		ruleContext:      ruleContext,
 		index:            index,
 		ordered:          index.canBlock[sourceFile.PathKey()],
 		functionMayBlock: map[*ast.Node]uint8{},

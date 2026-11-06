@@ -35,6 +35,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/system-inc/cohere/policy"
@@ -66,7 +67,7 @@ const (
 	// MillisecondSuffix is the millisecond unit written as a camelCase word, with the values `name` and
 	// `suggestion`.
 	MillisecondSuffix = "millisecondSuffix"
-	// AbbreviatedWordSegment is a segment finding, with the values `name`, `word` and `suggestion`.
+	// AbbreviatedWordSegment is a segment finding, with the values `name`, `word` and `advice`.
 	AbbreviatedWordSegment = "abbreviatedWordSegment"
 )
 
@@ -82,11 +83,13 @@ type vocabularyFile struct {
 // Entry is one abbreviated word and the forms it is judged in.
 type Entry struct {
 	Abbreviation string `json:"abbreviation"`
-	// Expansion is the word the abbreviation stands in for. Absent for a word that has no single expansion, where
-	// Advice says what to write instead.
-	Expansion string `json:"expansion"`
-	// Advice replaces "Use <expansion>" in the whole-word message, and in the prefix message when the prefix form's
-	// style is advice.
+	// Expansions are the words the abbreviation stands in for, the most common meaning first. A word with more than
+	// one common meaning lists every one, and every message names them all rather than guessing, since only the
+	// name's author knows which it means: `resultPos` beside `resultNeg` is positive, not position. Absent for a
+	// word whose meanings are too many to list, where Advice says what to write instead.
+	Expansions []string `json:"expansions"`
+	// Advice replaces "Use <expansion>" in the whole-word message, and in the prefix or segment message when that
+	// form's style is advice.
 	Advice  string       `json:"advice"`
 	Reason  string       `json:"reason"`
 	Whole   *WholeForm   `json:"whole"`
@@ -121,7 +124,10 @@ type SuffixForm struct {
 }
 
 // SegmentForm judges the abbreviation capitalized as a camelCase word anywhere in a name.
-type SegmentForm struct{}
+type SegmentForm struct {
+	// Style is empty for a rename to the expansion, or "advice" for the entry's advice.
+	Style string `json:"style"`
+}
 
 type allowedName struct {
 	Name   string `json:"name"`
@@ -277,10 +283,23 @@ func validateEntry(entry *Entry) error {
 		}
 	}
 	if entry.Segment != nil {
-		needsExpansion = true
+		switch entry.Segment.Style {
+		case "":
+			needsExpansion = true
+		case "advice":
+			if entry.Advice == "" {
+				return fmt.Errorf("segment style is advice and the entry has none")
+			}
+		default:
+			return fmt.Errorf("unknown segment style %q", entry.Segment.Style)
+		}
 	}
-	if needsExpansion && entry.Expansion == "" {
+	if needsExpansion && len(entry.Expansions) == 0 {
 		return fmt.Errorf("a form suggests the expansion and the entry has none")
+	}
+	// An empty expansion would print `Use ""`, or fold a name's own tail into the suggestion as if it were the word.
+	if slices.Contains(entry.Expansions, "") {
+		return fmt.Errorf("an expansion is empty")
 	}
 	return nil
 }
@@ -304,14 +323,50 @@ type Finding struct {
 	Values    map[string]string
 }
 
+// quoted is a list of names as a message reads it: `"a"`, `"a" or "b"`, or `"a", "b" or "c"`.
+func quoted(names []string) string {
+	quotedNames := make([]string, len(names))
+	for index, name := range names {
+		quotedNames[index] = `"` + name + `"`
+	}
+	if len(quotedNames) < 2 {
+		return strings.Join(quotedNames, "")
+	}
+	return strings.Join(quotedNames[:len(quotedNames)-1], ", ") + " or " + quotedNames[len(quotedNames)-1]
+}
+
+// useAdvice is the advice that names the candidates for a name. One candidate reads `Use "a".`, as every message did
+// before a word could mean more than one thing; more than one names them all and leaves the choice to the reader.
+func useAdvice(candidates []string) string {
+	if len(candidates) == 1 {
+		return `Use "` + candidates[0] + `".`
+	}
+	return `Use ` + quoted(candidates) + `, whichever it means.`
+}
+
+// expandedNames is a name with its abbreviation replaced by each expansion in turn, in the entry's order, each
+// written by the form's own spelling of the word.
+func expandedNames(entry *Entry, spell func(expansion string) string) []string {
+	names := make([]string, len(entry.Expansions))
+	for index, expansion := range entry.Expansions {
+		names[index] = spell(expansion)
+	}
+	return names
+}
+
 // wholeFinding is the finding for a name that is the abbreviation entire.
 func wholeFinding(entry *Entry, name string) Finding {
-	advice := `Use "` + entry.Expansion + `" or a more descriptive name.`
+	var advice string
 	switch entry.Whole.Style {
 	case "advice":
 		advice = entry.Advice
 	case "plain":
-		advice = `Use "` + entry.Expansion + `".`
+		advice = useAdvice(entry.Expansions)
+	default:
+		advice = `Use ` + quoted(entry.Expansions) + ` or a more descriptive name.`
+		if len(entry.Expansions) > 1 {
+			advice = `Use ` + quoted(entry.Expansions) + `, whichever it means, or a more descriptive name.`
+		}
 	}
 	return abbreviatedIdentifierFinding(FormWhole, entry, name, advice)
 }
@@ -324,19 +379,22 @@ func prefixFinding(entry *Entry, name string) Finding {
 	if entry.Prefix.Style == "advice" {
 		return abbreviatedIdentifierFinding(FormPrefix, entry, entry.Abbreviation, entry.Advice)
 	}
-	suggestion := entry.Expansion + strings.TrimPrefix(name, entry.Abbreviation)
-	return abbreviatedIdentifierFinding(FormPrefix, entry, name, `Use "`+suggestion+`".`)
+	rest := strings.TrimPrefix(name, entry.Abbreviation)
+	suggestions := expandedNames(entry, func(expansion string) string { return expansion + rest })
+	return abbreviatedIdentifierFinding(FormPrefix, entry, name, useAdvice(suggestions))
 }
 
 // suffixFinding is the finding for a name that ends with the abbreviation capitalized.
 func suffixFinding(entry *Entry, name string, suffix string) Finding {
 	advice := entry.Suffix.Advice
 	if advice == "" {
-		replacement := entry.Suffix.Replacement
-		if replacement == "" {
-			replacement = Capitalize(entry.Expansion)
+		head := strings.TrimSuffix(name, suffix)
+		// A replacement is the one spelling the file chose for every meaning, so it stands alone.
+		suggestions := []string{head + entry.Suffix.Replacement}
+		if entry.Suffix.Replacement == "" {
+			suggestions = expandedNames(entry, func(expansion string) string { return head + Capitalize(expansion) })
 		}
-		advice = `Use "` + strings.TrimSuffix(name, suffix) + replacement + `".`
+		advice = useAdvice(suggestions)
 	}
 	return Finding{
 		Form:      FormSuffix,

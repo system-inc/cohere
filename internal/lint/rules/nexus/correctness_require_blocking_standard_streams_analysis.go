@@ -9,8 +9,8 @@ import (
 
 // correctnessRequireBlockingStandardStreamsAnalysis is one entry being read.
 type correctnessRequireBlockingStandardStreamsAnalysis struct {
-	ctx   rule.Context
-	index *correctnessRequireBlockingStandardStreamsIndex
+	ruleContext rule.Context
+	index       *correctnessRequireBlockingStandardStreamsIndex
 
 	// ordered is whether this file can reach the streams, so that where a block happens matters.
 	ordered bool
@@ -119,7 +119,7 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) callMayBlock(
 		// An element access, a call's result, or anything else the checker names no declaration for.
 		return true
 	}
-	return analysis.symbolMayBlock(analysis.ctx.TypeChecker.GetSymbolAtLocation(name), name)
+	return analysis.symbolMayBlock(analysis.ruleContext.TypeChecker.GetSymbolAtLocation(name), name)
 }
 
 // handsOnMayBlock says whether an argument is a function, or names one, that may block when the
@@ -130,9 +130,9 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) handsOnMayBlo
 	case ast.KindFunctionExpression, ast.KindArrowFunction:
 		return analysis.mayBlockWhenRun(unwrapped)
 	case ast.KindIdentifier:
-		symbol := analysis.ctx.TypeChecker.GetSymbolAtLocation(unwrapped)
+		symbol := analysis.ruleContext.TypeChecker.GetSymbolAtLocation(unwrapped)
 		if symbol != nil && symbol.Flags&ast.SymbolFlagsAlias != 0 {
-			symbol = analysis.ctx.TypeChecker.GetAliasedSymbol(symbol)
+			symbol = analysis.ruleContext.TypeChecker.GetAliasedSymbol(symbol)
 		}
 		if symbol == nil || symbol.Flags&ast.SymbolFlagsFunction == 0 {
 			return false
@@ -150,7 +150,7 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) symbolMayBloc
 ) bool {
 	resolved := symbol
 	if resolved != nil && resolved.Flags&ast.SymbolFlagsAlias != 0 {
-		resolved = analysis.ctx.TypeChecker.GetAliasedSymbol(resolved)
+		resolved = analysis.ruleContext.TypeChecker.GetAliasedSymbol(resolved)
 	}
 	if resolved == nil || len(resolved.Declarations) == 0 {
 		return true
@@ -246,12 +246,12 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) localFunction
 	default:
 		return nil
 	}
-	symbol := analysis.ctx.TypeChecker.GetSymbolAtLocation(unwrapped)
+	symbol := analysis.ruleContext.TypeChecker.GetSymbolAtLocation(unwrapped)
 	if symbol == nil {
 		return nil
 	}
 	for _, declaration := range symbol.Declarations {
-		if ast.GetSourceFileOfNode(declaration) != analysis.ctx.SourceFile {
+		if ast.GetSourceFileOfNode(declaration) != analysis.ruleContext.SourceFile {
 			continue
 		}
 		switch declaration.Kind {
@@ -382,7 +382,7 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) reachedExits(
 func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) analyzeRoot(
 	root *ast.Node,
 ) ([]*ast.Node, []*ast.Node) {
-	ruleContext := analysis.ctx
+	ruleContext := analysis.ruleContext
 	type event = correctnessRequireBlockingStandardStreamsEvent
 	type builder = control_flow_graph.Builder[event]
 	recorded := map[*ast.Node]bool{}

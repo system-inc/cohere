@@ -66,14 +66,33 @@ func parseWith(text string, construct func(in *input) *parser) (root *estree.Nod
 	return toEstree(parser.root, in), nil
 }
 
-// toEstree hands a node out as an estree.Node, offsets crossing from UTF-16 units to bytes.
+// toEstree hands a node out as an estree.Node, offsets crossing from UTF-16 units to bytes. raws and
+// source become the plain objects the css glue reads, built only here, where they are handed to the node;
+// the parser carries them typed.
 func toEstree(each *node, in *input) *estree.Node {
 	start, end := 0, 0
 	if each.source != nil && each.source.start != nil && each.source.end != nil {
 		start = in.byteOffset(each.source.start.offset)
 		end = in.byteOffset(each.source.end.offset)
 	}
-	result := estree.New(each.nodeType, start, end, []estree.Property{{Key: "raws", Value: rawsToRecord(each.raws)}})
+	// raws holds each raw as postcss does: text as a string, a flag as a boolean, and Parser.raw's pair as
+	// {raw, value}, with postcss-scss's scss beside them where it set one.
+	raws := make(estree.Record, len(each.raws))
+	for key, entry := range each.raws {
+		switch typed := entry.(type) {
+		case rawText:
+			raws[key] = estree.String(typed)
+		case rawFlag:
+			raws[key] = estree.Boolean(typed)
+		case *rawValue:
+			pair := estree.Record{"raw": estree.String(typed.raw), "value": estree.String(typed.value)}
+			if typed.hasScss {
+				pair["scss"] = estree.String(typed.scss)
+			}
+			raws[key] = pair
+		}
+	}
+	result := estree.New(each.nodeType, start, end, []estree.Property{{Key: "raws", Value: raws}})
 	for _, key := range each.keys {
 		switch key {
 		case "nodes":
@@ -83,7 +102,22 @@ func toEstree(each *node, in *input) *estree.Node {
 			}
 			result.Set("nodes", children)
 		case "source":
-			result.Set("source", sourceToRecord(each.source, in))
+			// Each position's offset is in bytes; its column stays in UTF-16 units, as postcss counts.
+			nodeSource := estree.Record{
+				"start": estree.Record{
+					"column": estree.Integer(each.source.start.column),
+					"line":   estree.Integer(each.source.start.line),
+					"offset": estree.Integer(in.byteOffset(each.source.start.offset)),
+				},
+			}
+			if each.source.end != nil {
+				nodeSource["end"] = estree.Record{
+					"column": estree.Integer(each.source.end.column),
+					"line":   estree.Integer(each.source.end.line),
+					"offset": estree.Integer(in.byteOffset(each.source.end.offset)),
+				}
+			}
+			result.Set("source", nodeSource)
 		case "selector":
 			result.Set("selector", estree.String(each.selector))
 		case "name":
@@ -101,51 +135,10 @@ func toEstree(each *node, in *input) *estree.Node {
 		case "isNested":
 			result.Set("isNested", estree.Boolean(each.isNested))
 		default:
+			// Invariant: keys holds only the names the node constructors list and the parser marks, and
+			// each of them has an arm here; Parse recovers the panic into an error.
 			panic("postcss: no field " + key)
 		}
 	}
 	return result
-}
-
-// rawsToRecord is the parser's raws as the node's: a string or a flag as itself, and a rawValue as its
-// {raw, value} object.
-func rawsToRecord(raws map[string]any) estree.Record {
-	result := make(estree.Record, len(raws))
-	for key, value := range raws {
-		switch typed := value.(type) {
-		case string:
-			result[key] = estree.String(typed)
-		case bool:
-			result[key] = estree.Boolean(typed)
-		case *rawValue:
-			rawRecord := estree.Record{"raw": estree.String(typed.raw), "value": estree.String(typed.value)}
-			if typed.hasScss {
-				rawRecord["scss"] = estree.String(typed.scss)
-			}
-			result[key] = rawRecord
-		default:
-			// Invariant: the parsers write a raw only as a string, a flag (inline, semicolon) or a rawValue;
-			// parseWith recovers the panic into an error.
-			panic(fmt.Sprintf("postcss: raws.%s is a %T", key, value))
-		}
-	}
-	return result
-}
-
-func sourceToRecord(each *source, in *input) estree.Record {
-	result := estree.Record{"start": positionToRecord(each.start, in)}
-	if each.end != nil {
-		result["end"] = positionToRecord(each.end, in)
-	}
-	return result
-}
-
-// positionToRecord is a position with its offset in bytes; column stays in UTF-16 units, as postcss
-// counts.
-func positionToRecord(each *position, in *input) estree.Record {
-	return estree.Record{
-		"column": estree.Integer(each.column),
-		"line":   estree.Integer(each.line),
-		"offset": estree.Integer(in.byteOffset(each.offset)),
-	}
 }

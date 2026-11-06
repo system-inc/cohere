@@ -168,7 +168,7 @@ var NoUnstableNestedComponents = rule.Rule[NoUnstableNestedComponentsOptions]{
 				}
 
 				state := &unstableNestedState{
-					ctx:                 ruleContext,
+					ruleContext:         ruleContext,
 					isComponent:         isComponent,
 					allowAsProps:        settings.AllowAsProperties,
 					propertyNameMatches: propertyNameMatches,

@@ -7,8 +7,8 @@ import (
 
 // noInvalidThisWalker carries the validity stack across the recursive walk.
 type noInvalidThisWalker struct {
-	ctx      rule.Context
-	settings noInvalidThisSettings
+	ruleContext rule.Context
+	settings    noInvalidThisSettings
 
 	// thisIsValid's top is the binding in force for the `this` being visited, and an empty stack
 	// means top level, where a module's `this` is `undefined` and therefore invalid.
@@ -28,7 +28,7 @@ func (walker *noInvalidThisWalker) walk(node *ast.Node) {
 	switch node.Kind {
 	case ast.KindThisKeyword:
 		if !walker.currentlyValid() {
-			walker.ctx.ReportNode(node, messageNoInvalidThisUnexpectedThis)
+			walker.ruleContext.ReportNode(node, messageNoInvalidThisUnexpectedThis)
 		}
 
 	case ast.KindComputedPropertyName:
@@ -47,7 +47,10 @@ func (walker *noInvalidThisWalker) walk(node *ast.Node) {
 		}
 
 	case ast.KindFunctionDeclaration, ast.KindFunctionExpression:
-		walker.thisIsValid = append(walker.thisIsValid, !thisIsDefaultBoundIn(walker.ctx, node, walker.settings))
+		walker.thisIsValid = append(
+			walker.thisIsValid,
+			!thisIsDefaultBoundIn(walker.ruleContext, node, walker.settings),
+		)
 		pushed = true
 
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor,

@@ -9,9 +9,9 @@ import (
 
 // complexityWalker carries the frame stack across the recursive walk.
 type complexityWalker struct {
-	ctx      rule.Context
-	settings ComplexitySettings
-	frames   []complexityFrame
+	ruleContext rule.Context
+	settings    ComplexitySettings
+	frames      []complexityFrame
 }
 
 func (walker *complexityWalker) walk(node *ast.Node) {
@@ -132,10 +132,10 @@ func (walker *complexityWalker) reportIfOverThreshold(frame complexityFrame) {
 	if frame.count <= walker.settings.Maximum {
 		return
 	}
-	name := complexityNameOf(walker.ctx, frame.node)
-	walker.ctx.Report(rule.Diagnostic{
-		Range:      complexityHeadRange(walker.ctx, frame.node),
-		SourceFile: walker.ctx.SourceFile,
+	name := complexityNameOf(walker.ruleContext, frame.node)
+	walker.ruleContext.Report(rule.Diagnostic{
+		Range:      complexityHeadRange(walker.ruleContext, frame.node),
+		SourceFile: walker.ruleContext.SourceFile,
 		Message: rule.Message{
 			Id: messageComplexityComplex.Id,
 			Description: fmt.Sprintf("%s has a complexity of %d. Maximum allowed is %d. %s",

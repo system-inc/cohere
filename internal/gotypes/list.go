@@ -76,9 +76,9 @@ var listings = struct {
 }{byRequest: map[string]*listingOnce{}}
 
 type listingOnce struct {
-	once    sync.Once
-	listing *listing
-	err     error
+	once      sync.Once
+	listing   *listing
+	listError error
 }
 
 // list runs go list once per directory, environment and patterns in this process: the tree does not change
@@ -95,8 +95,8 @@ func list(directory string, environment []string, patterns []string) (*listing, 
 		listings.byRequest[request] = entry
 	}
 	listings.Unlock()
-	entry.once.Do(func() { entry.listing, entry.err = runList(directory, environment, patterns) })
-	return entry.listing, entry.err
+	entry.once.Do(func() { entry.listing, entry.listError = runList(directory, environment, patterns) })
+	return entry.listing, entry.listError
 }
 
 func runList(directory string, environment []string, patterns []string) (*listing, error) {

@@ -11,4 +11,4 @@ type countingProgram struct {
 	fileSystem *countingFileSystem
 }
 
-func (program countingProgram) FS() vfs.FS { return program.fileSystem }
+func (program countingProgram) FileSystem() vfs.FS { return program.fileSystem }

@@ -26,6 +26,8 @@ import (
 // and is undefined forever); that cannot be ported, so it is an error here too, named for what it is.
 
 // errorReadingMode is the TypeError V8 throws on modesEntered[lastModeIndex].mode with lastModeIndex -1.
+//
+//cohere:ignore consistency-require-error-clause V8's TypeError text, which the oracle compares byte for byte
 var errorReadingMode = errors.New("Cannot read properties of undefined (reading 'mode')")
 
 // errorUnclosedUrl stands for the infinite loop on an unclosed `url(`, where the library never returns.
@@ -254,23 +256,10 @@ func parseMediaQuery(text string, index int) ([]*estree.Node, error) {
 			if node.nodes != nil {
 				result = append(
 					result,
-					newContainer(
-						estree.String(node.after),
-						estree.String(node.before),
-						node.nodeType,
-						node.value,
-						estree.Integer(node.sourceIndex),
-						node.nodes,
-					),
+					newContainer(node.after, node.before, node.nodeType, node.value, node.sourceIndex, node.nodes),
 				)
 			} else {
-				result = append(result, newNode(
-					estree.String(node.after),
-					estree.String(node.before),
-					node.nodeType,
-					node.value,
-					estree.Integer(node.sourceIndex),
-				))
+				result = append(result, newNode(node.after, node.before, node.nodeType, node.value, node.sourceIndex))
 			}
 			node = resetNode()
 			insideSomeValue = false
@@ -395,11 +384,11 @@ func parseMediaList(text string) ([]*estree.Node, error) {
 		}
 		// result.unshift into an empty result.
 		result = append([]*estree.Node{newNode(
-			estree.String(leadingWhitespace(text[index:])),
-			estree.String(urlBefore),
+			leadingWhitespace(text[index:]),
+			urlBefore,
 			"url",
 			trim(text[:index]),
-			estree.Integer(len(urlBefore)),
+			len(urlBefore),
 		)}, result...)
 		interimIndex = index
 	}
@@ -425,11 +414,11 @@ func parseMediaList(text string) ([]*estree.Node, error) {
 				return nil, parseMediaQueryError
 			}
 			result = append(result, newContainer(
-				estree.String(trailingWhitespace(mediaQueryString)),
-				estree.String(spaceBefore),
+				trailingWhitespace(mediaQueryString),
+				spaceBefore,
 				"media-query",
 				trim(mediaQueryString),
-				estree.Integer(interimIndex+len(spaceBefore)),
+				interimIndex+len(spaceBefore),
 				nodes,
 			))
 			interimIndex = index + 1
@@ -443,11 +432,11 @@ func parseMediaList(text string) ([]*estree.Node, error) {
 		return nil, parseMediaQueryError
 	}
 	result = append(result, newContainer(
-		estree.String(trailingWhitespace(mediaQueryString)),
-		estree.String(spaceBefore),
+		trailingWhitespace(mediaQueryString),
+		spaceBefore,
 		"media-query",
 		trim(mediaQueryString),
-		estree.Integer(interimIndex+len(spaceBefore)),
+		interimIndex+len(spaceBefore),
 		nodes,
 	))
 

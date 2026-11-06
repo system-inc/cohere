@@ -46,8 +46,8 @@ func parseJson(text string, allowComments bool) (*Node, []*Node, error) {
 		return nil, nil, parseValueError
 	}
 	reader.skipTrivia()
-	if reader.err != nil {
-		return nil, nil, reader.err
+	if reader.triviaError != nil {
+		return nil, nil, reader.triviaError
 	}
 	if reader.position < len(text) {
 		return nil, nil, reader.errorf("unexpected %q", reader.text[reader.position:min(reader.position+10, len(text))])

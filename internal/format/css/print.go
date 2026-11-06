@@ -18,6 +18,8 @@ import (
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
+var javaScriptWhitespaceCharacters = javaScriptWhitespaceClass[1 : len(javaScriptWhitespaceClass)-1]
+
 var (
 	declarationBeforePattern = regexp.MustCompile(`[` + javaScriptWhitespaceCharacters + `;]`)
 	importantPattern         = regexp.MustCompile(
@@ -28,12 +30,11 @@ var (
 	afterNameTwoNewlinesPattern = regexp.MustCompile(
 		`^` + javaScriptWhitespaceClass + `*\n` + javaScriptWhitespaceClass + `*\n`,
 	)
-	afterNameNewlinePattern        = regexp.MustCompile(`^` + javaScriptWhitespaceClass + `*\n`)
-	mediaFeatureSpacesPattern      = regexp.MustCompile(` +`)
-	mediaUrlOpeningPattern         = regexp.MustCompile(`(?i)^url\(` + javaScriptWhitespaceClass + `+`)
-	mediaUrlClosingPattern         = regexp.MustCompile(javaScriptWhitespaceClass + `+\)$`)
-	valueAllSpacePattern           = regexp.MustCompile(`^ *$`)
-	javaScriptWhitespaceCharacters = javaScriptWhitespaceClass[1 : len(javaScriptWhitespaceClass)-1]
+	afterNameNewlinePattern   = regexp.MustCompile(`^` + javaScriptWhitespaceClass + `*\n`)
+	mediaFeatureSpacesPattern = regexp.MustCompile(` +`)
+	mediaUrlOpeningPattern    = regexp.MustCompile(`(?i)^url\(` + javaScriptWhitespaceClass + `+`)
+	mediaUrlClosingPattern    = regexp.MustCompile(javaScriptWhitespaceClass + `+\)$`)
+	valueAllSpacePattern      = regexp.MustCompile(`^ *$`)
 )
 
 func genericPrint(path *astPath, options *printerOptions, print printFunc, _ *printing.NoArguments) doc.Doc {
@@ -69,7 +70,7 @@ func genericPrint(path *astPath, options *printerOptions, print printFunc, _ *pr
 		}
 
 	case "css-comment":
-		isInlineComment := node.Truthy("inline") || estree.IsTruthy(rawsOf(node)["inline"])
+		isInlineComment := node.Truthy("inline") || isRawTruthy(node, "inline")
 
 		text := sliceText(options.OriginalText, locStart(node), locEnd(node))
 
@@ -344,6 +345,8 @@ func genericPrint(path *astPath, options *printerOptions, print printFunc, _ *pr
 	}
 
 	// "front-matter" is handled in core, "value-comma" in `value-comma_group`.
+	// Invariant: every type the glue's parsers make has an arm above; one they missed is upstream's throw,
+	// which Format and PrintToDoc recover into their error, as upstream's caller catches it.
 	panic(fmt.Sprintf("Unexpected PostCSS node type: %q.", node.Type()))
 }
 
@@ -426,7 +429,7 @@ func printDeclaration(path *astPath, options *printerOptions, print printFunc) d
 			doc.Text("}"),
 		}
 	case isTemplatePropNode(node) &&
-		!estree.IsTruthy(rawsOf(parentNode)["semicolon"]) &&
+		!isRawTruthy(parentNode, "semicolon") &&
 		characterBefore(options.OriginalText, locEnd(node)) != ";":
 		ending = doc.Text("")
 	default:
@@ -452,7 +455,7 @@ func printAtRule(path *astPath, options *printerOptions, print printFunc) doc.Do
 	node := currentNode(path)
 	parentNode, _ := path.Parent()
 	isTemplatePlaceholderNodeWithoutSemiColon := isTemplatePlaceholderNode(node) &&
-		!estree.IsTruthy(rawsOf(parentNode)["semicolon"]) &&
+		!isRawTruthy(parentNode, "semicolon") &&
 		characterBefore(options.OriginalText, locEnd(node)) != ";"
 
 	// Less mixins, functions and variables are gated on options.parser === "less".

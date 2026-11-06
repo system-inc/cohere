@@ -15,8 +15,8 @@ import (
 // on entry and cleared on exit, so it guards a cycle without making a second, independent encounter
 // of the same name answer differently from the first.
 type jsxNoConstructedContextValuesStabilityWalk struct {
-	ctx    rule.Context
-	active map[*ast.Node]bool
+	ruleContext rule.Context
+	active      map[*ast.Node]bool
 
 	// render is the component whose provider is being judged.
 	render *ast.Node
@@ -25,7 +25,7 @@ type jsxNoConstructedContextValuesStabilityWalk struct {
 // isPrimitive reports whether every part of a node's type compares by value, so a fresh computation
 // of it is still equal to the last one.
 func (walk *jsxNoConstructedContextValuesStabilityWalk) isPrimitive(node *ast.Node) bool {
-	subjectType := walk.ctx.TypeChecker.GetTypeAtLocation(node)
+	subjectType := walk.ruleContext.TypeChecker.GetTypeAtLocation(node)
 	if subjectType == nil {
 		return false
 	}
@@ -164,7 +164,7 @@ func (walk *jsxNoConstructedContextValuesStabilityWalk) evaluate(
 			return walk.evaluate(binary.Right, scope, depth+1)
 		case ast.KindEqualsToken:
 			target := jsxNoConstructedContextValuesUnwrap(binary.Left)
-			local := jsxNoConstructedContextValuesLocalDeclaration(walk.ctx, target, scope)
+			local := jsxNoConstructedContextValuesLocalDeclaration(walk.ruleContext, target, scope)
 			if local == nil {
 				return jsxNoConstructedContextValuesUnknown
 			}
@@ -185,7 +185,7 @@ func (walk *jsxNoConstructedContextValuesStabilityWalk) evaluate(
 			reason := fmt.Sprintf("comes from a %s with no dependency list", name)
 			if inner.dependency != nil {
 				reason = fmt.Sprintf("comes from a %s whose own dependency %q %s",
-					name, jsxNoConstructedContextValuesDependencyText(walk.ctx, inner.dependency), inner.reason)
+					name, jsxNoConstructedContextValuesDependencyText(walk.ruleContext, inner.dependency), inner.reason)
 			}
 			return jsxNoConstructedContextValuesEvaluation{
 				fresh: &jsxNoConstructedContextValuesInstability{origin: inner.origin, reason: reason},
@@ -195,7 +195,7 @@ func (walk *jsxNoConstructedContextValuesStabilityWalk) evaluate(
 		return walk.callEvaluation(unwrapped, depth+1)
 
 	case ast.KindIdentifier:
-		declaration := jsxNoConstructedContextValuesRenderConst(walk.ctx, unwrapped, scope, walk.render)
+		declaration := jsxNoConstructedContextValuesRenderConst(walk.ruleContext, unwrapped, scope, walk.render)
 		if declaration == nil || walk.active[declaration] {
 			return jsxNoConstructedContextValuesUnknown
 		}
@@ -230,7 +230,7 @@ func (walk *jsxNoConstructedContextValuesStabilityWalk) callEvaluation(
 	call *ast.Node,
 	depth int,
 ) jsxNoConstructedContextValuesEvaluation {
-	signature := walk.ctx.TypeChecker.GetResolvedSignature(call)
+	signature := walk.ruleContext.TypeChecker.GetResolvedSignature(call)
 	if signature == nil {
 		return jsxNoConstructedContextValuesUnknown
 	}
@@ -344,7 +344,7 @@ func (walk *jsxNoConstructedContextValuesStabilityWalk) anyEscapes(holders []*as
 		if name == nil {
 			return true
 		}
-		symbol := walk.ctx.TypeChecker.GetSymbolAtLocation(name)
+		symbol := walk.ruleContext.TypeChecker.GetSymbolAtLocation(name)
 		if symbol == nil {
 			return true
 		}
@@ -355,9 +355,9 @@ func (walk *jsxNoConstructedContextValuesStabilityWalk) anyEscapes(holders []*as
 				return true
 			}
 			if node.Kind == ast.KindIdentifier && node != name {
-				reference := walk.ctx.TypeChecker.GetSymbolAtLocation(node)
+				reference := walk.ruleContext.TypeChecker.GetSymbolAtLocation(node)
 				if node.Parent != nil && node.Parent.Kind == ast.KindShorthandPropertyAssignment {
-					reference = walk.ctx.TypeChecker.GetShorthandAssignmentValueSymbol(node.Parent)
+					reference = walk.ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(node.Parent)
 				}
 				if reference == symbol && !jsxNoConstructedContextValuesStaysHome(node, scope, render) {
 					escaped = true

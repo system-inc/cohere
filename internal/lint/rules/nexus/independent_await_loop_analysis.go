@@ -11,9 +11,9 @@ import (
 
 // independentAwaitLoopAnalysis holds one loop and what the walks over its body found.
 type independentAwaitLoopAnalysis struct {
-	ctx  rule.Context
-	loop *ast.Node
-	body *ast.Node
+	ruleContext rule.Context
+	loop        *ast.Node
+	body        *ast.Node
 
 	// collection is the expression the loop iterates: the for-of iterable, or `xs` in `xs.length`.
 	collection *ast.Node
@@ -207,12 +207,12 @@ func (analysis *independentAwaitLoopAnalysis) calleeMakesOrderedCall(callee *ast
 	default:
 		return false
 	}
-	symbol := analysis.ctx.TypeChecker.GetSymbolAtLocation(name)
+	symbol := analysis.ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if symbol == nil {
 		return false
 	}
 	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
-		symbol = checker.SkipAlias(symbol, analysis.ctx.TypeChecker)
+		symbol = checker.SkipAlias(symbol, analysis.ruleContext.TypeChecker)
 		if symbol == nil {
 			return false
 		}
@@ -264,9 +264,9 @@ func (analysis *independentAwaitLoopAnalysis) bodyMakesOrderedCall(body *ast.Nod
 func (analysis *independentAwaitLoopAnalysis) symbolOf(identifier *ast.Node) *ast.Symbol {
 	if identifier.Parent != nil && identifier.Parent.Kind == ast.KindShorthandPropertyAssignment &&
 		identifier.Parent.AsShorthandPropertyAssignment().Name() == identifier {
-		return analysis.ctx.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent)
+		return analysis.ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent)
 	}
-	return analysis.ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	return analysis.ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 }
 
 // isOuter answers whether a binding outlives one iteration: no declaration of it lies inside the
@@ -276,7 +276,7 @@ func (analysis *independentAwaitLoopAnalysis) isOuter(symbol *ast.Symbol) bool {
 		return true
 	}
 	for _, declaration := range symbol.Declarations {
-		if ast.GetSourceFileOfNode(declaration) == analysis.ctx.SourceFile &&
+		if ast.GetSourceFileOfNode(declaration) == analysis.ruleContext.SourceFile &&
 			declaration.Pos() >= analysis.loop.Pos() && declaration.End() <= analysis.loop.End() {
 			return false
 		}
@@ -486,7 +486,7 @@ func (analysis *independentAwaitLoopAnalysis) computeTaint() {
 				return
 			}
 			if node.Kind == ast.KindIdentifier {
-				if symbol := analysis.ctx.TypeChecker.GetSymbolAtLocation(
+				if symbol := analysis.ruleContext.TypeChecker.GetSymbolAtLocation(
 					node,
 				); symbol != nil && !analysis.taintedSymbols[symbol] {
 					analysis.taintedSymbols[symbol] = true

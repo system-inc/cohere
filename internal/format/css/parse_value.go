@@ -66,7 +66,7 @@ func parseValueNode(valueNode *estree.Node, walk valueRootWalk, options *parseOp
 			)
 			parsedSelector := parseSelector(selector)
 			parsedSelector.Set("sourceIndex", estree.Integer(intProperty(group.Child("open"), "sourceIndex")+1))
-			raws := rawsIn(parsedSelector)
+			raws, _ := parsedSelector.Get("raws").(estree.Record)
 			if raws == nil {
 				raws = estree.Record{}
 				parsedSelector.Set("raws", raws)
@@ -116,6 +116,8 @@ func parseValueNode(valueNode *estree.Node, walk valueRootWalk, options *parseOp
 
 			/* c8 ignore next 3 */
 			if len(commaGroupStack) == 1 {
+				// Invariant: this is upstream's throw, not a crash: parseCatching recovers every
+				// javaScriptError into the parse's error, as upstream's caller catches it.
 				panic(javaScriptError{message: "Unbalanced parenthesis"})
 			}
 

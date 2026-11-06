@@ -30,7 +30,11 @@ import (
 // thrownError is what a throw in upstream becomes: input.error's new Error(message), or a TypeError.
 type thrownError struct{ message string }
 
-func throwError(message string) { panic(thrownError{message}) }
+func throwError(message string) {
+	// Invariant: every throw happens under Parse, whose deferred recover turns a thrownError into the
+	// returned error, so this panic never leaves the package.
+	panic(thrownError{message})
+}
 
 // throwTypeError is V8's TypeError for reading key on undefined.
 func throwTypeError(key string) {
@@ -92,25 +96,34 @@ func (parser *parser) attribute() {
 		// end: {line: this.currToken[2], ...} when the brackets closed inside a string token.
 		throwTypeError("2")
 	}
-	attributeProperties := []estree.Property{
-		{Key: "operator", Value: partAt(parts, 1)},
-		{Key: "value", Value: partAt(parts, 2)},
-		{
+	// operator: parts[1], value: parts[2], undefined both when the text has no operator, where
+	// splitAttribute returns [text] alone.
+	attributeProperties := []estree.Property{{Key: "operator"}, {Key: "value"}}
+	if len(parts) > 2 {
+		attributeProperties = []estree.Property{
+			{Key: "operator", Value: estree.String(parts[1])},
+			{Key: "value", Value: estree.String(parts[2])},
+		}
+	}
+	attributeProperties = append(attributeProperties,
+		estree.Property{
 			Key:   "source",
 			Value: source(startingToken.at(2), startingToken.at(3), parser.currToken().at(2), parser.currToken().at(3)),
 		},
-		{Key: "sourceIndex", Value: estree.Integer(startingToken.at(4))},
-	}
+		estree.Property{Key: "sourceIndex", Value: estree.Integer(startingToken.at(4))},
+	)
 	if len(namespace) > 1 {
-		var namespaceZero estree.Value = estree.String(namespace[0])
-		if namespace[0] == "" {
-			namespaceZero = estree.Boolean(true)
-		}
 		attributeProperties = append(
 			attributeProperties,
 			estree.Property{Key: "attribute", Value: estree.String(parser.parseValue(namespace[2]))},
-			estree.Property{Key: "namespace", Value: parser.parseNamespace(namespaceZero)},
 		)
+		// namespace[0] || true: a bar with nothing before it is namespace true.
+		prefix := parser.parseNamespace(namespacePrefix{text: namespace[0], bare: namespace[0] == ""})
+		namespaceProperty := estree.Property{Key: "namespace", Value: estree.String(prefix.text)}
+		if prefix.bare {
+			namespaceProperty.Value = estree.Boolean(true)
+		}
+		attributeProperties = append(attributeProperties, namespaceProperty)
 	} else {
 		attributeProperties = append(
 			attributeProperties,
@@ -119,23 +132,23 @@ func (parser *parser) attribute() {
 	}
 	attr := newSelectorNode(typeAttribute, attributeProperties)
 
-	if partTwo, _ := partAt(parts, 2).(estree.String); partTwo != "" {
-		insensitive := splitInsensitive(string(partTwo))
+	if len(parts) > 2 && parts[2] != "" {
+		insensitive := splitInsensitive(parts[2])
 		trimmedValue := jsTrim(insensitive[0])
 		attr.Set("value", estree.String(insensitive[0]))
 		if len(insensitive) > 1 && insensitive[1] != "" {
 			attr.Set("insensitive", estree.Boolean(true))
-			rawsOf(attr)["insensitive"] = estree.String(insensitive[1])
+			setRaw(attr, "insensitive", insensitive[1])
 		}
 		quoted := strings.HasPrefix(trimmedValue, "'") || strings.HasPrefix(trimmedValue, "\"")
 		attr.Set("quoted", estree.Boolean(quoted))
 		if attr.Bool("quoted") {
-			rawsOf(attr)["unquoted"] = estree.String(jsSliceOneFromEach(trimmedValue))
+			setRaw(attr, "unquoted", jsSliceOneFromEach(trimmedValue))
 		} else {
-			rawsOf(attr)["unquoted"] = estree.String(trimmedValue)
+			setRaw(attr, "unquoted", trimmedValue)
 		}
 	}
-	parser.newNode(attr, nil)
+	parser.newNode(attr, namespacePrefix{})
 	parser.position++
 }
 
@@ -164,14 +177,14 @@ func (parser *parser) combinator() {
 		parser.currToken() != nil &&
 		(parser.currToken().kind == "space" || parser.currToken().kind == "combinator") {
 		if parser.nextToken() != nil && parser.nextToken().kind == "combinator" {
-			spacesOf(node)["before"] = estree.String(parser.parseSpace(parser.currToken().value, ""))
-			sourceEdgeOf(node, "start")["line"] = estree.Integer(parser.nextToken().at(2))
-			sourceEdgeOf(node, "start")["column"] = estree.Integer(parser.nextToken().at(3))
-			sourceEdgeOf(node, "end")["column"] = estree.Integer(parser.nextToken().at(3))
-			sourceEdgeOf(node, "end")["line"] = estree.Integer(parser.nextToken().at(2))
+			setSpace(node, "before", parser.parseSpace(parser.currToken().value, ""))
+			setSourceEdge(node, "start", "line", parser.nextToken().at(2))
+			setSourceEdge(node, "start", "column", parser.nextToken().at(3))
+			setSourceEdge(node, "end", "column", parser.nextToken().at(3))
+			setSourceEdge(node, "end", "line", parser.nextToken().at(2))
 			node.Set("sourceIndex", estree.Integer(parser.nextToken().at(4)))
 		} else if parser.previousToken() != nil && parser.previousToken().kind == "combinator" {
-			spacesOf(node)["after"] = estree.String(parser.parseSpace(parser.currToken().value, ""))
+			setSpace(node, "after", parser.parseSpace(parser.currToken().value, ""))
 		} else if parser.currToken().kind == "combinator" {
 			node.Set("value", estree.String(parser.currToken().value))
 		} else if parser.currToken().kind == "space" {
@@ -179,7 +192,7 @@ func (parser *parser) combinator() {
 		}
 		parser.position++
 	}
-	parser.newNode(node, nil)
+	parser.newNode(node, namespacePrefix{})
 }
 
 func (parser *parser) comma() {
@@ -211,7 +224,7 @@ func (parser *parser) comment() {
 			{Key: "sourceIndex", Value: estree.Integer(parser.currToken().at(6))},
 		},
 	)
-	parser.newNode(node, nil)
+	parser.newNode(node, namespacePrefix{})
 	parser.position++
 }
 
@@ -233,9 +246,9 @@ func (parser *parser) missingSquareBracket() {
 
 func (parser *parser) namespace() {
 	// this.prevToken && this.prevToken[1] || true: a token's value is never empty.
-	var before estree.Value = estree.Boolean(true)
+	before := namespacePrefix{bare: true}
 	if parser.previousToken() != nil && parser.previousToken().value != "" {
-		before = estree.String(parser.previousToken().value)
+		before = namespacePrefix{text: parser.previousToken().value}
 	}
 	if parser.nextToken() == nil {
 		throwTypeError("0")
@@ -250,6 +263,8 @@ func (parser *parser) namespace() {
 		return
 	}
 	// Upstream returns here without consuming the bar, and every caller comes straight back to it.
+	// Invariant: Parse's deferred recover turns loopsForever into ErrLoopsForever, so this panic never
+	// leaves the package.
 	panic(loopsForever{})
 }
 
@@ -269,7 +284,7 @@ func (parser *parser) nesting() {
 			},
 			{Key: "sourceIndex", Value: estree.Integer(parser.currToken().at(4))},
 		},
-	), nil)
+	), namespacePrefix{})
 	parser.position++
 }
 
@@ -292,9 +307,8 @@ func (parser *parser) parentheses() {
 			if balanced != 0 {
 				parser.parse(false)
 			} else {
-				end := sourceEdgeOf(parser.parents[selector], "end")
-				end["line"] = estree.Integer(parser.currToken().at(2))
-				end["column"] = estree.Integer(parser.currToken().at(3))
+				setSourceEdge(parser.parents[selector], "end", "line", parser.currToken().at(2))
+				setSourceEdge(parser.parents[selector], "end", "column", parser.currToken().at(3))
 				parser.position++
 			}
 		}
@@ -338,21 +352,26 @@ func (parser *parser) pseudo() {
 		return
 	}
 	if parser.currToken().kind == "word" {
-		parser.splitWord(nil, func(first string, length int) {
+		parser.splitWord(namespacePrefix{}, func(first string, length int) {
 			pseudoString += first
+			// currToken may be a space token here (see token.loose): its [4] is its pos, and its [5] is
+			// undefined.
+			endColumn, hasEndColumn := parser.currToken().loose(5)
+			pseudoSource := sourceRange{
+				startLine:          startingToken.at(2),
+				startColumn:        startingToken.at(3),
+				endLine:            parser.currToken().at(4),
+				endColumn:          endColumn,
+				endColumnUndefined: !hasEndColumn,
+			}
 			pseudo := newSelectorNode(typePseudo,
 				[]estree.Property{
 					{Key: "value", Value: estree.String(pseudoString)},
-					{Key: "source", Value: looseSource(
-						estree.Integer(startingToken.at(2)),
-						estree.Integer(startingToken.at(3)),
-						parser.currToken().loose(4),
-						parser.currToken().loose(5),
-					)},
+					{Key: "source", Value: sourceRecord(pseudoSource)},
 					{Key: "sourceIndex", Value: estree.Integer(startingToken.at(4))},
 				},
 			)
-			parser.newNode(pseudo, nil)
+			parser.newNode(pseudo, namespacePrefix{})
 			if length > 1 && parser.nextToken() != nil && parser.nextToken().kind == "(" {
 				parser.error("Misplaced parenthesis.")
 			}
@@ -375,7 +394,7 @@ func (parser *parser) space() {
 		if last == nil {
 			throwTypeError("spaces")
 		}
-		spacesOf(last)["after"] = estree.String(parser.parseSpace(token.value, ""))
+		setSpace(last, "after", parser.parseSpace(token.value, ""))
 		parser.position++
 	} else {
 		parser.combinator()
@@ -390,11 +409,11 @@ func (parser *parser) string() {
 			{Key: "source", Value: source(token.at(2), token.at(3), token.at(4), token.at(5))},
 			{Key: "sourceIndex", Value: estree.Integer(token.at(6))},
 		},
-	), nil)
+	), namespacePrefix{})
 	parser.position++
 }
 
-func (parser *parser) universal(namespace estree.Value) {
+func (parser *parser) universal(namespace namespacePrefix) {
 	nextToken := parser.nextToken()
 	if nextToken != nil && nextToken.value == "|" {
 		parser.position++
@@ -420,7 +439,7 @@ func (parser *parser) universal(namespace estree.Value) {
 	parser.position++
 }
 
-func (parser *parser) splitWord(namespace estree.Value, firstCallback func(first string, length int)) {
+func (parser *parser) splitWord(namespace namespacePrefix, firstCallback func(first string, length int)) {
 	nextToken := parser.nextToken()
 	word := parser.currToken().value
 	for nextToken != nil && nextToken.kind == "word" {
@@ -462,20 +481,18 @@ func (parser *parser) splitWord(namespace estree.Value, firstCallback func(first
 			firstCallback(unitsToWtf8(value), len(indices))
 			continue
 		}
+		// currToken may be a space token here (see token.loose), which has a [2], [3] and [4] (its pos) and
+		// no [6]: undefined plus a number is NaN, which upstream stores as the sourceIndex like any number.
 		currToken := parser.currToken()
-		nodeSource := looseSource(
-			currToken.loose(2),
-			jsAdd(currToken.loose(3), ind),
-			currToken.loose(4),
-			jsAdd(currToken.loose(3), index-1),
-		)
+		nodeSource := source(currToken.at(2), currToken.at(3)+ind, currToken.at(4), currToken.at(3)+index-1)
+		position, hasPosition := currToken.loose(6)
 		var node *estree.Node
 		if containsInt(hasClass, ind) {
 			node = newSelectorNode(typeClass,
 				[]estree.Property{
 					{Key: "value", Value: estree.String(unitsToWtf8(value[1:]))},
 					{Key: "source", Value: nodeSource},
-					{Key: "sourceIndex", Value: jsAdd(currToken.loose(6), indices[indexIndex])},
+					{Key: "sourceIndex", Value: estree.Integer(position + indices[indexIndex])},
 				},
 			)
 		} else if containsInt(hasId, ind) {
@@ -483,7 +500,7 @@ func (parser *parser) splitWord(namespace estree.Value, firstCallback func(first
 				[]estree.Property{
 					{Key: "value", Value: estree.String(unitsToWtf8(value[1:]))},
 					{Key: "source", Value: nodeSource},
-					{Key: "sourceIndex", Value: jsAdd(currToken.loose(6), indices[indexIndex])},
+					{Key: "sourceIndex", Value: estree.Integer(position + indices[indexIndex])},
 				},
 			)
 		} else {
@@ -491,16 +508,19 @@ func (parser *parser) splitWord(namespace estree.Value, firstCallback func(first
 				[]estree.Property{
 					{Key: "value", Value: estree.String(unitsToWtf8(value))},
 					{Key: "source", Value: nodeSource},
-					{Key: "sourceIndex", Value: jsAdd(currToken.loose(6), indices[indexIndex])},
+					{Key: "sourceIndex", Value: estree.Integer(position + indices[indexIndex])},
 				},
 			)
+		}
+		if !hasPosition {
+			node.Set("sourceIndex", estree.Number(math.NaN()))
 		}
 		parser.newNode(node, namespace)
 	}
 	parser.position++
 }
 
-func (parser *parser) word(namespace estree.Value) {
+func (parser *parser) word(namespace namespacePrefix) {
 	nextToken := parser.nextToken()
 	if nextToken != nil && nextToken.value == "|" {
 		parser.position++
@@ -534,7 +554,7 @@ func (parser *parser) parse(throwOnParenthesis bool) {
 	case "]":
 		parser.missingSquareBracket()
 	case "at-word", "word":
-		parser.word(nil)
+		parser.word(namespacePrefix{})
 	case ":":
 		parser.pseudo()
 	case ";":
@@ -542,7 +562,7 @@ func (parser *parser) parse(throwOnParenthesis bool) {
 	case ",":
 		parser.comma()
 	case "*":
-		parser.universal(nil)
+		parser.universal(namespacePrefix{})
 	case "&":
 		parser.nesting()
 	case "combinator":
@@ -557,7 +577,7 @@ func (parser *parser) parse(throwOnParenthesis bool) {
  */
 
 // parseNamespace returns namespace: its lossy trim never runs (see the file comment).
-func (parser *parser) parseNamespace(namespace estree.Value) estree.Value {
+func (parser *parser) parseNamespace(namespace namespacePrefix) namespacePrefix {
 	return namespace
 }
 
@@ -576,26 +596,20 @@ func (parser *parser) parseParenthesisToken(token *token) string {
 	return token.value
 }
 
-func (parser *parser) newNode(node *estree.Node, namespace estree.Value) *estree.Node {
-	if estree.IsTruthy(namespace) {
-		node.Set("namespace", parser.parseNamespace(namespace))
+func (parser *parser) newNode(node *estree.Node, namespace namespacePrefix) *estree.Node {
+	if namespace.present() {
+		prefix := parser.parseNamespace(namespace)
+		if prefix.bare {
+			node.Set("namespace", estree.Boolean(true))
+		} else {
+			node.Set("namespace", estree.String(prefix.text))
+		}
 	}
 	if parser.spaces != "" {
-		spacesOf(node)["before"] = estree.String(parser.spaces)
+		setSpace(node, "before", parser.spaces)
 		parser.spaces = ""
 	}
 	return parser.append(parser.current, node)
-}
-
-// sourceEdgeOf is node.source.start or node.source.end, the {line, column} object the parser moves.
-func sourceEdgeOf(node *estree.Node, edge string) estree.Record {
-	position, isMap := sourceOf(node)[edge].(estree.Record)
-	if !isMap {
-		// Invariant: the parser moves an edge only on a combinator or pseudo it built with source(),
-		// which sets both edges to a map; Parse recovers the panic into an error.
-		panic("css selector parser: node.source." + edge + " is not a {line, column} object")
-	}
-	return position
 }
 
 // currToken, nextToken and prevToken are upstream's getters, nil past either end of the tokens.
@@ -660,14 +674,6 @@ func splitInsensitive(text string) []string {
 	return []string{text[:start], text[start:], ""}
 }
 
-// partAt is parts[index], nil where JavaScript reads undefined past the end.
-func partAt(parts []string, index int) estree.Value {
-	if index >= len(parts) {
-		return nil
-	}
-	return estree.String(parts[index])
-}
-
 // jsIsWhitespace is JavaScript's \s and String.prototype.trim's set: WhiteSpace and LineTerminator.
 func jsIsWhitespace(character rune) bool {
 	switch character {
@@ -690,15 +696,6 @@ func jsSliceOneFromEach(text string) string {
 		return ""
 	}
 	return unitsToWtf8(units[1 : len(units)-1])
-}
-
-// jsAdd is `left + right` where left is a token field that may be undefined: undefined plus a number
-// is NaN, which upstream stores as a sourceIndex or column like any number.
-func jsAdd(left estree.Value, right int) estree.Value {
-	if value, isInt := left.(estree.Integer); isInt {
-		return value + estree.Integer(right)
-	}
-	return estree.Number(math.NaN())
 }
 
 // jsStringOf is the string a value becomes in `value + '('`: an undefined value reads "undefined".

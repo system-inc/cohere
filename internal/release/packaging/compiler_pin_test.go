@@ -25,10 +25,10 @@ type compilerFixture struct {
 // Building it takes eleven git commands, about 8s under load, and every test here wants the same module, so
 // it is built once and each test reads it or a copy of it. TestMain removes it.
 var compilerTemplate struct {
-	once    sync.Once
-	root    string
-	fixture compilerFixture
-	err     error
+	once       sync.Once
+	root       string
+	fixture    compilerFixture
+	buildError error
 }
 
 // TestMain removes the compiler template once every test is done with it.
@@ -47,13 +47,13 @@ func sharedModuleWithCompiler(test *testing.T) compilerFixture {
 	test.Helper()
 
 	compilerTemplate.once.Do(func() {
-		compilerTemplate.root, compilerTemplate.err = os.MkdirTemp("", "cohere-compiler-pin-")
-		if compilerTemplate.err == nil {
-			compilerTemplate.fixture, compilerTemplate.err = buildModuleWithCompiler(compilerTemplate.root)
+		compilerTemplate.root, compilerTemplate.buildError = os.MkdirTemp("", "cohere-compiler-pin-")
+		if compilerTemplate.buildError == nil {
+			compilerTemplate.fixture, compilerTemplate.buildError = buildModuleWithCompiler(compilerTemplate.root)
 		}
 	})
-	if compilerTemplate.err != nil {
-		test.Fatalf("building the compiler fixture: %v", compilerTemplate.err)
+	if compilerTemplate.buildError != nil {
+		test.Fatalf("building the compiler fixture: %v", compilerTemplate.buildError)
 	}
 	return compilerTemplate.fixture
 }

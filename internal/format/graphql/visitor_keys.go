@@ -78,6 +78,8 @@ var visitorKeys = map[string][]string{
 func getVisitorKeys(node *estree.Node) []string {
 	keys, known := visitorKeys[node.Type()]
 	if !known {
+		// Invariant: visitorKeys lists every kind the parser builds, and the core asks only about nodes of
+		// the tree; Format and PrintToDoc recover the panic into their error.
 		panic(fmt.Sprintf("Missing visitor keys for '%s'.", node.Type()))
 	}
 	return keys

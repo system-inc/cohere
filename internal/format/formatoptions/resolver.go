@@ -27,7 +27,7 @@ func (resolver *Resolver) Resolve(directory string) (Resolution, error) {
 		return Resolution{}, absolutePathError
 	}
 	answer := resolver.resolve(absolute)
-	return answer.resolution, answer.err
+	return answer.resolution, answer.resolveError
 }
 
 func (resolver *Resolver) resolve(directory string) resolved {
@@ -51,26 +51,30 @@ func (resolver *Resolver) resolve(directory string) resolved {
 func (resolver *Resolver) resolveHere(directory string) resolved {
 	leftover, found, prettierConfigurationInError := prettierConfigIn(directory)
 	if prettierConfigurationInError != nil {
-		return resolved{err: prettierConfigurationInError}
+		return resolved{resolveError: prettierConfigurationInError}
 	}
 	if found {
 		return resolved{
-			err: fmt.Errorf("%s: %w; delete it, since cohere reads format options only from a \"format\" block in %s",
-				leftover, ErrPrettierConfigRemains, SettingsFileName),
+			resolveError: fmt.Errorf(
+				"%s: %w; delete it, since cohere reads format options only from a \"format\" block in %s",
+				leftover,
+				ErrPrettierConfigRemains,
+				SettingsFileName,
+			),
 		}
 	}
 
 	path := filepath.Join(directory, SettingsFileName)
 	if _, statError := os.Stat(path); statError == nil {
 		resolution, chainOfError := chainOf(path)
-		return resolved{resolution: resolution, err: chainOfError}
+		return resolved{resolution: resolution, resolveError: chainOfError}
 	}
 
 	parent := filepath.Dir(directory)
 	if parent == directory {
 		// No settings anywhere above: zero config, which is the house stack and its format.
 		resolution, houseResolutionError := houseResolution()
-		return resolved{resolution: resolution, err: houseResolutionError}
+		return resolved{resolution: resolution, resolveError: houseResolutionError}
 	}
 	return resolver.resolve(parent)
 }

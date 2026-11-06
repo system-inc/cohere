@@ -9,7 +9,7 @@ import (
 
 // logicalAssignmentState carries the two things every judgment needs.
 type logicalAssignmentState struct {
-	ctx rule.Context
+	ruleContext rule.Context
 	// isStrict is the file-level answer to upstream's `sourceCode.getScope(ast).isStrict`, which is
 	// consulted only to decide whether a `with` block can be in play.
 	isStrict bool
@@ -55,14 +55,14 @@ func (state *logicalAssignmentState) isUndefined(expression *ast.Node) bool {
 // is the answer for source that does not shadow it, which is nearly all source, so the untyped
 // harness agrees with the typed one on everything except a deliberate shadow.
 func (state *logicalAssignmentState) isShadowedInThisFile(identifier *ast.Node) bool {
-	if state.ctx.TypeChecker == nil {
+	if state.ruleContext.TypeChecker == nil {
 		return false
 	}
-	symbol := state.ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	symbol := state.ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return false
 	}
-	return rule.IsDeclaredInFile(state.ctx.SourceFile, symbol)
+	return rule.IsDeclaredInFile(state.ruleContext.SourceFile, symbol)
 }
 
 // cannotBeGetter is upstream's function of the same name: is this reference safe to read once
@@ -144,14 +144,14 @@ func (state *logicalAssignmentState) report(
 		return
 	}
 	if len(fixes) == 0 {
-		state.ctx.ReportNode(node, message)
+		state.ruleContext.ReportNode(node, message)
 		return
 	}
 	if shouldBeFixed {
-		state.ctx.ReportNodeWithFixes(node, message, fixes...)
+		state.ruleContext.ReportNodeWithFixes(node, message, fixes...)
 		return
 	}
-	state.ctx.ReportNodeWithSuggestions(node, message,
+	state.ruleContext.ReportNodeWithSuggestions(node, message,
 		rule.Suggestion{Message: suggestionMessage, Fixes: fixes})
 }
 
@@ -191,7 +191,7 @@ func (state *logicalAssignmentState) checkAssignment(node *ast.Node) {
 		return
 	}
 
-	leftOperand := logicalAssignmentLeftmostOperand(state.ctx.SourceFile, right)
+	leftOperand := logicalAssignmentLeftmostOperand(state.ruleContext.SourceFile, right)
 	if !logicalAssignmentIsSameReference(assignment.Left, leftOperand) {
 		return
 	}
@@ -214,8 +214,8 @@ func (state *logicalAssignmentState) assignmentFix(
 	assignment *ast.BinaryExpression,
 	leftOperand *ast.Node,
 ) []rule.Fix {
-	nodeRange := rule.TokenRange(state.ctx.SourceFile, node)
-	if logicalAssignmentCommentsInside(state.ctx, nodeRange.Pos(), node.End()) {
+	nodeRange := rule.TokenRange(state.ruleContext.SourceFile, node)
+	if logicalAssignmentCommentsInside(state.ruleContext, nodeRange.Pos(), node.End()) {
 		return nil
 	}
 
@@ -232,7 +232,7 @@ func (state *logicalAssignmentState) assignmentFix(
 		return nil
 	}
 
-	equalsRange := rule.TokenRange(state.ctx.SourceFile, assignment.OperatorToken)
+	equalsRange := rule.TokenRange(state.ruleContext.SourceFile, assignment.OperatorToken)
 	rightOperand := logical.AsBinaryExpression().Right
 	if rightOperand == nil {
 		return nil
@@ -248,8 +248,8 @@ func (state *logicalAssignmentState) assignmentFix(
 		// it. The right operand's own leading trivia is preserved by ending at its token start
 		// rather than at its node position.
 		rule.RemoveRange(core.NewTextRange(
-			rule.TokenRange(state.ctx.SourceFile, logical).Pos(),
-			rule.TokenRange(state.ctx.SourceFile, rightOperand).Pos())),
+			rule.TokenRange(state.ruleContext.SourceFile, logical).Pos(),
+			rule.TokenRange(state.ruleContext.SourceFile, rightOperand).Pos())),
 	}
 }
 
@@ -304,20 +304,20 @@ func (state *logicalAssignmentState) checkLogical(node *ast.Node) {
 // A fourth edit wraps the result in parentheses when the surrounding expression binds tighter than
 // an assignment, because `a || (a = b)` is an operand where `a ||= b` would not be one.
 func (state *logicalAssignmentState) logicalFix(node *ast.Node, inner *ast.Node) []rule.Fix {
-	nodeRange := rule.TokenRange(state.ctx.SourceFile, node)
-	if logicalAssignmentCommentsInside(state.ctx, nodeRange.Pos(), node.End()) {
+	nodeRange := rule.TokenRange(state.ruleContext.SourceFile, node)
+	if logicalAssignmentCommentsInside(state.ruleContext, nodeRange.Pos(), node.End()) {
 		return nil
 	}
 
 	assignment := inner.AsBinaryExpression()
-	operatorRange := rule.TokenRange(state.ctx.SourceFile, assignment.OperatorToken)
+	operatorRange := rule.TokenRange(state.ruleContext.SourceFile, assignment.OperatorToken)
 	logicalOperator := node.AsBinaryExpression().OperatorToken
 	operatorText, known := logicalAssignmentShorthand[logicalOperator.Kind]
 	if !known {
 		return nil
 	}
 
-	innerRange := rule.TokenRange(state.ctx.SourceFile, inner)
+	innerRange := rule.TokenRange(state.ruleContext.SourceFile, inner)
 	fixes := []rule.Fix{
 		rule.RemoveRange(core.NewTextRange(nodeRange.Pos(), innerRange.Pos())),
 		rule.RemoveRange(core.NewTextRange(inner.End(), node.End())),
@@ -328,7 +328,7 @@ func (state *logicalAssignmentState) logicalFix(node *ast.Node, inner *ast.Node)
 	// Upstream's condition is `!isParenthesised(logical) && requiresOuterParenthesis`, and both
 	// halves are needed. The token check is what makes a sole call argument keep its bare form.
 	if !logicalAssignmentIsSurroundedByParentheses(
-		state.ctx.SourceFile.Text(), nodeRange.Pos(), node.End()) &&
+		state.ruleContext.SourceFile.Text(), nodeRange.Pos(), node.End()) &&
 		state.logicalFixNeedsOuterParentheses(node) {
 		fixes = append(fixes,
 			rule.ReplaceRange(core.NewTextRange(nodeRange.Pos(), nodeRange.Pos()), "("),
@@ -593,19 +593,19 @@ func (state *logicalAssignmentState) ifFix(
 	hasBody bool,
 	operator string,
 ) []rule.Fix {
-	nodeRange := rule.TokenRange(state.ctx.SourceFile, node)
-	if logicalAssignmentCommentsInside(state.ctx, nodeRange.Pos(), node.End()) {
+	nodeRange := rule.TokenRange(state.ruleContext.SourceFile, node)
+	if logicalAssignmentCommentsInside(state.ruleContext, nodeRange.Pos(), node.End()) {
 		return nil
 	}
 
-	text := state.ctx.SourceFile.Text()
-	bodyRange := rule.TokenRange(state.ctx.SourceFile, body)
+	text := state.ruleContext.SourceFile.Text()
+	bodyRange := rule.TokenRange(state.ruleContext.SourceFile, body)
 	if logicalAssignmentIfFixWouldGlue(text, nodeRange.Pos(), bodyRange.Pos()) {
 		return nil
 	}
 
 	assignment := expression.AsBinaryExpression()
-	operatorRange := rule.TokenRange(state.ctx.SourceFile, assignment.OperatorToken)
+	operatorRange := rule.TokenRange(state.ruleContext.SourceFile, assignment.OperatorToken)
 
 	fixes := []rule.Fix{
 		rule.ReplaceRange(core.NewTextRange(operatorRange.Pos(), operatorRange.Pos()), operator),
@@ -656,13 +656,13 @@ func (state *logicalAssignmentState) prohibitFix(
 	assignment *ast.BinaryExpression,
 	longForm string,
 ) []rule.Fix {
-	nodeRange := rule.TokenRange(state.ctx.SourceFile, node)
-	if logicalAssignmentCommentsInside(state.ctx, nodeRange.Pos(), node.End()) {
+	nodeRange := rule.TokenRange(state.ruleContext.SourceFile, node)
+	if logicalAssignmentCommentsInside(state.ruleContext, nodeRange.Pos(), node.End()) {
 		return nil
 	}
 
-	text := state.ctx.SourceFile.Text()
-	operatorRange := rule.TokenRange(state.ctx.SourceFile, assignment.OperatorToken)
+	text := state.ruleContext.SourceFile.Text()
+	operatorRange := rule.TokenRange(state.ruleContext.SourceFile, assignment.OperatorToken)
 	// The target text is read off the unwrapped target, because upstream's
 	// `sourceCode.getText(assignment.left)` reads a node whose parentheses live in `extra` rather
 	// than in the node's own range. Measured against the installed build: `(a) ||= b` expands to
@@ -673,7 +673,7 @@ func (state *logicalAssignmentState) prohibitFix(
 	if target == nil {
 		return nil
 	}
-	leftRange := rule.TokenRange(state.ctx.SourceFile, target)
+	leftRange := rule.TokenRange(state.ruleContext.SourceFile, target)
 	targetText := text[leftRange.Pos():target.End()]
 
 	fixes := []rule.Fix{
@@ -700,7 +700,7 @@ func (state *logicalAssignmentState) prohibitFix(
 		return fixes
 	}
 
-	rightRange := rule.TokenRange(state.ctx.SourceFile, right)
+	rightRange := rule.TokenRange(state.ruleContext.SourceFile, right)
 	return append(fixes,
 		rule.ReplaceRange(core.NewTextRange(rightRange.Pos(), rightRange.Pos()), "("),
 		rule.ReplaceRange(core.NewTextRange(right.End(), right.End()), ")"))

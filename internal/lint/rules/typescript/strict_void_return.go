@@ -101,7 +101,7 @@ var StrictVoidReturn = rule.Rule[StrictVoidReturnOptions]{
 			settings = DefaultStrictVoidReturnSettings()
 		}
 
-		state := &strictVoidReturnState{ctx: ruleContext, settings: settings}
+		state := &strictVoidReturnState{ruleContext: ruleContext, settings: settings}
 
 		return rule.Listeners{
 			ast.KindCallExpression: state.checkCall,

@@ -196,7 +196,7 @@ var Complexity = rule.Rule[ComplexitySettings]{
 				// One walk maintaining a frame stack, for the same reason max-depth does it: the
 				// rule needs a counter that belongs to the innermost enclosing function, and the
 				// listener walk is pre-order with no exit hook to pop on.
-				walker := &complexityWalker{ctx: ruleContext, settings: settings}
+				walker := &complexityWalker{ruleContext: ruleContext, settings: settings}
 				walker.walk(node)
 			},
 		}

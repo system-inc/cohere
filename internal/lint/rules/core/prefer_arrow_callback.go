@@ -147,7 +147,7 @@ var PreferArrowCallback = rule.Rule[PreferArrowCallbackSettings]{
 				// One walk rather than per-kind listeners, because the rule needs to know which
 				// enclosing function each `this`, `super`, `new.target` and `arguments` belongs to,
 				// and the listener walk is pre-order with no exit hook.
-				walker := &preferArrowCallbackWalker{ctx: ruleContext, settings: settings}
+				walker := &preferArrowCallbackWalker{ruleContext: ruleContext, settings: settings}
 				walker.walk(node, nil)
 			},
 		}

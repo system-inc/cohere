@@ -157,12 +157,12 @@ func storeDiagnostic(diagnostic *ast.Diagnostic, sourceFile *ast.SourceFile) (St
 		return StoredDiagnostic{}, false
 	}
 	stored := StoredDiagnostic{
-		Pos:                diagnostic.Pos(),
+		Start:              diagnostic.Pos(),
 		End:                diagnostic.End(),
 		Code:               diagnostic.Code(),
 		Category:           int64(diagnostic.Category()),
 		MessageKey:         string(diagnostic.MessageKey()),
-		MessageArgs:        diagnostic.MessageArgs(),
+		MessageArguments:   diagnostic.MessageArgs(),
 		Source:             diagnostic.Source(),
 		MessageText:        diagnostic.MessageText(),
 		ReportsUnnecessary: diagnostic.ReportsUnnecessary(),

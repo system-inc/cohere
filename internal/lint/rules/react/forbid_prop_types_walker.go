@@ -7,8 +7,8 @@ import (
 
 // forbidPropTypesWalker carries the per-file import state the rule's judgment depends on.
 type forbidPropTypesWalker struct {
-	ctx      rule.Context
-	settings ForbidPropTypesOptions
+	ruleContext rule.Context
+	settings    ForbidPropTypesOptions
 
 	// propertyTypesPackageName is the local name bound to the prop-types package, when one is imported.
 	propertyTypesPackageName string
@@ -298,10 +298,10 @@ func (walker *forbidPropTypesWalker) checkNode(node *ast.Node) {
 // declaration with an object literal initializer qualifies, which is upstream's
 // `propTypesObject && propTypesObject.properties` test.
 func (walker *forbidPropTypesWalker) resolveToObjectLiteral(identifier *ast.Node) *ast.Node {
-	if walker.ctx.TypeChecker == nil {
+	if walker.ruleContext.TypeChecker == nil {
 		return nil
 	}
-	symbol := walker.ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	symbol := walker.ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return nil
 	}
@@ -434,7 +434,7 @@ func (walker *forbidPropTypesWalker) reportIfForbidden(property *ast.Node, typeN
 	}
 	for _, forbidden := range walker.settings.forbiddenTypes() {
 		if forbidden == typeName {
-			walker.ctx.ReportNode(property, forbidPropTypesMessage(typeName))
+			walker.ruleContext.ReportNode(property, forbidPropTypesMessage(typeName))
 			return
 		}
 	}

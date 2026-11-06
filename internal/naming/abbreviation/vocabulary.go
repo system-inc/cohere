@@ -2,6 +2,7 @@ package abbreviation
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -107,18 +108,26 @@ func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {
 		if !patterns.boundary.MatchString(name) && !patterns.camel.MatchString(name) {
 			continue
 		}
-		suggestion := replaceFirst(patterns.replace, name, Capitalize(entry.Expansion)+"${1}")
-		if suggestion == name {
-			continue
+		advice := entry.Advice
+		if entry.Segment.Style != "advice" {
+			suggestions := expandedNames(entry, func(expansion string) string {
+				return replaceFirst(patterns.replace, name, Capitalize(expansion)+"${1}")
+			})
+			// Every expansion rewrites the same occurrence, so a rewrite that leaves the name as it was leaves
+			// it so for all of them, and the name holds nothing to rename.
+			if slices.Contains(suggestions, name) {
+				continue
+			}
+			advice = useAdvice(suggestions)
 		}
 		return Finding{
 			Form:      FormSegment,
 			Entry:     entry,
 			MessageId: AbbreviatedWordSegment,
 			Values: map[string]string{
-				"name":       name,
-				"word":       Capitalize(entry.Abbreviation),
-				"suggestion": suggestion,
+				"name":   name,
+				"word":   Capitalize(entry.Abbreviation),
+				"advice": advice,
 			},
 		}, true
 	}

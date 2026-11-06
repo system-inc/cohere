@@ -47,16 +47,11 @@ func choose(condition bool, document func() doc.Doc) doc.Doc {
 	return doc.Text("")
 }
 
-// rawsOf is node.raws, postcss's and the sub-parsers' plain object of source details.
-func rawsOf(node *estree.Node) estree.Record {
-	raws, _ := node.Get("raws").(estree.Record)
-	return raws
-}
-
-// rawString is node.raws[key] when it is a string, and "" otherwise.
+// rawString is node.raws[key] when it is a string, and "" otherwise. node.raws is postcss's and the
+// sub-parsers' plain object of source details.
 func rawString(node *estree.Node, key string) string {
-	value, _ := rawsOf(node)[key].(estree.String)
-	return string(value)
+	value, _ := rawStringIn(node, key)
+	return value
 }
 
 // isPresent is JavaScript's truthiness for a property that holds an array, where an empty array is
@@ -102,6 +97,8 @@ func everyNode(list []*estree.Node, predicate func(*estree.Node) bool) bool {
 // throws a TypeError, and so does the port, so a source the fork fails on fails here too.
 func mustNode(node *estree.Node) *estree.Node {
 	if node == nil {
+		// Invariant: this is upstream's TypeError, not a crash: Format and PrintToDoc recover it into
+		// their error, as upstream's caller catches it.
 		panic("TypeError: Cannot read properties of undefined (reading 'type')")
 	}
 	return node
@@ -110,12 +107,12 @@ func mustNode(node *estree.Node) *estree.Node {
 // sliceText is String.prototype.slice for the non-negative offsets the printer passes, clamped as
 // JavaScript clamps them.
 func sliceText(text string, start int, end int) string {
-	start = min(max(start, 0), len(text))
-	end = min(max(end, 0), len(text))
-	if start >= end {
+	clampedStart := min(max(start, 0), len(text))
+	clampedEnd := min(max(end, 0), len(text))
+	if clampedStart >= clampedEnd {
 		return ""
 	}
-	return text[start:end]
+	return text[clampedStart:clampedEnd]
 }
 
 // characterBefore is originalText[offset - 1] for the ASCII comparisons the printer makes.

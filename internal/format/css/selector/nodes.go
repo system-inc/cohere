@@ -51,43 +51,62 @@ func newSelectorNode(nodeType string, options []estree.Property) *estree.Node {
 	return node
 }
 
-// source is the {start: {line, column}, end: {line, column}} object the parser passes as opts.source,
-// from a token's fields.
-func source(startLine int, startColumn int, endLine int, endColumn int) estree.Record {
-	return looseSource(estree.Integer(startLine), estree.Integer(startColumn), estree.Integer(endLine),
-		estree.Integer(endColumn))
+// sourceRange is the {start: {line, column}, end: {line, column}} object the parser passes as
+// opts.source, which sourceRecord writes out as upstream's object. Every line and column is a token's
+// number, except where pseudo reads a space token's [5], past its end: endColumnUndefined marks that
+// undefined.
+type sourceRange struct {
+	startLine          int
+	startColumn        int
+	endLine            int
+	endColumn          int
+	endColumnUndefined bool
 }
 
-// looseSource is source where splitWord or pseudo reads past a space token: each field an Integer, nil for
-// undefined, or NaN.
-func looseSource(
-	startLine estree.Value,
-	startColumn estree.Value,
-	endLine estree.Value,
-	endColumn estree.Value,
-) estree.Record {
+// source is upstream's opts.source object of a token's numbers.
+func source(startLine int, startColumn int, endLine int, endColumn int) estree.Record {
+	return sourceRecord(
+		sourceRange{startLine: startLine, startColumn: startColumn, endLine: endLine, endColumn: endColumn},
+	)
+}
+
+// sourceRecord is a sourceRange as upstream's object, its end column nil where it is undefined.
+func sourceRecord(nodeSource sourceRange) estree.Record {
+	end := estree.Record{"line": estree.Integer(nodeSource.endLine), "column": estree.Integer(nodeSource.endColumn)}
+	if nodeSource.endColumnUndefined {
+		end["column"] = nil
+	}
 	return estree.Record{
-		"start": estree.Record{"line": startLine, "column": startColumn},
-		"end":   estree.Record{"line": endLine, "column": endColumn},
+		"start": estree.Record{
+			"line":   estree.Integer(nodeSource.startLine),
+			"column": estree.Integer(nodeSource.startColumn),
+		},
+		"end": end,
 	}
 }
 
-// sourceOf is node.source, mutated in place where the parser moves a start or an end.
-func sourceOf(node *estree.Node) estree.Record {
-	value, _ := node.Get("source").(estree.Record)
-	return value
+// setSourceEdge is `node.source[edge][key] = value`, the parser moving a start or an end in place.
+func setSourceEdge(node *estree.Node, edge string, key string, value int) {
+	nodeSource, _ := node.Get("source").(estree.Record)
+	position, isRecord := nodeSource[edge].(estree.Record)
+	if !isRecord {
+		// Invariant: the parser moves an edge only on a combinator or pseudo it built with a source
+		// record, which sets both edges to a record; Parse recovers the panic into an error.
+		panic("css selector parser: node.source." + edge + " is not a {line, column} object")
+	}
+	position[key] = estree.Integer(value)
 }
 
-// spacesOf is node.spaces.
-func spacesOf(node *estree.Node) estree.Record {
-	value, _ := node.Get("spaces").(estree.Record)
-	return value
+// setSpace is `node.spaces[side] = text`, side being before or after.
+func setSpace(node *estree.Node, side string, text string) {
+	spaces, _ := node.Get("spaces").(estree.Record)
+	spaces[side] = estree.String(text)
 }
 
-// rawsOf is attribute.raws.
-func rawsOf(node *estree.Node) estree.Record {
-	value, _ := node.Get("raws").(estree.Record)
-	return value
+// setRaw is `attribute.raws[key] = text`.
+func setRaw(node *estree.Node, key string, text string) {
+	raws, _ := node.Get("raws").(estree.Record)
+	raws[key] = estree.String(text)
 }
 
 // lastOf is container.last, nil where JavaScript has undefined.

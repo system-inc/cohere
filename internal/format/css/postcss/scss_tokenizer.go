@@ -37,7 +37,7 @@ type scssTokenizer struct {
 	escape            bool
 	escaped           bool
 	previous          string
-	n                 int
+	nextCode          int
 	currentToken      token
 
 	length   int
@@ -70,8 +70,7 @@ func (tokens *scssTokenizer) characterCodeAt(index int) int {
 
 // indexOf is css.indexOf(search, from) for an ASCII search string.
 func (tokens *scssTokenizer) indexOf(search string, from int) int {
-	from = max(from, 0)
-	for index := from; index+len(search) <= tokens.length; index++ {
+	for index := max(from, 0); index+len(search) <= tokens.length; index++ {
 		matched := true
 		for offset := 0; offset < len(search); offset++ {
 			if tokens.css[index+offset] != uint16(search[offset]) {
@@ -91,6 +90,9 @@ func (tokens *scssTokenizer) position() int {
 }
 
 func (tokens *scssTokenizer) unclosed(what string) {
+	// Invariant: this is upstream's throw of a CssSyntaxError, which an unclosed string, comment or
+	// interpolation reaches; Parse recovers every *CssSyntaxError and returns it as a syntax error, so the
+	// panic never leaves the package.
 	panic(tokens.input.errorAt("Unclosed "+what, tokens.pos))
 }
 
@@ -111,7 +113,7 @@ func (tokens *scssTokenizer) interpolation() {
 		}
 
 		tokens.code = tokens.characterCodeAt(tokens.next)
-		tokens.n = tokens.characterCodeAt(tokens.next + 1)
+		tokens.nextCode = tokens.characterCodeAt(tokens.next + 1)
 
 		if stringQuote != 0 {
 			if !stringEscaped && tokens.code == stringQuote {
@@ -126,7 +128,7 @@ func (tokens *scssTokenizer) interpolation() {
 			stringQuote = tokens.code
 		} else if tokens.code == closeCurly {
 			deep -= 1
-		} else if tokens.code == hash && tokens.n == openCurly {
+		} else if tokens.code == hash && tokens.nextCode == openCurly {
 			deep += 1
 		}
 	}
@@ -185,20 +187,20 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			tokens.previous = tokens.buffer[len(tokens.buffer)-1].value
 			tokens.buffer = tokens.buffer[:len(tokens.buffer)-1]
 		}
-		tokens.n = tokens.characterCodeAt(tokens.pos + 1)
+		tokens.nextCode = tokens.characterCodeAt(tokens.pos + 1)
 
 		// `SCSS PATCH` {
-		if tokens.previous == "url" && tokens.n != singleQuote && tokens.n != doubleQuote {
+		if tokens.previous == "url" && tokens.nextCode != singleQuote && tokens.nextCode != doubleQuote {
 			tokens.brackets = 1
 			tokens.escaped = false
 			tokens.next = tokens.pos + 1
 			for tokens.next <= tokens.length-1 {
-				tokens.n = tokens.characterCodeAt(tokens.next)
-				if tokens.n == backslash {
+				tokens.nextCode = tokens.characterCodeAt(tokens.next)
+				if tokens.nextCode == backslash {
 					tokens.escaped = !tokens.escaped
-				} else if tokens.n == openParentheses {
+				} else if tokens.nextCode == openParentheses {
 					tokens.brackets += 1
-				} else if tokens.n == closeParentheses {
+				} else if tokens.nextCode == closeParentheses {
 					tokens.brackets -= 1
 					if tokens.brackets == 0 {
 						break
@@ -241,7 +243,7 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			}
 
 			tokens.code = tokens.characterCodeAt(tokens.next)
-			tokens.n = tokens.characterCodeAt(tokens.next + 1)
+			tokens.nextCode = tokens.characterCodeAt(tokens.next + 1)
 
 			if !tokens.escaped && tokens.code == tokens.quote {
 				break
@@ -249,7 +251,7 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 				tokens.escaped = !tokens.escaped
 			} else if tokens.escaped {
 				tokens.escaped = false
-			} else if tokens.code == hash && tokens.n == openCurly {
+			} else if tokens.code == hash && tokens.nextCode == openCurly {
 				tokens.interpolation()
 			}
 		}
@@ -325,15 +327,15 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 
 	default:
 		// `SCSS PATCH` {
-		tokens.n = tokens.characterCodeAt(tokens.pos + 1)
+		tokens.nextCode = tokens.characterCodeAt(tokens.pos + 1)
 
-		if tokens.code == hash && tokens.n == openCurly {
+		if tokens.code == hash && tokens.nextCode == openCurly {
 			tokens.next = tokens.pos
 			tokens.interpolation()
 			tokens.content = tokens.input.slice(tokens.pos, tokens.next+1)
 			tokens.currentToken = token{kind: "word", value: tokens.content, start: tokens.pos, end: tokens.next}
 			tokens.pos = tokens.next
-		} else if tokens.code == slash && tokens.n == asterisk {
+		} else if tokens.code == slash && tokens.nextCode == asterisk {
 			// } `SCSS PATCH`
 			tokens.next = tokens.indexOf("*/", tokens.pos+2) + 1
 			if tokens.next == 0 {
@@ -350,7 +352,7 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			tokens.pos = tokens.next
 
 			// `SCSS PATCH` {
-		} else if tokens.code == slash && tokens.n == slash {
+		} else if tokens.code == slash && tokens.nextCode == slash {
 			// RE_NEW_LINE.lastIndex = pos + 1; RE_NEW_LINE.test(css).
 			match := -1
 			for index := tokens.pos + 1; index < tokens.length; index++ {

@@ -51,8 +51,10 @@ func (cache *OracleCache) format(oracle Formatter, path string, text string) (st
 			_, writeError := temporary.WriteString(formatted)
 			closeError := temporary.Close()
 			if writeError == nil && closeError == nil {
+				// Ignored: a rename that fails leaves the entry uncached, and the next run formats the file again.
 				_ = os.Rename(temporary.Name(), entry)
 			} else {
+				// Ignored: a temporary left behind is only a stray file in the cache directory, never read as an entry.
 				_ = os.Remove(temporary.Name())
 			}
 		}

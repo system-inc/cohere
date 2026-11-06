@@ -171,7 +171,7 @@ type independentAwaitLoopPath struct {
 
 func newIndependentAwaitLoopAnalysis(ruleContext rule.Context, loop *ast.Node) *independentAwaitLoopAnalysis {
 	analysis := &independentAwaitLoopAnalysis{
-		ctx:            ruleContext,
+		ruleContext:    ruleContext,
 		loop:           loop,
 		taintedSymbols: map[*ast.Symbol]bool{},
 		orderedBodies:  map[*ast.Node]bool{},

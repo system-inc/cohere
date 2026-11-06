@@ -46,5 +46,5 @@ func Parse(parameters string) (*estree.Node, error) {
 		return nil, printing.Syntax(parseMediaListError)
 	}
 	// after, before and sourceIndex are undefined in the options, so Container derives them.
-	return newContainer(nil, nil, "media-query-list", trim(parameters), nil, nodes), nil
+	return newRootContainer("media-query-list", trim(parameters), nodes), nil
 }

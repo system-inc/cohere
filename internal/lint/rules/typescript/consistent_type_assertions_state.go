@@ -8,14 +8,14 @@ import (
 
 // consistentTypeAssertionsState carries what every step needs.
 type consistentTypeAssertionsState struct {
-	ctx      rule.Context
-	settings ConsistentTypeAssertionsOptions
+	ruleContext rule.Context
+	settings    ConsistentTypeAssertionsOptions
 }
 
 // textOf reads a node's own source, excluding leading trivia.
 func (state *consistentTypeAssertionsState) textOf(node *ast.Node) string {
-	nodeRange := rule.TokenRange(state.ctx.SourceFile, node)
-	return state.ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
+	nodeRange := rule.TokenRange(state.ruleContext.SourceFile, node)
+	return state.ruleContext.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
 }
 
 // reportIncorrectStyle is upstream's `reportIncorrectAssertionType`.
@@ -31,7 +31,7 @@ func (state *consistentTypeAssertionsState) reportIncorrectStyle(
 	}
 
 	if state.settings.AssertionStyle == ConsistentTypeAssertionsNever {
-		state.ctx.ReportNode(node, rule.Message{
+		state.ruleContext.ReportNode(node, rule.Message{
 			Id:          "never",
 			Description: "Do not use any type assertions.",
 		})
@@ -40,7 +40,7 @@ func (state *consistentTypeAssertionsState) reportIncorrectStyle(
 
 	cast := state.textOf(typeNode)
 	if state.settings.AssertionStyle == ConsistentTypeAssertionsAngleBracket {
-		state.ctx.ReportNode(node, rule.Message{
+		state.ruleContext.ReportNode(node, rule.Message{
 			Id:          "angle-bracket",
 			Description: "Use '<" + cast + ">' instead of 'as " + cast + "'.",
 		})
@@ -48,10 +48,10 @@ func (state *consistentTypeAssertionsState) reportIncorrectStyle(
 	}
 
 	// Only the angle-bracket-to-`as` direction is fixable upstream, and this is it.
-	state.ctx.ReportNodeWithFixes(node, rule.Message{
+	state.ruleContext.ReportNodeWithFixes(node, rule.Message{
 		Id:          "as",
 		Description: "Use 'as " + cast + "' instead of '<" + cast + ">'.",
-	}, rule.ReplaceRange(rule.TokenRange(state.ctx.SourceFile, node),
+	}, rule.ReplaceRange(rule.TokenRange(state.ruleContext.SourceFile, node),
 		state.buildAsExpressionText(node, expression, cast)))
 }
 
@@ -132,7 +132,7 @@ func (state *consistentTypeAssertionsState) reportLiteralAssertion(
 	}
 
 	cast := state.textOf(typeNode)
-	state.ctx.ReportNodeWithSuggestions(node,
+	state.ruleContext.ReportNodeWithSuggestions(node,
 		rule.Message{Id: reportId, Description: reportText},
 		state.buildLiteralSuggestions(node, expression, cast,
 			annotationId, annotationTemplate, satisfiesId, satisfiesTemplate)...)
@@ -154,11 +154,11 @@ func (state *consistentTypeAssertionsState) buildLiteralSuggestions(
 	// parentheses. Our parser makes the parenthesis a node, so its text already carries them and
 	// reading the node is the same answer.
 	expressionText := state.textOf(expression)
-	nodeRange := rule.TokenRange(state.ctx.SourceFile, node)
+	nodeRange := rule.TokenRange(state.ruleContext.SourceFile, node)
 
 	var suggestions []rule.Suggestion
 	if declarator := declaratorWithoutAnnotation(node); declarator != nil {
-		nameRange := rule.TokenRange(state.ctx.SourceFile, declarator.AsVariableDeclaration().Name())
+		nameRange := rule.TokenRange(state.ruleContext.SourceFile, declarator.AsVariableDeclaration().Name())
 		suggestions = append(suggestions, rule.Suggestion{
 			Message: rule.Message{
 				Id:          annotationId,

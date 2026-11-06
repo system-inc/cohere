@@ -76,6 +76,8 @@ func Apply(text string, changes []core.TextChange) string {
 		if start < 0 || end > len(result) || start > end {
 			// A range outside the text means the change was computed against a different string.
 			// Returning the input unchanged would report a false agreement, so this is loud.
+			// Invariant: Apply's one caller, FormatFile, hands it the changes FormatDocument computed against this
+			// same text, which lie inside it and do not overlap, so applied back to front each still fits.
 			panic("formatdiff: text change out of range")
 		}
 		builder.Reset()
@@ -103,14 +105,16 @@ func FormatFile(fileName string, text string) (formatted string, ok bool, panick
 		scriptKind = core.ScriptKindJS
 	}
 
-	if !tspath.IsRootedDiskPath(fileName) {
-		fileName = "/" + strings.TrimPrefix(fileName, "/")
+	// The parser wants a rooted path, so a relative name is rooted at the top before it is normalized.
+	rootedName := fileName
+	if !tspath.IsRootedDiskPath(rootedName) {
+		rootedName = "/" + strings.TrimPrefix(rootedName, "/")
 	}
-	fileName = tspath.NormalizePath(fileName)
+	normalizedName := tspath.NormalizePath(rootedName)
 
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
-		FileName: tspath.RootedFilePath(fileName),
-		PathKey:  tspath.PathKey(fileName),
+		FileName: tspath.RootedFilePath(normalizedName),
+		PathKey:  tspath.PathKey(normalizedName),
 	}, text, scriptKind)
 	if sourceFile == nil {
 		return "", false, false, ""

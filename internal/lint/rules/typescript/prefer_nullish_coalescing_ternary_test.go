@@ -133,9 +133,11 @@ func TestPreferNullishCoalescingTernaryAndIfMessages(test *testing.T) {
 
 // preferNullishCoalescingTernaryAndIfCases are upstream's invalid cases that report from the ternary
 // or if-statement path, generated from the replay described on TestPreferNullishCoalescingTernaryAndIfFire.
-// Each path's table lives in a file of its own, and this joins them.
-var preferNullishCoalescingTernaryAndIfCases = append(append([]preferNullishCoalescingReplayedCase(nil),
-	preferNullishCoalescingTernaryCases...), preferNullishCoalescingIfCases...)
+// Each path's table lives in files of its own, the ternary's in two split at invalid[95], since one would
+// pass the long-file limit by itself, and this joins them in upstream's order.
+var preferNullishCoalescingTernaryAndIfCases = append(append(append([]preferNullishCoalescingReplayedCase(nil),
+	preferNullishCoalescingTernaryComparisonCases...), preferNullishCoalescingTernaryDeclaredCases...),
+	preferNullishCoalescingIfCases...)
 
 // TestPreferNullishCoalescingTernaryAndIfFire runs every upstream invalid case that reports from the
 // ternary or the if-statement path, 221 of them, two of which also report a `||`.

@@ -146,13 +146,13 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				// differently (`\A`, `\a`, `\e`) would keep its .NET meaning,
 				// and one .NET does not know at all would refuse to compile.
 				if current.ignoreCase {
-					if class, widened := CaseClass(escape.r, current.unicode); widened {
+					if class, widened := CaseClass(escape.character, current.unicode); widened {
 						out.WriteString(class)
 						index = end
 						continue
 					}
 				}
-				out.WriteString(literalRune(escape.r))
+				out.WriteString(literalRune(escape.character))
 
 			case escapeBackreference:
 				if current.ignoreCase {

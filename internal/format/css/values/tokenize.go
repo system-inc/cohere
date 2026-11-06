@@ -55,7 +55,8 @@ func atEnd(code uint16) bool {
 // wordEnd is upstream's /[ \n\t\r\(\)\{\}\*:;@!&'"\+\|~>,\[\]\\]|\/(?=\*)/g at one index.
 func wordEnd(css []uint16, index int) bool {
 	switch css[index] {
-	case ' ', '\n', '\t', '\r', '(', ')', '{', '}', '*', ':', ';', '@', '!', '&', '\'', '"', '+', '|', '~', '>', ',', '[', ']', '\\':
+	case ' ', '\n', '\t', '\r', '(', ')', '{', '}', '*', ':', ';', '@', '!', '&', '\'', '"', '+', '|', '~', '>', ',',
+		'[', ']', '\\':
 		return true
 	case '/':
 		return index+1 < len(css) && css[index+1] == '*'
@@ -66,7 +67,8 @@ func wordEnd(css []uint16, index int) bool {
 // endsNumberWord is upstream's /[ \n\t\r\(\)\{\}\*:;@!&'"\-\+\|~>,\[\]\\]|\//g at one index.
 func endsNumberWord(css []uint16, index int) bool {
 	switch css[index] {
-	case ' ', '\n', '\t', '\r', '(', ')', '{', '}', '*', ':', ';', '@', '!', '&', '\'', '"', '-', '+', '|', '~', '>', ',', '[', ']', '\\', '/':
+	case ' ', '\n', '\t', '\r', '(', ')', '{', '}', '*', ':', ';', '@', '!', '&', '\'', '"', '-', '+', '|', '~', '>',
+		',', '[', ']', '\\', '/':
 		return true
 	}
 	return false
@@ -100,10 +102,7 @@ func regexLastIndex(css []uint16, from int, matches func(css []uint16, index int
 
 // indexOfUnits is css.indexOf(search, from).
 func indexOfUnits(css []uint16, search []uint16, from int) int {
-	if from < 0 {
-		from = 0
-	}
-	for index := from; index+len(search) <= len(css); index++ {
+	for index := max(from, 0); index+len(search) <= len(css); index++ {
 		found := true
 		for offset := range search {
 			if css[index+offset] != search[offset] {
@@ -144,12 +143,9 @@ func tokenize(input []uint16, options Options) []token {
 
 	// slice is css.slice for the non-negative bounds this file passes, clamped the way slice clamps.
 	slice := func(start int, end int) []uint16 {
-		start = min(max(start, 0), length)
-		end = min(max(end, 0), length)
-		if end < start {
-			end = start
-		}
-		return css[start:end]
+		clampedStart := min(max(start, 0), length)
+		clampedEnd := max(min(max(end, 0), length), clampedStart)
+		return css[clampedStart:clampedEnd]
 	}
 
 	push := func(kind string, value []uint16, startLine int, startColumn int, endLine int, endColumn int, index int) {
@@ -183,6 +179,9 @@ func tokenize(input []uint16, options Options) []token {
 	}
 
 	unclosed := func(what string) {
+		// Invariant: this is upstream's throw of a TokenizeError, which an unclosed quote or comment
+		// reaches; Parse recovers every *Error and returns it as a syntax error, so the panic never
+		// leaves the package.
 		panic(&Error{Name: "TokenizeError", Message: "Unclosed " +
 			what +
 			" at line: " +
@@ -358,7 +357,8 @@ func tokenize(input []uint16, options Options) []token {
 					}
 				}
 
-				var nextLine, nextOffset int
+				var nextLine int
+				var nextOffset int
 				if last > 0 {
 					nextLine = line + last
 					nextOffset = next - lastLineLength

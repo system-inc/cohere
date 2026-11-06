@@ -72,7 +72,7 @@ type NoConflictingClassesOptions struct {
 // picks for them.
 var NoConflictingClasses = rule.Rule[NoConflictingClassesOptions]{
 	Name: "better-tailwindcss/no-conflicting-classes",
-	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
+	// The design system: its stylesheets, read through the recording file system (DesignSystemFileSystem).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
 	Run: func(ruleContext rule.Context, options rule.Given[NoConflictingClassesOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {

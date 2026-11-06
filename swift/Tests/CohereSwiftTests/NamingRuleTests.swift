@@ -43,6 +43,7 @@ struct NamingRuleTests {
         #expect(
             vocabulary.segments.map(\.abbreviation) == [
                 "cwd", "dir", "env", "cli", "len", "seq", "db", "tx", "vars", "var",
+                "buf", "tmp", "pkg", "src", "dst", "conn", "cmd", "cfg", "pos", "wg", "mu", "ch", "sb",
             ]
         )
         #expect(vocabulary.suffixes.map(\.abbreviation).prefix(5) == ["prop", "props", "param", "params", "ms"])
@@ -50,7 +51,7 @@ struct NamingRuleTests {
         #expect(vocabulary.allowedSegments == ["InnoDb"])
     }
 
-    /* The Go test's count: every form of every entry judged once, 92 in all. */
+    /* The Go test's count: every form of every entry judged once, 131 in all. */
     @Test func everyFormIsJudged() throws {
         let vocabulary = try Self.vocabulary()
         var judged = 0
@@ -82,7 +83,7 @@ struct NamingRuleTests {
             )
             judged += 1
         }
-        #expect(judged == 92)
+        #expect(judged == 131)
     }
 
     @Test(arguments: [
@@ -96,6 +97,83 @@ struct NamingRuleTests {
         #expect(finding.message.contains(advice), "\(finding.message)")
     }
 
+    /* The sentence every message but the millisecond one ends on, so a rendered text is compared whole. */
+    static let reasoning =
+        "A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call site by a reader who has to expand the abbreviation themselves and hope they expanded it the way the author meant."
+
+    /* A word with one expansion renders every form byte for byte as it did when an entry held a single expansion: Go's `TestFindRendersAWordWithOneExpansionAsBefore`. */
+    @Test(arguments: [
+        ("idx", #"Identifier "idx" should not be abbreviated. Use "index" or a more descriptive name."#),
+        ("db", #"Identifier "db" should not be abbreviated. Use "database"."#),
+        ("idxStart", #"Identifier "idxStart" should not be abbreviated. Use "indexStart"."#),
+        ("rowProps", #"Identifier "rowProps" should not end with "Props". Use "rowProperties"."#),
+        ("outputDirPath", #"Identifier "outputDirPath" abbreviates "Dir". Use "outputDirectoryPath"."#),
+        ("themeVarsVar", #"Identifier "themeVarsVar" abbreviates "Vars". Use "themeVariablesVar"."#),
+    ])
+    func aWordWithOneExpansionRendersAsBefore(name: String, want: String) throws {
+        let finding = try #require(try Self.vocabulary().find(name))
+        #expect(finding.message == want + " " + Self.reasoning)
+    }
+
+    /*
+     A word with more than one meaning names them all and asks for whichever it is, never one guess: Go's
+     `TestFindNamesEveryMeaningOfAWordWithMore`, `resultPos` beside `resultNeg` among them, where it means positive.
+     */
+    @Test(arguments: [
+        (
+            "policy", "pos",
+            #"Identifier "pos" should not be abbreviated. Use "position" or "positive", whichever it means, or a more descriptive name."#,
+        ),
+        (
+            "policy", "posLabel",
+            #"Identifier "posLabel" should not be abbreviated. Use "positionLabel" or "positiveLabel", whichever it means."#,
+        ),
+        (
+            "policy", "resultPos",
+            #"Identifier "resultPos" abbreviates "Pos". Use "resultPosition" or "resultPositive", whichever it means."#,
+        ),
+        (
+            "listed", "neg",
+            #"Identifier "neg" should not be abbreviated. Use "negative" or "negation", whichever it means."#,
+        ),
+        (
+            "listed", "resultNeg",
+            #"Identifier "resultNeg" should not end with "Neg". Use "resultNegative" or "resultNegation", whichever it means."#,
+        ),
+        (
+            "listed", "readRelPath",
+            #"Identifier "readRelPath" abbreviates "Rel". Use "readRelativePath", "readRelationPath" or "readReleasePath", whichever it means."#,
+        ),
+    ])
+    func aWordWithMoreThanOneMeaningNamesThemAll(vocabularyName: String, name: String, want: String) throws {
+        /* The plain whole form, the suffix form and three meanings, which no word in policy's file has yet. */
+        let listed = try AbbreviationVocabulary.load(
+            data: Data(
+                #"""
+                {"abbreviations": [
+                    {"abbreviation": "neg", "expansions": ["negative", "negation"], "whole": {"style": "plain"}, "suffix": {}},
+                    {"abbreviation": "rel", "expansions": ["relative", "relation", "release"], "segment": {}}
+                ]}
+                """#.utf8
+            )
+        )
+        let vocabulary = vocabularyName == "policy" ? try Self.vocabulary() : listed
+        let finding = try #require(vocabulary.find(name))
+        #expect(finding.message == want + " " + Self.reasoning)
+    }
+
+    /* `sb` fits more words than a list could hold, a scroll region's bottom among them, so every form asks what it holds. */
+    @Test(arguments: [
+        ("sb", "whole", #"Identifier "sb" should not be abbreviated. Spell out what it holds."#),
+        ("sbBottom", "prefix", #"Identifier "sb" should not be abbreviated. Spell out what it holds."#),
+        ("scrollSbOffset", "segment", #"Identifier "scrollSbOffset" abbreviates "Sb". Spell out what it holds."#),
+    ])
+    func unlistableWordAsksWhatItHolds(name: String, form: String, want: String) throws {
+        let finding = try #require(try Self.vocabulary().find(name))
+        #expect(finding.form == form)
+        #expect(finding.message == want + " " + Self.reasoning)
+    }
+
     @Test func allowedNamesAndSegmentsAreNotJudged() throws {
         let vocabulary = try Self.vocabulary()
         #expect(vocabulary.find("URLSearchParams") == nil)
@@ -105,15 +183,21 @@ struct NamingRuleTests {
     }
 
     @Test(arguments: [
-        #"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "suffx": {}}]}"#,
-        #"{"abbreviations": [{"abbreviation": "val", "expansion": "value"}]}"#,
-        #"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"style": "loud"}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], "suffx": {}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansions": ["value"]}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], "whole": {"style": "loud"}}]}"#,
         #"{"abbreviations": [{"abbreviation": "val", "whole": {"style": "plain"}}]}"#,
-        #"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "prefix": {"phase": "middle"}}]}"#,
-        #"{"abbreviations": [{"abbreviation": "Val", "expansion": "value", "segment": {}}]}"#,
-        #"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "segment": {}}, {"abbreviation": "val", "expansion": "value", "segment": {}}]}"#,
-        #"{"abbreviations": [{"abbreviation": "ms", "expansion": "m", "suffix": {"matcher": "seconds"}}]}"#,
-        #"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"messageId": "noVal", "style": "plain"}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], "prefix": {"phase": "middle"}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "Val", "expansions": ["value"], "segment": {}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], "segment": {}}, {"abbreviation": "val", "expansions": ["value"], "segment": {}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "ms", "expansions": ["m"], "suffix": {"matcher": "seconds"}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], "whole": {"messageId": "noVal", "style": "plain"}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"style": "plain"}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansions": [], "whole": {"style": "plain"}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansions": ["value", ""], "segment": {}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansions": "value", "whole": {"style": "plain"}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], "segment": {"style": "loud"}}]}"#,
+        #"{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], "segment": {"style": "advice"}}]}"#,
     ])
     func aMalformedFileIsRefused(file: String) {
         #expect(throws: (any Error).self) { try AbbreviationVocabulary.load(data: Data(file.utf8)) }
@@ -145,7 +229,7 @@ struct NamingRuleTests {
             """
         #expect(
             Self.flagged(ConsistencyNoAbbreviatedIdentifier(vocabulary: try Self.vocabulary()), source) == [
-                "Config:1", "maxBytes:2", "params:3", "idx:4",
+                "Config:1", "maxBytes:2", "params:3", "src:3", "idx:4",
             ]
         )
     }

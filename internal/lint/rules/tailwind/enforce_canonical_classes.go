@@ -111,7 +111,7 @@ type EnforceCanonicalClassesOptions struct {
 // author to act on.
 var EnforceCanonicalClasses = rule.Rule[EnforceCanonicalClassesOptions]{
 	Name: "better-tailwindcss/enforce-canonical-classes",
-	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
+	// The design system: its stylesheets, read through the recording file system (DesignSystemFileSystem).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
 	Run: func(ruleContext rule.Context, options rule.Given[EnforceCanonicalClassesOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {

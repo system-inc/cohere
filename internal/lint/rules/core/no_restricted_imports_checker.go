@@ -10,7 +10,7 @@ import (
 
 // noRestrictedImportsChecker carries the compiled configuration across the listeners.
 type noRestrictedImportsChecker struct {
-	ctx rule.Context
+	ruleContext rule.Context
 
 	// paths is grouped by module name, because upstream groups them and a module named twice
 	// reports twice. `import { bar } from 'mod'` with `mod` listed both bare and with importNames
@@ -40,19 +40,19 @@ func (checker *noRestrictedImportsChecker) checkImportDeclaration(node *ast.Node
 	if declared.Default != nil {
 		bindings = append(bindings, noRestrictedImportsBinding{
 			name:        "default",
-			reportRange: rule.TokenRange(checker.ctx.SourceFile, declared.Default),
+			reportRange: rule.TokenRange(checker.ruleContext.SourceFile, declared.Default),
 		})
 	}
 	if declared.Namespace != nil {
 		bindings = append(bindings, noRestrictedImportsBinding{
 			name:        "*",
-			reportRange: rule.TokenRange(checker.ctx.SourceFile, declared.Namespace),
+			reportRange: rule.TokenRange(checker.ruleContext.SourceFile, declared.Namespace),
 		})
 	}
 	for _, specifier := range declared.Named {
 		bindings = append(bindings, noRestrictedImportsBinding{
 			name:        noRestrictedImportsImportedName(specifier),
-			reportRange: rule.TokenRange(checker.ctx.SourceFile, specifier),
+			reportRange: rule.TokenRange(checker.ruleContext.SourceFile, specifier),
 			typeOnly:    specifier.AsImportSpecifier().IsTypeOnly,
 		})
 	}
@@ -79,14 +79,14 @@ func (checker *noRestrictedImportsChecker) checkExportDeclaration(node *ast.Node
 	case declaration.ExportClause == nil:
 		// `export * from 'm'`. Upstream reports at `sourceCode.getFirstToken(node, 1)`, the token
 		// after `export`, which is the `*`.
-		if star := noRestrictedImportsStarToken(checker.ctx, node); star != nil {
+		if star := noRestrictedImportsStarToken(checker.ruleContext, node); star != nil {
 			bindings = append(bindings, noRestrictedImportsBinding{name: "*", reportRange: *star})
 		}
 
 	case declaration.ExportClause.Kind == ast.KindNamespaceExport:
 		// `export * as ns from 'm'`. Upstream's ExportAllDeclaration arm reaches this with the same
 		// `*` token, because it reads the token rather than the clause.
-		if star := noRestrictedImportsStarToken(checker.ctx, node); star != nil {
+		if star := noRestrictedImportsStarToken(checker.ruleContext, node); star != nil {
 			bindings = append(bindings, noRestrictedImportsBinding{name: "*", reportRange: *star})
 		}
 
@@ -95,7 +95,7 @@ func (checker *noRestrictedImportsChecker) checkExportDeclaration(node *ast.Node
 			for _, specifier := range elements.Nodes {
 				bindings = append(bindings, noRestrictedImportsBinding{
 					name:        noRestrictedImportsExportedLocalName(specifier),
-					reportRange: rule.TokenRange(checker.ctx.SourceFile, specifier),
+					reportRange: rule.TokenRange(checker.ruleContext.SourceFile, specifier),
 					typeOnly:    specifier.AsExportSpecifier().IsTypeOnly,
 				})
 			}
@@ -284,11 +284,11 @@ func (checker *noRestrictedImportsChecker) reportForPattern(
 
 // report anchors a finding on a whole statement.
 func (checker *noRestrictedImportsChecker) report(node *ast.Node, message rule.Message) {
-	checker.ctx.ReportNode(node, message)
+	checker.ruleContext.ReportNode(node, message)
 }
 
 // reportRange anchors a finding on a span, which a namespace re-export needs because it has no
 // specifier node.
 func (checker *noRestrictedImportsChecker) reportRange(span core.TextRange, message rule.Message) {
-	checker.ctx.ReportRange(span, message)
+	checker.ruleContext.ReportRange(span, message)
 }
