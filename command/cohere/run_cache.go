@@ -345,12 +345,21 @@ func prepareCacheDirectory(root string) {
 			return
 		}
 		ignoreFile := filepath.Join(root, gitignore.IgnoreFileName)
-		matcher, newGitignoreError := gitignore.New(root)
+		// Asked as git asks it, from the repository's root down to the project, so a repository whose root
+		// `.gitignore` ignores `.cache/` silences it for every project beneath, one of discovery's children among
+		// them. Rooted at the project, every such child said its cache would be tracked, which git would not do.
+		repository := ignoreRulesRoot(root)
+		matcher, newGitignoreError := gitignore.New(repository)
 		if newGitignoreError != nil {
 			return
 		}
+		projectFromRepository, relativePathError := filepath.Rel(repository, root)
+		if relativePathError != nil {
+			return
+		}
+		tablePath := filepath.ToSlash(filepath.Join(projectFromRepository, ".cache", "cohere", "findings.gob"))
 		if ignored, _, ignoredPathError := matcher.IgnoredPath(
-			".cache/cohere/findings.gob",
+			tablePath,
 			false,
 		); ignoredPathError == nil && !ignored {
 			fmt.Fprintf(
@@ -362,6 +371,20 @@ func prepareCacheDirectory(root string) {
 			showWarning()
 		}
 	})
+}
+
+// ignoreRulesRoot is the repository whose ignore rules govern root: the nearest directory at or above it holding a
+// `.git`, a clone's directory or a worktree's or submodule's file, and root itself when none does, as a fixture or a
+// tarball is read on its own.
+func ignoreRulesRoot(root string) string {
+	for directory := filepath.Clean(root); ; directory = filepath.Dir(directory) {
+		if format_files.HasOwnRepository(directory) {
+			return directory
+		}
+		if filepath.Dir(directory) == directory {
+			return filepath.Clean(root)
+		}
+	}
 }
 
 // readFormatSection is the format record's section of this root's table, nil when there is none or the

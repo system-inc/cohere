@@ -741,12 +741,11 @@ func TestEveryProjectOfAMixedRootReplays(test *testing.T) {
 	binary := buildCohere(test)
 	root := newRepository(test, map[string]string{
 		".gitignore": ".cache/\nnode_modules/\n",
-		// Each project's own too: the note a project whose ignore files do not cover .cache prints is not the subject.
-		"service/.gitignore": ".cache/\n",
-		"web/.gitignore":     ".cache/\n",
-		"service/go.mod":     "module example.com/service\n\ngo 1.27\n",
-		"service/go.sum":     "",
-		"service/a.go":       goReplaySource("service", "Greet"),
+		// Only the repository's root ignores .cache/, as a real repository does, so no project's section opens on a
+		// note that its cache would be tracked.
+		"service/go.mod": "module example.com/service\n\ngo 1.27\n",
+		"service/go.sum": "",
+		"service/a.go":   goReplaySource("service", "Greet"),
 		"web/tsconfig.json": `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext",` +
 			`"moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},` +
 			`"include":["source"]}`,
