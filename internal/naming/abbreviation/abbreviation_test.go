@@ -3,9 +3,11 @@ package abbreviation_test
 import (
 	"maps"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/naming/abbreviation"
+	"github.com/system-inc/cohere/policy"
 )
 
 // Every finding carries exactly the values its message's text uses, since each engine renders the id it names with
@@ -17,7 +19,7 @@ func TestFindGivesEachMessageItsValues(test *testing.T) {
 		abbreviation.AbbreviatedIdentifier:  {"advice", "name"},
 		abbreviation.AbbreviatedSuffix:      {"advice", "name", "suffix"},
 		abbreviation.MillisecondSuffix:      {"name", "suggestion"},
-		abbreviation.AbbreviatedWordSegment: {"name", "suggestion", "word"},
+		abbreviation.AbbreviatedWordSegment: {"advice", "name", "word"},
 	}
 	vocabulary := abbreviation.Policy
 	names := slices.Collect(maps.Keys(vocabulary.WholeByName))
@@ -54,5 +56,153 @@ func TestFindStaysQuietOnFullWords(test *testing.T) {
 		if finding, found := abbreviation.Policy.Find(name); found {
 			test.Errorf("%q reads as an abbreviation: %+v", name, finding)
 		}
+	}
+}
+
+// reasoning is the sentence every message but the millisecond one ends on, the `reasoning` phrase of the rule's
+// message file, written out here so a rendered text is compared whole.
+const reasoning = "A name is written once and read everywhere, so the letters saved at the declaration are paid back " +
+	"at every call site by a reader who has to expand the abbreviation themselves and hope they expanded it the way " +
+	"the author meant."
+
+// rendered is a finding as the TypeScript rule prints it, from the rule's entry in the policy message catalog.
+func rendered(test *testing.T, vocabulary *abbreviation.Vocabulary, name string) string {
+	test.Helper()
+	finding, found := vocabulary.Find(name)
+	if !found {
+		test.Fatalf("%q: not found", name)
+	}
+	return policy.MessageOf("nexus/consistency-no-abbreviated-identifier", finding.MessageId).Render(finding.Values)
+}
+
+// A word with one expansion renders every form byte for byte as it did when an entry held a single expansion, so
+// the move to a list changed no finding anyone has read. The texts are the ones the rule printed before the move.
+func TestFindRendersAWordWithOneExpansionAsBefore(test *testing.T) {
+	test.Parallel()
+	cases := []struct{ name, want string }{
+		{"idx", `Identifier "idx" should not be abbreviated. Use "index" or a more descriptive name.`},
+		{"db", `Identifier "db" should not be abbreviated. Use "database".`},
+		{"idxStart", `Identifier "idxStart" should not be abbreviated. Use "indexStart".`},
+		{"rowProps", `Identifier "rowProps" should not end with "Props". Use "rowProperties".`},
+		{"outputDirPath", `Identifier "outputDirPath" abbreviates "Dir". Use "outputDirectoryPath".`},
+		{"themeVarsVar", `Identifier "themeVarsVar" abbreviates "Vars". Use "themeVariablesVar".`},
+		{"args", `Identifier "args" should not be abbreviated. Use "arguments", "commandArguments", ` +
+			`"commandLineArguments", or a more descriptive name.`},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			if got := rendered(test, abbreviation.Policy, testCase.name); got != testCase.want+" "+reasoning {
+				test.Errorf("got %q, want %q", got, testCase.want+" "+reasoning)
+			}
+		})
+	}
+}
+
+// `pos` means position or positive, and a census found `resultPos` beside `resultNeg`, where it is positive, read
+// back as `resultPosition`. Every form names both meanings now, in the file's order, and asks for whichever it is.
+func TestFindNamesEveryMeaningOfAWordWithMore(test *testing.T) {
+	test.Parallel()
+	listed, loadError := abbreviation.Load([]byte(`{"abbreviations": [
+		{"abbreviation": "neg", "expansions": ["negative", "negation"], "whole": {"style": "plain"}, "suffix": {}},
+		{"abbreviation": "rel", "expansions": ["relative", "relation", "release"], "segment": {}}
+	]}`))
+	if loadError != nil {
+		test.Fatal(loadError)
+	}
+	cases := []struct {
+		name       string
+		vocabulary *abbreviation.Vocabulary
+		want       string
+	}{
+		{"pos", abbreviation.Policy, `Identifier "pos" should not be abbreviated. ` +
+			`Use "position" or "positive", whichever it means, or a more descriptive name.`},
+		{"posLabel", abbreviation.Policy, `Identifier "posLabel" should not be abbreviated. ` +
+			`Use "positionLabel" or "positiveLabel", whichever it means.`},
+		{"resultPos", abbreviation.Policy, `Identifier "resultPos" abbreviates "Pos". ` +
+			`Use "resultPosition" or "resultPositive", whichever it means.`},
+		// The plain whole form and the suffix form, which no word in policy's file has two meanings in yet.
+		{"neg", listed, `Identifier "neg" should not be abbreviated. ` +
+			`Use "negative" or "negation", whichever it means.`},
+		{"resultNeg", listed, `Identifier "resultNeg" should not end with "Neg". ` +
+			`Use "resultNegative" or "resultNegation", whichever it means.`},
+		// Three meanings are a list: commas, then "or" before the last.
+		{"readRelPath", listed, `Identifier "readRelPath" abbreviates "Rel". ` +
+			`Use "readRelativePath", "readRelationPath" or "readReleasePath", whichever it means.`},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			if got := rendered(test, testCase.vocabulary, testCase.name); got != testCase.want+" "+reasoning {
+				test.Errorf("got %q, want %q", got, testCase.want+" "+reasoning)
+			}
+		})
+	}
+}
+
+// `sb` is Go's habit for a strings.Builder, but a census found it naming a scroll region's bottom, and its letters
+// fit more words than a list could hold. So no form suggests a word: each asks what it holds.
+func TestFindAsksWhatAnUnlistableWordHolds(test *testing.T) {
+	test.Parallel()
+	cases := []struct {
+		name string
+		form abbreviation.Form
+		want string
+	}{
+		{"sb", abbreviation.FormWhole, `Identifier "sb" should not be abbreviated. Spell out what it holds.`},
+		// An advice-style prefix names the abbreviation rather than the name, as the role words always have.
+		{"sbBottom", abbreviation.FormPrefix, `Identifier "sb" should not be abbreviated. Spell out what it holds.`},
+		{"scrollSbOffset", abbreviation.FormSegment, `Identifier "scrollSbOffset" abbreviates "Sb". ` +
+			`Spell out what it holds.`},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			if finding, _ := abbreviation.Policy.Find(testCase.name); finding.Form != testCase.form {
+				test.Errorf("form %q, want %q", finding.Form, testCase.form)
+			}
+			got := rendered(test, abbreviation.Policy, testCase.name)
+			if got != testCase.want+" "+reasoning {
+				test.Errorf("got %q, want %q", got, testCase.want+" "+reasoning)
+			}
+			if strings.Contains(got, "stringBuilder") {
+				test.Errorf("%q still guesses a builder", got)
+			}
+		})
+	}
+}
+
+// The loader refuses an expansion list the engines would read as something other than meant, and the key it
+// replaced, so a file written for the single expansion fails at startup rather than judging with none.
+func TestLoadRefusesABrokenExpansionList(test *testing.T) {
+	test.Parallel()
+	cases := []struct{ name, file string }{
+		{"an empty list where a form renames", `{"abbreviations": [
+			{"abbreviation": "val", "expansions": [], "whole": {"style": "plain"}}]}`},
+		{"an empty word in the list", `{"abbreviations": [
+			{"abbreviation": "val", "expansions": ["value", ""], "segment": {}}]}`},
+		{"the retired single expansion", `{"abbreviations": [
+			{"abbreviation": "val", "expansion": "value", "whole": {"style": "plain"}}]}`},
+		{"a lone word rather than a list", `{"abbreviations": [
+			{"abbreviation": "val", "expansions": "value", "whole": {"style": "plain"}}]}`},
+		{"an unknown segment style", `{"abbreviations": [
+			{"abbreviation": "val", "expansions": ["value"], "segment": {"style": "loud"}}]}`},
+		{"a segment asking for advice the entry lacks", `{"abbreviations": [
+			{"abbreviation": "val", "expansions": ["value"], "segment": {"style": "advice"}}]}`},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			if _, loadError := abbreviation.Load([]byte(testCase.file)); loadError == nil {
+				test.Errorf("the loader accepted it")
+			}
+		})
+	}
+	// The clean case beside them: advice alone carries a word with no expansions through every form that takes it.
+	if _, loadError := abbreviation.Load([]byte(`{"abbreviations": [{"abbreviation": "sb", "advice": "Say.",
+		"whole": {"style": "advice"}, "prefix": {"phase": "late", "style": "advice"},
+		"segment": {"style": "advice"}}]}`,
+	)); loadError != nil {
+		test.Errorf("an advice-only entry is refused: %v", loadError)
 	}
 }
