@@ -2,7 +2,7 @@
 {"kind":"project","root":"/project","package":"example.com/options","elapsedMilliseconds":0,"filesInPackage":1,"filesOurs":1,"filesInScope":1,"scopeDescription":"","targets":[{"name":"example.com/options","kind":"module","files":1,"languageMode":"1.24"}],"excluded":[]}
 {"kind":"fix","filesConsidered":1,"filesRewritten":0,"fixesApplied":0,"fixesRefused":0,"refusalsByReason":{},"filesReformatted":0,"filesNotFormatted":0,"notFormattedReasons":{},"formatScope":"every Go file in the module","changedFiles":[]}
 {"kind":"phase","name":"fix","outcome":"ran","elapsedMilliseconds":0,"detail":""}
-{"kind":"types","diagnostics":0,"files":1,"elapsedMilliseconds":0,"filesWithoutRecord":[],"build":"go list -deps -test, type-checked from source: N packages, 1 in the workspace"}
+{"kind":"types","diagnostics":0,"files":1,"elapsedMilliseconds":0,"filesWithoutRecord":[],"build":"go list -deps with go test's variants built here, type-checked from source: N packages, 1 in the workspace","withheldInDependencyCgo":[],"withheldDependencyCgoBodies":0}
 {"kind":"phase","name":"types","outcome":"ran","elapsedMilliseconds":0,"detail":""}
 {"kind":"finding","source":"rule","file":"/project/options.go","line":2,"column":1,"severity":"error","rule":"cohere-go/correctness-report-limit","messageId":"reportlimit","message":"the limit is 7","fixes":[],"suggestions":[]}
 {"kind":"lint","findings":1,"rulesRun":4,"filesWalked":1,"nodesVisited":10,"elapsedMilliseconds":0,"reusedFrom":"","rulesSilent":["cohere-go/correctness-require-package-option"],"rulesWatchedAndQuiet":2,"crashes":[],"rulesScopedOff":{},"rulesNotConfigured":["cohere-go/correctness-require-package-option"],"configNote":"","withheldBySuppression":{},"withheldAsGenerated":{},"withheldAsCopied":{}}

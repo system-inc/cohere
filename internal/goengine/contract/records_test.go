@@ -35,7 +35,8 @@ var fieldsNotWritten = map[Kind][]string{
 // additiveFields are fields this engine writes beyond the contract, by kind: additive within contract 3, so the
 // front door ignores them until it reads them. Each must be written, and none is compared with the contract.
 var additiveFields = map[Kind][]string{
-	KindLint: {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied"},
+	KindLint:  {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied"},
+	KindTypes: {"withheldInDependencyCgo", "withheldDependencyCgoBodies"},
 }
 
 // dictionaryFields are objects keyed by data (a reason, a rule name) rather than by field names, so their
@@ -302,6 +303,10 @@ func populatedRecords() []Record {
 			ElapsedMilliseconds: 900,
 			FilesWithoutRecord:  []string{"/project/d.go"},
 			Build:               "go list -deps -test",
+			WithheldInDependencyCgo: []WithheldFile{
+				{Package: "net", File: "/goroot/src/net/cgo_unix.go", Errors: 1},
+			},
+			WithheldDependencyCgoBodies: 3,
 		},
 		LintRecord{
 			Findings:              1,
@@ -508,5 +513,21 @@ func TestLintRecordWritesEmptyWithheldCountsAsObjects(test *testing.T) {
 		if !strings.Contains(output.String(), field) {
 			test.Errorf("an empty lint record wrote %s, want %s in it", output.String(), field)
 		}
+	}
+}
+
+// TestTypesRecordWritesNoWithheldFilesAsAnEmptyList keeps an unset list from encoding as null, which would read as
+// "not counted" rather than "none withheld".
+func TestTypesRecordWritesNoWithheldFilesAsAnEmptyList(test *testing.T) {
+	test.Parallel()
+	var output bytes.Buffer
+	writer := NewWriter(&output)
+	for _, record := range []Record{ProvenanceRecord{Contract: Version}, TypesRecord{}} {
+		if writeError := writer.Write(record); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	if !strings.Contains(output.String(), `"withheldInDependencyCgo":[]`) {
+		test.Errorf("an empty types record wrote %s, want %s in it", output.String(), `"withheldInDependencyCgo":[]`)
 	}
 }

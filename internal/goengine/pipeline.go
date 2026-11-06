@@ -223,8 +223,10 @@ func (engine *pipeline) reread(file string) {
 	engine.described.contents[file] = contents
 }
 
-// runTypes is the types phase: every list, parse and type error the load met is a compiler finding, and every
-// file in scope that no analyzed package holds is a file nothing saw.
+// runTypes is the types phase: every list, parse and type error the load met is a compiler finding, but those it
+// withheld in a dependency the cgo tool would translate, which the record names instead, as it counts the
+// dependency's functions the rules were given without their bodies, and every file in scope that no analyzed
+// package holds is a file nothing saw.
 func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 	if !engine.request.requests(contract.PhaseTypes) {
 		engine.phase(contract.PhaseTypes, contract.OutcomeSkipped, 0, detailNotRequested)
@@ -241,13 +243,24 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 	if len(withoutRecord) > 0 {
 		engine.incomplete = true
 	}
+	withheld := make([]contract.WithheldFile, 0, len(loaded.WithheldInDependencyCgo))
+	for _, each := range loaded.WithheldInDependencyCgo {
+		withheld = append(withheld, contract.WithheldFile{Package: each.Package, File: each.File, Errors: each.Errors})
+	}
+	// The build text says which load ran: from source, or through go/packages for a project with cgo of its own.
+	build := "go list -deps with go test's variants built here"
+	if loaded.CgoTranslated {
+		build = "go/packages with go list -deps -test -compiled, the project's cgo translated by the cgo tool"
+	}
 	engine.write(contract.TypesRecord{
 		Diagnostics:         len(loaded.Diagnostics),
 		Files:               loaded.FilesTypeChecked,
 		ElapsedMilliseconds: int(loaded.Elapsed.Milliseconds()),
 		FilesWithoutRecord:  withoutRecord,
-		Build: fmt.Sprintf("go list -deps -test, type-checked from source: %d packages, %d in the workspace",
+		Build: fmt.Sprintf("%s, type-checked from source: %d packages, %d in the workspace", build,
 			loaded.PackagesLoaded, loaded.PackagesInWorkspace),
+		WithheldInDependencyCgo:     withheld,
+		WithheldDependencyCgoBodies: loaded.WithheldDependencyCgoBodies,
 	})
 	engine.phase(contract.PhaseTypes, contract.OutcomeRan, loaded.Elapsed, "")
 }

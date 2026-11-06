@@ -210,6 +210,11 @@ type endToEndCase struct {
 
 	exitCode int
 
+	// needsCgo marks a case whose project has cgo of its own, which the engine loads through go/packages and the cgo
+	// tool: it skips, named, where the toolchain has no cgo, and Loom's runner, which refuses the go list -compiled
+	// that load runs, cannot reach it at all.
+	needsCgo bool
+
 	// rules replaces the registry when set.
 	rules []rule.Rule
 
@@ -230,7 +235,7 @@ var endToEndCases = []endToEndCase{
 	{name: "type-error", exitCode: 1},
 	{name: "vet-finding", exitCode: 1},
 	{name: "workspace", exitCode: 0, verify: unchanged("third_party/lib/lib.go", "workspace")},
-	{name: "cgo", exitCode: 0},
+	{name: "cgo", exitCode: 0, needsCgo: true},
 	{name: "build-constrained", exitCode: 1, verify: unchanged("generated.go", "build-constrained")},
 	{name: "generated-house-rule", fixture: "build-constrained", exitCode: 1, rules: []rule.Rule{everyFileRule}},
 	{
@@ -286,6 +291,15 @@ func TestEndToEnd(test *testing.T) {
 // the case's expected files, or rewrites them under -update.
 func runCase(test *testing.T, endToEnd endToEndCase) {
 	test.Helper()
+	if endToEnd.needsCgo {
+		output, goEnvironmentError := exec.Command("go", "env", "CGO_ENABLED").Output()
+		if goEnvironmentError != nil {
+			test.Fatalf("reading CGO_ENABLED with go env: %v", goEnvironmentError)
+		}
+		if enabled := strings.TrimSpace(string(output)); enabled != "1" {
+			test.Skipf("the toolchain here has no cgo (go env CGO_ENABLED is %q), and the cgo tool needs it", enabled)
+		}
+	}
 	fixture := cmp.Or(endToEnd.fixture, endToEnd.name)
 	root := copyFixture(test, filepath.Join("testdata", fixture))
 	registered := endToEnd.rules
