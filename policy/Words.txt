@@ -4,7 +4,7 @@
 #     Copyright (c) 2017-2025 Street Side Software <support@streetsidesoftware.nl>
 # From @cspell/dict-software-terms 5.2.2, under the MIT License:
 #     Copyright (c) 2017-2025 Street Side Software <support@streetsidesoftware.nl>
-# With the house's own words, 1 from policy/HouseWords.txt, each with its reason there.
+# With the house's own words, 14 from policy/HouseWords.txt, each with its reason there.
 # The license texts are in policy/Words.NOTICE.
 a
 aa
@@ -25582,6 +25582,7 @@ cloudburst
 cloudbursts
 clouded
 cloudera
+cloudflare
 cloudflared
 cloudier
 cloudiest
@@ -40734,6 +40735,7 @@ doonesbury
 door
 doorbell
 doorbells
+doordash
 doorframe
 doorframes
 doorhandles
@@ -41692,6 +41694,7 @@ dropsical
 dropsied
 dropsies
 dropsonde
+dropstream
 dropsy
 dropt
 dropwort
@@ -57942,6 +57945,7 @@ godunov
 godwin
 godwit
 godwits
+godword
 godzilla
 goebbels
 goer
@@ -78041,6 +78045,7 @@ lifeboatmen
 lifeboats
 lifebuoy
 lifebuoys
+lifecycle
 lifeforms
 lifeful
 lifeguard
@@ -84132,6 +84137,7 @@ meromorphic
 meronym
 meronymous
 meronymy
+meross
 merovingian
 merozoite
 merozoites
@@ -85039,6 +85045,7 @@ midinettes
 midiron
 midirons
 midis
+midjourney
 midland
 midlands
 midleg
@@ -99652,6 +99659,7 @@ pensacola
 pense
 pensee
 pensees
+pensieve
 pensile
 pension
 pensionable
@@ -99689,6 +99697,7 @@ pentagrams
 pentagrid
 pentahedron
 pentahedrons
+pentair
 pentalogies
 pentalpha
 pentamerous
@@ -102129,6 +102138,7 @@ pintails
 pintas
 pinter
 pinteresque
+pinterest
 pintle
 pintles
 pinto
@@ -102626,6 +102636,7 @@ planetologist
 planetologists
 planetology
 planets
+planetscale
 plangency
 plangent
 plangently
@@ -150287,6 +150298,7 @@ waiters
 waitfor
 waiting
 waitings
+waitlist
 waitperson
 waitpersons
 waitress
@@ -150910,6 +150922,7 @@ watsonville
 watt
 wattage
 wattages
+wattbox
 watteau
 wattest
 watthour
