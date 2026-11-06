@@ -37,8 +37,8 @@ type crashEngine struct {
 
 // swiftCrashSentence is the Swift engine's crash, worded as swift/Sources/CohereSwift/Pipeline/Linter.swift
 // words it: never a panic, and it names what the file was not judged for.
-const swiftCrashSentence = "no index store described it, so the rules that read what its names resolve to could not judge it " +
-	"(cohere-swift/correctness-no-unused-declaration); every other rule ran on it"
+const swiftCrashSentence = "no index store described it, so the rules that read what its names resolve to " +
+	"could not judge it (cohere-swift/correctness-no-unused-declaration); every other rule ran on it"
 
 // goCrashSentence is the Go engine's crash, worded as internal/goengine/check's crashSentence words one: the
 // rule, and what failed. Every other rule ran on the package.
