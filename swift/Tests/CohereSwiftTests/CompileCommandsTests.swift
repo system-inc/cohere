@@ -194,6 +194,104 @@ struct CompileCommandsTests {
         )
     }
 
+    /*
+     A compile directory as an explicit-module build leaves it: an SDK whose settings name its version, a module the
+     map names, and the map beside the output file map. `missing` names a module that is gone instead.
+     */
+    static func explicitBuild(missing: Bool = false) throws -> (driver: [String], objects: URL, sdk: URL) {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-explicit-\(UUID().uuidString)",
+            isDirectory: true,
+        )
+        let objects = directory.appendingPathComponent("Objects-normal/arm64", isDirectory: true)
+        let sdk = directory.appendingPathComponent("MacOSX27.2.sdk", isDirectory: true)
+        try FileManager.default.createDirectory(at: objects, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: sdk, withIntermediateDirectories: true)
+        try #"{"Version": "27.2", "DefaultDeploymentTarget": "27.2"}"#.write(
+            to: sdk.appendingPathComponent("SDKSettings.json"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        let module = directory.appendingPathComponent("Swift.swiftmodule")
+        try "".write(to: module, atomically: true, encoding: .utf8)
+        let named = missing ? directory.appendingPathComponent("Gone.pcm").path : module.path
+        try #"[{"moduleName": "Swift", "modulePath": "\#(named)", "isFramework": false}]"#.write(
+            to: objects.appendingPathComponent("Subject-dependencies-1.json"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        let driver = [
+            "-module-name", "Subject", "-sdk", sdk.path, "-target", "arm64-apple-macos15.0", "-explicit-module-build",
+            "-output-file-map", objects.appendingPathComponent("Subject-OutputFileMap.json").path,
+        ]
+        return (driver, objects, sdk)
+    }
+
+    static func explicitArguments(map: URL, clangTarget: String) -> [String] {
+        [
+            "-Xfrontend", "-disable-implicit-swift-modules", "-Xfrontend", "-explicit-swift-module-map-file",
+            "-Xfrontend", map.path, "-Xcc", "-fno-implicit-modules", "-Xcc", "-fno-implicit-module-maps",
+            "-Xfrontend", "-clang-target", "-Xfrontend", clangTarget,
+        ]
+    }
+
+    /* The build's own modules, handed over: its map, implicit modules off, and the Clang target its PCMs were compiled for. */
+    @Test func anExplicitModuleBuildIsGivenTheModulesItCompiled() throws {
+        let build = try Self.explicitBuild()
+        let command = try CompileCommands.command(from: build.driver)
+        #expect(
+            command.arguments
+                == ["-module-name", "Subject", "-sdk", build.sdk.path, "-target", "arm64-apple-macos15.0"]
+                + Self.explicitArguments(
+                    map: build.objects.appendingPathComponent("Subject-dependencies-1.json"),
+                    clangTarget: "arm64-apple-macos27.2",
+                )
+        )
+    }
+
+    /* A compile the build did not plan explicitly, or one whose map names a module that is gone, keeps building its modules implicitly. */
+    @Test func aMapThatCannotBeTrustedKeepsImplicitModules() throws {
+        let implicit = try Self.explicitBuild()
+        let notExplicit = try CompileCommands.command(from: implicit.driver.filter { $0 != "-explicit-module-build" })
+        #expect(!notExplicit.arguments.contains("-explicit-swift-module-map-file"))
+        let gone = try Self.explicitBuild(missing: true)
+        #expect(!(try CompileCommands.command(from: gone.driver).arguments.contains("-explicit-swift-module-map-file")))
+    }
+
+    /* The numbered maps are not in build order, so the one the last build wrote, the newest, is the one taken. */
+    @Test func theNewestMapIsTheOneTaken() throws {
+        let build = try Self.explicitBuild()
+        let older = build.objects.appendingPathComponent("Subject-dependencies-1.json")
+        let newer = build.objects.appendingPathComponent("Subject-dependencies-2.json")
+        try FileManager.default.copyItem(at: older, to: newer)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSinceNow: -3600)],
+            ofItemAtPath: newer.path,
+        )
+        let command = try CompileCommands.command(from: build.driver)
+        #expect(command.arguments.contains(older.path))
+        #expect(!command.arguments.contains(newer.path))
+    }
+
+    /* The SDK's version replaces macOS's deployment target, `DefaultDeploymentTarget` first; any other platform is left implicit. */
+    @Test func onlyAMacOSTargetIsAlignedToItsSDK() throws {
+        let build = try Self.explicitBuild()
+        func aligned(_ target: String) -> String? {
+            CompileCommands.sdkAlignedClangTarget(arguments: ["-target", target, "-sdk", build.sdk.path])
+        }
+        #expect(aligned("arm64-apple-macos15.0") == "arm64-apple-macos27.2")
+        #expect(aligned("x86_64-apple-macosx14.0") == "x86_64-apple-macosx27.2")
+        #expect(aligned("arm64-apple-ios17.0") == nil)
+        #expect(aligned("arm64-apple-ios17.0-macabi") == nil)
+        #expect(CompileCommands.sdkAlignedClangTarget(arguments: ["-target", "arm64-apple-macos15.0"]) == nil)
+        try #"{"Version": "27.1"}"#.write(
+            to: build.sdk.appendingPathComponent("SDKSettings.json"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        #expect(aligned("arm64-apple-macos15.0") == "arm64-apple-macos27.1")
+    }
+
     /* A task store with no Swift compile in it means the format moved, and must say so rather than read as no files. */
     @Test func aStoreWithNoCompileIsAFailure() throws {
         let scratch = FileManager.default.temporaryDirectory.appendingPathComponent(

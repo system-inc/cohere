@@ -37,8 +37,15 @@ struct BuildInputSnapshot: Equatable, Codable {
      function bodies.
      */
     var interfaces: [String: String] = [:]
+    /*
+     Each owned Swift file's bytes as the same build compiles them, as a content hash by resolved path, filled
+     in beside `interfaces`. It is what lets a file whose time moved while its bytes did not, an edit undone,
+     count as unchanged (`changes(since:)`). Time and size alone never matched again after an edit and its
+     revert, so every run until the next interface build checked the reverted file in sourcekitd once more.
+     */
+    var contents: [String: String] = [:]
 
-    /* Equal when the build would read the same inputs. The interfaces are derived from those inputs, so they never decide. */
+    /* Equal when the build would read the same inputs. The interfaces and contents are derived from those inputs, so they never decide. */
     static func == (left: BuildInputSnapshot, right: BuildInputSnapshot) -> Bool {
         left.fingerprint == right.fingerprint
     }
@@ -87,21 +94,41 @@ struct BuildInputSnapshot: Equatable, Codable {
         )
     }
 
+    /* What moved since an earlier snapshot, when only files did. */
+    struct Changes: Equatable {
+        /* Files whose time or size moved and whose bytes are not the ones `earlier` recorded, or that it recorded no bytes for, by walked path. */
+        var edited: Set<String> = []
+        /* Files whose time or size moved while their bytes are the ones `earlier` recorded, by resolved path, to the modification time `earlier` saw. */
+        var restored: [String: Date] = [:]
+    }
+
     /*
      The files that changed since `earlier`, when nothing else did: the same settings and the same set of
      files, only some of them edited. Nil when anything else moved (a file added or removed, a pin, the
      toolchain), because then only a build can say what the compiler thinks.
+
+     A file whose bytes are again the ones the build compiled is restored, not edited: the build's records
+     describe it exactly, judged against the time the build saw it at. Only owned Swift files carry recorded
+     bytes, so any other file that moved stays edited, and the types phase builds for it.
      */
-    func filesChanged(since earlier: BuildInputSnapshot) -> Set<String>? {
+    func changes(since earlier: BuildInputSnapshot) -> Changes? {
         guard settings == earlier.settings, files.count == earlier.files.count else { return nil }
-        var changed = Set<String>()
+        var changes = Changes()
         for (path, entry) in files {
             guard let before = earlier.files[path] else { return nil }
-            if before != entry {
-                changed.insert(path)
+            guard before != entry else { continue }
+            let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath()
+            if let recorded = earlier.contents[resolved.path],
+                PackageDescriptionCache.fingerprint(of: resolved) == recorded,
+                let seconds = before.split(separator: "\t").last.flatMap({ Double($0) })
+            {
+                changes.restored[resolved.path] = Date(timeIntervalSinceReferenceDate: seconds)
+            }
+            else {
+                changes.edited.insert(path)
             }
         }
-        return changed
+        return changes
     }
 
     /* Where the last successful build's snapshot is kept, beside that build in the engine's scratch. */

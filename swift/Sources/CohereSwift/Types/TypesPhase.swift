@@ -106,24 +106,31 @@ struct TypesPhase {
         /*
          Nothing a build reads changed since the last build that succeeded, so its records are this build's
          records. Read them, and keep them only if every file of ours has one newer than its source: anything
-         less (a scratch someone cleaned, a record gone) means building after all.
+         less (a scratch someone cleaned, a record gone) means building after all. A file whose bytes are again
+         the ones that build compiled is unchanged too, an edit and its revert, judged by the time the build saw.
          */
         let stored = BuildInputSnapshot.stored(scratchPath: scratchPath)
-        if let snapshot, let stored, stored != snapshot,
-            let checked = checkBodiesOnly(snapshot: snapshot, stored: stored, start: start)
+        let changes = snapshot.flatMap { snapshot in stored.flatMap { snapshot.changes(since: $0) } }
+        if let stored, let changes, !changes.edited.isEmpty,
+            let checked = checkBodiesOnly(changes: changes, stored: stored, start: start)
         {
             return checked
         }
-        if let snapshot, stored == snapshot {
+        if let changes, changes.edited.isEmpty {
             do {
                 let directories = try builds.flatMap { try buildDirectories(under: $0.scratchPath) }
                 if !directories.isEmpty {
+                    let restoredWords =
+                        changes.restored.isEmpty
+                        ? ""
+                        : " (\(changes.restored.count == 1 ? "1 file is" : "\(changes.restored.count) files are") again the bytes it compiled)"
                     let reused = try read(
                         targetDirectories: directories,
                         failedBuilds: [],
                         start: start,
                         build:
-                            "no input changed since the last successful build, so its compiler records were read without building",
+                            "no input changed since the last successful build\(restoredWords), so its compiler records were read without building",
+                        restored: changes.restored,
                     )
                     if reused.record.filesWithoutRecord.isEmpty {
                         return reused
@@ -135,8 +142,11 @@ struct TypesPhase {
             }
         }
 
-        /* Each file's interface as this build compiles it, so the next run can tell whether an edit stayed inside bodies. */
-        let interfaces = snapshot == nil ? [:] : interfaceFingerprints()
+        /*
+         Each file's interface and bytes as this build compiles them, so the next run can tell whether an edit
+         stayed inside bodies, and whether an edit was undone.
+         */
+        let fingerprints = snapshot == nil ? Fingerprints() : fingerprints()
 
         let buildSystem = try buildSystemArguments()
         var failedBuilds: [ProcessRunner.Result] = []
@@ -170,7 +180,8 @@ struct TypesPhase {
             targetDirectories.append(contentsOf: directories)
         }
         if var snapshot, failedBuilds.isEmpty {
-            snapshot.interfaces = interfaces
+            snapshot.interfaces = fingerprints.interfaces
+            snapshot.contents = fingerprints.contents
             snapshot.store(scratchPath: scratchPath)
         }
         else {
@@ -210,58 +221,83 @@ struct TypesPhase {
      which means building: anything but owned Swift files changed, a file's interface changed, the last build
      left no interface for it, its compile arguments are not in the build's record, or sourcekitd could not
      answer. Measured on Presence before this path: a one-file edit cost a 19 to 33s incremental build.
+
+     Each file is asked about only when it changed since the last run asked (`BodiesOnlyAnswers`), and a file
+     whose bytes are again the build's is not asked at all (`BuildInputSnapshot.changes(since:)`).
      */
-    private func checkBodiesOnly(snapshot: BuildInputSnapshot, stored: BuildInputSnapshot, start: Date) -> Result? {
-        guard let changed = snapshot.filesChanged(since: stored), !changed.isEmpty else { return nil }
+    private func checkBodiesOnly(
+        changes: BuildInputSnapshot.Changes,
+        stored: BuildInputSnapshot,
+        start: Date,
+    ) -> Result? {
         let owned = Dictionary(
             files.map { ($0.url.resolvingSymlinksInPath().path, $0) },
             uniquingKeysWith: { first, _ in first },
         )
         var edited: [(path: String, file: FileSet.OwnedFile)] = []
-        for path in changed {
+        var interfaces: [String: String] = [:]
+        for path in changes.edited {
             let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
-            guard let file = owned[resolved], let before = stored.interfaces[resolved], let tree = tree(of: file),
-                InterfaceFingerprint.of(tree) == before
+            guard let file = owned[resolved], let before = stored.interfaces[resolved], let tree = tree(of: file)
             else { return nil }
+            let interface = InterfaceFingerprint.of(tree)
+            guard interface == before else { return nil }
             edited.append((resolved, file))
+            interfaces[resolved] = interface
         }
         do {
             var tables = [try CompileCommands.read(layout: .swiftPackage(scratchPath: scratchPath))]
             for build in builds.dropFirst() where FileManager.default.fileExists(atPath: build.scratchPath.path) {
                 tables.append(try CompileCommands.read(layout: .swiftPackage(scratchPath: build.scratchPath)))
             }
-            let session = try Sourcekitd.shared(runner: runner)
+            let earlier = BodiesOnlyAnswers.stored(scratchPath: scratchPath)
+            var kept = BodiesOnlyAnswers()
+            var replayed = 0
             var answered: [String: [FindingRecord]] = [:]
             for (path, file) in edited.sorted(by: { $0.path < $1.path }) {
                 guard let command = tables.lazy.compactMap({ $0.command(for: file.url) }).first else { return nil }
-                answered[path] = try session.diagnostics(file: path, arguments: command.arguments).compactMap {
-                    diagnostic in
-                    guard let severity = diagnostic.findingSeverity,
-                        URL(fileURLWithPath: diagnostic.file).resolvingSymlinksInPath().path == path
-                    else { return nil }
-                    return FindingRecord(
-                        source: .compiler,
-                        file: path,
-                        line: max(diagnostic.line, 1),
-                        column: max(diagnostic.column, 1),
-                        severity: severity,
-                        rule: TypesOracle.group(of: diagnostic),
-                        messageId: "",
-                        message: diagnostic.message,
+                /* Read once: these bytes are both what the key holds and the text sourcekitd checks. */
+                let contents = try Data(contentsOf: URL(fileURLWithPath: path))
+                guard let text = String(data: contents, encoding: .utf8) else { return nil }
+                let key = try BodiesOnlyAnswers.key(
+                    contents: contents,
+                    arguments: command.arguments,
+                    build: stored.fingerprint,
+                    siblingInterfaces: BodiesOnlyAnswers.siblingInterfaces(
+                        of: path,
+                        current: interfaces,
+                        built: stored.interfaces,
+                    ),
+                )
+                let answer = try kept.answer(path: path, key: key, replaying: earlier) {
+                    try Self.findings(
+                        in: Sourcekitd.shared(runner: runner).diagnostics(
+                            file: path,
+                            arguments: command.arguments,
+                            text: text,
+                        ),
+                        of: path,
                     )
                 }
+                answered[path] = answer.findings
+                replayed += answer.replayed ? 1 : 0
             }
             let directories = try builds.flatMap { try buildDirectories(under: $0.scratchPath) }
             guard !directories.isEmpty else { return nil }
+            let replayedWords =
+                replayed == 0 ? "" : ", \(replayed) of them answered by an earlier run's check of the same text"
             let result = try read(
                 targetDirectories: directories,
                 failedBuilds: [],
                 start: start,
                 build:
-                    "\(edited.count == 1 ? "1 file" : "\(edited.count) files") \(Self.checkedInProcessWords), and the rest were read from the last successful build's compiler records",
+                    "\(edited.count == 1 ? "1 file" : "\(edited.count) files") \(Self.checkedInProcessWords)\(replayedWords), and the rest were read from the last successful build's compiler records",
                 answeredInProcess: answered,
+                restored: changes.restored,
             )
-            return result.record.filesWithoutRecord.isEmpty ? result : nil
+            guard result.record.filesWithoutRecord.isEmpty else { return nil }
+            kept.store(scratchPath: scratchPath)
+            return result
         }
         catch {
             /* Anything this path could not do, a build does. */
@@ -269,14 +305,48 @@ struct TypesPhase {
         }
     }
 
-    /* Every owned file's interface, by resolved path, fingerprinted side by side. A file that cannot be read has none, so an edit to it always builds. */
-    private func interfaceFingerprints() -> [String: String] {
+    /* sourcekitd's diagnostics placed in this file, as the findings a build's record of it would give. */
+    static func findings(in diagnostics: [Sourcekitd.Diagnostic], of path: String) -> [FindingRecord] {
+        diagnostics.compactMap { diagnostic in
+            guard let severity = diagnostic.findingSeverity,
+                URL(fileURLWithPath: diagnostic.file).resolvingSymlinksInPath().path == path
+            else { return nil }
+            return FindingRecord(
+                source: .compiler,
+                file: path,
+                line: max(diagnostic.line, 1),
+                column: max(diagnostic.column, 1),
+                severity: severity,
+                rule: TypesOracle.group(of: diagnostic),
+                messageId: "",
+                message: diagnostic.message,
+            )
+        }
+    }
+
+    /* Every owned file's interface and content hash, by resolved path. */
+    struct Fingerprints {
+        var interfaces: [String: String] = [:]
+        var contents: [String: String] = [:]
+    }
+
+    /*
+     Every owned file's interface and bytes, by resolved path, fingerprinted side by side. A file that cannot be
+     read has neither, so an edit to it always builds, and its revert is never taken for unchanged.
+     */
+    private func fingerprints() -> Fingerprints {
         let owned = files
-        let byPath = Mutex<[String: String]>([:])
+        let byPath = Mutex(Fingerprints())
         DispatchQueue.concurrentPerform(iterations: owned.count) { index in
-            guard let fingerprint = tree(of: owned[index]).map(InterfaceFingerprint.of) else { return }
-            let path = owned[index].url.resolvingSymlinksInPath().path
-            byPath.withLock { $0[path] = fingerprint }
+            guard let interface = tree(of: owned[index]).map(InterfaceFingerprint.of) else { return }
+            let resolved = owned[index].url.resolvingSymlinksInPath()
+            let contents = PackageDescriptionCache.fingerprint(of: resolved)
+            byPath.withLock { fingerprints in
+                fingerprints.interfaces[resolved.path] = interface
+                if contents != "absent" {
+                    fingerprints.contents[resolved.path] = contents
+                }
+            }
         }
         return byPath.withLock { $0 }
     }
@@ -296,10 +366,12 @@ struct TypesPhase {
         start: Date,
         build: String,
         answeredInProcess: [String: [FindingRecord]] = [:],
+        restored: [String: Date] = [:],
     ) throws -> Result {
         let reading = try CompilerRecords(files: files, runner: runner).read(
             targetDirectories: targetDirectories,
             answeredInProcess: answeredInProcess,
+            restored: restored,
         )
         var findings = reading.findings
         let withoutRecord = reading.filesWithoutRecord
