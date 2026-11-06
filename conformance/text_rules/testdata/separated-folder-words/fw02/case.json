@@ -1,0 +1,14 @@
+{
+    "why": "fw02: each underscore-separated part is judged on its own, so `text_formatoptions` is reported for its second part though its first is already separated. Go form only: Go reports at the package clause, which a covers span names, and TypeScript and Swift have no clause, so their finding would be the file's start, which a case can't write beside Go's covers span",
+    "expect": [
+        {
+            "covers": "package text_formatoptions",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": "text_formatoptions/fw02",
+    "languages": [
+        "go"
+    ]
+}

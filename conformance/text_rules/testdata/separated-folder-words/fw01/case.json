@@ -1,0 +1,14 @@
+{
+    "why": "fw01: `formatoptions` runs two words together and is reported, asking for `format_options`. Go form only: Go reports at the package clause, which a covers span names, and TypeScript and Swift have no clause, so their finding would be the file's start, which a case can't write beside Go's covers span",
+    "expect": [
+        {
+            "covers": "package formatoptions",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": "formatoptions/fw01",
+    "languages": [
+        "go"
+    ]
+}

@@ -40,6 +40,12 @@
         "reason": "`no-labels` reports the `continue` and the `break` naming the label too, three findings for one label"
     },
     {
+        "engine": "typescript",
+        "family": "separated-folder-words",
+        "task": "narw7aq",
+        "reason": "TypeScript has no separated-folder-words rule"
+    },
+    {
         "engine": "swift",
         "family": "ambiguous-identifier",
         "case": "am03",
@@ -76,5 +82,11 @@
         "family": "labels",
         "task": "tb2jk7k",
         "reason": "Swift has no label rule"
+    },
+    {
+        "engine": "swift",
+        "family": "separated-folder-words",
+        "task": "2fnqe2h",
+        "reason": "Swift has no separated-folder-words rule"
     }
 ]

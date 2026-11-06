@@ -1,0 +1,11 @@
+{
+    "why": "fw11: `vfs` is no word, so `cachedvfs` splits into words no way and is clean, a name the lists can't read rather than words run together",
+    "expect": [],
+    "options": {},
+    "path": "cachedvfs/fw11",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}
