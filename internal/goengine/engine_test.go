@@ -21,6 +21,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/printf"
 
+	"github.com/system-inc/cohere/internal/goengine/cgotest"
 	"github.com/system-inc/cohere/internal/goengine/contract"
 	"github.com/system-inc/cohere/internal/goengine/rule"
 	"github.com/system-inc/cohere/internal/goengine/rules"
@@ -211,8 +212,8 @@ type endToEndCase struct {
 	exitCode int
 
 	// needsCgo marks a case whose project has cgo of its own, which the engine loads through go/packages and the cgo
-	// tool: it skips, named, where the toolchain has no cgo, and Loom's runner, which refuses the go list -compiled
-	// that load runs, cannot reach it at all.
+	// tool: it skips, named, where the toolchain has no cgo and under a runner's stand-in go, as Loom's, which
+	// refuses to compile (see cgotest).
 	needsCgo bool
 
 	// rules replaces the registry when set.
@@ -292,13 +293,7 @@ func TestEndToEnd(test *testing.T) {
 func runCase(test *testing.T, endToEnd endToEndCase) {
 	test.Helper()
 	if endToEnd.needsCgo {
-		output, goEnvironmentError := exec.Command("go", "env", "CGO_ENABLED").Output()
-		if goEnvironmentError != nil {
-			test.Fatalf("reading CGO_ENABLED with go env: %v", goEnvironmentError)
-		}
-		if enabled := strings.TrimSpace(string(output)); enabled != "1" {
-			test.Skipf("the toolchain here has no cgo (go env CGO_ENABLED is %q), and the cgo tool needs it", enabled)
-		}
+		cgotest.RequireTranslation(test)
 	}
 	fixture := cmp.Or(endToEnd.fixture, endToEnd.name)
 	root := copyFixture(test, filepath.Join("testdata", fixture))

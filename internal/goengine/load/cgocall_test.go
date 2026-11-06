@@ -8,6 +8,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/cgocall"
 
+	"github.com/system-inc/cohere/internal/goengine/cgotest"
 	"github.com/system-inc/cohere/internal/goengine/check/checker"
 )
 
@@ -21,12 +22,12 @@ var cgocallFiles = map[string]string{
 
 // vet's cgocall reads a package's raw cgo files, and runs only on a package whose types import runtime/cgo, as
 // cgo's translation makes them. A project's own cgo package sends the load through go/packages, whose cgo tool
-// translates it, so cgocall runs over it as it would under go vet, and finds the slice passed to C. It needs cgo,
-// so it skips where the toolchain has none; Loom's runner, which refuses the go list -compiled that go/packages
-// runs, cannot reach it at all.
+// translates it, so cgocall runs over it as it would under go vet, and finds the slice passed to C. It needs a go
+// that translates cgo, so it skips, named, where the toolchain has no cgo and under a runner's stand-in go, as
+// Loom's, which refuses to compile.
 func TestCgocallFindsItsViolationInAProjectsCgoPackage(test *testing.T) {
 	test.Parallel()
-	requireCgo(test)
+	cgotest.RequireTranslation(test)
 
 	directory := test.TempDir()
 	for name, contents := range cgocallFiles {

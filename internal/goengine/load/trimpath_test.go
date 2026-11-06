@@ -2,25 +2,13 @@ package load
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
-)
 
-// requireCgo skips test, with the reason, where the toolchain has no cgo: go reports `CGO_ENABLED` 0 when it finds
-// no C compiler, and only the load through go/packages, which translates cgo with one, needs it.
-func requireCgo(test *testing.T) {
-	test.Helper()
-	output, goEnvironmentError := exec.Command("go", "env", "CGO_ENABLED").Output()
-	if goEnvironmentError != nil {
-		test.Fatalf("reading CGO_ENABLED with go env: %v", goEnvironmentError)
-	}
-	if enabled := strings.TrimSpace(string(output)); enabled != "1" {
-		test.Skipf("the toolchain here has no cgo (go env CGO_ENABLED is %q), and the cgo tool needs it", enabled)
-	}
-}
+	"github.com/system-inc/cohere/internal/goengine/cgotest"
+)
 
 // cgoPackageFiles is one cgo package, the same bytes in every directory it is written to, so go can serve a
 // second load the cgo translation it cached for the first.
@@ -36,11 +24,11 @@ var cgoPackageFiles = map[string]string{
 // pool runs every go command, each load's positions must name its own directory's native.go, one that exists,
 // and never the other's.
 //
-// It needs cgo, so it skips where the toolchain has none; Loom's runner, which refuses the go list -compiled that
-// go/packages runs, cannot reach it at all.
+// It needs a go that translates cgo, so it skips, named, where the toolchain has no cgo and under a runner's
+// stand-in go, as Loom's, which refuses to compile.
 func TestACgoPackageLoadedUnderTrimpathNamesItsOwnFiles(test *testing.T) {
 	test.Parallel()
-	requireCgo(test)
+	cgotest.RequireTranslation(test)
 
 	for _, directory := range []string{test.TempDir(), test.TempDir()} {
 		for name, contents := range cgoPackageFiles {
@@ -83,11 +71,11 @@ func TestACgoPackageLoadedUnderTrimpathNamesItsOwnFiles(test *testing.T) {
 // -trimpath=false comes last, so the value is never empty: an empty one would hand go the go env file's flags,
 // which on this machine hold -trimpath.
 //
-// It is the translated load's, so it runs only where that load can, with cgo; Loom's runner cannot reach it, and
-// refuses the go env it runs under the spellings `--trimpath` and `-trimpathy` besides.
+// It is the translated load's, so it runs only where that load can, and skips, named, where it cannot: Loom's
+// runner refuses the go env it runs under the spellings `--trimpath` and `-trimpathy` besides.
 func TestTranslatedEnvironmentTakesTrimpathOutOfGoFlags(test *testing.T) {
 	test.Parallel()
-	requireCgo(test)
+	cgotest.RequireTranslation(test)
 
 	directory := test.TempDir()
 	for given, want := range map[string]string{
