@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/system-inc/cohere/internal/jsonvalue"
 	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 )
 
@@ -103,9 +104,9 @@ type node struct {
 	pointer string
 
 	types      []string
-	constant   JsonValue
+	constant   jsonvalue.JsonValue
 	hasConst   bool
-	enumValues []JsonValue
+	enumValues []jsonvalue.JsonValue
 	hasEnum    bool
 
 	properties           map[string]*node
@@ -171,7 +172,7 @@ func Compile(raw []byte) (*Schema, error) {
 	if decodeError := decoder.Decode(&first); decodeError != nil {
 		return nil, decodeError
 	}
-	document, parseError := ParseJsonValue(first)
+	document, parseError := jsonvalue.ParseJsonValue(first)
 	if parseError != nil {
 		return nil, parseError
 	}
@@ -187,19 +188,19 @@ func Compile(raw []byte) (*Schema, error) {
 }
 
 type compiler struct {
-	document  JsonValue
+	document  jsonvalue.JsonValue
 	byPointer map[string]*node
 	pending   []*node
 }
 
-func (compiler *compiler) compile(value JsonValue, pointer string) (*node, error) {
+func (compiler *compiler) compile(value jsonvalue.JsonValue, pointer string) (*node, error) {
 	compiled := &node{pointer: pointer}
 	compiler.byPointer[pointer] = compiled
 	switch typed := value.(type) {
-	case JsonBoolean:
+	case jsonvalue.JsonBoolean:
 		compiled.always, compiled.never = bool(typed), !bool(typed)
 		return compiled, nil
-	case JsonObject:
+	case jsonvalue.JsonObject:
 		if len(typed) == 0 {
 			compiled.always = true
 			return compiled, nil
@@ -216,7 +217,7 @@ func (compiler *compiler) compile(value JsonValue, pointer string) (*node, error
 		}
 		// Nested definitions are compiled so a $ref can land on them by pointer.
 		for _, definitions := range []string{"$defs", "definitions"} {
-			if entries, isObject := typed[definitions].(JsonObject); isObject {
+			if entries, isObject := typed[definitions].(jsonvalue.JsonObject); isObject {
 				for name, entry := range entries {
 					if _, compileError := compiler.compile(
 						entry,
@@ -235,19 +236,19 @@ func (compiler *compiler) compile(value JsonValue, pointer string) (*node, error
 }
 
 // shapeName names a value's JSON shape in words, as a refusal reads it: "not an array".
-func shapeName(value JsonValue) string {
+func shapeName(value jsonvalue.JsonValue) string {
 	switch value.(type) {
-	case JsonNull:
+	case jsonvalue.JsonNull:
 		return "null"
-	case JsonBoolean:
+	case jsonvalue.JsonBoolean:
 		return "a boolean"
-	case JsonNumber:
+	case jsonvalue.JsonNumber:
 		return "a number"
-	case JsonString:
+	case jsonvalue.JsonString:
 		return "a string"
-	case JsonArray:
+	case jsonvalue.JsonArray:
 		return "an array"
-	case JsonObject:
+	case jsonvalue.JsonObject:
 		return "an object"
 	}
 	// Only a nil interface lands here, which ParseJsonValue never returns.
@@ -257,12 +258,12 @@ func shapeName(value JsonValue) string {
 // keyword compiles one keyword of a schema object into the node that object compiles to.
 //
 // Mutates: compiled each keyword fills its own fields of the node compile is building, one call per key
-func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, pointer string) error {
-	child := func(name string, value JsonValue) (*node, error) {
+func (compiler *compiler) keyword(compiled *node, key string, value jsonvalue.JsonValue, pointer string) error {
+	child := func(name string, value jsonvalue.JsonValue) (*node, error) {
 		return compiler.compile(value, pointer+"/"+name)
 	}
-	children := func(name string, value JsonValue) ([]*node, error) {
-		list, isList := value.(JsonArray)
+	children := func(name string, value jsonvalue.JsonValue) ([]*node, error) {
+		list, isList := value.(jsonvalue.JsonArray)
 		if !isList {
 			return nil, fmt.Errorf("%s must be a list of schemas", name)
 		}
@@ -280,11 +281,11 @@ func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, p
 	switch key {
 	case "type":
 		switch typed := value.(type) {
-		case JsonString:
+		case jsonvalue.JsonString:
 			compiled.types = []string{string(typed)}
-		case JsonArray:
+		case jsonvalue.JsonArray:
 			for _, item := range typed {
-				name, isString := item.(JsonString)
+				name, isString := item.(jsonvalue.JsonString)
 				if !isString {
 					return fmt.Errorf("type lists only names")
 				}
@@ -303,13 +304,13 @@ func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, p
 	case "const":
 		compiled.constant, compiled.hasConst = value, true
 	case "enum":
-		list, isList := value.(JsonArray)
+		list, isList := value.(jsonvalue.JsonArray)
 		if !isList {
 			return fmt.Errorf("enum must be a list")
 		}
 		compiled.enumValues, compiled.hasEnum = list, true
 	case "properties":
-		entries, isObject := value.(JsonObject)
+		entries, isObject := value.(jsonvalue.JsonObject)
 		if !isObject {
 			return fmt.Errorf("properties must be an object")
 		}
@@ -323,7 +324,7 @@ func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, p
 			}
 		}
 	case "patternProperties":
-		entries, isObject := value.(JsonObject)
+		entries, isObject := value.(jsonvalue.JsonObject)
 		if !isObject {
 			return fmt.Errorf("patternProperties must be an object")
 		}
@@ -350,32 +351,32 @@ func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, p
 			)
 		}
 	case "additionalProperties":
-		if allowed, isBool := value.(JsonBoolean); isBool {
+		if allowed, isBool := value.(jsonvalue.JsonBoolean); isBool {
 			compiled.noAdditional = !bool(allowed)
 			return nil
 		}
 		compiled.additionalProperties, err = child(key, value)
 	case "required":
-		list, isList := value.(JsonArray)
+		list, isList := value.(jsonvalue.JsonArray)
 		if !isList {
 			return fmt.Errorf("required must be a list")
 		}
 		for _, item := range list {
-			name, isString := item.(JsonString)
+			name, isString := item.(jsonvalue.JsonString)
 			if !isString {
 				return fmt.Errorf("required lists only names")
 			}
 			compiled.required = append(compiled.required, string(name))
 		}
 	case "items":
-		if _, isList := value.(JsonArray); isList {
+		if _, isList := value.(jsonvalue.JsonArray); isList {
 			var childrenError error
 			compiled.tupleItems, childrenError = children(key, value)
 			return childrenError
 		}
 		compiled.items, err = child(key, value)
 	case "additionalItems":
-		if allowed, isBool := value.(JsonBoolean); isBool {
+		if allowed, isBool := value.(jsonvalue.JsonBoolean); isBool {
 			compiled.noAdditionalItems = !bool(allowed)
 			return nil
 		}
@@ -389,7 +390,7 @@ func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, p
 	case "maxLength":
 		compiled.maxLength, err = count(value)
 	case "uniqueItems":
-		unique, isBool := value.(JsonBoolean)
+		unique, isBool := value.(jsonvalue.JsonBoolean)
 		if !isBool {
 			return fmt.Errorf("uniqueItems must be a boolean")
 		}
@@ -399,7 +400,7 @@ func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, p
 	case "maximum":
 		compiled.maximum, err = number(value)
 	case "pattern":
-		source, isString := value.(JsonString)
+		source, isString := value.(jsonvalue.JsonString)
 		if !isString {
 			return fmt.Errorf("pattern must be a string")
 		}
@@ -415,7 +416,7 @@ func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, p
 	case "not":
 		compiled.not, err = child(key, value)
 	case "$ref":
-		reference, isString := value.(JsonString)
+		reference, isString := value.(jsonvalue.JsonString)
 		if !isString {
 			return fmt.Errorf("$ref must be a string")
 		}

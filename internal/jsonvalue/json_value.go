@@ -1,4 +1,4 @@
-package optionschema
+package jsonvalue
 
 import (
 	"bytes"
